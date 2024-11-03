@@ -6,11 +6,15 @@ import { UserButton, SignInButton, useUser } from "@clerk/nextjs";
 import { usePathname } from "next/navigation";
 import Image from "next/image";
 
+import ThemeToggle from './ThemeToggle';
+import { useTheme } from '../../context/ThemeContext';
+
 const Navbar = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const { isSignedIn, user } = useUser();
   const [hackerId, setHackerId] = useState<string | null>(null);
   const pathname = usePathname();
+  const { isDarkMode } = useTheme();
   const isPWA =
     typeof window !== "undefined" &&
     window.matchMedia("(display-mode: standalone)").matches;
@@ -48,13 +52,19 @@ const Navbar = () => {
 
   return (
     <nav
-      className={`fixed top-0 left-0 w-full z-50 transition-all duration-300 ${
-        isScrolled ? "bg-[#E5E5E5] shadow-md opacity-90" : "bg-[#E5E5E5]"
+      className={`fixed top-0 left-0 w-full z-50 transition-all duration-300 font-space-mono ${
+        isDarkMode
+          ? isScrolled
+            ? "bg-gray-900 shadow-md opacity-90"
+            : "bg-gray-900"
+          : isScrolled
+            ? "bg-[#E5E5E5] shadow-md opacity-90"
+            : "bg-[#E5E5E5]"
       }`}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center py-4">
-          <div className="text-lg font-montserrat text-indigo-800 font-semibold">
+          <div className="text-lg font-space-mono text-indigo-800 font-semibold tracking-wider">
             <Link
               href="/"
               className={`text-center group flex items-center ${
@@ -69,6 +79,7 @@ const Navbar = () => {
                 className="transition-transform duration-300 transform group-hover:scale-110 mr-2"
               />
             </Link>
+            
           </div>
           <div className="flex items-center">
             <Link
@@ -77,11 +88,11 @@ const Navbar = () => {
                 isPWA ? "px-4 py-3" : "px-3 py-2"
               } mx-2 rounded-lg active:bg-indigo-100`}
             >
-              <span className="text-sm text-black hover:text-indigo-700 dark:hover:text-indigo-500 transition duration-300">
+              <span className={`text-sm font-fira-code ${isDarkMode ? 'text-gray-200' : 'text-black'} hover:text-indigo-700 dark:hover:text-indigo-500 transition duration-300`}>
                 Join a Project
               </span>
             </Link>
-
+            
             {isSignedIn && (
               <>
                 <Link
@@ -90,7 +101,7 @@ const Navbar = () => {
                     isPWA ? "px-4 py-3" : "px-3 py-2"
                   } mx-2 rounded-lg active:bg-indigo-100`}
                 >
-                  <span className="text-sm text-black hover:text-indigo-700 dark:hover:text-indigo-500 transition duration-300">
+                  <span className={`text-sm font-fira-code ${isDarkMode ? 'text-gray-200' : 'text-black'} hover:text-indigo-700 dark:hover:text-indigo-500 transition duration-300`}>
                     New Project
                   </span>
                 </Link>
@@ -101,7 +112,7 @@ const Navbar = () => {
                     isPWA ? "px-4 py-3" : "px-3 py-2"
                   } mx-2 rounded-lg active:bg-indigo-100`}
                 >
-                  <span className="text-sm text-black hover:text-indigo-700 dark:hover:text-indigo-500 transition duration-300">
+                  <span className={`text-sm font-fira-code ${isDarkMode ? 'text-gray-200' : 'text-black'} hover:text-indigo-700 dark:hover:text-indigo-500 transition duration-300`}>
                     My Profile
                   </span>
                 </Link>
@@ -131,6 +142,9 @@ const Navbar = () => {
                   </span>
                 </SignInButton>
               )}
+            </div>
+            <div className={`${isPWA ? "ml-2 p-1" : "ml-1"} px-2`}>
+              <ThemeToggle />
             </div>
           </div>
         </div>
