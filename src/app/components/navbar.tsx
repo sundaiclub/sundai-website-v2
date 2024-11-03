@@ -45,6 +45,7 @@ const Navbar = () => {
 
     fetchHackerId();
   }, [user?.id]);
+
   return (
     <nav
       className={`fixed top-0 left-0 w-full z-50 transition-all duration-300 ${
@@ -57,7 +58,7 @@ const Navbar = () => {
             <Link
               href="/"
               className={`text-center group flex items-center ${
-                isPWA ? "p-2" : "" // Extra padding for PWA
+                isPWA ? "p-2" : ""
               }`}
             >
               <Image
@@ -77,7 +78,7 @@ const Navbar = () => {
               } mx-2 rounded-lg active:bg-indigo-100`}
             >
               <span className="text-sm text-black hover:text-indigo-700 dark:hover:text-indigo-500 transition duration-300">
-                Join Projects
+                Join a Project
               </span>
             </Link>
 
