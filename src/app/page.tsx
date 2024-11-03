@@ -50,10 +50,14 @@ export default function Home() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8, delay: 0.4 }}
             >
-              <h1 className="font-semibold text-2xl sm:text-3xl md:text-4xl lg:text-5xl text-black mb-6 font-space-mono tracking-tight">
+              <h1 className={`font-semibold text-2xl sm:text-3xl md:text-4xl lg:text-5xl mb-6 font-space-mono tracking-tight ${
+                isDarkMode ? 'text-gray-100' : 'text-gray-900'
+              }`}>
                 Sundai
               </h1>
-              <p className="text-base sm:text-lg md:text-xl text-black mb-8 max-w-xl mx-auto font-fira-code">
+              <p className={`text-base sm:text-lg md:text-xl mb-8 max-w-xl mx-auto font-fira-code ${
+                isDarkMode ? 'text-gray-300' : 'text-gray-700'
+              }`}>
                 Building & Launching AI Prototypes Every Sunday.
               </p>
 
@@ -77,7 +81,9 @@ export default function Home() {
                     height={96}
                   />
                 </motion.div>
-                <div className="text-xl text-black font-mono h-full mt-8 text-center px-4 py-2 rounded-lg">
+                <div className={`text-xl font-mono h-full mt-8 text-center px-4 py-2 rounded-lg ${
+                  isDarkMode ? 'text-gray-200' : 'text-gray-800'
+                }`}>
                   <Typewriter
                     onInit={(typewriter) => {
                       typewriter
@@ -169,7 +175,7 @@ export default function Home() {
         transition={{ delay: 0.5, duration: 0.8 }}
         className={`${
           isDarkMode 
-            ? 'bg-gradient-to-r from-gray-900 to-gray-800 text-gray-300' 
+            ? 'bg-gradient-to-r from-gray-900 to-gray-800 text-gray-200' 
             : 'bg-gradient-to-r from-gray-100 to-gray-200 text-gray-700'
           } py-6 md:py-8`}
       >
