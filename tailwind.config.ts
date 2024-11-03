@@ -11,6 +11,8 @@ const config: Config = {
       fontFamily: {
         mackinac: ['"P22 Mackinac Pro"', "serif"],
         montserrat: ['"Montserrat"', "sans-serif"],
+        'space-mono': ['"Space Mono"', 'monospace'],
+        'fira-code': ['"Fira Code"', 'monospace'],
       },
       fontSize: {
         xs: "0.6rem",

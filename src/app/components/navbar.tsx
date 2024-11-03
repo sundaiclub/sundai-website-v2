@@ -33,7 +33,7 @@ const Navbar = () => {
 
   return (
     <nav
-      className={`fixed top-0 left-0 w-full z-50 transition-all duration-300 ${
+      className={`fixed top-0 left-0 w-full z-50 transition-all duration-300 font-space-mono ${
         isDarkMode
           ? isScrolled
             ? "bg-gray-900 shadow-md opacity-90"
@@ -45,7 +45,7 @@ const Navbar = () => {
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center py-4">
-          <div className="text-lg font-montserrat text-indigo-800 font-semibold">
+          <div className="text-lg font-space-mono text-indigo-800 font-semibold tracking-wider">
             <Link
               href="/"
               className={`text-center group flex items-center ${
@@ -69,7 +69,7 @@ const Navbar = () => {
                 isPWA ? "px-4 py-3" : "px-3 py-2"
               } mx-2 rounded-lg active:bg-indigo-100`}
             >
-              <span className={`text-sm ${isDarkMode ? 'text-gray-200' : 'text-black'} hover:text-indigo-700 dark:hover:text-indigo-500 transition duration-300`}>
+              <span className={`text-sm font-fira-code ${isDarkMode ? 'text-gray-200' : 'text-black'} hover:text-indigo-700 dark:hover:text-indigo-500 transition duration-300`}>
                 Join a Project
               </span>
             </Link>
@@ -82,7 +82,7 @@ const Navbar = () => {
                     isPWA ? "px-4 py-3" : "px-3 py-2"
                   } mx-2 rounded-lg active:bg-indigo-100`}
                 >
-                  <span className={`text-sm ${isDarkMode ? 'text-gray-200' : 'text-black'} hover:text-indigo-700 dark:hover:text-indigo-500 transition duration-300`}>
+                  <span className={`text-sm font-fira-code ${isDarkMode ? 'text-gray-200' : 'text-black'} hover:text-indigo-700 dark:hover:text-indigo-500 transition duration-300`}>
                     New Project
                   </span>
                 </Link>
@@ -93,7 +93,7 @@ const Navbar = () => {
                     isPWA ? "px-4 py-3" : "px-3 py-2"
                   } mx-2 rounded-lg active:bg-indigo-100`}
                 >
-                  <span className={`text-sm ${isDarkMode ? 'text-gray-200' : 'text-black'} hover:text-indigo-700 dark:hover:text-indigo-500 transition duration-300`}>
+                  <span className={`text-sm font-fira-code ${isDarkMode ? 'text-gray-200' : 'text-black'} hover:text-indigo-700 dark:hover:text-indigo-500 transition duration-300`}>
                     My Profile
                   </span>
                 </Link>

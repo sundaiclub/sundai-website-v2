@@ -39,7 +39,7 @@ export default function Home() {
       isDarkMode 
         ? 'bg-gradient-to-b from-gray-900 to-black text-gray-100' 
         : 'bg-gradient-to-b from-[#E5E5E5] to-[#F0F0F0] text-gray-800'
-      } font-montserrat`}>
+      } font-space-mono`}>
       
       <section className="relative py-16 md:py-24 lg:py-26 px-4 md:px-8 overflow-hidden">
         <div className="container mx-auto relative z-10">
@@ -50,10 +50,10 @@ export default function Home() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8, delay: 0.4 }}
             >
-              <h1 className="font-semibold text-2xl sm:text-3xl md:text-4xl lg:text-5xl text-black mb-6 font-montserrat">
+              <h1 className="font-semibold text-2xl sm:text-3xl md:text-4xl lg:text-5xl text-black mb-6 font-space-mono tracking-tight">
                 Sundai
               </h1>
-              <p className="text-base sm:text-lg md:text-xl text-black mb-8 max-w-xl mx-auto">
+              <p className="text-base sm:text-lg md:text-xl text-black mb-8 max-w-xl mx-auto font-fira-code">
                 Building & Launching AI Prototypes Every Sunday.
               </p>
 

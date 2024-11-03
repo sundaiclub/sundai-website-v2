@@ -7,8 +7,20 @@ import { ClerkProvider } from "@clerk/nextjs";
 import { UserProvider } from "./contexts/UserContext";
 import { ThemeProvider } from '../context/ThemeContext';
 import { Providers } from './components/Providers';
+import { Space_Mono, Fira_Code } from 'next/font/google'
 
 const inter = Inter({ subsets: ["latin"] });
+
+const spaceMono = Space_Mono({
+  weight: ['400', '700'],
+  subsets: ['latin'],
+  variable: '--font-space-mono',
+})
+
+const firaCode = Fira_Code({
+  subsets: ['latin'],
+  variable: '--font-fira-code',
+})
 
 export const metadata: Metadata = {
   title: "Sundai",
@@ -29,7 +41,7 @@ export default function RootLayout({
       <UserProvider>
         <html lang="en">
           <body
-            className={`${inter.className} h-screen`}
+            className={`${inter.className} h-screen ${spaceMono.variable} ${firaCode.variable}`}
             style={{
               WebkitOverflowScrolling: "touch",
               overscrollBehavior: "none",
