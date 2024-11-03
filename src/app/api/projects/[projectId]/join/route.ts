@@ -1,5 +1,6 @@
-import { PrismaClient } from "@prisma/client";
 import { NextResponse } from "next/server";
+import { auth } from "@clerk/nextjs/server";
+import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
@@ -8,15 +9,28 @@ export async function POST(
   { params }: { params: { projectId: string } }
 ) {
   try {
-    const { hackerId, role } = await request.json();
-    const projectId = params.projectId;
+    const { userId } = auth();
+    if (!userId) {
+      return new NextResponse("Unauthorized", { status: 401 });
+    }
+
+    // Get the hacker using clerkId
+    const hacker = await prisma.hacker.findUnique({
+      where: { clerkId: userId },
+    });
+
+    if (!hacker) {
+      return new NextResponse("Hacker not found", { status: 404 });
+    }
+
+    const { role } = await request.json();
 
     // Check if user is already a participant
     const existingParticipant = await prisma.projectToParticipant.findUnique({
       where: {
         hackerId_projectId: {
-          hackerId,
-          projectId,
+          hackerId: hacker.id,
+          projectId: params.projectId,
         },
       },
     });
@@ -31,17 +45,63 @@ export async function POST(
     // Add user as participant
     const participant = await prisma.projectToParticipant.create({
       data: {
-        hackerId,
-        projectId,
+        hackerId: hacker.id,
+        projectId: params.projectId,
         role,
+      },
+      include: {
+        hacker: {
+          include: {
+            avatar: true,
+          },
+        },
       },
     });
 
     return NextResponse.json(participant);
   } catch (error) {
-    console.error("Error joining project:", error);
+    console.error("[PROJECT_JOIN]", error);
     return NextResponse.json(
       { error: "Error joining project" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(
+  request: Request,
+  { params }: { params: { projectId: string } }
+) {
+  try {
+    const { userId } = auth();
+    if (!userId) {
+      return new NextResponse("Unauthorized", { status: 401 });
+    }
+
+    // Get the hacker using clerkId
+    const hacker = await prisma.hacker.findUnique({
+      where: { clerkId: userId },
+    });
+
+    if (!hacker) {
+      return new NextResponse("Hacker not found", { status: 404 });
+    }
+
+    // Remove user from project
+    await prisma.projectToParticipant.delete({
+      where: {
+        hackerId_projectId: {
+          hackerId: hacker.id,
+          projectId: params.projectId,
+        },
+      },
+    });
+
+    return new NextResponse(null, { status: 204 });
+  } catch (error) {
+    console.error("[PROJECT_LEAVE]", error);
+    return NextResponse.json(
+      { error: "Error leaving project" },
       { status: 500 }
     );
   }

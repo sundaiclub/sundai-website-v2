@@ -71,13 +71,13 @@ const Navbar = () => {
           </div>
           <div className="flex items-center">
             <Link
-              href="/get-started"
+              href="/projects"
               className={`${
                 isPWA ? "px-4 py-3" : "px-3 py-2"
               } mx-2 rounded-lg active:bg-indigo-100`}
             >
               <span className="text-sm text-black hover:text-indigo-700 dark:hover:text-indigo-500 transition duration-300">
-                Explore
+                Join Projects
               </span>
             </Link>
 
