@@ -1,0 +1,214 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Hacker {
+  id          String    @id @default(uuid())
+  clerkId     String    @unique
+  name        String
+  discordId   String?   @unique
+  role        Role?
+  bio         String?
+  githubUrl   String?
+  email       String?
+  phoneNumber String?
+  attended    Int       @default(0)
+  avatar      Image?    @relation("HackerAvatar", fields: [avatarId], references: [id])
+  avatarId    String?   @unique
+  projects    ProjectToParticipant[]
+  ledProjects Project[] @relation("LaunchLead")
+  images      Image[]   @relation("HackerImages")
+  likes       ProjectLike[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  pushSubscriptions PushSubscription[]
+  notifications Notification[]
+  attendanceRecords    Attendance[]
+  verifiedAttendances  Attendance[] @relation("AttendanceVerifications")
+  totalMinutesAttended Int          @default(0)
+  lastAttendance      DateTime?
+}
+
+model Project {
+  id          String    @id @default(uuid())
+  title       String
+  description String
+  githubUrl   String?
+  demoUrl     String?
+  thumbnail   Image?    @relation("ProjectThumbnail", fields: [thumbnailId], references: [id])
+  thumbnailId String?   @unique
+  launchLead  Hacker    @relation("LaunchLead", fields: [launchLeadId], references: [id])
+  launchLeadId String
+  participants ProjectToParticipant[]
+  images      Image[]   @relation("ProjectImages")
+  startDate   DateTime  @default(now())
+  endDate     DateTime?
+  status      ProjectStatus @default(PENDING)
+  likes       ProjectLike[]
+  weeks       Week[]    // Many-to-many as projects can span multiple weeks
+  attendances Attendance[] // Add this line to complete the many-to-many relation
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([launchLeadId])
+}
+
+model ProjectToParticipant {
+  id        String   @id @default(uuid())
+  hacker    Hacker   @relation(fields: [hackerId], references: [id])
+  hackerId  String
+  project   Project  @relation(fields: [projectId], references: [id])
+  projectId String
+  role      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([hackerId, projectId])
+}
+
+model Image {
+  id              String    @id @default(uuid())
+  key             String    @unique // S3 object key
+  bucket          String    // S3 bucket name
+  url             String    // Full S3 URL
+  filename        String    // Original filename
+  mimeType        String    // File MIME type
+  size            Int       // File size in bytes
+  width           Int?      // Image width in pixels
+  height          Int?      // Image height in pixels
+  alt             String?   // Alt text for accessibility
+  description     String?   // Optional description
+  
+  // Relations
+  hackerAvatar    Hacker?   @relation("HackerAvatar")
+  hackerImages    Hacker?   @relation("HackerImages", fields: [hackerId], references: [id])
+  hackerId        String?
+  
+  projectThumbnail Project? @relation("ProjectThumbnail")
+  projectImages    Project? @relation("ProjectImages", fields: [projectId], references: [id])
+  projectId        String?
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([key])
+  @@index([hackerId])
+  @@index([projectId])
+}
+
+model ProjectLike {
+  id        String   @id @default(uuid())
+  project   Project  @relation(fields: [projectId], references: [id])
+  projectId String
+  hacker    Hacker   @relation(fields: [hackerId], references: [id])
+  hackerId  String
+  createdAt DateTime @default(now())
+
+  @@unique([projectId, hackerId])
+  @@index([projectId])
+  @@index([hackerId])
+}
+
+model PushSubscription {
+  id          String    @id @default(uuid())
+  endpoint    String    @unique
+  p256dh      String    // Public key
+  auth        String    // Auth secret
+  hacker      Hacker    @relation(fields: [hackerId], references: [id])
+  hackerId    String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Notification preferences
+  notifyNewProjects     Boolean   @default(true)
+  notifyProjectUpdates  Boolean   @default(true)
+  notifyLikes          Boolean   @default(true)
+  notifyNewMembers     Boolean   @default(true)
+
+  @@index([hackerId])
+}
+
+model Notification {
+  id          String    @id @default(uuid())
+  type        NotificationType
+  title       String
+  body        String
+  icon        String?   // URL to notification icon
+  data        Json?     // Additional data like URLs
+  hacker      Hacker    @relation(fields: [hackerId], references: [id])
+  hackerId    String
+  read        Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+
+  @@index([hackerId])
+  @@index([createdAt])
+}
+
+model Attendance {
+  id          String    @id @default(uuid())
+  hacker      Hacker    @relation(fields: [hackerId], references: [id])
+  hackerId    String
+  week        Week      @relation(fields: [weekId], references: [id])
+  weekId      String
+  date        DateTime  @default(now())
+  checkInTime DateTime  @default(now())
+  checkOutTime DateTime?
+  duration    Int?      // Duration in minutes
+  notes       String?
+  location    String?   // e.g., "Remote", "In-Person", etc.
+  verified    Boolean   @default(false)
+  verifiedBy  Hacker?   @relation("AttendanceVerifications", fields: [verifierId], references: [id])
+  verifierId  String?
+  projects    Project[] // Projects worked on during this attendance
+
+  @@unique([hackerId, date])
+  @@index([hackerId])
+  @@index([date])
+  @@index([weekId])
+}
+
+model Week {
+  id          String    @id @default(uuid())
+  number      Int       // Week number (1, 2, 3, etc.)
+  startDate   DateTime
+  endDate     DateTime
+  theme       String?   // Optional theme for the week
+  description String?
+  projects    Project[] // Projects started this week
+  attendance  Attendance[] // Attendance records for this week
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([number])
+  @@index([startDate, endDate])
+}
+
+enum Role {
+  NOT_SET
+  HACKER
+  ADMIN
+  NON_HACKER
+}
+
+enum ProjectStatus {
+  PENDING
+  APPROVED
+}
+
+enum NotificationType {
+  NEW_PROJECT
+  PROJECT_UPDATE
+  NEW_LIKE
+  NEW_MEMBER
+  CUSTOM
+}

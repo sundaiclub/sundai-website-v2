@@ -12,7 +12,7 @@ export default function Home() {
           name="description"
           content="Join our platform to report and track side effects from medications. We use AI to find side effects from sources like Reddit."
         />
-        <link rel="icon" href="/favicon.ico" />
+        <link rel="icon" href="public/assets/logo.png" />
       </Head>
 
       {/* Hero Section */}

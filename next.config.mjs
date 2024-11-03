@@ -6,6 +6,9 @@ const nextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
+  images: {
+    domains: ["img.clerk.com", "images.clerk.dev", "www.gravatar.com"],
+  },
 };
 
 export default nextConfig;

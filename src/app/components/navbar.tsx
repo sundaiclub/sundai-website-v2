@@ -8,8 +8,11 @@ import Image from "next/image";
 
 const Navbar = () => {
   const [isScrolled, setIsScrolled] = useState(false);
-  const { isSignedIn } = useUser();
+  const { isSignedIn, user } = useUser();
   const pathname = usePathname();
+  const isPWA =
+    typeof window !== "undefined" &&
+    window.matchMedia("(display-mode: standalone)").matches;
 
   useEffect(() => {
     const handleScroll = () => {
@@ -21,10 +24,7 @@ const Navbar = () => {
     };
 
     window.addEventListener("scroll", handleScroll);
-
-    return () => {
-      window.removeEventListener("scroll", handleScroll);
-    };
+    return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
   return (
@@ -36,32 +36,83 @@ const Navbar = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center py-4">
           <div className="text-lg font-montserrat text-indigo-800 font-semibold">
-            <Link href="/" className="text-center group flex items-center">
+            <Link
+              href="/"
+              className={`text-center group flex items-center ${
+                isPWA ? "p-2" : "" // Extra padding for PWA
+              }`}
+            >
               <Image
-                src="/assets/am-i-the-only-logo.svg"
-                alt="Am I the Only One Logo"
+                src="/images/logo.svg"
+                alt="Sundai Club Logo"
                 width={80}
                 height={80}
                 className="transition-transform duration-300 transform group-hover:scale-110 mr-2"
               />
-              <span className="text-black">AM I THE ONLY ONE</span>
             </Link>
           </div>
-          <div className="flex space-x-6 items-center">
-            <Link href="/get-started">
+          <div className="flex items-center">
+            <Link
+              href="/projects"
+              className={`${
+                isPWA ? "px-4 py-3" : "px-3 py-2"
+              } mx-2 rounded-lg active:bg-indigo-100`}
+            >
               <span className="text-sm text-black hover:text-indigo-700 dark:hover:text-indigo-500 transition duration-300">
-                Explore
+                Join a Project
               </span>
             </Link>
-            {isSignedIn ? (
-              <UserButton afterSignOutUrl={pathname} />
-            ) : (
-              <SignInButton mode="modal">
-                <span className="text-sm bg-indigo-600 text-white px-4 py-1 rounded-full hover:bg-indigo-700 transition duration-300 cursor-pointer">
-                  Log In
-                </span>
-              </SignInButton>
+
+            {isSignedIn && (
+              <>
+                <Link
+                  href="/projects/new"
+                  className={`${
+                    isPWA ? "px-4 py-3" : "px-3 py-2"
+                  } mx-2 rounded-lg active:bg-indigo-100`}
+                >
+                  <span className="text-sm text-black hover:text-indigo-700 dark:hover:text-indigo-500 transition duration-300">
+                    New Project
+                  </span>
+                </Link>
+
+                <Link
+                  href={`/hacker/${user?.id}`}
+                  className={`${
+                    isPWA ? "px-4 py-3" : "px-3 py-2"
+                  } mx-2 rounded-lg active:bg-indigo-100`}
+                >
+                  <span className="text-sm text-black hover:text-indigo-700 dark:hover:text-indigo-500 transition duration-300">
+                    My Profile
+                  </span>
+                </Link>
+              </>
             )}
+
+            <div className={`${isPWA ? "ml-2 p-1" : "ml-1"}`}>
+              {isSignedIn ? (
+                <UserButton
+                  afterSignOutUrl={pathname}
+                  appearance={{
+                    elements: {
+                      avatarBox: isPWA ? "w-10 h-10" : "w-8 h-8",
+                    },
+                  }}
+                />
+              ) : (
+                <SignInButton mode="modal">
+                  <span
+                    className={`
+                    text-sm bg-indigo-600 text-white rounded-full hover:bg-indigo-700 
+                    transition duration-300 cursor-pointer
+                    ${isPWA ? "px-6 py-3" : "px-4 py-2"}
+                  `}
+                  >
+                    Log In
+                  </span>
+                </SignInButton>
+              )}
+            </div>
           </div>
         </div>
       </div>

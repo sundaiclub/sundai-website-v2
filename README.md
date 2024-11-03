@@ -1,17 +1,46 @@
+# Sundai Website
+
 This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
 
 ## Getting Started
 
-First, run the development server:
+### 1. Start the Database
+
+First, start the PostgreSQL database using Docker:
 
 ```bash
+# Start the database
+docker-compose up -d
+
+# To stop the database
+docker-compose down
+
+# To view database logs
+docker-compose logs -f postgres
+```
+
+The database will be available at:
+
+- Host: localhost
+- Port: 5432
+- User: postgres
+- Password: postgres
+- Database: sundai_db
+
+### 2. Run the Development Server
+
+```bash
+# Install dependencies
+npm install
+
+# Run database migrations
+npx prisma migrate dev
+
+# Seed the database (optional)
+npx prisma db seed
+
+# Start the development server
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
@@ -34,8 +63,3 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/deployment) for more details.
-# meds-ai
-# meds-ai
-# meds-ai
-# sundai-website-v2
-# sundai-website-v2
