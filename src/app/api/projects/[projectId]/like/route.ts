@@ -46,9 +46,9 @@ export async function DELETE(
       return new NextResponse("Unauthorized", { status: 401 });
     }
 
-    // Get the hacker using discordId
+    // Get the hacker using clerkId
     const hacker = await prisma.hacker.findUnique({
-      where: { discordId: userId },
+      where: { clerkId: userId },
     });
 
     if (!hacker) {
@@ -60,7 +60,7 @@ export async function DELETE(
       where: {
         projectId_hackerId: {
           projectId: params.projectId,
-          hackerId: hacker.id, // Use hacker.id instead of userId
+          hackerId: hacker.id,
         },
       },
     });
