@@ -1,5 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 import { NextResponse } from "next/server";
+import { auth } from "@clerk/nextjs/server";
 
 const prisma = new PrismaClient();
 
@@ -57,68 +58,7 @@ export async function GET(
       return NextResponse.json({ error: "Hacker not found" }, { status: 404 });
     }
 
-    return NextResponse.json({
-      id: hacker.id,
-      name: hacker.name,
-      bio: hacker.bio,
-      email: hacker.email,
-      githubUrl: hacker.githubUrl,
-      phoneNumber: hacker.phoneNumber,
-      role: hacker.role,
-      avatar: hacker.avatar
-        ? {
-            url: hacker.avatar.url,
-          }
-        : null,
-      ledProjects: hacker.ledProjects.map((project) => ({
-        id: project.id,
-        title: project.title,
-        description: project.description,
-        status: project.status,
-        thumbnail: project.thumbnail
-          ? {
-              url: project.thumbnail.url,
-            }
-          : null,
-      })),
-      projects: hacker.projects.map((participation) => ({
-        role: participation.role,
-        project: {
-          id: participation.project.id,
-          title: participation.project.title,
-          description: participation.project.description,
-          status: participation.project.status,
-          thumbnail: participation.project.thumbnail
-            ? {
-                url: participation.project.thumbnail.url,
-              }
-            : null,
-          likes: participation.project.likes,
-        },
-      })),
-      likedProjects: hacker.likes.map((like) => ({
-        createdAt: like.createdAt,
-        project: {
-          id: like.project.id,
-          title: like.project.title,
-          description: like.project.description,
-          status: like.project.status,
-          thumbnail: like.project.thumbnail
-            ? {
-                url: like.project.thumbnail.url,
-              }
-            : null,
-          launchLead: {
-            name: like.project.launchLead.name,
-            avatar: like.project.launchLead.avatar
-              ? {
-                  url: like.project.launchLead.avatar.url,
-                }
-              : null,
-          },
-        },
-      })),
-    });
+    return NextResponse.json(hacker);
   } catch (error) {
     console.error("Error fetching hacker:", error);
     return NextResponse.json(
@@ -128,20 +68,52 @@ export async function GET(
   }
 }
 
-export async function PUT(
+export async function PATCH(
   request: Request,
   { params }: { params: { hackerId: string } }
 ) {
   try {
+    const { userId } = auth();
+    if (!userId) {
+      return new NextResponse("Unauthorized", { status: 401 });
+    }
+
+    // Get the hacker making the request
+    const requestingHacker = await prisma.hacker.findUnique({
+      where: { clerkId: userId },
+    });
+
+    if (!requestingHacker) {
+      return new NextResponse("Hacker not found", { status: 404 });
+    }
+
+    // Check if the hacker is updating their own profile
+    if (requestingHacker.id !== params.hackerId) {
+      return new NextResponse("Unauthorized", { status: 401 });
+    }
+
     const data = await request.json();
+    const allowedFields = ["name", "bio", "githubUrl", "phoneNumber"];
+
+    // Filter out any fields that aren't allowed to be updated
+    const sanitizedData = Object.keys(data).reduce((acc, key) => {
+      if (allowedFields.includes(key)) {
+        acc[key] = data[key];
+      }
+      return acc;
+    }, {} as Record<string, any>);
+
     const updatedHacker = await prisma.hacker.update({
       where: { id: params.hackerId },
-      data,
+      data: sanitizedData,
       include: {
         avatar: true,
         ledProjects: {
           include: {
             thumbnail: true,
+          },
+          orderBy: {
+            createdAt: "desc",
           },
         },
         projects: {
@@ -149,8 +121,29 @@ export async function PUT(
             project: {
               include: {
                 thumbnail: true,
+                likes: true,
               },
             },
+          },
+          orderBy: {
+            createdAt: "desc",
+          },
+        },
+        likes: {
+          include: {
+            project: {
+              include: {
+                thumbnail: true,
+                launchLead: {
+                  include: {
+                    avatar: true,
+                  },
+                },
+              },
+            },
+          },
+          orderBy: {
+            createdAt: "desc",
           },
         },
       },

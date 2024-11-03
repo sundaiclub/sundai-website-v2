@@ -1,11 +1,12 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
-import { useUserContext } from "@/app/contexts/UserContext";
+import { useUser } from "@clerk/nextjs";
 import Image from "next/image";
 import Link from "next/link";
 import { Cog6ToothIcon } from "@heroicons/react/24/outline";
 import { HeartIcon } from "@heroicons/react/24/solid";
+import { PencilIcon, XMarkIcon, CheckIcon } from "@heroicons/react/24/outline";
 
 type HackerProfile = {
   id: string;
@@ -76,12 +77,60 @@ const scrollableSection = `
   px-4
 `;
 
+// Add this type for the edit form
+type EditableFields = {
+  name: string;
+  bio: string;
+  githubUrl: string;
+  phoneNumber: string;
+};
+
 export default function HackerProfile() {
   const params = useParams();
-  const { userInfo } = useUserContext();
+  const { user } = useUser();
   const [hacker, setHacker] = useState<HackerProfile | null>(null);
   const [loading, setLoading] = useState(true);
-  const isOwnProfile = userInfo?.id === params.hackerId;
+  const [isEditing, setIsEditing] = useState(false);
+  const [editForm, setEditForm] = useState<EditableFields>({
+    name: "",
+    bio: "",
+    githubUrl: "",
+    phoneNumber: "",
+  });
+  const [currentUserHackerId, setCurrentUserHackerId] = useState<string | null>(
+    null
+  );
+
+  useEffect(() => {
+    const fetchCurrentUserHackerId = async () => {
+      if (user?.id) {
+        try {
+          const response = await fetch(`/api/hackers?clerkId=${user.id}`);
+          if (response.ok) {
+            const data = await response.json();
+            setCurrentUserHackerId(data.id);
+          }
+        } catch (error) {
+          console.error("Error fetching current user hacker ID:", error);
+        }
+      }
+    };
+
+    fetchCurrentUserHackerId();
+  }, [user?.id]);
+
+  const isOwnProfile = currentUserHackerId === params.hackerId;
+
+  useEffect(() => {
+    if (hacker) {
+      setEditForm({
+        name: hacker.name || "",
+        bio: hacker.bio || "",
+        githubUrl: hacker.githubUrl || "",
+        phoneNumber: hacker.phoneNumber || "",
+      });
+    }
+  }, [hacker]);
 
   useEffect(() => {
     const fetchHacker = async () => {
@@ -110,6 +159,29 @@ export default function HackerProfile() {
     }
   }, [params.hackerId]);
 
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const response = await fetch(`/api/hackers/${params.hackerId}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(editForm),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to update profile");
+      }
+
+      const updatedHacker = await response.json();
+      setHacker((prev) => ({ ...prev!, ...updatedHacker }));
+      setIsEditing(false);
+    } catch (error) {
+      console.error("Error updating profile:", error);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-screen">
@@ -132,15 +204,6 @@ export default function HackerProfile() {
       </div>
     );
   }
-
-  // if (isOwnProfile) {
-  //   // Return existing edit profile view
-  //   return (
-  //     <div className="min-h-screen py-16 text-gray-800">
-  //       {/* ... existing profile edit UI ... */}
-  //     </div>
-  //   );
-  // }
 
   return (
     <div className="min-h-screen py-20 bg-[#E5E5E5]">
@@ -166,55 +229,130 @@ export default function HackerProfile() {
                   </div>
                 )}
               </div>
-              <div className="mt-4 sm:mt-0 sm:ml-6 text-center sm:text-left">
-                <h1 className="text-3xl font-bold text-gray-900">
-                  {hacker.name}
-                </h1>
-                {hacker.bio && (
-                  <p className="mt-2 text-gray-600 max-w-2xl">{hacker.bio}</p>
+              <div className="mt-4 sm:mt-0 sm:ml-6 text-center sm:text-left flex-grow">
+                {isEditing ? (
+                  <form onSubmit={handleEditSubmit} className="space-y-4">
+                    <input
+                      type="text"
+                      value={editForm.name}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, name: e.target.value })
+                      }
+                      className="w-full px-3 py-2 border rounded-lg"
+                      placeholder="Name"
+                    />
+                    <textarea
+                      value={editForm.bio}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, bio: e.target.value })
+                      }
+                      className="w-full px-3 py-2 border rounded-lg"
+                      placeholder="Bio"
+                      rows={3}
+                    />
+                    <input
+                      type="url"
+                      value={editForm.githubUrl}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, githubUrl: e.target.value })
+                      }
+                      className="w-full px-3 py-2 border rounded-lg"
+                      placeholder="GitHub URL"
+                    />
+                    <input
+                      type="tel"
+                      value={editForm.phoneNumber}
+                      onChange={(e) =>
+                        setEditForm({
+                          ...editForm,
+                          phoneNumber: e.target.value,
+                        })
+                      }
+                      className="w-full px-3 py-2 border rounded-lg"
+                      placeholder="Phone Number"
+                    />
+                    <div className="flex justify-end space-x-2">
+                      <button
+                        type="button"
+                        onClick={() => setIsEditing(false)}
+                        className="px-4 py-2 text-gray-600 hover:text-gray-800"
+                      >
+                        <XMarkIcon className="h-5 w-5" />
+                      </button>
+                      <button
+                        type="submit"
+                        className="px-4 py-2 text-green-600 hover:text-green-800"
+                      >
+                        <CheckIcon className="h-5 w-5" />
+                      </button>
+                    </div>
+                  </form>
+                ) : (
+                  <>
+                    <div className="flex justify-between items-start">
+                      <h1 className="text-3xl font-bold text-gray-900">
+                        {hacker.name}
+                      </h1>
+                      {isOwnProfile && (
+                        <button
+                          onClick={() => setIsEditing(true)}
+                          className="p-2 text-gray-600 hover:text-gray-800"
+                        >
+                          <PencilIcon className="h-5 w-5" />
+                        </button>
+                      )}
+                    </div>
+                    {hacker.bio && (
+                      <p className="mt-2 text-gray-600 max-w-2xl">
+                        {hacker.bio}
+                      </p>
+                    )}
+                  </>
                 )}
               </div>
             </div>
 
             {/* Contact & Links */}
-            <div className="flex flex-wrap gap-4 justify-center sm:justify-start">
-              {hacker.githubUrl && (
-                <Link
-                  href={hacker.githubUrl}
-                  target="_blank"
-                  className="flex items-center px-4 py-2 bg-gray-100 rounded-full hover:bg-gray-200 transition-colors"
-                >
-                  <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
-                    <path
-                      fill="currentColor"
-                      d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"
-                    />
-                  </svg>
-                  GitHub
-                </Link>
-              )}
-              {hacker.email && (
-                <Link
-                  href={`mailto:${hacker.email}`}
-                  className="flex items-center px-4 py-2 bg-gray-100 rounded-full hover:bg-gray-200 transition-colors"
-                >
-                  <svg
-                    className="w-5 h-5 mr-2"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
+            {!isEditing && (
+              <div className="flex flex-wrap gap-4 justify-center sm:justify-start">
+                {hacker.githubUrl && (
+                  <Link
+                    href={hacker.githubUrl}
+                    target="_blank"
+                    className="flex items-center px-4 py-2 bg-gray-100 rounded-full hover:bg-gray-200 transition-colors"
                   >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-                    />
-                  </svg>
-                  Email
-                </Link>
-              )}
-            </div>
+                    <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
+                      <path
+                        fill="currentColor"
+                        d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"
+                      />
+                    </svg>
+                    GitHub
+                  </Link>
+                )}
+                {hacker.email && (
+                  <Link
+                    href={`mailto:${hacker.email}`}
+                    className="flex items-center px-4 py-2 bg-gray-100 rounded-full hover:bg-gray-200 transition-colors"
+                  >
+                    <svg
+                      className="w-5 h-5 mr-2"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+                      />
+                    </svg>
+                    Email
+                  </Link>
+                )}
+              </div>
+            )}
           </div>
         </div>
 

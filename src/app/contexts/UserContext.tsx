@@ -6,10 +6,15 @@ type UserContextType = {
   isAdmin: boolean;
   userInfo: {
     id: string;
-    name: string | null;
+    name: string;
     email: string | null;
     role: string | null;
-    avatar?: string | null;
+    avatar?: {
+      url: string;
+    } | null;
+    bio?: string | null;
+    githubUrl?: string | null;
+    phoneNumber?: string | null;
   } | null;
   loading: boolean;
 };
@@ -30,18 +35,29 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     const fetchUserInfo = async () => {
       if (user?.id) {
         try {
-          const response = await fetch(`/api/hackers/${user.id}`);
-          const data = await response.json();
+          // First get the hacker ID using clerkId
+          const hackerResponse = await fetch(`/api/hackers?clerkId=${user.id}`);
+          if (!hackerResponse.ok) throw new Error("Failed to fetch hacker ID");
+          const hackerData = await hackerResponse.json();
+
+          // Then get the full hacker profile using the Prisma ID
+          const profileResponse = await fetch(`/api/hackers/${hackerData.id}`);
+          if (!profileResponse.ok)
+            throw new Error("Failed to fetch hacker profile");
+          const profileData = await profileResponse.json();
 
           setUserInfo({
-            id: data.id,
-            name: data.name,
-            email: data.email,
-            role: data.role,
-            avatar: data.avatar?.url,
+            id: profileData.id,
+            name: profileData.name,
+            email: profileData.email,
+            role: profileData.role,
+            avatar: profileData.avatar,
+            bio: profileData.bio,
+            githubUrl: profileData.githubUrl,
+            phoneNumber: profileData.phoneNumber,
           });
 
-          setIsAdmin(data.role === "ADMIN");
+          setIsAdmin(profileData.role === "ADMIN");
         } catch (error) {
           console.error("Error fetching user info:", error);
         } finally {

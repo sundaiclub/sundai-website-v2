@@ -12,6 +12,7 @@ import { useTheme } from '../../context/ThemeContext';
 const Navbar = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const { isSignedIn, user } = useUser();
+  const [hackerId, setHackerId] = useState<string | null>(null);
   const pathname = usePathname();
   const { isDarkMode } = useTheme();
   const isPWA =
@@ -31,6 +32,24 @@ const Navbar = () => {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
+  useEffect(() => {
+    const fetchHackerId = async () => {
+      if (user?.id) {
+        try {
+          const response = await fetch(`/api/hackers?clerkId=${user.id}`);
+          if (response.ok) {
+            const data = await response.json();
+            setHackerId(data.id);
+          }
+        } catch (error) {
+          console.error("Error fetching hacker ID:", error);
+        }
+      }
+    };
+
+    fetchHackerId();
+  }, [user?.id]);
+
   return (
     <nav
       className={`fixed top-0 left-0 w-full z-50 transition-all duration-300 font-space-mono ${
@@ -49,7 +68,7 @@ const Navbar = () => {
             <Link
               href="/"
               className={`text-center group flex items-center ${
-                isPWA ? "p-2" : "" // Extra padding for PWA
+                isPWA ? "p-2" : ""
               }`}
             >
               <Image
@@ -88,7 +107,7 @@ const Navbar = () => {
                 </Link>
 
                 <Link
-                  href={`/hacker/${user?.id}`}
+                  href={`/hacker/${hackerId}`}
                   className={`${
                     isPWA ? "px-4 py-3" : "px-3 py-2"
                   } mx-2 rounded-lg active:bg-indigo-100`}
