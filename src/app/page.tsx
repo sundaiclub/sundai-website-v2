@@ -74,7 +74,8 @@ export default function Home() {
                   transition={{ delay: 0.2 }}
                 >
                   <Image
-                    src="/images/affiliations/mit_logo_std_rgb_black.svg"
+                    src="/images/affiliations/mit_logo_std_rgb_silver-gray.svg"
+                    style={{ filter: "brightness(1.2)" }}
                     className="w-24 h-24 opacity-90"
                     alt="Logo MIT"
                     width={96}
