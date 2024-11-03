@@ -25,18 +25,14 @@ export default function RootLayout({
   return (
     <ClerkProvider>
       <UserProvider>
-        <html lang="en">
+        <html lang="en" className="h-screen">
           <body
-            className={`${inter.className} h-screen bg-[#E5E5E5]`}
-            style={{
-              WebkitOverflowScrolling: "touch",
-              overscrollBehavior: "none",
-            }}
+            className={`${inter.className} bg-lightBackground min-h-screen overflow-hidden overscroll-none`}
           >
             <Navbar />
-            <div className="origin-top-left min-h-screen pt-16 bg-[#E5E5E5]">
+            <main className="origin-top-container">
               {children}
-            </div>
+            </main>
           </body>
         </html>
       </UserProvider>

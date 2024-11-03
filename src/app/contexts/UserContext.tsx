@@ -55,6 +55,14 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     fetchUserInfo();
   }, [user?.id, isLoaded]);
 
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <div className="spinner spinner-small"></div>
+      </div>
+    );
+  }
+
   return (
     <UserContext.Provider value={{ isAdmin, userInfo, loading }}>
       {children}

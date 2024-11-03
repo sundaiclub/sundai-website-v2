@@ -11,6 +11,7 @@ const config: Config = {
       fontFamily: {
         mackinac: ['"P22 Mackinac Pro"', "serif"],
         montserrat: ['"Montserrat"', "sans-serif"],
+        inter: ['"Inter"', "sans-serif"],
       },
       fontSize: {
         xs: "0.6rem",
@@ -25,11 +26,33 @@ const config: Config = {
         "6xl": "2.75rem",
       },
       colors: {
+        lightBackground: "#E5E5E5",
         indigo: {
           600: "#4f46e5",
           700: "#4338ca",
           900: "#312e81",
         },
+        gradient: {
+          darkStart: "#E5E5E5",
+          darkEnd: "#F0F0F0",
+          purpleStart: "#E9D5FF",
+          pinkEnd: "#FBCFE8",
+        },
+      },
+      spacing: {
+        4: "1rem",
+        16: "4rem",
+        24: "6rem",
+        26: "6.5rem",
+        72: "18rem",
+      },
+      borderRadius: {
+        large: "1rem",
+        full: "9999px",
+      },
+      boxShadow: {
+        customLight: "0 2px 4px rgba(0, 0, 0, 0.1)",
+        customDark: "0 4px 8px rgba(0, 0, 0, 0.2)",
       },
       animation: {
         "slide-left": "slideLeft 1s ease-out",
@@ -47,10 +70,10 @@ const config: Config = {
       },
     },
   },
-  plugins: [],
-  darkMode: "class", // Enable dark mode
+  plugins: [
+    
+  ],
+  darkMode: "class",
 };
-
-// Montserrat font classes
 
 export default config;

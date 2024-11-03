@@ -81,9 +81,7 @@ export default function NewProject() {
     if (file) {
       setThumbnail(file);
       const reader = new FileReader();
-      reader.onloadend = () => {
-        setThumbnailPreview(reader.result as string);
-      };
+      reader.onloadend = () => setThumbnailPreview(reader.result as string);
       reader.readAsDataURL(file);
     }
   };
@@ -94,7 +92,6 @@ export default function NewProject() {
       alert("Please sign in to create a project");
       return;
     }
-
     if (!project.launchLeadId) {
       alert("Please select a launch lead");
       return;
@@ -118,20 +115,15 @@ export default function NewProject() {
         )
       );
 
-      if (thumbnail) {
-        formData.append("thumbnail", thumbnail);
-      }
+      if (thumbnail) formData.append("thumbnail", thumbnail);
 
       const response = await fetch("/api/projects", {
         method: "POST",
         body: formData,
       });
 
-      if (response.ok) {
-        router.push("/");
-      } else {
-        alert("Failed to create project");
-      }
+      if (response.ok) router.push("/");
+      else alert("Failed to create project");
     } catch (error) {
       console.error("Error creating project:", error);
       alert("Error creating project");
@@ -150,18 +142,13 @@ export default function NewProject() {
   };
 
   return (
-    <div className="min-h-screen py-16 bg-[#E5E5E5] text-gray-800">
-      <div className="max-w-2xl mx-auto p-6 bg-white rounded-lg shadow-sm">
-        <h1 className="text-3xl font-bold text-gray-900 mb-8">
-          Initialize New Project
-        </h1>
+    <div className="page-background pt-16">
+      <div className="form-container">
+        <h1 className="form-title">Initialize New Project</h1>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="form-section">
           <div>
-            <label
-              htmlFor="launchLeadId"
-              className="block text-sm font-medium text-gray-700 mb-1"
-            >
+            <label htmlFor="launchLeadId" className="form-label">
               Launch Lead *
             </label>
             <select
@@ -170,7 +157,7 @@ export default function NewProject() {
               required
               value={project.launchLeadId}
               onChange={handleChange}
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+              className="form-select"
             >
               <option value="">Select Launch Lead</option>
               {hackers.map((hacker) => (
@@ -182,10 +169,7 @@ export default function NewProject() {
           </div>
 
           <div>
-            <label
-              htmlFor="title"
-              className="block text-sm font-medium text-gray-700 mb-1"
-            >
+            <label htmlFor="title" className="form-label">
               Project Title *
             </label>
             <input
@@ -195,16 +179,13 @@ export default function NewProject() {
               required
               value={project.title}
               onChange={handleChange}
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+              className="form-input"
               placeholder="Enter project title"
             />
           </div>
 
           <div>
-            <label
-              htmlFor="description"
-              className="block text-sm font-medium text-gray-700 mb-1"
-            >
+            <label htmlFor="description" className="form-label">
               Description *
             </label>
             <textarea
@@ -214,16 +195,13 @@ export default function NewProject() {
               rows={4}
               value={project.description}
               onChange={handleChange}
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+              className="form-textarea"
               placeholder="Describe your project"
             />
           </div>
 
           <div>
-            <label
-              htmlFor="githubUrl"
-              className="block text-sm font-medium text-gray-700 mb-1"
-            >
+            <label htmlFor="githubUrl" className="form-label">
               GitHub URL
             </label>
             <input
@@ -232,16 +210,13 @@ export default function NewProject() {
               name="githubUrl"
               value={project.githubUrl}
               onChange={handleChange}
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+              className="form-input"
               placeholder="https://github.com/username/project"
             />
           </div>
 
           <div>
-            <label
-              htmlFor="demoUrl"
-              className="block text-sm font-medium text-gray-700 mb-1"
-            >
+            <label htmlFor="demoUrl" className="form-label">
               Demo URL
             </label>
             <input
@@ -250,24 +225,19 @@ export default function NewProject() {
               name="demoUrl"
               value={project.demoUrl}
               onChange={handleChange}
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+              className="form-input"
               placeholder="https://your-demo-url.com"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Team Members
-            </label>
+            <label className="form-label">Team Members</label>
             <div className="flex flex-wrap gap-2 mb-2">
               {selectedMembers.map((member) => (
-                <div
-                  key={member.id}
-                  className="flex items-center bg-indigo-100 text-indigo-800 px-3 py-1 rounded-full text-sm"
-                >
+                <div key={member.id} className="badge">
                   <span>{member.name}</span>
-                  <span className="mx-1 text-indigo-400">•</span>
-                  <span className="text-indigo-600">
+                  <span className="mx-1">•</span>
+                  <span>
                     {roles.find((r) => r.id === member.role)?.label}
                   </span>
                   <button
@@ -283,16 +253,14 @@ export default function NewProject() {
             <button
               type="button"
               onClick={() => setShowModal(true)}
-              className="text-indigo-600 hover:text-indigo-800 text-sm font-medium"
+              className="link-button text-sm font-medium"
             >
               + Add Team Members
             </button>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Project Thumbnail
-            </label>
+            <label className="form-label">Project Thumbnail</label>
             <div className="mt-1 flex items-center space-x-4">
               {thumbnailPreview && (
                 <div className="relative w-32 h-32">
@@ -333,13 +301,13 @@ export default function NewProject() {
             <button
               type="submit"
               disabled={loading}
-              className={`${
+              className={`button-primary ${
                 loading ? "bg-indigo-400" : "bg-indigo-600 hover:bg-indigo-700"
-              } text-white px-6 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 flex items-center space-x-2`}
+              } flex items-center space-x-2`}
             >
               {loading ? (
                 <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div>
+                  <div className="spinner-small border-white"></div>
                   <span>Creating...</span>
                 </>
               ) : (
@@ -351,22 +319,20 @@ export default function NewProject() {
       </div>
 
       {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md m-4">
-            <div className="flex justify-between items-center mb-4">
+        <div className="modal-overlay">
+          <div className="modal-container">
+            <div className="modal-header">
               <h2 className="text-xl font-semibold">Add Team Members</h2>
               <button
                 onClick={() => setShowModal(false)}
-                className="text-gray-500 hover:text-gray-700"
+                className="modal-close-button"
               >
                 <XMarkIcon className="h-6 w-6" />
               </button>
             </div>
 
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Role
-              </label>
+              <label className="form-label">Role</label>
               <div className="flex flex-wrap gap-2">
                 {roles.map((role) => (
                   <button
@@ -390,7 +356,7 @@ export default function NewProject() {
               placeholder="Search members..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md mb-4 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="form-input mb-4"
             />
 
             <div className="max-h-60 overflow-y-auto">
@@ -419,7 +385,7 @@ export default function NewProject() {
             <div className="mt-4 flex justify-end">
               <button
                 onClick={() => setShowModal(false)}
-                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200"
+                className="button-secondary"
               >
                 Done
               </button>

@@ -1,4 +1,5 @@
 "use client";
+
 import React, { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
@@ -70,7 +71,7 @@ export default function ProjectCard() {
     projectId: string,
     isLiked: boolean
   ) => {
-    e.preventDefault(); // Prevent navigation
+    e.preventDefault();
     if (!user) {
       alert("Please sign in to like projects");
       return;
@@ -130,19 +131,16 @@ export default function ProjectCard() {
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-600"></div>
+        <div className="spinner spinner-small"></div>
       </div>
     );
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 py-6 sm:py-12">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+    <div className="max-w-7xl mx-auto px-4 py-12">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {projects.map((project) => (
-          <div
-            key={project.id}
-            className="bg-white rounded-lg shadow-lg overflow-hidden hover:shadow-xl transition-shadow"
-          >
+          <div key={project.id} className="card card-hover project-card">
             <div className="relative h-40 sm:h-48">
               <Link href={`/projects/${project.id}`}>
                 <Image
@@ -152,15 +150,15 @@ export default function ProjectCard() {
                   }
                   alt={project.title}
                   fill
-                  className="object-cover"
+                  className="object-cover rounded-t-lg"
                 />
               </Link>
             </div>
-            <div className="p-4 sm:p-6">
+            <div className="card-content">
               <div className="flex justify-between items-start mb-4">
                 <div>
                   <Link href={`/projects/${project.id}`}>
-                    <h3 className="text-lg sm:text-xl font-bold text-gray-900 hover:text-indigo-600 transition-colors">
+                    <h3 className="text-lg font-bold text-gray-900 hover:text-indigo-600 transition-colors">
                       {project.title}
                     </h3>
                   </Link>
@@ -168,60 +166,40 @@ export default function ProjectCard() {
                     Created {new Date(project.createdAt).toLocaleDateString()}
                   </p>
                 </div>
-                <div className="flex items-center space-x-2">
-                  <button
-                    onClick={(e) => {
-                      handleLike(
-                        e,
-                        project.id,
-                        project.likes.some((like) => like.hackerId === user?.id)
-                      );
-                    }}
-                    className="p-2 -m-2 flex items-center space-x-1 text-gray-600 hover:text-indigo-600 transition-colors active:scale-95 touch-manipulation"
-                    aria-label={`Like project ${project.title}`}
-                  >
-                    <div className="relative">
-                      {project.likes.some(
-                        (like) => like.hackerId === user?.id
-                      ) ? (
-                        <HeartIconSolid className="h-7 w-7 text-indigo-600" />
-                      ) : (
-                        <HeartIcon className="h-7 w-7" />
-                      )}
-                      <span className="absolute -bottom-4 left-1/2 -translate-x-1/2 text-sm">
-                        {project.likes.length}
-                      </span>
-                    </div>
-                  </button>
-
-                  {isAdmin && (
-                    <button
-                      onClick={() => handleMoveToPending(project.id)}
-                      className="p-2 -m-2 text-sm text-gray-500 hover:text-red-600 transition-colors active:scale-95 touch-manipulation min-w-full"
-                      aria-label="Move to pending"
-                    >
-                      <span className="bg-gray-100 px-3 py-2 rounded-full hover:bg-red-50 min-w-full">
-                        Move to Pending
-                      </span>
-                    </button>
-                  )}
-                </div>
+                <button
+                  onClick={(e) =>
+                    handleLike(
+                      e,
+                      project.id,
+                      project.likes.some((like) => like.hackerId === user?.id)
+                    )
+                  }
+                  className="like-button"
+                  aria-label={`Like project ${project.title}`}
+                >
+                  <div className="relative">
+                    {project.likes.some((like) => like.hackerId === user?.id) ? (
+                      <HeartIconSolid className="h-7 w-7 text-indigo-600" />
+                    ) : (
+                      <HeartIcon className="h-7 w-7" />
+                    )}
+                    <span className="like-counter">
+                      {project.likes.length}
+                    </span>
+                  </div>
+                </button>
               </div>
 
               <Link href={`/projects/${project.id}`}>
-                <p className="text-sm sm:text-base text-gray-600 mb-4">
-                  {project.description}
-                </p>
+                <p className="text-sm text-gray-600 mb-4">{project.description}</p>
               </Link>
 
               {/* Team Section */}
               <div className="mb-4">
-                <h4 className="text-xs sm:text-sm font-semibold text-gray-700 mb-2">
-                  Team
-                </h4>
+                <h4 className="section-header">Team</h4>
                 <div className="space-y-2">
                   {/* Launch Lead */}
-                  <div className="flex items-center">
+                  <div className="team-member-card">
                     <div className="flex-shrink-0">
                       {project.launchLead.avatar ? (
                         <Image
@@ -232,18 +210,18 @@ export default function ProjectCard() {
                           className="rounded-full"
                         />
                       ) : (
-                        <div className="w-7 h-7 bg-indigo-100 rounded-full flex items-center justify-center">
-                          <span className="text-indigo-600 text-xs">
+                        <div className="avatar-placeholder avatar-placeholder-lead w-7 h-7">
+                          <span className="text-xs">
                             {project.launchLead.name[0]}
                           </span>
                         </div>
                       )}
                     </div>
-                    <div className="ml-2 sm:ml-3">
-                      <p className="text-xs sm:text-sm font-medium text-gray-900">
+                    <div className="ml-3">
+                      <p className="text-sm font-medium text-gray-900">
                         {project.launchLead.name}
                       </p>
-                      <p className="text-xs text-indigo-600">Launch Lead</p>
+                      <p className="team-role">Launch Lead</p>
                     </div>
                   </div>
 
@@ -251,7 +229,7 @@ export default function ProjectCard() {
                   {project.participants.map((participant) => (
                     <div
                       key={participant.hacker.id}
-                      className="flex items-center"
+                      className="team-member-card"
                     >
                       <div className="flex-shrink-0">
                         {participant.hacker.avatar ? (
@@ -263,20 +241,18 @@ export default function ProjectCard() {
                             className="rounded-full"
                           />
                         ) : (
-                          <div className="w-7 h-7 bg-gray-100 rounded-full flex items-center justify-center">
-                            <span className="text-gray-600 text-xs">
+                          <div className="avatar-placeholder avatar-placeholder-participant w-7 h-7">
+                            <span className="text-xs">
                               {participant.hacker.name[0]}
                             </span>
                           </div>
                         )}
                       </div>
-                      <div className="ml-2 sm:ml-3">
-                        <p className="text-xs sm:text-sm font-medium text-gray-900">
+                      <div className="ml-3">
+                        <p className="text-sm font-medium text-gray-900">
                           {participant.hacker.name}
                         </p>
-                        <p className="text-xs text-gray-500">
-                          {participant.role}
-                        </p>
+                        <p className="text-xs text-gray-500">{participant.role}</p>
                       </div>
                     </div>
                   ))}
@@ -288,7 +264,7 @@ export default function ProjectCard() {
                 {project.demoUrl && (
                   <Link
                     href={project.demoUrl}
-                    className="text-indigo-600 hover:text-indigo-800 text-xs sm:text-sm font-medium"
+                    className="link-button link-button-demo"
                     target="_blank"
                   >
                     View Demo →
@@ -297,7 +273,7 @@ export default function ProjectCard() {
                 {project.githubUrl && (
                   <Link
                     href={project.githubUrl}
-                    className="text-gray-600 hover:text-gray-800 text-xs sm:text-sm font-medium"
+                    className="link-button link-button-github"
                     target="_blank"
                   >
                     GitHub →

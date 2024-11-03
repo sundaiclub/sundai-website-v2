@@ -16,11 +16,7 @@ const Navbar = () => {
 
   useEffect(() => {
     const handleScroll = () => {
-      if (window.scrollY > 50) {
-        setIsScrolled(true);
-      } else {
-        setIsScrolled(false);
-      }
+      setIsScrolled(window.scrollY > 50);
     };
 
     window.addEventListener("scroll", handleScroll);
@@ -28,63 +24,45 @@ const Navbar = () => {
   }, []);
 
   return (
-    <nav
-      className={`fixed top-0 left-0 w-full z-50 transition-all duration-300 ${
-        isScrolled ? "bg-[#E5E5E5] shadow-md opacity-90" : "bg-[#E5E5E5]"
-      }`}
-    >
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <nav className={`navbar ${isScrolled ? "navbar-scrolled" : ""}`}>
+      <div className="section-container">
         <div className="flex justify-between items-center py-4">
           <div className="text-lg font-montserrat text-indigo-800 font-semibold">
             <Link
               href="/"
-              className={`text-center group flex items-center ${
-                isPWA ? "p-2" : "" // Extra padding for PWA
-              }`}
+              className={`group flex items-center ${isPWA ? "pwa-padding-large" : ""}`}
             >
               <Image
                 src="/images/logo.svg"
                 alt="Sundai Club Logo"
                 width={80}
                 height={80}
-                className="transition-transform duration-300 transform group-hover:scale-110 mr-2"
+                className="mr-2 hover-scale"
               />
             </Link>
           </div>
-          <div className="flex items-center">
+          <div className="flex items-center space-x-4">
             <Link
               href="/projects"
-              className={`${
-                isPWA ? "px-4 py-3" : "px-3 py-2"
-              } mx-2 rounded-lg active:bg-indigo-100`}
+              className={`navbar-button ${isPWA ? "pwa-padding-large" : "pwa-padding"}`}
             >
-              <span className="text-sm text-black hover:text-indigo-700 dark:hover:text-indigo-500 transition duration-300">
-                Join a Project
-              </span>
+              Join a Project
             </Link>
 
             {isSignedIn && (
               <>
                 <Link
                   href="/projects/new"
-                  className={`${
-                    isPWA ? "px-4 py-3" : "px-3 py-2"
-                  } mx-2 rounded-lg active:bg-indigo-100`}
+                  className={`navbar-button ${isPWA ? "pwa-padding-large" : "pwa-padding"}`}
                 >
-                  <span className="text-sm text-black hover:text-indigo-700 dark:hover:text-indigo-500 transition duration-300">
-                    New Project
-                  </span>
+                  New Project
                 </Link>
 
                 <Link
                   href={`/hacker/${user?.id}`}
-                  className={`${
-                    isPWA ? "px-4 py-3" : "px-3 py-2"
-                  } mx-2 rounded-lg active:bg-indigo-100`}
+                  className={`navbar-button ${isPWA ? "pwa-padding-large" : "pwa-padding"}`}
                 >
-                  <span className="text-sm text-black hover:text-indigo-700 dark:hover:text-indigo-500 transition duration-300">
-                    My Profile
-                  </span>
+                  My Profile
                 </Link>
               </>
             )}
@@ -101,13 +79,7 @@ const Navbar = () => {
                 />
               ) : (
                 <SignInButton mode="modal">
-                  <span
-                    className={`
-                    text-sm bg-indigo-600 text-white rounded-full hover:bg-indigo-700 
-                    transition duration-300 cursor-pointer
-                    ${isPWA ? "px-6 py-3" : "px-4 py-2"}
-                  `}
-                  >
+                  <span className={`navbar-button ${isPWA ? "pwa-padding-large" : "pwa-padding"}`}>
                     Log In
                   </span>
                 </SignInButton>

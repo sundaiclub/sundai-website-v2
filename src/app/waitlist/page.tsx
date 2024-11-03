@@ -10,7 +10,6 @@ export default function Waitlist() {
   const [message, setMessage] = useState("");
   const [isSubmitted, setIsSubmitted] = useState(false);
 
-  // Replace with your Google Form URL and entry IDs
   const formActionUrl =
     "https://docs.google.com/forms/d/e/1FAIpQLScLfMxNyHsBf3XreSWEn6Rkujp27VnOAzsi_jhlQR3XGf2mJA/formResponse";
   const emailEntryField = "entry.177482849";
@@ -22,14 +21,12 @@ export default function Waitlist() {
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
-    // Validate email
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       setMessage("Please enter a valid email address.");
       return;
     }
 
-    // Construct form data
     const formData = new FormData();
     formData.append(emailEntryField, email);
     formData.append(sideEffectEntryField, sideEffectExperience);
@@ -38,7 +35,6 @@ export default function Waitlist() {
     formData.append(willingnessToPayEntryField, willingnessToPay);
 
     try {
-      // Submit to Google Forms
       await fetch(formActionUrl, {
         method: "POST",
         body: formData,
@@ -58,8 +54,8 @@ export default function Waitlist() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-r from-purple-100 to-pink-100 text-gray-800 flex flex-col items-center justify-center font-montserrat pt-20">
-      <main className="w-full max-w-2xl p-8 bg-white rounded-lg shadow-lg m-6">
+    <div className="page-background flex flex-col items-center justify-center pt-20 min-h-screen">
+      <main className="form-container m-6">
         <h1 className="text-4xl font-bold mb-6 text-center text-indigo-900">
           Have You Faced Unusual Side-Effects?
         </h1>
@@ -74,12 +70,9 @@ export default function Waitlist() {
           We are building an app that allows users to confirm medication side
           effects that are not yet clinically recognized.
         </p>
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="form-section">
           <div className="mb-4">
-            <label
-              htmlFor="email"
-              className="block text-lg font-medium text-gray-700 mb-2"
-            >
+            <label htmlFor="email" className="form-label-lg">
               Email Address
             </label>
             <input
@@ -87,16 +80,13 @@ export default function Waitlist() {
               id="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-3 py-2 bg-purple-50 text-gray-800 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="form-input"
               required
             />
           </div>
 
           <div className="mb-4">
-            <label
-              htmlFor="sideEffectExperience"
-              className="block text-lg font-medium text-gray-700 mb-2"
-            >
+            <label htmlFor="sideEffectExperience" className="form-label-lg">
               Have you ever had a side-effect from a medication that was
               unreported or under-reported?
             </label>
@@ -104,7 +94,7 @@ export default function Waitlist() {
               id="sideEffectExperience"
               value={sideEffectExperience}
               onChange={(e) => setSideEffectExperience(e.target.value)}
-              className="w-full px-3 py-2 bg-red-50 text-gray-800 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-red-500 text-lg"
+              className="form-select"
               required
             >
               <option value="">Select...</option>
@@ -114,10 +104,7 @@ export default function Waitlist() {
           </div>
 
           <div className="mb-4">
-            <label
-              htmlFor="onlineValidation"
-              className="block text-lg font-medium text-gray-700 mb-2"
-            >
+            <label htmlFor="onlineValidation" className="form-label-lg">
               Have you ever used online forums, like Reddit, to validate your
               symptoms/side-effects?
             </label>
@@ -125,7 +112,7 @@ export default function Waitlist() {
               id="onlineValidation"
               value={onlineValidation}
               onChange={(e) => setOnlineValidation(e.target.value)}
-              className="w-full px-3 py-2 bg-red-50 text-gray-800 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-red-500 text-lg "
+              className="form-select"
               required
             >
               <option value="">Select...</option>
@@ -135,10 +122,7 @@ export default function Waitlist() {
           </div>
 
           <div className="mb-4">
-            <label
-              htmlFor="appInterest"
-              className="block text-lg font-medium text-gray-700 mb-2"
-            >
+            <label htmlFor="appInterest" className="form-label-lg">
               Will you use an app that confirms side-effects not yet reported
               clinically, but reported by other users?
             </label>
@@ -146,7 +130,7 @@ export default function Waitlist() {
               id="appInterest"
               value={appInterest}
               onChange={(e) => setAppInterest(e.target.value)}
-              className="w-full px-3 py-2 bg-red-50 text-gray-800 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-red-500 text-lg"
+              className="form-select"
               required
             >
               <option value="">Select...</option>
@@ -157,17 +141,14 @@ export default function Waitlist() {
           </div>
 
           <div className="mb-4">
-            <label
-              htmlFor="willingnessToPay"
-              className="block text-lg font-medium text-gray-700 mb-2"
-            >
+            <label htmlFor="willingnessToPay" className="form-label-lg">
               Will you pay $0.10 (10 cents) per use of the app?
             </label>
             <select
               id="willingnessToPay"
               value={willingnessToPay}
               onChange={(e) => setWillingnessToPay(e.target.value)}
-              className="w-full px-3 py-2 bg-red-50 text-gray-800 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-red-500 text-lg"
+              className="form-select"
               required
             >
               <option value="">Select...</option>
@@ -178,18 +159,11 @@ export default function Waitlist() {
           </div>
 
           {message && (
-            <p
-              className={`text-md ${
-                isSubmitted ? "text-green-600" : "text-red-600"
-              } mb-4`}
-            >
+            <p className={`text-md ${isSubmitted ? "text-green-600" : "text-red-600"} mb-4`}>
               {message}
             </p>
           )}
-          <button
-            type="submit"
-            className=" text-lg w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-full focus:outline-none focus:ring-2 focus:ring-indigo-500 transition duration-300"
-          >
+          <button type="submit" className="button-primary w-full text-lg">
             Submit Your Response
           </button>
         </form>

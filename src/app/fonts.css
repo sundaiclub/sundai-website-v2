@@ -1,17 +1,48 @@
+/* fonts.css */
+
+/* Import Montserrat and Inter from Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap');
+
+/* Import or define P22 Mackinac Pro (If available locally or from a hosted source) */
+/* Example using a local file (ensure you have the font files in your public directory) */
 @font-face {
-  font-family: 'P22 Mackinac Pro';
-  src: url('/fonts/P22MackinacPro-Medium.woff2') format('woff2'),
-    url('/fonts/P22MackinacPro-Medium.woff') format('woff');
-  font-weight: 500;
+  font-family: "P22 Mackinac Pro";
+  src: url("/fonts/P22MackinacPro-Regular.woff2") format("woff2"),
+       url("/fonts/P22MackinacPro-Regular.woff") format("woff");
+  font-weight: normal;
   font-style: normal;
-  font-display: swap;
 }
 
 @font-face {
-  font-family: 'P22 Mackinac Pro';
-  src: url('/fonts/P22MackinacPro-MediumItalic.woff2') format('woff2'),
-    url('/fonts/P22MackinacPro-MediumItalic.woff') format('woff');
-  font-weight: 500;
-  font-style: italic;
-  font-display: swap;
+  font-family: "P22 Mackinac Pro";
+  src: url("/fonts/P22MackinacPro-Bold.woff2") format("woff2"),
+       url("/fonts/P22MackinacPro-Bold.woff") format("woff");
+  font-weight: bold;
+  font-style: normal;
+}
+
+/* Font Classes */
+.font-montserrat {
+  font-family: 'Montserrat', sans-serif;
+}
+
+.font-inter {
+  font-family: 'Inter', sans-serif;
+}
+
+.font-mackinac {
+  font-family: 'P22 Mackinac Pro', serif;
+}
+
+/* Applying these fonts to common elements */
+body, html {
+  font-family: 'Montserrat', sans-serif;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'P22 Mackinac Pro', serif;
+}
+
+p, a, span, div, input, button {
+  font-family: 'Inter', sans-serif;
 }

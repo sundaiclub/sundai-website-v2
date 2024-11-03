@@ -42,12 +42,7 @@ type JoinModalProps = {
   projectTitle: string;
 };
 
-const JoinModal = ({
-  isOpen,
-  onClose,
-  onJoin,
-  projectTitle,
-}: JoinModalProps) => {
+const JoinModal = ({ isOpen, onClose, onJoin, projectTitle }: JoinModalProps) => {
   const [selectedRole, setSelectedRole] = useState("MEMBER");
 
   const roles = [
@@ -60,14 +55,11 @@ const JoinModal = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 w-full max-w-md m-4">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-semibold text-gray-900">Join Project</h2>
-          <button
-            onClick={onClose}
-            className="text-gray-500 hover:text-gray-700"
-          >
+    <div className="modal-overlay">
+      <div className="modal-container">
+        <div className="modal-header">
+          <h2 className="modal-title">Join Project</h2>
+          <button onClick={onClose} className="modal-close-button">
             <XMarkIcon className="h-6 w-6" />
           </button>
         </div>
@@ -81,17 +73,14 @@ const JoinModal = ({
             <button
               key={role.id}
               onClick={() => setSelectedRole(role.id)}
-              className={`text-gray-900 w-full px-4 py-3 rounded-lg text-left flex items-center space-x-3 ${
+              className={`w-full px-4 py-3 rounded-lg flex items-center space-x-3 ${
                 selectedRole === role.id
                   ? "bg-indigo-50 border-2 border-indigo-500"
                   : "border-2 border-gray-200 hover:border-indigo-200"
               }`}
             >
-              <div
-                className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                  selectedRole === role.id
-                    ? "border-indigo-500"
-                    : "border-gray-400"
+              <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                  selectedRole === role.id ? "border-indigo-500" : "border-gray-400"
                 }`}
               >
                 {selectedRole === role.id && (
@@ -106,16 +95,10 @@ const JoinModal = ({
         </div>
 
         <div className="mt-6 flex justify-end space-x-3">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-gray-600 hover:text-gray-800"
-          >
+          <button onClick={onClose} className="px-4 py-2 text-gray-600 hover:text-gray-800">
             Cancel
           </button>
-          <button
-            onClick={() => onJoin(selectedRole)}
-            className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
-          >
+          <button onClick={() => onJoin(selectedRole)} className="button-primary">
             Join Project
           </button>
         </div>
@@ -130,9 +113,7 @@ export default function ProjectsAdmin() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [joinModalOpen, setJoinModalOpen] = useState(false);
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
-    null
-  );
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [selectedProjectTitle, setSelectedProjectTitle] = useState("");
 
   useEffect(() => {
@@ -158,6 +139,35 @@ export default function ProjectsAdmin() {
     fetchProjects();
   }, [userInfo?.role, userLoading, router]);
 
+  const handleRemoveParticipant = async (projectId: string, hackerId: string) => {
+    if (!userInfo?.role) return;
+
+    try {
+      const response = await fetch(`/api/projects/${projectId}/participants/${hackerId}`, {
+        method: "DELETE",
+      });
+
+      if (response.ok) {
+        setProjects(
+          projects.map((project) => {
+            if (project.id === projectId) {
+              return {
+                ...project,
+                participants: project.participants.filter((p) => p.hacker.id !== hackerId),
+              };
+            }
+            return project;
+          })
+        );
+      } else {
+        alert("Failed to remove participant");
+      }
+    } catch (error) {
+      console.error("Error removing participant:", error);
+      alert("Error removing participant");
+    }
+  };
+
   const handleApprove = async (projectId: string) => {
     if (!isAdmin) {
       alert("Only admins can approve projects");
@@ -165,9 +175,7 @@ export default function ProjectsAdmin() {
     }
 
     try {
-      const response = await fetch(`/api/projects/${projectId}/approve`, {
-        method: "POST",
-      });
+      const response = await fetch(`/api/projects/${projectId}/approve`, { method: "POST" });
 
       if (response.ok) {
         setProjects(projects.filter((p) => p.id !== projectId));
@@ -188,9 +196,7 @@ export default function ProjectsAdmin() {
     }
 
     try {
-      const response = await fetch(`/api/projects/${projectId}`, {
-        method: "DELETE",
-      });
+      const response = await fetch(`/api/projects/${projectId}`, { method: "DELETE" });
 
       if (response.ok) {
         setProjects(projects.filter((p) => p.id !== projectId));
@@ -200,43 +206,6 @@ export default function ProjectsAdmin() {
     } catch (error) {
       console.error("Error deleting project:", error);
       alert("Error deleting project");
-    }
-  };
-
-  const handleRemoveParticipant = async (
-    projectId: string,
-    hackerId: string
-  ) => {
-    if (!userInfo?.role) return;
-
-    try {
-      const response = await fetch(
-        `/api/projects/${projectId}/participants/${hackerId}`,
-        {
-          method: "DELETE",
-        }
-      );
-
-      if (response.ok) {
-        setProjects(
-          projects.map((project) => {
-            if (project.id === projectId) {
-              return {
-                ...project,
-                participants: project.participants.filter(
-                  (p) => p.hacker.id !== hackerId
-                ),
-              };
-            }
-            return project;
-          })
-        );
-      } else {
-        alert("Failed to remove participant");
-      }
-    } catch (error) {
-      console.error("Error removing participant:", error);
-      alert("Error removing participant");
     }
   };
 
@@ -255,14 +224,10 @@ export default function ProjectsAdmin() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          hackerId: userInfo?.id,
-          role: role,
-        }),
+        body: JSON.stringify({ hackerId: userInfo?.id, role: role }),
       });
 
       if (response.ok) {
-        // Update local state to reflect the new participant
         setProjects(
           projects.map((project) => {
             if (project.id === selectedProjectId) {
@@ -275,9 +240,7 @@ export default function ProjectsAdmin() {
                     hacker: {
                       id: userInfo?.id || "",
                       name: userInfo?.name || "",
-                      avatar: userInfo?.avatar
-                        ? { url: userInfo.avatar }
-                        : null,
+                      avatar: userInfo?.avatar ? { url: userInfo.avatar } : null,
                     },
                   },
                 ],
@@ -299,46 +262,33 @@ export default function ProjectsAdmin() {
   if (userLoading || loading) {
     return (
       <div className="flex justify-center items-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-600"></div>
+        <div className="spinner-large"></div>
       </div>
     );
   }
 
-  if (
-    !userInfo?.role ||
-    (userInfo.role !== "ADMIN" && userInfo.role !== "HACKER")
-  ) {
+  if (!userInfo?.role || (userInfo.role !== "ADMIN" && userInfo.role !== "HACKER")) {
     return null;
   }
 
   return (
     <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 py-20">
       <div className="flex flex-col space-y-4 mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Project Review</h1>
+        <h1 className="section-title">Project Review</h1>
         <p className="text-gray-600">
-          {isAdmin
-            ? "Review and approve new project submissions"
-            : "View pending projects"}
+          {isAdmin ? "Review and approve new project submissions" : "View pending projects"}
         </p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
         {projects.map((project) => (
-          <div
-            key={project.id}
-            className="bg-white rounded-lg shadow-lg overflow-hidden hover:shadow-xl transition-shadow"
-          >
+          <div key={project.id} className="card shadow-lg hover:shadow-xl transition-shadow">
             <div className="relative h-40 sm:h-48">
               <Link href={`/projects/${project.id}`}>
-                <Image
-                  src={"/images/projects_screenshots/week-25.jpg"}
-                  alt={project.title}
-                  fill
-                  className="object-cover"
-                />
+                <Image src={project.thumbnail?.url || "/images/projects_screenshots/week-25.jpg"} alt={project.title} fill className="object-cover" />
               </Link>
             </div>
-            <div className="p-4 sm:p-6">
+            <div className="card-content">
               <div className="flex justify-between items-start mb-4">
                 <Link href={`/projects/${project.id}`}>
                   <h3 className="text-lg sm:text-xl font-bold text-gray-900 hover:text-indigo-600 transition-colors">
@@ -346,16 +296,13 @@ export default function ProjectsAdmin() {
                   </h3>
                 </Link>
                 <div className="flex space-x-2">
-                  {!project.participants.some(
-                    (p) => p.hacker.id === userInfo?.id
-                  ) && (
+                  {!project.participants.some((p) => p.hacker.id === userInfo?.id) && (
                     <button
                       onClick={(e) => {
                         e.preventDefault();
-                        e.stopPropagation();
                         handleJoinClick(project.id, project.title);
                       }}
-                      className="px-4 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 transition-colors touch-manipulation"
+                      className="button-primary text-sm"
                     >
                       Join
                     </button>
@@ -364,10 +311,9 @@ export default function ProjectsAdmin() {
                     <button
                       onClick={(e) => {
                         e.preventDefault();
-                        e.stopPropagation();
                         handleApprove(project.id);
                       }}
-                      className="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors touch-manipulation"
+                      className="button-primary bg-green-600 hover:bg-green-700 text-sm"
                     >
                       Approve
                     </button>
@@ -376,10 +322,9 @@ export default function ProjectsAdmin() {
                     <button
                       onClick={(e) => {
                         e.preventDefault();
-                        e.stopPropagation();
                         handleDelete(project.id, project.launchLead.id);
                       }}
-                      className="px-4 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 transition-colors touch-manipulation"
+                      className="button-primary bg-red-600 hover:bg-red-700 text-sm"
                     >
                       Delete
                     </button>
@@ -388,122 +333,65 @@ export default function ProjectsAdmin() {
               </div>
 
               <Link href={`/projects/${project.id}`}>
-                <p className="text-sm sm:text-base text-gray-600 mb-4">
-                  {project.description}
-                </p>
+                <p className="text-sm text-gray-600 mb-4">{project.description}</p>
               </Link>
 
-              {/* Team Section */}
               <div className="mb-4">
-                <h4 className="text-xs sm:text-sm font-semibold text-gray-700 mb-2">
-                  Team
-                </h4>
+                <h4 className="text-xs font-semibold text-gray-700 mb-2">Team</h4>
                 <div className="space-y-2">
-                  {/* Launch Lead */}
                   <div className="flex items-center">
-                    <div className="flex-shrink-0">
+                    <div className="avatar-small">
                       {project.launchLead.avatar ? (
-                        <Image
-                          src={project.launchLead.avatar.url}
-                          alt={project.launchLead.name}
-                          width={28}
-                          height={28}
-                          className="rounded-full"
-                        />
+                        <Image src={project.launchLead.avatar.url} alt={project.launchLead.name} width={28} height={28} className="rounded-full" />
                       ) : (
-                        <div className="w-7 h-7 bg-indigo-100 rounded-full flex items-center justify-center">
-                          <span className="text-indigo-600 text-xs">
-                            {project.launchLead.name[0]}
-                          </span>
+                        <div className="avatar-placeholder-large">
+                          <span className="text-indigo-600 text-xs">{project.launchLead.name[0]}</span>
                         </div>
                       )}
                     </div>
-                    <div className="ml-2 sm:ml-3">
-                      <p className="text-xs sm:text-sm font-medium text-gray-900">
-                        {project.launchLead.name}
-                      </p>
+                    <div className="ml-2">
+                      <p className="text-sm font-medium text-gray-900">{project.launchLead.name}</p>
                       <p className="text-xs text-indigo-600">Launch Lead</p>
                     </div>
                   </div>
 
-                  {/* Other Participants */}
                   {project.participants.map((participant) => (
-                    <div
-                      key={participant.hacker.id}
-                      className="flex items-center justify-between group"
-                    >
+                    <div key={participant.hacker.id} className="flex items-center justify-between">
                       <div className="flex items-center">
-                        <div className="flex-shrink-0">
+                        <div className="avatar-small">
                           {participant.hacker.avatar ? (
-                            <Image
-                              src={participant.hacker.avatar.url}
-                              alt={participant.hacker.name}
-                              width={28}
-                              height={28}
-                              className="rounded-full"
-                            />
+                            <Image src={participant.hacker.avatar.url} alt={participant.hacker.name} width={28} height={28} className="rounded-full" />
                           ) : (
-                            <div className="w-7 h-7 bg-gray-100 rounded-full flex items-center justify-center">
-                              <span className="text-gray-600 text-xs">
-                                {participant.hacker.name[0]}
-                              </span>
+                            <div className="avatar-placeholder-gray">
+                              <span className="text-gray-600 text-xs">{participant.hacker.name[0]}</span>
                             </div>
                           )}
                         </div>
-                        <div className="ml-2 sm:ml-3">
-                          <p className="text-xs sm:text-sm font-medium text-gray-900">
-                            {participant.hacker.name}
-                          </p>
-                          <p className="text-xs text-gray-500">
-                            {participant.role}
-                          </p>
+                        <div className="ml-2">
+                          <p className="text-sm font-medium text-gray-900">{participant.hacker.name}</p>
+                          <p className="text-xs text-gray-500">{participant.role}</p>
                         </div>
                       </div>
                       <button
-                        onClick={() =>
-                          handleRemoveParticipant(
-                            project.id,
-                            participant.hacker.id
-                          )
-                        }
-                        className="opacity-0 group-hover:opacity-100 transition-opacity text-gray-400 hover:text-red-500"
+                        onClick={() => handleRemoveParticipant(project.id, participant.hacker.id)}
+                        className="text-gray-400 hover:text-red-500"
                         aria-label="Remove participant"
                       >
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          className="h-4 w-4 sm:h-5 sm:w-5"
-                          viewBox="0 0 20 20"
-                          fill="currentColor"
-                        >
-                          <path
-                            fillRule="evenodd"
-                            d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
-                            clipRule="evenodd"
-                          />
-                        </svg>
+                        <XMarkIcon className="h-4 w-4" />
                       </button>
                     </div>
                   ))}
                 </div>
               </div>
 
-              {/* Links */}
               <div className="flex space-x-4 mt-4 pt-4 border-t">
                 {project.demoUrl && (
-                  <Link
-                    href={project.demoUrl}
-                    className="text-indigo-600 hover:text-indigo-800 text-xs sm:text-sm font-medium"
-                    target="_blank"
-                  >
+                  <Link href={project.demoUrl} className="link-button text-sm" target="_blank">
                     View Demo →
                   </Link>
                 )}
                 {project.githubUrl && (
-                  <Link
-                    href={project.githubUrl}
-                    className="text-gray-600 hover:text-gray-800 text-xs sm:text-sm font-medium"
-                    target="_blank"
-                  >
+                  <Link href={project.githubUrl} className="link-button-github text-sm" target="_blank">
                     GitHub →
                   </Link>
                 )}

@@ -50,17 +50,15 @@ export default function AttendanceTable() {
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-[200px]">
-        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-600"></div>
+        <div className="spinner-small"></div>
       </div>
     );
   }
 
   return (
-    <div className="bg-white rounded-lg shadow overflow-hidden">
-      <div className="px-4 py-5 sm:px-6 flex justify-between items-center">
-        <h3 className="text-lg font-medium leading-6 text-gray-900">
-          Attendance Records
-        </h3>
+    <div className="card p-6">
+      <div className="flex justify-between items-center pb-4 border-b border-gray-200">
+        <h3 className="section-title">Attendance Records</h3>
         <div className="flex space-x-4">
           <input
             type="date"
@@ -71,7 +69,7 @@ export default function AttendanceTable() {
                 startDate: new Date(e.target.value),
               }))
             }
-            className="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+            className="form-input"
           />
           <input
             type="date"
@@ -82,32 +80,20 @@ export default function AttendanceTable() {
                 endDate: new Date(e.target.value),
               }))
             }
-            className="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+            className="form-input"
           />
         </div>
       </div>
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto mt-4">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Hacker
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Date
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Check In
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Check Out
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Duration
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Status
-              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Hacker</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Check In</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Check Out</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Duration</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
@@ -115,7 +101,7 @@ export default function AttendanceTable() {
               <tr key={record.id}>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="flex items-center">
-                    <div className="flex-shrink-0 h-10 w-10">
+                    <div className="avatar-large">
                       {record.hacker.avatar ? (
                         <Image
                           src={record.hacker.avatar.url}
@@ -125,7 +111,7 @@ export default function AttendanceTable() {
                           className="rounded-full"
                         />
                       ) : (
-                        <div className="h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center">
+                        <div className="avatar-placeholder">
                           <span className="text-indigo-600 font-medium">
                             {record.hacker.name[0]}
                           </span>
@@ -137,8 +123,7 @@ export default function AttendanceTable() {
                         {record.hacker.name}
                       </div>
                       <div className="text-sm text-gray-500">
-                        Total:{" "}
-                        {Math.floor(record.hacker.totalMinutesAttended / 60)}h{" "}
+                        Total: {Math.floor(record.hacker.totalMinutesAttended / 60)}h{" "}
                         {record.hacker.totalMinutesAttended % 60}m
                       </div>
                     </div>
@@ -157,17 +142,13 @@ export default function AttendanceTable() {
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                   {record.duration
-                    ? `${Math.floor(record.duration / 60)}h ${
-                        record.duration % 60
-                      }m`
+                    ? `${Math.floor(record.duration / 60)}h ${record.duration % 60}m`
                     : "-"}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <span
-                    className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                      record.verified
-                        ? "bg-green-100 text-green-800"
-                        : "bg-yellow-100 text-yellow-800"
+                    className={`badge ${
+                      record.verified ? "status-badge-approved" : "badge-pending"
                     }`}
                   >
                     {record.verified ? "Verified" : "Pending"}

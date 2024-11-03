@@ -2,88 +2,197 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --foreground-rgb: 0, 0, 0;
-  --background-start-rgb: 214, 219, 220;
-  --background-end-rgb: 255, 255, 255;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --foreground-rgb: 255, 255, 255;
-    --background-start-rgb: 0, 0, 0;
-    --background-end-rgb: 0, 0, 0;
+/* === Font Settings === */
+@layer base {
+  body {
+    @apply font-montserrat;
+  }
+  .page-font {
+    @apply font-inter;
   }
 }
 
-body {
-  color: rgb(var(--foreground-rgb));
-  background: linear-gradient(
-      to bottom,
-      transparent,
-      rgb(var(--background-end-rgb))
-    )
-    rgb(var(--background-start-rgb));
-}
-
+/* === Utility Classes === */
 @layer utilities {
   .text-balance {
     text-wrap: balance;
   }
-
-  /* Add these scrollbar styles */
-  .scrollbar-thin {
-    scrollbar-width: thin;
+  .scroll-touch {
+    @apply overscroll-none;
   }
+}
 
-  .scrollbar-thumb-gray-300 {
-    scrollbar-color: #d1d5db transparent;
+/* === Background and Layout Styling === */
+@layer components {
+  .page-background-light {
+    @apply bg-lightBackground;
   }
-
-  .scrollbar-track-transparent {
-    scrollbar-track-color: transparent;
+  .page-gradient {
+    @apply bg-gradient-to-b from-gradient-darkStart to-gradient-darkEnd;
   }
-
-  .hover\:scrollbar-thumb-gray-400:hover {
-    scrollbar-color: #9ca3af transparent;
+  .page-background {
+    @apply min-h-screen bg-gradient-to-r from-gradient-purpleStart to-gradient-pinkEnd text-gray-800 flex flex-col items-center justify-center pt-20;
   }
-
-  /* For Webkit browsers */
-  .scrollbar-thin::-webkit-scrollbar {
-    height: 8px;
+  .bg-gradient-dark {
+    @apply bg-gradient-to-r from-gray-100 to-gray-200;
   }
-
-  .scrollbar-thin::-webkit-scrollbar-track {
-    background: transparent;
+  .section-spacing {
+    @apply py-16 md:py-24 lg:py-26 px-4 md:px-8;
   }
-
-  .scrollbar-thin::-webkit-scrollbar-thumb {
-    background-color: #d1d5db;
-    border-radius: 4px;
+  .section-container {
+    @apply container mx-auto relative z-10;
   }
-
-  .scrollbar-thin:hover::-webkit-scrollbar-thumb {
-    background-color: #9ca3af;
+  .full-height-screen {
+    @apply h-screen min-h-screen;
   }
+}
 
-  /* Add this class for horizontal scroll containers */
-  .scroll-container {
-    @apply overflow-x-auto 
-      flex 
-      space-x-6 
-      pb-4 
-      scrollbar-thin 
-      scrollbar-thumb-gray-300 
-      scrollbar-track-transparent 
-      hover:scrollbar-thumb-gray-400 
-      -mx-4 
-      px-4;
-    -webkit-overflow-scrolling: touch;
-    scroll-snap-type: x mandatory;
+/* === Navbar Styling === */
+@layer components {
+  .navbar {
+    @apply fixed top-0 left-0 w-full z-50 transition-all duration-300 bg-lightBackground;
   }
+  .navbar-scrolled {
+    @apply shadow-md opacity-90;
+  }
+}
 
-  .scroll-item {
-    @apply flex-shrink-0;
-    scroll-snap-align: start;
+/* === Card Styling === */
+@layer components {
+  .card,
+  .card-light {
+    @apply bg-white rounded-lg shadow-lg transition-shadow;
+  }
+  .card-light {
+    @apply p-6 shadow-[inset_0_2px_4px_rgba(0,0,0,0.1)];
+  }
+  .card-hover:hover {
+    @apply shadow-xl;
+  }
+  .card-large {
+    @apply max-w-4xl;
+  }
+}
+
+/* === Typography === */
+@layer components {
+  .heading-primary {
+    @apply font-semibold text-2xl sm:text-3xl md:text-4xl lg:text-5xl text-black;
+  }
+  .text-primary {
+    @apply text-base sm:text-lg md:text-xl text-black mb-8 max-w-xl mx-auto;
+  }
+  .footer-text {
+    @apply text-sm md:text-base text-gray-400;
+  }
+  .section-heading {
+    @apply text-4xl md:text-5xl font-bold text-white mb-6;
+  }
+  .section-title,
+  .subsection-title {
+    @apply text-2xl font-bold text-gray-900 mb-4;
+  }
+}
+
+/* === Button Styling === */
+@layer components {
+  .button-secondary,
+  .info-link,
+  .link-text {
+    @apply text-indigo-600 hover:text-indigo-800 font-medium;
+  }
+  .button-disabled {
+    @apply bg-indigo-400 cursor-not-allowed opacity-50;
+  }
+  .link-button {
+    @apply bg-blue-500 text-white px-6 py-3 rounded-full hover:bg-blue-600 transition duration-300 cursor-pointer shadow-lg;
+  }
+}
+
+/* === Badge Styling === */
+@layer components {
+  .badge,
+  .status-badge {
+    @apply px-2 py-1 rounded-full text-sm;
+  }
+  .badge-pending {
+    @apply bg-yellow-500 text-white;
+  }
+}
+
+/* === Spinner Styling === */
+@layer components {
+  .spinner-small {
+    @apply animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-500;
+  }
+  .spinner-large {
+    @apply h-32 w-32;
+  }
+}
+
+/* === Avatar Styling === */
+@layer components {
+  .avatar-small,
+  .avatar-placeholder {
+    @apply w-7 h-7 rounded-full flex items-center justify-center;
+  }
+  .avatar-placeholder {
+    @apply bg-indigo-100 text-indigo-600 text-xs;
+  }
+  .avatar-large {
+    @apply w-32 h-32 sm:w-48 sm:h-48 border-4 border-white shadow-lg;
+  }
+}
+
+/* === Form Styling === */
+@layer components {
+  .form-container {
+    @apply max-w-2xl mx-auto p-6 bg-white rounded-lg shadow-sm;
+  }
+  .form-title {
+    @apply text-3xl font-bold text-gray-900 mb-8;
+  }
+  .form-label-lg {
+    @apply text-lg;
+  }
+  .form-input {
+    @apply w-full px-3 py-2 bg-purple-50 text-gray-800 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500 text-lg;
+  }
+}
+
+/* === Modal Styling === */
+@layer components {
+  .modal-overlay {
+    @apply fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50;
+  }
+  .modal-container {
+    @apply bg-white rounded-lg p-6 w-full max-w-md m-4;
+  }
+  .modal-header {
+    @apply flex justify-between items-center mb-4;
+  }
+}
+
+/* === Notification and Alert Boxes === */
+@layer components {
+  .success-message {
+    @apply bg-gray-100 border-l-4 border-green-500 text-green-700 p-4 mb-12 rounded-lg;
+  }
+  .empty-state-text {
+    @apply text-gray-600;
+  }
+}
+
+/* === Footer Styling === */
+@layer components {
+  .footer {
+    @apply bg-gray-900 text-gray-400 py-8 text-center;
+  }
+}
+
+/* === Scrollable Section for Projects === */
+@layer components {
+  .scrollable-section {
+    @apply overflow-x-auto flex space-x-6 pb-4 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent hover:scrollbar-thumb-gray-400 -mx-4 px-4;
   }
 }
