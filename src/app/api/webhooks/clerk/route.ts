@@ -46,12 +46,9 @@ async function handler(request: Request) {
   const eventType = evt.type;
 
   if (eventType === "user.created") {
-    console.log(evt.data);
     const { id, email_addresses, first_name, last_name, image_url } = evt.data;
     try {
-      // Get email username as fallback
       const emailUsername = email_addresses[0].email_address.split("@")[0];
-      // Create display name from available data
       const name =
         first_name && last_name
           ? `${first_name} ${last_name}`
@@ -62,10 +59,9 @@ async function handler(request: Request) {
       const hacker = await prisma.hacker.create({
         data: {
           name: name,
-          discordId: id,
+          clerkId: id,
           email: email_addresses[0].email_address,
           role: "HACKER",
-          // Add avatar if image_url exists
           ...(image_url && {
             avatar: {
               create: {

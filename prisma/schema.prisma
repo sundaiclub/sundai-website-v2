@@ -15,8 +15,8 @@ datasource db {
 
 model Hacker {
   id          String    @id @default(uuid())
+  clerkId     String    @unique
   name        String
-  discordId   String    @unique
   role        Role?
   bio         String?
   githubUrl   String?
@@ -37,6 +37,8 @@ model Hacker {
   verifiedAttendances  Attendance[] @relation("AttendanceVerifications")
   totalMinutesAttended Int          @default(0)
   lastAttendance      DateTime?
+
+  @@index([clerkId])
 }
 
 model Project {
@@ -55,10 +57,12 @@ model Project {
   endDate     DateTime?
   status      ProjectStatus @default(PENDING)
   likes       ProjectLike[]
+  weeks       Week[]    // Many-to-many as projects can span multiple weeks
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
   @@index([launchLeadId])
+  Attendance Attendance[]
 }
 
 model ProjectToParticipant {
@@ -155,6 +159,8 @@ model Attendance {
   id          String    @id @default(uuid())
   hacker      Hacker    @relation(fields: [hackerId], references: [id])
   hackerId    String
+  week        Week      @relation(fields: [weekId], references: [id]) // Link to specific week
+  weekId      String
   date        DateTime  @default(now())
   checkInTime DateTime  @default(now())
   checkOutTime DateTime?
@@ -164,10 +170,28 @@ model Attendance {
   verified    Boolean   @default(false)
   verifiedBy  Hacker?   @relation("AttendanceVerifications", fields: [verifierId], references: [id])
   verifierId  String?
+  projects    Project[] // Projects worked on during this attendance
 
   @@unique([hackerId, date])
   @@index([hackerId])
   @@index([date])
+  @@index([weekId])
+}
+
+model Week {
+  id          String    @id @default(uuid())
+  number      Int       // Week number (1, 2, 3, etc.)
+  startDate   DateTime
+  endDate     DateTime
+  theme       String?   // Optional theme for the week
+  description String?
+  projects    Project[] // Projects started this week
+  attendance  Attendance[] // Attendance records for this week
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([number])
+  @@index([startDate, endDate])
 }
 
 enum Role {

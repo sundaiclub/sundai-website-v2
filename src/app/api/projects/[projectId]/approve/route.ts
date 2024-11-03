@@ -14,9 +14,8 @@ export async function POST(
       return new NextResponse("Unauthorized", { status: 401 });
     }
 
-    // Check if user is admin
     const user = await prisma.hacker.findUnique({
-      where: { id: userId },
+      where: { clerkId: userId },
       select: {
         role: true,
       },

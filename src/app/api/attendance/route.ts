@@ -12,11 +12,24 @@ export async function POST(req: Request) {
     }
 
     const hacker = await prisma.hacker.findUnique({
-      where: { id: userId },
+      where: { clerkId: userId },
     });
 
     if (!hacker) {
       return new NextResponse("Hacker not found", { status: 404 });
+    }
+
+    // Get current week
+    const now = new Date();
+    const currentWeek = await prisma.week.findFirst({
+      where: {
+        startDate: { lte: now },
+        endDate: { gte: now },
+      },
+    });
+
+    if (!currentWeek) {
+      return new NextResponse("No active week found", { status: 400 });
     }
 
     // Check if already checked in today
@@ -67,12 +80,13 @@ export async function POST(req: Request) {
       });
     }
 
-    // Create new attendance record
+    // Create new attendance record with week
     const attendance = await prisma.attendance.create({
       data: {
         hackerId: hacker.id,
+        weekId: currentWeek.id,
         date: today,
-        location: "Remote", // Default to remote
+        location: "Remote",
       },
     });
 

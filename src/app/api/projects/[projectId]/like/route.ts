@@ -13,22 +13,19 @@ export async function POST(
     if (!userId) {
       return new NextResponse("Unauthorized", { status: 401 });
     }
-    console.log(userId);
-    // Get the hacker using discordId (which stores Clerk userId)
+
     const hacker = await prisma.hacker.findUnique({
-      where: { id: userId },
+      where: { clerkId: userId },
     });
 
-    console.log(hacker);
     if (!hacker) {
       return new NextResponse("Hacker not found", { status: 404 });
     }
 
-    // Create like using hacker.id
     const like = await prisma.projectLike.create({
       data: {
         projectId: params.projectId,
-        hackerId: hacker.id, // Use hacker.id instead of userId
+        hackerId: hacker.id,
       },
     });
 
@@ -51,7 +48,7 @@ export async function DELETE(
 
     // Get the hacker using discordId
     const hacker = await prisma.hacker.findUnique({
-      where: { id: userId },
+      where: { discordId: userId },
     });
 
     if (!hacker) {

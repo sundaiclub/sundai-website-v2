@@ -63,3 +63,18 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/deployment) for more details.
+
+## Database Connection
+
+The application connects to a Google Cloud SQL PostgreSQL instance:
+
+```bash
+# Connection Details
+Host: 34.148.221.200
+Port: 5432
+Database: sundai_db
+Instance: sundai-club-434220:us-east1:club-site-main
+Service Account: p199983032721-yeh8ti@gcp-sa-cloud-sql.iam.gserviceaccount.com
+```
+
+To connect locally, update your .env file with the correct DATABASE_URL.
