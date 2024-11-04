@@ -5,17 +5,12 @@ import { motion } from "framer-motion";
 import ProjectCard from "./components/Project";
 import Typewriter from "typewriter-effect";
 import { useState, useEffect } from "react";
-import { registerServiceWorker } from "./pwa";
 import { usePullToRefresh } from "./hooks/usePullToRefresh";
 import { useTheme } from './contexts/ThemeContext';
 
 export default function Home() {
   const [isTypingDone, setIsTypingDone] = useState(false);
   const { isDarkMode } = useTheme();
-
-  useEffect(() => {
-    registerServiceWorker();
-  }, []);
 
   usePullToRefresh();
 
@@ -42,7 +37,13 @@ export default function Home() {
       } font-space-mono`}>
       
       <section className="relative py-16 md:py-24 lg:py-26 px-4 md:px-8 overflow-hidden">
-        <div className="container mx-auto relative z-10">
+        <div className="container mx-auto relative z-10"
+             style={{
+              backgroundImage: "url('/images/background_sundai.webp')",
+              backgroundSize: "cover",
+              backgroundPosition: "center",
+              backgroundRepeat: "no-repeat",
+              }}>
           <div className="flex flex-col items-center justify-center">
             <motion.div
               className="w-full text-center mb-8"
