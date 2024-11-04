@@ -143,7 +143,7 @@ const Navbar = () => {
                 </SignInButton>
               )}
             </div>
-            <div className={`${isPWA ? "ml-2 p-1" : "ml-1"} px-2`}>
+            <div className={`${isPWA ? "mx-2 p-1" : "mx-1"} px-3 flex justify-center`}>
               <ThemeToggle />
             </div>
           </div>
