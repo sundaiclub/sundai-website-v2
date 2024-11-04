@@ -4,7 +4,7 @@ import { useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { XMarkIcon } from "@heroicons/react/24/solid";
 import Image from "next/image";
-import { useTheme } from '../../../context/ThemeContext';
+import { useTheme } from '../../contexts/ThemeContext';
 
 type Hacker = {
   id: string;

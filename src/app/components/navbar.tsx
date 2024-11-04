@@ -7,7 +7,7 @@ import { usePathname } from "next/navigation";
 import Image from "next/image";
 
 import ThemeToggle from './ThemeToggle';
-import { useTheme } from '../../context/ThemeContext';
+import { useTheme } from '../contexts/ThemeContext';
 
 const Navbar = () => {
   const [isScrolled, setIsScrolled] = useState(false);

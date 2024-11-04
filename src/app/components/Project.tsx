@@ -6,7 +6,7 @@ import { useUser } from "@clerk/nextjs";
 import { HeartIcon } from "@heroicons/react/24/outline";
 import { HeartIcon as HeartIconSolid } from "@heroicons/react/24/solid";
 import { useUserContext } from "../contexts/UserContext";
-import { useTheme } from '../../context/ThemeContext';
+import { useTheme } from '../contexts/ThemeContext';
 
 type Project = {
   id: string;

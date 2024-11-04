@@ -7,7 +7,7 @@ import Typewriter from "typewriter-effect";
 import { useState, useEffect } from "react";
 import { registerServiceWorker } from "./pwa";
 import { usePullToRefresh } from "./hooks/usePullToRefresh";
-import { useTheme } from '../context/ThemeContext';
+import { useTheme } from './contexts/ThemeContext';
 
 export default function Home() {
   const [isTypingDone, setIsTypingDone] = useState(false);
