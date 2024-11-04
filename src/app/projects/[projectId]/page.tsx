@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useUserContext } from "../../contexts/UserContext";
 import { HeartIcon } from "@heroicons/react/24/outline";
 import { HeartIcon as HeartIconSolid } from "@heroicons/react/24/solid";
+import { useTheme } from '../../../context/ThemeContext';
 
 type Project = {
   id: string;
@@ -51,6 +52,7 @@ export default function ProjectDetail() {
   const [loading, setLoading] = useState(true);
   const [isLiked, setIsLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
+  const { isDarkMode } = useTheme();
 
   useEffect(() => {
     const fetchProject = async () => {
@@ -104,7 +106,9 @@ export default function ProjectDetail() {
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-600"></div>
+        <div className={`animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 ${
+          isDarkMode ? 'border-purple-400' : 'border-indigo-600'
+        }`}></div>
       </div>
     );
   }
@@ -112,9 +116,15 @@ export default function ProjectDetail() {
   if (!project) return null;
 
   return (
-    <div className="min-h-screen py-20 px-4 bg-[#E5E5E5]">
+    <div className={`min-h-screen py-20 px-4 ${
+      isDarkMode 
+        ? 'bg-gradient-to-b from-gray-900 to-black text-gray-100' 
+        : 'bg-gradient-to-b from-[#E5E5E5] to-[#F0F0F0] text-gray-800'
+    } font-space-mono`}>
       <div className="max-w-4xl mx-auto">
-        <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+        <div className={`rounded-xl shadow-lg overflow-hidden ${
+          isDarkMode ? 'bg-gray-800' : 'bg-white'
+        }`}>
           {/* Project Header */}
           <div className="relative h-64 w-full">
             <Image
@@ -164,7 +174,9 @@ export default function ProjectDetail() {
           {/* Project Content */}
           <div className="p-6">
             <div className="prose max-w-none mb-8">
-              <p className="text-gray-700">{project.description}</p>
+              <p className={isDarkMode ? 'text-gray-300' : 'text-gray-700'}>
+                {project.description}
+              </p>
             </div>
 
             {/* Links Section */}
@@ -172,7 +184,11 @@ export default function ProjectDetail() {
               {project.demoUrl && (
                 <Link
                   href={project.demoUrl}
-                  className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                  className={`px-4 py-2 rounded-lg transition-colors ${
+                    isDarkMode 
+                      ? 'bg-indigo-700 hover:bg-indigo-600' 
+                      : 'bg-indigo-600 hover:bg-indigo-700'
+                  } text-white`}
                   target="_blank"
                 >
                   View Demo
@@ -181,7 +197,11 @@ export default function ProjectDetail() {
               {project.githubUrl && (
                 <Link
                   href={project.githubUrl}
-                  className="px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-900 transition-colors"
+                  className={`px-4 py-2 rounded-lg transition-colors ${
+                    isDarkMode 
+                      ? 'bg-gray-700 hover:bg-gray-600' 
+                      : 'bg-gray-800 hover:bg-gray-900'
+                  } text-white`}
                   target="_blank"
                 >
                   GitHub Repository
@@ -191,15 +211,21 @@ export default function ProjectDetail() {
 
             {/* Team Section */}
             <div>
-              <h2 className="text-xl font-bold mb-4">Team</h2>
+              <h2 className={`text-xl font-bold mb-4 ${
+                isDarkMode ? 'text-gray-100' : 'text-gray-900'
+              }`}>Team</h2>
 
               {/* Launch Lead */}
               <div className="mb-6">
-                <h3 className="text-sm font-semibold text-gray-500 mb-3">
-                  Launch Lead
-                </h3>
+                <h3 className={`text-sm font-semibold mb-3 ${
+                  isDarkMode ? 'text-gray-400' : 'text-gray-500'
+                }`}>Launch Lead</h3>
                 <Link href={`/hacker/${project.launchLead.id}`}>
-                  <div className="flex items-center p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                  <div className={`flex items-center p-4 rounded-lg transition-colors ${
+                    isDarkMode 
+                      ? 'bg-gray-700 hover:bg-gray-600' 
+                      : 'bg-gray-50 hover:bg-gray-100'
+                  }`}>
                     <div className="relative w-12 h-12">
                       {project.launchLead.avatar ? (
                         <Image
@@ -217,7 +243,9 @@ export default function ProjectDetail() {
                       )}
                     </div>
                     <div className="ml-4">
-                      <h4 className="text-lg font-semibold text-gray-900">
+                      <h4 className={`text-lg font-semibold ${
+                        isDarkMode ? 'text-gray-100' : 'text-gray-900'
+                      }`}>
                         {project.launchLead.name}
                       </h4>
                       <p className="text-sm text-indigo-600">Launch Lead</p>
@@ -228,16 +256,20 @@ export default function ProjectDetail() {
 
               {/* Team Members */}
               <div>
-                <h3 className="text-sm font-semibold text-gray-500 mb-3">
-                  Team Members
-                </h3>
+                <h3 className={`text-sm font-semibold mb-3 ${
+                  isDarkMode ? 'text-gray-400' : 'text-gray-500'
+                }`}>Team Members</h3>
                 <div className="space-y-3">
                   {project.participants.map((participant) => (
                     <Link
                       key={participant.hacker.id}
                       href={`/hacker/${participant.hacker.id}`}
                     >
-                      <div className="flex items-center p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                      <div className={`flex items-center p-4 rounded-lg transition-colors ${
+                        isDarkMode 
+                          ? 'bg-gray-700 hover:bg-gray-600' 
+                          : 'bg-gray-50 hover:bg-gray-100'
+                      }`}>
                         <div className="relative w-12 h-12">
                           {participant.hacker.avatar ? (
                             <Image
@@ -255,14 +287,20 @@ export default function ProjectDetail() {
                           )}
                         </div>
                         <div className="ml-4">
-                          <h4 className="text-lg font-semibold text-gray-900">
+                          <h4 className={`text-lg font-semibold ${
+                            isDarkMode ? 'text-gray-100' : 'text-gray-900'
+                          }`}>
                             {participant.hacker.name}
                           </h4>
-                          <p className="text-sm text-gray-600">
+                          <p className={`text-sm ${
+                            isDarkMode ? 'text-indigo-400' : 'text-gray-600'
+                          }`}>
                             {participant.role}
                           </p>
                           {participant.hacker.bio && (
-                            <p className="text-sm text-gray-500 mt-1 line-clamp-2">
+                            <p className={`text-sm mt-1 line-clamp-2 ${
+                              isDarkMode ? 'text-gray-400' : 'text-gray-500'
+                            }`}>
                               {participant.hacker.bio}
                             </p>
                           )}

@@ -4,6 +4,7 @@ import { useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { XMarkIcon } from "@heroicons/react/24/solid";
 import Image from "next/image";
+import { useTheme } from '../../../context/ThemeContext';
 
 type Hacker = {
   id: string;
@@ -34,6 +35,7 @@ export default function NewProject() {
   const [selectedRole, setSelectedRole] = useState("engineer");
   const [thumbnail, setThumbnail] = useState<File | null>(null);
   const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null);
+  const { isDarkMode } = useTheme();
 
   const roles = [
     { id: "engineer", label: "Engineer" },
@@ -150,18 +152,27 @@ export default function NewProject() {
   };
 
   return (
-    <div className="min-h-screen py-16 bg-[#E5E5E5] text-gray-800">
-      <div className="max-w-2xl mx-auto p-6 bg-white rounded-lg shadow-sm">
-        <h1 className="text-3xl font-bold text-gray-900 mb-8">
+    <div className={`min-h-screen py-16 ${
+      isDarkMode 
+        ? 'bg-gradient-to-b from-gray-900 to-black text-gray-100' 
+        : 'bg-gradient-to-b from-[#E5E5E5] to-[#F0F0F0] text-gray-800'
+    } font-space-mono`}>
+      <div className={`max-w-2xl mx-auto p-6 ${
+        isDarkMode 
+          ? 'bg-gray-800 shadow-lg' 
+          : 'bg-white shadow-sm'
+      } rounded-lg`}>
+        <h1 className={`text-3xl font-bold mb-8 font-space-mono ${
+          isDarkMode ? 'text-gray-100' : 'text-gray-900'
+        }`}>
           Initialize New Project
         </h1>
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
-            <label
-              htmlFor="launchLeadId"
-              className="block text-sm font-medium text-gray-700 mb-1"
-            >
+            <label className={`block text-sm font-medium mb-1 ${
+              isDarkMode ? 'text-gray-300' : 'text-gray-700'
+            } font-fira-code`}>
               Launch Lead *
             </label>
             <select
@@ -170,7 +181,11 @@ export default function NewProject() {
               required
               value={project.launchLeadId}
               onChange={handleChange}
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+              className={`mt-1 block w-full px-3 py-2 rounded-md shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 ${
+                isDarkMode 
+                  ? 'bg-gray-700 border-gray-600 text-gray-100' 
+                  : 'bg-white border-2 border-gray-200 text-gray-900 hover:border-gray-300'
+              } font-fira-code`}
             >
               <option value="">Select Launch Lead</option>
               {hackers.map((hacker) => (
@@ -184,7 +199,9 @@ export default function NewProject() {
           <div>
             <label
               htmlFor="title"
-              className="block text-sm font-medium text-gray-700 mb-1"
+              className={`block text-sm font-medium mb-1 ${
+                isDarkMode ? 'text-gray-300' : 'text-gray-700'
+              } font-fira-code`}
             >
               Project Title *
             </label>
@@ -195,7 +212,11 @@ export default function NewProject() {
               required
               value={project.title}
               onChange={handleChange}
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+              className={`mt-1 block w-full px-3 py-2 rounded-md shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 ${
+                isDarkMode 
+                  ? 'bg-gray-700 border-gray-600 text-gray-100' 
+                  : 'bg-white border-2 border-gray-200 text-gray-900 hover:border-gray-300'
+              } font-fira-code`}
               placeholder="Enter project title"
             />
           </div>
@@ -203,7 +224,9 @@ export default function NewProject() {
           <div>
             <label
               htmlFor="description"
-              className="block text-sm font-medium text-gray-700 mb-1"
+              className={`block text-sm font-medium mb-1 ${
+                isDarkMode ? 'text-gray-300' : 'text-gray-700'
+              } font-fira-code`}
             >
               Description *
             </label>
@@ -214,7 +237,11 @@ export default function NewProject() {
               rows={4}
               value={project.description}
               onChange={handleChange}
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+              className={`mt-1 block w-full px-3 py-2 rounded-md shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 ${
+                isDarkMode 
+                  ? 'bg-gray-700 border-gray-600 text-gray-100' 
+                  : 'bg-white border-2 border-gray-200 text-gray-900 hover:border-gray-300'
+              } font-fira-code`}
               placeholder="Describe your project"
             />
           </div>
@@ -222,7 +249,9 @@ export default function NewProject() {
           <div>
             <label
               htmlFor="githubUrl"
-              className="block text-sm font-medium text-gray-700 mb-1"
+              className={`block text-sm font-medium mb-1 ${
+                isDarkMode ? 'text-gray-300' : 'text-gray-700'
+              } font-fira-code`}
             >
               GitHub URL
             </label>
@@ -232,7 +261,11 @@ export default function NewProject() {
               name="githubUrl"
               value={project.githubUrl}
               onChange={handleChange}
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+              className={`mt-1 block w-full px-3 py-2 rounded-md shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 ${
+                isDarkMode 
+                  ? 'bg-gray-700 border-gray-600 text-gray-100' 
+                  : 'bg-white border-2 border-gray-200 text-gray-900 hover:border-gray-300'
+              } font-fira-code`}
               placeholder="https://github.com/username/project"
             />
           </div>
@@ -240,7 +273,9 @@ export default function NewProject() {
           <div>
             <label
               htmlFor="demoUrl"
-              className="block text-sm font-medium text-gray-700 mb-1"
+              className={`block text-sm font-medium mb-1 ${
+                isDarkMode ? 'text-gray-300' : 'text-gray-700'
+              } font-fira-code`}
             >
               Demo URL
             </label>
@@ -250,30 +285,44 @@ export default function NewProject() {
               name="demoUrl"
               value={project.demoUrl}
               onChange={handleChange}
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+              className={`mt-1 block w-full px-3 py-2 rounded-md shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 ${
+                isDarkMode 
+                  ? 'bg-gray-700 border-gray-600 text-gray-100' 
+                  : 'bg-white border-2 border-gray-200 text-gray-900 hover:border-gray-300'
+              } font-fira-code`}
               placeholder="https://your-demo-url.com"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className={`block text-sm font-medium mb-1 ${
+              isDarkMode ? 'text-gray-300' : 'text-gray-700'
+            } font-fira-code`}>
               Team Members
             </label>
             <div className="flex flex-wrap gap-2 mb-2">
               {selectedMembers.map((member) => (
                 <div
                   key={member.id}
-                  className="flex items-center bg-indigo-100 text-indigo-800 px-3 py-1 rounded-full text-sm"
+                  className={`flex items-center px-3 py-1 rounded-full text-sm ${
+                    isDarkMode 
+                      ? 'bg-gray-700 text-gray-100' 
+                      : 'bg-indigo-100 text-indigo-800'
+                  }`}
                 >
                   <span>{member.name}</span>
-                  <span className="mx-1 text-indigo-400">•</span>
-                  <span className="text-indigo-600">
+                  <span className={`mx-1 ${isDarkMode ? 'text-gray-400' : 'text-indigo-400'}`}>•</span>
+                  <span className={isDarkMode ? 'text-gray-300' : 'text-indigo-600'}>
                     {roles.find((r) => r.id === member.role)?.label}
                   </span>
                   <button
                     type="button"
                     onClick={() => handleRemoveMember(member.id)}
-                    className="ml-2 text-indigo-600 hover:text-indigo-800"
+                    className={`ml-2 ${
+                      isDarkMode 
+                        ? 'text-gray-400 hover:text-gray-200' 
+                        : 'text-indigo-600 hover:text-indigo-800'
+                    }`}
                   >
                     <XMarkIcon className="h-4 w-4" />
                   </button>
@@ -283,14 +332,20 @@ export default function NewProject() {
             <button
               type="button"
               onClick={() => setShowModal(true)}
-              className="text-indigo-600 hover:text-indigo-800 text-sm font-medium"
+              className={`text-sm font-medium ${
+                isDarkMode 
+                  ? 'text-indigo-400 hover:text-indigo-300' 
+                  : 'text-indigo-600 hover:text-indigo-800'
+              }`}
             >
               + Add Team Members
             </button>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className={`block text-sm font-medium mb-1 ${
+              isDarkMode ? 'text-gray-300' : 'text-gray-700'
+            } font-fira-code`}>
               Project Thumbnail
             </label>
             <div className="mt-1 flex items-center space-x-4">
@@ -314,7 +369,11 @@ export default function NewProject() {
                   </button>
                 </div>
               )}
-              <label className="cursor-pointer bg-white px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none">
+              <label className={`cursor-pointer px-4 py-2 rounded-md shadow-sm text-sm font-medium ${
+                isDarkMode 
+                  ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' 
+                  : 'bg-white text-gray-700 hover:bg-gray-50 border-2 border-gray-200 hover:border-gray-300'
+              }`}>
                 {thumbnailPreview ? "Change Image" : "Upload Image"}
                 <input
                   type="file"
@@ -324,7 +383,9 @@ export default function NewProject() {
                 />
               </label>
             </div>
-            <p className="mt-2 text-sm text-gray-500">
+            <p className={`mt-2 text-sm ${
+              isDarkMode ? 'text-gray-400' : 'text-gray-500'
+            }`}>
               Recommended: 1200x630px or larger, 16:9 ratio
             </p>
           </div>
@@ -352,19 +413,29 @@ export default function NewProject() {
 
       {showModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md m-4">
+          <div className={`rounded-lg p-6 w-full max-w-md m-4 ${
+            isDarkMode ? 'bg-gray-800' : 'bg-white'
+          }`}>
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-semibold">Add Team Members</h2>
+              <h2 className={`text-xl font-semibold font-space-mono ${
+                isDarkMode ? 'text-gray-100' : 'text-gray-900'
+              }`}>
+                Add Team Members
+              </h2>
               <button
                 onClick={() => setShowModal(false)}
-                className="text-gray-500 hover:text-gray-700"
+                className={`${
+                  isDarkMode ? 'text-gray-400 hover:text-gray-200' : 'text-gray-500 hover:text-gray-700'
+                }`}
               >
                 <XMarkIcon className="h-6 w-6" />
               </button>
             </div>
 
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className={`block text-sm font-medium mb-1 ${
+                isDarkMode ? 'text-gray-300' : 'text-gray-700'
+              } font-fira-code`}>
                 Role
               </label>
               <div className="flex flex-wrap gap-2">
@@ -376,7 +447,9 @@ export default function NewProject() {
                     className={`px-3 py-1 rounded-full text-sm ${
                       selectedRole === role.id
                         ? "bg-indigo-600 text-white"
-                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                        : isDarkMode 
+                          ? "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                          : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                     }`}
                   >
                     {role.label}
@@ -390,7 +463,11 @@ export default function NewProject() {
               placeholder="Search members..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md mb-4 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className={`w-full px-3 py-2 rounded-md shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 ${
+                isDarkMode 
+                  ? 'bg-gray-700 border-gray-600 text-gray-100' 
+                  : 'bg-white border-2 border-gray-200 text-gray-900 hover:border-gray-300'
+              } font-fira-code`}
             />
 
             <div className="max-h-60 overflow-y-auto">
@@ -398,19 +475,31 @@ export default function NewProject() {
                 <button
                   key={hacker.id}
                   onClick={() => handleAddMember(hacker)}
-                  className="w-full text-left px-4 py-2 hover:bg-gray-100 rounded-md flex items-center justify-between group"
+                  className={`w-full text-left px-4 py-2 rounded-md flex items-center justify-between group ${
+                    isDarkMode 
+                      ? 'hover:bg-gray-700' 
+                      : 'hover:bg-gray-100'
+                  }`}
                 >
                   <div>
-                    <div className="font-medium">{hacker.name}</div>
-                    <div className="text-sm text-gray-500">{hacker.email}</div>
+                    <div className={isDarkMode ? 'text-gray-100' : 'text-gray-900 font-medium'}>
+                      {hacker.name}
+                    </div>
+                    <div className={isDarkMode ? 'text-gray-400' : 'text-gray-500'}>
+                      {hacker.email}
+                    </div>
                   </div>
-                  <span className="text-indigo-600 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <span className={`opacity-0 group-hover:opacity-100 transition-opacity ${
+                    isDarkMode ? 'text-indigo-400' : 'text-indigo-600'
+                  }`}>
                     Add as {roles.find((r) => r.id === selectedRole)?.label}
                   </span>
                 </button>
               ))}
               {filteredHackers.length === 0 && (
-                <p className="text-center text-gray-500 py-4">
+                <p className={`text-center py-4 ${
+                  isDarkMode ? 'text-gray-400' : 'text-gray-500'
+                }`}>
                   No members found
                 </p>
               )}
@@ -419,7 +508,11 @@ export default function NewProject() {
             <div className="mt-4 flex justify-end">
               <button
                 onClick={() => setShowModal(false)}
-                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200"
+                className={`px-4 py-2 rounded-md ${
+                  isDarkMode 
+                    ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' 
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
               >
                 Done
               </button>
