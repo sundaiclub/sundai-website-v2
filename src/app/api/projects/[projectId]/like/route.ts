@@ -22,6 +22,21 @@ export async function POST(
       return new NextResponse("Hacker not found", { status: 404 });
     }
 
+    // Check if like already exists
+    const existingLike = await prisma.projectLike.findUnique({
+      where: {
+        projectId_hackerId: {
+          projectId: params.projectId,
+          hackerId: hacker.id,
+        },
+      },
+    });
+
+    if (existingLike) {
+      return NextResponse.json(existingLike);
+    }
+
+    // Create new like if it doesn't exist
     const like = await prisma.projectLike.create({
       data: {
         projectId: params.projectId,
@@ -46,7 +61,6 @@ export async function DELETE(
       return new NextResponse("Unauthorized", { status: 401 });
     }
 
-    // Get the hacker using clerkId
     const hacker = await prisma.hacker.findUnique({
       where: { clerkId: userId },
     });
