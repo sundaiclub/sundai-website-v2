@@ -5,7 +5,7 @@ import "./fonts.css";
 import Navbar from "./components/navbar";
 import { ClerkProvider } from "@clerk/nextjs";
 import { UserProvider } from "./contexts/UserContext";
-import { ThemeProvider } from '../context/ThemeContext';
+import { ThemeProvider } from './contexts/ThemeContext';
 import { Providers } from './components/Providers';
 import { Space_Mono, Fira_Code } from 'next/font/google'
 

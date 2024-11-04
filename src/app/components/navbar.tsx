@@ -7,7 +7,7 @@ import { usePathname } from "next/navigation";
 import Image from "next/image";
 
 import ThemeToggle from './ThemeToggle';
-import { useTheme } from '../../context/ThemeContext';
+import { useTheme } from '../contexts/ThemeContext';
 
 const Navbar = () => {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -72,10 +72,10 @@ const Navbar = () => {
               }`}
             >
               <Image
-                src="/images/logo.svg"
+                src={isDarkMode ? "/images/logos/sundai_logo_dark_horizontal.svg" : "/images/logos/sundai_logo_light_horizontal.svg"}
                 alt="Sundai Club Logo"
-                width={80}
-                height={80}
+                width={150}
+                height={100}
                 className="transition-transform duration-300 transform group-hover:scale-110 mr-2"
               />
             </Link>
@@ -143,7 +143,7 @@ const Navbar = () => {
                 </SignInButton>
               )}
             </div>
-            <div className={`${isPWA ? "ml-2 p-1" : "ml-1"} px-2`}>
+            <div className={`${isPWA ? "mx-2 p-1" : "mx-1"} px-3 flex justify-center`}>
               <ThemeToggle />
             </div>
           </div>
