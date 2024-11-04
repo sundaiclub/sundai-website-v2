@@ -1,5 +1,7 @@
 import { PrismaClient, ProjectStatus } from "@prisma/client";
 import { NextResponse } from "next/server";
+import { auth } from "@clerk/nextjs/server";
+import { uploadToGCS } from "@/lib/gcp-storage";
 
 const prisma = new PrismaClient();
 
@@ -11,7 +13,12 @@ export async function GET(req: Request) {
     const projects = await prisma.project.findMany({
       where: status ? { status: status as ProjectStatus } : undefined,
       include: {
-        thumbnail: true,
+        thumbnail: {
+          select: {
+            url: true,
+            alt: true,
+          },
+        },
         launchLead: {
           include: {
             avatar: true,
@@ -35,10 +42,10 @@ export async function GET(req: Request) {
       },
       orderBy: [
         {
-          status: status === "PENDING" ? "asc" : "desc", // This will put APPROVED first when not filtering
+          status: status === "PENDING" ? "asc" : "desc",
         },
         {
-          createdAt: "desc", // Most recent first within each status group
+          createdAt: "desc",
         },
       ],
     });
@@ -65,49 +72,91 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
+    const { userId } = auth();
+    if (!userId) {
+      return new NextResponse("Unauthorized", { status: 401 });
+    }
+
     const formData = await req.formData();
     const title = formData.get("title") as string;
     const description = formData.get("description") as string;
     const githubUrl = formData.get("githubUrl") as string;
     const demoUrl = formData.get("demoUrl") as string;
-    const launchLeadId = formData.get("launchLeadId") as string;
     const members = JSON.parse(formData.get("members") as string);
-    const thumbnail = formData.get("thumbnail") as File;
+    const thumbnail = formData.get("thumbnail") as File | null;
 
-    if (!title || !description || !launchLeadId) {
+    // Get the hacker using clerkId
+    const hacker = await prisma.hacker.findUnique({
+      where: { clerkId: userId },
+    });
+
+    if (!hacker) {
+      return new NextResponse("Hacker not found", { status: 404 });
+    }
+
+    if (!title || !description) {
       return new NextResponse("Missing required fields", { status: 400 });
     }
 
-    let thumbnailUrl = null;
-    let thumbnailKey = null;
-
+    let thumbnailImage = null;
     if (thumbnail) {
-      // const fileBuffer = await thumbnail.arrayBuffer();
-      // const fileName = `projects/${Date.now()}-${thumbnail.name}`;
-      // const file = bucket.file(fileName);
-      // await file.save(Buffer.from(fileBuffer), {
-      //   metadata: {
-      //     contentType: thumbnail.type,
-      //   },
-      // });
-      // thumbnailUrl = `https://storage.googleapis.com/${bucket.name}/${fileName}`;
-      // thumbnailKey = fileName;
+      try {
+        const uploadResult = await uploadToGCS(thumbnail);
+
+        // Create image record with all required fields
+        thumbnailImage = await prisma.image.create({
+          data: {
+            key: uploadResult.filename,
+            bucket: process.env.GOOGLE_CLOUD_BUCKET!,
+            url: uploadResult.url,
+            filename: thumbnail.name,
+            mimeType: thumbnail.type || "application/octet-stream",
+            size: thumbnail.size,
+            width: undefined,
+            height: undefined,
+            alt: title,
+            description: description,
+          },
+        });
+      } catch (error) {
+        console.error("Error uploading thumbnail:", error);
+        return new NextResponse("Error uploading thumbnail", { status: 500 });
+      }
     }
 
-    // // Create image record if thumbnail exists
-    // let thumbnailImage = null;
-    // if (thumbnailUrl && thumbnailKey) {
-    //   thumbnailImage = await prisma.image.create({
-    //     data: {
-    //       key: thumbnailKey,
-    //       bucket: bucket.name,
-    //       url: thumbnailUrl,
-    //       filename: thumbnail.name,
-    //       mimeType: thumbnail.type,
-    //       size: thumbnail.size,
-    //     },
-    //   });
-    // }
+    // Get or create current week
+    const now = new Date();
+    let currentWeek = await prisma.week.findFirst({
+      where: {
+        startDate: { lte: now },
+        endDate: { gte: now },
+      },
+    });
+
+    if (!currentWeek) {
+      // Create a new week if none exists
+      const startDate = new Date(now);
+      startDate.setHours(0, 0, 0, 0);
+      const endDate = new Date(startDate);
+      endDate.setDate(endDate.getDate() + 6);
+      endDate.setHours(23, 59, 59, 999);
+
+      // Get the latest week number
+      const latestWeek = await prisma.week.findFirst({
+        orderBy: { number: "desc" },
+      });
+      const weekNumber = (latestWeek?.number || 0) + 1;
+
+      currentWeek = await prisma.week.create({
+        data: {
+          number: weekNumber,
+          startDate,
+          endDate,
+          theme: `Week ${weekNumber}`,
+          description: `Projects for week ${weekNumber}`,
+        },
+      });
+    }
 
     // Create project with participants and thumbnail
     const project = await prisma.project.create({
@@ -116,9 +165,14 @@ export async function POST(req: Request) {
         description,
         githubUrl,
         demoUrl,
-        launchLeadId,
+        launchLeadId: hacker.id,
         status: "PENDING",
-        // thumbnailId: thumbnailImage?.id,
+        thumbnailId: thumbnailImage?.id,
+        weeks: {
+          connect: {
+            id: currentWeek.id,
+          },
+        },
         participants: {
           create: members.map((member: { id: string; role: string }) => ({
             hackerId: member.id,

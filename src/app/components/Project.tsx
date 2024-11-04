@@ -6,6 +6,7 @@ import { useUser } from "@clerk/nextjs";
 import { HeartIcon } from "@heroicons/react/24/outline";
 import { HeartIcon as HeartIconSolid } from "@heroicons/react/24/solid";
 import { useUserContext } from "../contexts/UserContext";
+import { useTheme } from '../contexts/ThemeContext';
 
 type Project = {
   id: string;
@@ -48,6 +49,7 @@ export default function ProjectCard() {
   const { isAdmin } = useUserContext();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
+  const { isDarkMode } = useTheme();
 
   useEffect(() => {
     async function fetchProjects() {
@@ -130,7 +132,9 @@ export default function ProjectCard() {
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-600"></div>
+        <div className={`animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 ${
+          isDarkMode ? 'border-purple-400' : 'border-indigo-600'
+        }`}></div>
       </div>
     );
   }
@@ -141,7 +145,11 @@ export default function ProjectCard() {
         {projects.map((project) => (
           <div
             key={project.id}
-            className="bg-white rounded-lg shadow-lg overflow-hidden hover:shadow-xl transition-shadow"
+            className={`${
+              isDarkMode 
+                ? 'bg-gray-800 hover:shadow-purple-400/20' 
+                : 'bg-white hover:shadow-xl'
+            } rounded-lg shadow-lg overflow-hidden transition-shadow`}
           >
             <div className="relative h-40 sm:h-48">
               <Link href={`/projects/${project.id}`}>
@@ -153,6 +161,7 @@ export default function ProjectCard() {
                   alt={project.title}
                   fill
                   className="object-cover"
+                  unoptimized
                 />
               </Link>
             </div>
@@ -160,11 +169,15 @@ export default function ProjectCard() {
               <div className="flex justify-between items-start mb-4">
                 <div>
                   <Link href={`/projects/${project.id}`}>
-                    <h3 className="text-lg sm:text-xl font-bold text-gray-900 hover:text-indigo-600 transition-colors">
+                    <h3 className={`text-lg sm:text-xl font-bold ${
+                      isDarkMode 
+                        ? 'text-gray-100 hover:text-purple-400' 
+                        : 'text-gray-900 hover:text-indigo-600'
+                    } transition-colors`}>
                       {project.title}
                     </h3>
                   </Link>
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-500'} mt-1`}>
                     Created {new Date(project.createdAt).toLocaleDateString()}
                   </p>
                 </div>
@@ -209,14 +222,18 @@ export default function ProjectCard() {
               </div>
 
               <Link href={`/projects/${project.id}`}>
-                <p className="text-sm sm:text-base text-gray-600 mb-4">
+                <p className={`text-sm sm:text-base ${
+                  isDarkMode ? 'text-gray-300' : 'text-gray-600'
+                } mb-4`}>
                   {project.description}
                 </p>
               </Link>
 
               {/* Team Section */}
               <div className="mb-4">
-                <h4 className="text-xs sm:text-sm font-semibold text-gray-700 mb-2">
+                <h4 className={`text-xs sm:text-sm font-semibold ${
+                  isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                } mb-2`}>
                   Team
                 </h4>
                 <div className="space-y-2">
@@ -232,18 +249,28 @@ export default function ProjectCard() {
                           className="rounded-full"
                         />
                       ) : (
-                        <div className="w-7 h-7 bg-indigo-100 rounded-full flex items-center justify-center">
-                          <span className="text-indigo-600 text-xs">
+                        <div className={`w-7 h-7 ${
+                          isDarkMode ? 'bg-purple-900' : 'bg-indigo-100'
+                        } rounded-full flex items-center justify-center`}>
+                          <span className={`${
+                            isDarkMode ? 'text-purple-400' : 'text-indigo-600'
+                          } text-xs`}>
                             {project.launchLead.name[0]}
                           </span>
                         </div>
                       )}
                     </div>
                     <div className="ml-2 sm:ml-3">
-                      <p className="text-xs sm:text-sm font-medium text-gray-900">
-                        {project.launchLead.name}
-                      </p>
-                      <p className="text-xs text-indigo-600">Launch Lead</p>
+                      <Link href={`/hacker/${project.launchLead.id}`}>
+                        <p className={`text-xs sm:text-sm font-medium ${
+                          isDarkMode ? 'text-gray-200 hover:text-purple-400' : 'text-gray-900 hover:text-indigo-600'
+                        } transition-colors`}>
+                          {project.launchLead.name}
+                        </p>
+                      </Link>
+                      <p className={`text-xs ${
+                        isDarkMode ? 'text-purple-400' : 'text-indigo-600'
+                      }`}>Launch Lead</p>
                     </div>
                   </div>
 
@@ -263,18 +290,28 @@ export default function ProjectCard() {
                             className="rounded-full"
                           />
                         ) : (
-                          <div className="w-7 h-7 bg-gray-100 rounded-full flex items-center justify-center">
-                            <span className="text-gray-600 text-xs">
+                          <div className={`w-7 h-7 ${
+                            isDarkMode ? 'bg-gray-700' : 'bg-gray-100'
+                          } rounded-full flex items-center justify-center`}>
+                            <span className={`${
+                              isDarkMode ? 'text-gray-300' : 'text-gray-600'
+                            } text-xs`}>
                               {participant.hacker.name[0]}
                             </span>
                           </div>
                         )}
                       </div>
                       <div className="ml-2 sm:ml-3">
-                        <p className="text-xs sm:text-sm font-medium text-gray-900">
-                          {participant.hacker.name}
-                        </p>
-                        <p className="text-xs text-gray-500">
+                        <Link href={`/hacker/${participant.hacker.id}`}>
+                          <p className={`text-xs sm:text-sm font-medium ${
+                            isDarkMode ? 'text-gray-200 hover:text-purple-400' : 'text-gray-900 hover:text-indigo-600'
+                          } transition-colors`}>
+                            {participant.hacker.name}
+                          </p>
+                        </Link>
+                        <p className={`text-xs ${
+                          isDarkMode ? 'text-gray-400' : 'text-gray-500'
+                        }`}>
                           {participant.role}
                         </p>
                       </div>
@@ -284,11 +321,15 @@ export default function ProjectCard() {
               </div>
 
               {/* Links */}
-              <div className="flex space-x-4 mt-4 pt-4 border-t">
+              <div className="flex space-x-4 mt-4 pt-4 border-t border-gray-200">
                 {project.demoUrl && (
                   <Link
                     href={project.demoUrl}
-                    className="text-indigo-600 hover:text-indigo-800 text-xs sm:text-sm font-medium"
+                    className={`${
+                      isDarkMode 
+                        ? 'text-purple-400 hover:text-purple-300' 
+                        : 'text-indigo-600 hover:text-indigo-800'
+                    } text-xs sm:text-sm font-medium`}
                     target="_blank"
                   >
                     View Demo →
@@ -297,7 +338,11 @@ export default function ProjectCard() {
                 {project.githubUrl && (
                   <Link
                     href={project.githubUrl}
-                    className="text-gray-600 hover:text-gray-800 text-xs sm:text-sm font-medium"
+                    className={`${
+                      isDarkMode 
+                        ? 'text-gray-400 hover:text-gray-300' 
+                        : 'text-gray-600 hover:text-gray-800'
+                    } text-xs sm:text-sm font-medium`}
                     target="_blank"
                   >
                     GitHub →
