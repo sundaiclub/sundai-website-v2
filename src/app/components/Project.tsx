@@ -260,11 +260,13 @@ export default function ProjectCard() {
                       )}
                     </div>
                     <div className="ml-2 sm:ml-3">
-                      <p className={`text-xs sm:text-sm font-medium ${
-                        isDarkMode ? 'text-gray-200' : 'text-gray-900'
-                      }`}>
-                        {project.launchLead.name}
-                      </p>
+                      <Link href={`/hacker/${project.launchLead.id}`}>
+                        <p className={`text-xs sm:text-sm font-medium ${
+                          isDarkMode ? 'text-gray-200 hover:text-purple-400' : 'text-gray-900 hover:text-indigo-600'
+                        } transition-colors`}>
+                          {project.launchLead.name}
+                        </p>
+                      </Link>
                       <p className={`text-xs ${
                         isDarkMode ? 'text-purple-400' : 'text-indigo-600'
                       }`}>Launch Lead</p>
@@ -299,11 +301,13 @@ export default function ProjectCard() {
                         )}
                       </div>
                       <div className="ml-2 sm:ml-3">
-                        <p className={`text-xs sm:text-sm font-medium ${
-                          isDarkMode ? 'text-gray-200' : 'text-gray-900'
-                        }`}>
-                          {participant.hacker.name}
-                        </p>
+                        <Link href={`/hacker/${participant.hacker.id}`}>
+                          <p className={`text-xs sm:text-sm font-medium ${
+                            isDarkMode ? 'text-gray-200 hover:text-purple-400' : 'text-gray-900 hover:text-indigo-600'
+                          } transition-colors`}>
+                            {participant.hacker.name}
+                          </p>
+                        </Link>
                         <p className={`text-xs ${
                           isDarkMode ? 'text-gray-400' : 'text-gray-500'
                         }`}>
