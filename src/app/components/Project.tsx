@@ -153,6 +153,7 @@ export default function ProjectCard() {
                   alt={project.title}
                   fill
                   className="object-cover"
+                  unoptimized
                 />
               </Link>
             </div>

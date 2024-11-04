@@ -120,7 +120,7 @@ export default function ProjectDetail() {
             <Image
               src={
                 project.thumbnail?.url ||
-                "/images/projects_screenshots/week-25.jpg"
+                "https://storage.googleapis.com/club-site-images/projects/c6a49e93-6af2-4e15-9de4-c02ec5f03f80-255bef71-d8d4-41af-9a6b-e5d73951b18e.webp"
               }
               alt={project.title}
               fill

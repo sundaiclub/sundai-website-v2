@@ -331,10 +331,14 @@ export default function ProjectsAdmin() {
             <div className="relative h-40 sm:h-48">
               <Link href={`/projects/${project.id}`}>
                 <Image
-                  src={"/images/projects_screenshots/week-25.jpg"}
+                  src={
+                    project.thumbnail?.url ||
+                    "/images/projects_screenshots/week-25.jpg"
+                  }
                   alt={project.title}
                   fill
                   className="object-cover"
+                  unoptimized
                 />
               </Link>
             </div>
