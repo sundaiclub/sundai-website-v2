@@ -11,8 +11,8 @@ const config: Config = {
       fontFamily: {
         mackinac: ['"P22 Mackinac Pro"', "serif"],
         montserrat: ['"Montserrat"', "sans-serif"],
-        'space-mono': ['"Space Mono"', 'monospace'],
-        'fira-code': ['"Fira Code"', 'monospace'],
+        "space-mono": ['"Space Mono"', "monospace"],
+        "fira-code": ['"Fira Code"', "monospace"],
       },
       fontSize: {
         xs: "0.6rem",
@@ -36,6 +36,7 @@ const config: Config = {
       animation: {
         "slide-left": "slideLeft 1s ease-out",
         "fade-in": "fadeIn 1s ease-out",
+        "scroll-vertical": "scroll-vertical 15s linear infinite",
       },
       keyframes: {
         slideLeft: {
@@ -45,6 +46,10 @@ const config: Config = {
         fadeIn: {
           "0%": { opacity: "0" },
           "100%": { opacity: "1" },
+        },
+        "scroll-vertical": {
+          "0%": { "background-position": "50% 0%" },
+          "100%": { "background-position": "50% 200%" },
         },
       },
     },
