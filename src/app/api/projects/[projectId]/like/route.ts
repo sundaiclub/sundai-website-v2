@@ -9,13 +9,15 @@ export async function POST(
   { params }: { params: { projectId: string } }
 ) {
   try {
-    const { userId } = auth();
-    if (!userId) {
+    // Get the current user's clerkId from auth
+    const { userId: clerkId } = auth();
+    if (!clerkId) {
       return new NextResponse("Unauthorized", { status: 401 });
     }
 
+    // Get the hacker using clerkId
     const hacker = await prisma.hacker.findUnique({
-      where: { clerkId: userId },
+      where: { clerkId },
     });
 
     if (!hacker) {
@@ -36,7 +38,7 @@ export async function POST(
       return NextResponse.json(existingLike);
     }
 
-    // Create new like if it doesn't exist
+    // Create new like
     const like = await prisma.projectLike.create({
       data: {
         projectId: params.projectId,
@@ -56,20 +58,22 @@ export async function DELETE(
   { params }: { params: { projectId: string } }
 ) {
   try {
-    const { userId } = auth();
-    if (!userId) {
+    // Get the current user's clerkId from auth
+    const { userId: clerkId } = auth();
+    if (!clerkId) {
       return new NextResponse("Unauthorized", { status: 401 });
     }
 
+    // Get the hacker using clerkId
     const hacker = await prisma.hacker.findUnique({
-      where: { clerkId: userId },
+      where: { clerkId },
     });
 
     if (!hacker) {
       return new NextResponse("Hacker not found", { status: 404 });
     }
 
-    // Delete like using hacker.id
+    // Delete like
     await prisma.projectLike.delete({
       where: {
         projectId_hackerId: {

@@ -15,6 +15,10 @@ type UserContextType = {
     bio?: string | null;
     githubUrl?: string | null;
     phoneNumber?: string | null;
+    likes?: Array<{
+      projectId: string;
+      createdAt: string;
+    }>;
   } | null;
   loading: boolean;
 };
@@ -35,12 +39,12 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     const fetchUserInfo = async () => {
       if (user?.id) {
         try {
-          // First get the hacker ID using clerkId
+          // Get the hacker using clerkId
           const hackerResponse = await fetch(`/api/hackers?clerkId=${user.id}`);
           if (!hackerResponse.ok) throw new Error("Failed to fetch hacker ID");
           const hackerData = await hackerResponse.json();
 
-          // Then get the full hacker profile using the Prisma ID
+          // Get the full hacker profile using the Prisma ID
           const profileResponse = await fetch(`/api/hackers/${hackerData.id}`);
           if (!profileResponse.ok)
             throw new Error("Failed to fetch hacker profile");
@@ -55,6 +59,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
             bio: profileData.bio,
             githubUrl: profileData.githubUrl,
             phoneNumber: profileData.phoneNumber,
+            likes: profileData.likes, // Include likes from the profile data
           });
 
           setIsAdmin(profileData.role === "ADMIN");
