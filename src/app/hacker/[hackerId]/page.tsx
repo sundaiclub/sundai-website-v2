@@ -7,7 +7,7 @@ import Link from "next/link";
 import { Cog6ToothIcon } from "@heroicons/react/24/outline";
 import { HeartIcon } from "@heroicons/react/24/solid";
 import { PencilIcon, XMarkIcon, CheckIcon } from "@heroicons/react/24/outline";
-import { useTheme } from '../../contexts/ThemeContext';
+import { useTheme } from "../../contexts/ThemeContext";
 
 type HackerProfile = {
   id: string;
@@ -43,6 +43,10 @@ type HackerProfile = {
       url: string;
     } | null;
     status: "PENDING" | "APPROVED";
+    likes: Array<{
+      hackerId: string;
+      createdAt: string;
+    }>;
   }>;
   likedProjects: Array<{
     createdAt: string;
@@ -186,9 +190,11 @@ export default function HackerProfile() {
 
   if (loading) {
     return (
-      <div className={`flex justify-center items-center min-h-screen ${
-        isDarkMode ? 'bg-gray-900' : 'bg-[#E5E5E5]'
-      }`}>
+      <div
+        className={`flex justify-center items-center min-h-screen ${
+          isDarkMode ? "bg-gray-900" : "bg-[#E5E5E5]"
+        }`}
+      >
         <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-600"></div>
       </div>
     );
@@ -196,20 +202,28 @@ export default function HackerProfile() {
 
   if (!hacker) {
     return (
-      <div className={`min-h-screen py-20 ${
-        isDarkMode ? 'bg-gray-900' : 'bg-[#E5E5E5]'
-      } flex items-center justify-center`}>
-        <div className={`${
-          isDarkMode ? 'bg-gray-800' : 'bg-white'
-        } p-8 rounded-lg shadow-lg`}>
-          <h1 className={`text-2xl font-bold ${
-            isDarkMode ? 'text-gray-100' : 'text-gray-900'
-          } mb-2 font-space-mono`}>
+      <div
+        className={`min-h-screen py-20 ${
+          isDarkMode ? "bg-gray-900" : "bg-[#E5E5E5]"
+        } flex items-center justify-center`}
+      >
+        <div
+          className={`${
+            isDarkMode ? "bg-gray-800" : "bg-white"
+          } p-8 rounded-lg shadow-lg`}
+        >
+          <h1
+            className={`text-2xl font-bold ${
+              isDarkMode ? "text-gray-100" : "text-gray-900"
+            } mb-2 font-space-mono`}
+          >
             Profile Not Found
           </h1>
-          <p className={`${
-            isDarkMode ? 'text-gray-300' : 'text-gray-600'
-          } font-fira-code`}>
+          <p
+            className={`${
+              isDarkMode ? "text-gray-300" : "text-gray-600"
+            } font-fira-code`}
+          >
             The requested profile could not be found.
           </p>
         </div>
@@ -218,16 +232,18 @@ export default function HackerProfile() {
   }
 
   return (
-    <div className={`min-h-screen py-20 ${
-      isDarkMode 
-        ? 'bg-gradient-to-b from-gray-900 to-black' 
-        : 'bg-[#E5E5E5]'
-    } font-space-mono`}>
+    <div
+      className={`min-h-screen py-20 ${
+        isDarkMode ? "bg-gradient-to-b from-gray-900 to-black" : "bg-[#E5E5E5]"
+      } font-space-mono`}
+    >
       <div className="max-w-5xl mx-auto px-4">
         {/* Profile Header */}
-        <div className={`${
-          isDarkMode ? 'bg-gray-800' : 'bg-white'
-        } rounded-xl shadow-lg overflow-hidden mb-8`}>
+        <div
+          className={`${
+            isDarkMode ? "bg-gray-800" : "bg-white"
+          } rounded-xl shadow-lg overflow-hidden mb-8`}
+        >
           <div className="bg-gradient-to-r from-indigo-500 to-purple-600 h-32 sm:h-48"></div>
           <div className="px-4 sm:px-8 pb-8">
             <div className="flex flex-col sm:flex-row items-center sm:items-end -mt-16 sm:-mt-24 mb-4 sm:mb-8">
@@ -253,21 +269,25 @@ export default function HackerProfile() {
                     <input
                       type="text"
                       value={editForm.name}
-                      onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, name: e.target.value })
+                      }
                       className={`w-full px-3 py-2 border rounded-lg ${
-                        isDarkMode 
-                          ? 'bg-gray-700 border-gray-600 text-gray-100' 
-                          : 'bg-white border-gray-300 text-gray-900'
+                        isDarkMode
+                          ? "bg-gray-700 border-gray-600 text-gray-100"
+                          : "bg-white border-gray-300 text-gray-900"
                       }`}
                       placeholder="Name"
                     />
                     <textarea
                       value={editForm.bio}
-                      onChange={(e) => setEditForm({ ...editForm, bio: e.target.value })}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, bio: e.target.value })
+                      }
                       className={`w-full px-3 py-2 border rounded-lg ${
-                        isDarkMode 
-                          ? 'bg-gray-700 border-gray-600 text-gray-100' 
-                          : 'bg-white border-gray-300 text-gray-900'
+                        isDarkMode
+                          ? "bg-gray-700 border-gray-600 text-gray-100"
+                          : "bg-white border-gray-300 text-gray-900"
                       }`}
                       placeholder="Bio"
                       rows={3}
@@ -275,22 +295,29 @@ export default function HackerProfile() {
                     <input
                       type="url"
                       value={editForm.githubUrl}
-                      onChange={(e) => setEditForm({ ...editForm, githubUrl: e.target.value })}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, githubUrl: e.target.value })
+                      }
                       className={`w-full px-3 py-2 border rounded-lg ${
-                        isDarkMode 
-                          ? 'bg-gray-700 border-gray-600 text-gray-100' 
-                          : 'bg-white border-gray-300 text-gray-900'
+                        isDarkMode
+                          ? "bg-gray-700 border-gray-600 text-gray-100"
+                          : "bg-white border-gray-300 text-gray-900"
                       }`}
                       placeholder="GitHub URL"
                     />
                     <input
                       type="tel"
                       value={editForm.phoneNumber}
-                      onChange={(e) => setEditForm({ ...editForm, phoneNumber: e.target.value })}
+                      onChange={(e) =>
+                        setEditForm({
+                          ...editForm,
+                          phoneNumber: e.target.value,
+                        })
+                      }
                       className={`w-full px-3 py-2 border rounded-lg ${
-                        isDarkMode 
-                          ? 'bg-gray-700 border-gray-600 text-gray-100' 
-                          : 'bg-white border-gray-300 text-gray-900'
+                        isDarkMode
+                          ? "bg-gray-700 border-gray-600 text-gray-100"
+                          : "bg-white border-gray-300 text-gray-900"
                       }`}
                       placeholder="Phone Number"
                     />
@@ -313,9 +340,11 @@ export default function HackerProfile() {
                 ) : (
                   <>
                     <div className="flex justify-between items-start">
-                      <h1 className={`text-3xl font-bold ${
-                        isDarkMode ? 'text-gray-100' : 'text-gray-900'
-                      }`}>
+                      <h1
+                        className={`text-3xl font-bold ${
+                          isDarkMode ? "text-gray-100" : "text-gray-900"
+                        }`}
+                      >
                         {hacker.name}
                       </h1>
                       {isOwnProfile && (
@@ -328,9 +357,11 @@ export default function HackerProfile() {
                       )}
                     </div>
                     {hacker.bio && (
-                      <p className={`mt-2 ${
-                        isDarkMode ? 'text-gray-300' : 'text-gray-600'
-                      } max-w-2xl font-fira-code`}>
+                      <p
+                        className={`mt-2 ${
+                          isDarkMode ? "text-gray-300" : "text-gray-600"
+                        } max-w-2xl font-fira-code`}
+                      >
                         {hacker.bio}
                       </p>
                     )}
@@ -347,9 +378,9 @@ export default function HackerProfile() {
                     href={hacker.githubUrl}
                     target="_blank"
                     className={`flex items-center px-4 py-2 ${
-                      isDarkMode 
-                        ? 'bg-gray-700 hover:bg-gray-600' 
-                        : 'bg-gray-100 hover:bg-gray-200'
+                      isDarkMode
+                        ? "bg-gray-700 hover:bg-gray-600"
+                        : "bg-gray-100 hover:bg-gray-200"
                     } rounded-full transition-colors`}
                   >
                     <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
@@ -365,9 +396,9 @@ export default function HackerProfile() {
                   <Link
                     href={`mailto:${hacker.email}`}
                     className={`flex items-center px-4 py-2 ${
-                      isDarkMode 
-                        ? 'bg-gray-700 hover:bg-gray-600 text-gray-200' 
-                        : 'bg-indigo-100 hover:bg-indigo-200 text-indigo-700'
+                      isDarkMode
+                        ? "bg-gray-700 hover:bg-gray-600 text-gray-200"
+                        : "bg-indigo-100 hover:bg-indigo-200 text-indigo-700"
                     } rounded-full transition-colors`}
                   >
                     <svg
@@ -397,9 +428,11 @@ export default function HackerProfile() {
           {Array.isArray(hacker.ledProjects) &&
             hacker.ledProjects.length > 0 && (
               <div className="mb-12">
-                <h2 className={`text-2xl font-bold ${
-                  isDarkMode ? 'text-gray-100' : 'text-gray-900'
-                } mb-4`}>
+                <h2
+                  className={`text-2xl font-bold ${
+                    isDarkMode ? "text-gray-100" : "text-gray-900"
+                  } mb-4`}
+                >
                   Projects Led
                 </h2>
                 <div className={scrollableSection}>
@@ -408,7 +441,7 @@ export default function HackerProfile() {
                       key={project.id}
                       href={`/projects/${project.id}`}
                       className={`flex-shrink-0 w-80 ${
-                        isDarkMode ? 'bg-gray-800' : 'bg-white'
+                        isDarkMode ? "bg-gray-800" : "bg-white"
                       } rounded-lg shadow-md hover:shadow-lg transition-shadow overflow-hidden`}
                     >
                       <div className="relative h-48">
@@ -421,6 +454,12 @@ export default function HackerProfile() {
                           fill
                           className="object-cover"
                         />
+                        <div className="absolute top-2 left-2 flex items-center space-x-1 bg-black/50 px-2 py-1 rounded-full">
+                          <HeartIcon className="h-4 w-4 text-white" />
+                          <span className="text-white text-sm">
+                            {project.likes?.length || 0}
+                          </span>
+                        </div>
                         {project.status === "PENDING" && (
                           <div className="absolute top-2 right-2 px-2 py-1 bg-yellow-500 text-white text-sm rounded-full">
                             Pending
@@ -428,14 +467,18 @@ export default function HackerProfile() {
                         )}
                       </div>
                       <div className="p-4">
-                        <h3 className={`text-xl font-semibold ${
-                          isDarkMode ? 'text-gray-100' : 'text-gray-900'
-                        } mb-2`}>
+                        <h3
+                          className={`text-xl font-semibold ${
+                            isDarkMode ? "text-gray-100" : "text-gray-900"
+                          } mb-2`}
+                        >
                           {project.title}
                         </h3>
-                        <p className={`${
-                          isDarkMode ? 'text-gray-300' : 'text-gray-600'
-                        } line-clamp-2 font-fira-code`}>
+                        <p
+                          className={`${
+                            isDarkMode ? "text-gray-300" : "text-gray-600"
+                          } line-clamp-2 font-fira-code`}
+                        >
                           {project.description}
                         </p>
                       </div>
@@ -448,9 +491,11 @@ export default function HackerProfile() {
           {/* Participated Projects */}
           {Array.isArray(hacker.projects) && hacker.projects.length > 0 && (
             <div className="mb-12">
-              <h2 className={`text-2xl font-bold ${
-                isDarkMode ? 'text-gray-100' : 'text-gray-900'
-              } mb-4`}>
+              <h2
+                className={`text-2xl font-bold ${
+                  isDarkMode ? "text-gray-100" : "text-gray-900"
+                } mb-4`}
+              >
                 Projects Contributed To
               </h2>
               <div className={scrollableSection}>
@@ -459,7 +504,7 @@ export default function HackerProfile() {
                     key={project.id}
                     href={`/projects/${project.id}`}
                     className={`flex-shrink-0 w-80 ${
-                      isDarkMode ? 'bg-gray-800' : 'bg-white'
+                      isDarkMode ? "bg-gray-800" : "bg-white"
                     } rounded-lg shadow-md hover:shadow-lg transition-shadow overflow-hidden`}
                   >
                     <div className="relative h-48">
@@ -488,14 +533,18 @@ export default function HackerProfile() {
                       </div>
                     </div>
                     <div className="p-4">
-                      <h3 className={`text-xl font-semibold ${
-                        isDarkMode ? 'text-gray-100' : 'text-gray-900'
-                      } mb-2`}>
+                      <h3
+                        className={`text-xl font-semibold ${
+                          isDarkMode ? "text-gray-100" : "text-gray-900"
+                        } mb-2`}
+                      >
                         {project.title}
                       </h3>
-                      <p className={`${
-                        isDarkMode ? 'text-gray-300' : 'text-gray-600'
-                      } line-clamp-2 font-fira-code`}>
+                      <p
+                        className={`${
+                          isDarkMode ? "text-gray-300" : "text-gray-600"
+                        } line-clamp-2 font-fira-code`}
+                      >
                         {project.description}
                       </p>
                     </div>
@@ -509,9 +558,11 @@ export default function HackerProfile() {
           {Array.isArray(hacker.likedProjects) &&
             hacker.likedProjects.length > 0 && (
               <div className="mb-12">
-                <h2 className={`text-2xl font-bold ${
-                  isDarkMode ? 'text-gray-100' : 'text-gray-900'
-                } mb-4`}>
+                <h2
+                  className={`text-2xl font-bold ${
+                    isDarkMode ? "text-gray-100" : "text-gray-900"
+                  } mb-4`}
+                >
                   Liked Projects
                 </h2>
                 <div className={scrollableSection}>
@@ -520,7 +571,7 @@ export default function HackerProfile() {
                       key={project.id}
                       href={`/projects/${project.id}`}
                       className={`flex-shrink-0 w-80 ${
-                        isDarkMode ? 'bg-gray-800' : 'bg-white'
+                        isDarkMode ? "bg-gray-800" : "bg-white"
                       } rounded-lg shadow-md hover:shadow-lg transition-shadow overflow-hidden`}
                     >
                       <div className="relative h-48">
@@ -561,18 +612,22 @@ export default function HackerProfile() {
                       </div>
                       <div className="p-4">
                         <div className="flex justify-between items-start mb-2">
-                          <h3 className={`text-xl font-semibold ${
-                            isDarkMode ? 'text-gray-100' : 'text-gray-900'
-                          }`}>
+                          <h3
+                            className={`text-xl font-semibold ${
+                              isDarkMode ? "text-gray-100" : "text-gray-900"
+                            }`}
+                          >
                             {project.title}
                           </h3>
                           <span className="text-xs text-gray-500">
                             {new Date(createdAt).toLocaleDateString()}
                           </span>
                         </div>
-                        <p className={`${
-                          isDarkMode ? 'text-gray-300' : 'text-gray-600'
-                        } line-clamp-2 font-fira-code`}>
+                        <p
+                          className={`${
+                            isDarkMode ? "text-gray-300" : "text-gray-600"
+                          } line-clamp-2 font-fira-code`}
+                        >
                           {project.description}
                         </p>
                       </div>
@@ -585,12 +640,16 @@ export default function HackerProfile() {
           {(!Array.isArray(hacker.projects) || hacker.projects.length === 0) &&
             (!Array.isArray(hacker.ledProjects) ||
               hacker.ledProjects.length === 0) && (
-              <div className={`text-center py-12 ${
-                isDarkMode ? 'bg-gray-800' : 'bg-white'
-              } rounded-lg shadow`}>
-                <p className={`${
-                  isDarkMode ? 'text-gray-300' : 'text-gray-600'
-                } font-fira-code`}>
+              <div
+                className={`text-center py-12 ${
+                  isDarkMode ? "bg-gray-800" : "bg-white"
+                } rounded-lg shadow`}
+              >
+                <p
+                  className={`${
+                    isDarkMode ? "text-gray-300" : "text-gray-600"
+                  } font-fira-code`}
+                >
                   No projects yet
                 </p>
               </div>

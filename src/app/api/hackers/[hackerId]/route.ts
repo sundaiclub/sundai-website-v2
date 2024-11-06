@@ -16,6 +16,7 @@ export async function GET(
         ledProjects: {
           include: {
             thumbnail: true,
+            likes: true,
           },
           orderBy: {
             createdAt: "desc",
@@ -44,6 +45,7 @@ export async function GET(
                     avatar: true,
                   },
                 },
+                likes: true,
               },
             },
           },
@@ -58,7 +60,19 @@ export async function GET(
       return NextResponse.json({ error: "Hacker not found" }, { status: 404 });
     }
 
-    return NextResponse.json(hacker);
+    const transformedHacker = {
+      ...hacker,
+      likedProjects: hacker.likes.map((like) => ({
+        createdAt: like.createdAt,
+        project: like.project,
+      })),
+    };
+
+    if (transformedHacker.likes) {
+      delete (transformedHacker as any).likes;
+    }
+
+    return NextResponse.json(transformedHacker);
   } catch (error) {
     console.error("Error fetching hacker:", error);
     return NextResponse.json(
