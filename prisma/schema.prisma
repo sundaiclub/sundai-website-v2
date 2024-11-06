@@ -62,7 +62,7 @@ model Project {
   updatedAt   DateTime  @updatedAt
 
   @@index([launchLeadId])
-  Attendance Attendance[]
+  attendance Attendance[]
 }
 
 model ProjectToParticipant {
@@ -156,26 +156,25 @@ model Notification {
 }
 
 model Attendance {
-  id          String    @id @default(uuid())
-  hacker      Hacker    @relation(fields: [hackerId], references: [id])
-  hackerId    String
-  week        Week      @relation(fields: [weekId], references: [id]) // Link to specific week
-  weekId      String
-  date        DateTime  @default(now())
-  checkInTime DateTime  @default(now())
-  checkOutTime DateTime?
-  duration    Int?      // Duration in minutes
-  notes       String?
-  location    String?   // e.g., "Remote", "In-Person", etc.
-  verified    Boolean   @default(false)
-  verifiedBy  Hacker?   @relation("AttendanceVerifications", fields: [verifierId], references: [id])
-  verifierId  String?
-  projects    Project[] // Projects worked on during this attendance
+  id        String          @id @default(cuid())
+  hacker    Hacker         @relation(fields: [hackerId], references: [id])
+  hackerId  String
+  verifiedBy Hacker?       @relation("AttendanceVerifications", fields: [verifierId], references: [id])
+  verifierId String?
+  week      Week           @relation(fields: [weekId], references: [id])
+  weekId    String
+  project   Project?       @relation(fields: [projectId], references: [id])
+  projectId String?
+  status    AttendanceStatus @default(PRESENT)
+  timestamp DateTime       @default(now())
 
-  @@unique([hackerId, date])
-  @@index([hackerId])
-  @@index([date])
-  @@index([weekId])
+  @@unique([hackerId, weekId])
+}
+
+enum AttendanceStatus {
+  PRESENT
+  LATE
+  ABSENT
 }
 
 model Week {

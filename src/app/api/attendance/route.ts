@@ -11,6 +11,7 @@ export async function POST(req: Request) {
       return new NextResponse("Unauthorized", { status: 401 });
     }
 
+    // Get the hacker using clerkId
     const hacker = await prisma.hacker.findUnique({
       where: { clerkId: userId },
     });
@@ -21,7 +22,7 @@ export async function POST(req: Request) {
 
     // Get current week
     const now = new Date();
-    const currentWeek = await prisma.week.findFirst({
+    let currentWeek = await prisma.week.findFirst({
       where: {
         startDate: { lte: now },
         endDate: { gte: now },
@@ -29,73 +30,57 @@ export async function POST(req: Request) {
     });
 
     if (!currentWeek) {
-      return new NextResponse("No active week found", { status: 400 });
+      // Create a new week if none exists
+      const startDate = new Date(now);
+      startDate.setHours(0, 0, 0, 0);
+      const endDate = new Date(startDate);
+      endDate.setDate(endDate.getDate() + 6);
+      endDate.setHours(23, 59, 59, 999);
+
+      const latestWeek = await prisma.week.findFirst({
+        orderBy: { number: "desc" },
+      });
+      const weekNumber = (latestWeek?.number || 0) + 1;
+
+      currentWeek = await prisma.week.create({
+        data: {
+          number: weekNumber,
+          startDate,
+          endDate,
+          theme: `Week ${weekNumber}`,
+          description: `Projects for week ${weekNumber}`,
+        },
+      });
     }
 
-    // Check if already checked in today
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const existingAttendance = await prisma.attendance.findFirst({
+    // Check if already checked in for this week
+    const existingAttendance = await prisma.attendance.findUnique({
       where: {
-        hackerId: hacker.id,
-        date: {
-          gte: today,
+        hackerId_weekId: {
+          hackerId: hacker.id,
+          weekId: currentWeek.id,
         },
       },
     });
 
     if (existingAttendance) {
-      if (!existingAttendance.checkOutTime) {
-        // Check out
-        const checkOutTime = new Date();
-        const duration = Math.floor(
-          (checkOutTime.getTime() - existingAttendance.checkInTime.getTime()) /
-            1000 /
-            60
-        );
-
-        const updated = await prisma.attendance.update({
-          where: { id: existingAttendance.id },
-          data: {
-            checkOutTime,
-            duration,
-          },
-        });
-
-        // Update hacker's total time
-        await prisma.hacker.update({
-          where: { id: hacker.id },
-          data: {
-            totalMinutesAttended: {
-              increment: duration,
-            },
-          },
-        });
-
-        return NextResponse.json(updated);
-      }
-      return new NextResponse("Already checked in and out today", {
+      return new NextResponse("Already checked in for this week", {
         status: 400,
       });
     }
 
-    // Create new attendance record with week
+    // Create attendance record
     const attendance = await prisma.attendance.create({
       data: {
         hackerId: hacker.id,
         weekId: currentWeek.id,
-        date: today,
-        location: "Remote",
       },
     });
 
     // Update hacker's last attendance
     await prisma.hacker.update({
       where: { id: hacker.id },
-      data: {
-        lastAttendance: new Date(),
-      },
+      data: { lastAttendance: now },
     });
 
     return NextResponse.json(attendance);
@@ -108,32 +93,27 @@ export async function POST(req: Request) {
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
-    const startDate = searchParams.get("startDate");
-    const endDate = searchParams.get("endDate");
+    const weekId = searchParams.get("weekId");
+
+    if (!weekId) {
+      return new NextResponse("Week ID is required", { status: 400 });
+    }
 
     const attendance = await prisma.attendance.findMany({
       where: {
-        date: {
-          gte: startDate ? new Date(startDate) : undefined,
-          lte: endDate ? new Date(endDate) : undefined,
-        },
+        weekId,
       },
       include: {
         hacker: {
           select: {
+            id: true,
             name: true,
             avatar: true,
-            totalMinutesAttended: true,
-          },
-        },
-        verifiedBy: {
-          select: {
-            name: true,
           },
         },
       },
       orderBy: {
-        date: "desc",
+        timestamp: "desc",
       },
     });
 
