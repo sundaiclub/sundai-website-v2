@@ -16,7 +16,7 @@ export async function PATCH(
 
     // Check if user is admin
     const user = await prisma.hacker.findUnique({
-      where: { id: userId },
+      where: { clerkId: userId },
       select: { role: true },
     });
 
