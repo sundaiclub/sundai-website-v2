@@ -80,3 +80,4 @@ Service Account: p199983032721-yeh8ti@gcp-sa-cloud-sql.iam.gserviceaccount.com
 
 To connect locally, update your .env file with the correct DATABASE_URL.
 # v2-sundai
+# v2-sundai
