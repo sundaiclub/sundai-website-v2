@@ -30,7 +30,14 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-background-light dark:bg-background-dark font-space-mono">
+    <div
+      className={`min-h-screen ${
+        isDarkMode
+          ? "bg-gradient-to-b from-gray-900 to-black text-gray-100"
+          : "bg-gradient-to-b from-[#E5E5E5] to-[#F0F0F0] text-gray-800"
+      } font-space-mono`}
+    >
+      {" "}
       <section className="relative py-16 md:py-24 lg:py-26 px-4 md:px-8 overflow-hidden">
         <div className="container mx-auto relative z-10 h-[600px] overflow-hidden">
           <div
@@ -177,7 +184,6 @@ export default function Home() {
           <ProjectCard />
         </motion.div>
       </section>
-
       <motion.footer
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
