@@ -89,7 +89,7 @@ const Navbar = () => {
               } mx-2 rounded-lg active:bg-indigo-100`}
             >
               <span className={`text-sm font-fira-code ${isDarkMode ? 'text-gray-200' : 'text-black'} hover:text-indigo-700 dark:hover:text-indigo-500 transition duration-300`}>
-                Join a Project
+                All Projects
               </span>
             </Link>
             

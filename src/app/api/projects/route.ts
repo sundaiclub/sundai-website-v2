@@ -33,6 +33,8 @@ export async function GET(req: Request) {
             },
           },
         },
+        techTags: true,
+        domainTags: true,
         likes: {
           select: {
             hackerId: true,

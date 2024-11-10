@@ -2,7 +2,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { motion } from "framer-motion";
-import ProjectCard from "./components/Project";
+import ProjectGrid from "./components/Project";
 import Typewriter from "typewriter-effect";
 import { useState, useEffect } from "react";
 import { usePullToRefresh } from "./hooks/usePullToRefresh";
@@ -39,7 +39,7 @@ export default function Home() {
     >
       {" "}
       <section className="relative py-16 md:py-24 lg:py-26 px-4 md:px-8 overflow-hidden">
-        <div className="container mx-auto relative z-10 h-[600px] overflow-hidden">
+        <div className="container mx-auto relative z-10 h-[400px] overflow-hidden">
           <div
             className="absolute inset-0 animate-scroll-vertical"
             style={{
@@ -138,7 +138,7 @@ export default function Home() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.6, delay: 0.8 }}
               >
-                <Link href="/projects/new">
+                {/* <Link href="/projects/new">
                   <motion.span
                     className={`gap-4 btn-xl btn-purple group/btn btn-border-dark rounded-full ${
                       isDarkMode
@@ -172,7 +172,7 @@ export default function Home() {
                       </svg>
                     </div>
                   </motion.span>
-                </Link>
+                </Link> */}
               </motion.div>
             </motion.div>
           </div>
@@ -183,7 +183,7 @@ export default function Home() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 1.3 }}
         >
-          <ProjectCard />
+          <ProjectGrid />
         </motion.div>
       </section>
       <motion.footer

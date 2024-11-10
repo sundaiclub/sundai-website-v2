@@ -6,35 +6,6 @@ import { useUserContext } from "../contexts/UserContext";
 import Link from "next/link";
 import { XMarkIcon } from "@heroicons/react/24/solid";
 
-type Project = {
-  id: string;
-  title: string;
-  description: string;
-  status: "PENDING" | "APPROVED";
-  githubUrl?: string | null;
-  demoUrl?: string | null;
-  thumbnail?: {
-    url: string;
-  } | null;
-  launchLead: {
-    id: string;
-    name: string;
-    avatar?: {
-      url: string;
-    } | null;
-  };
-  participants: Array<{
-    role: string;
-    hacker: {
-      id: string;
-      name: string;
-      avatar?: {
-        url: string;
-      } | null;
-    };
-  }>;
-};
-
 type JoinModalProps = {
   isOpen: boolean;
   onClose: () => void;

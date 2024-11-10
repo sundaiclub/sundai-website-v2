@@ -41,12 +41,36 @@ model Hacker {
   @@index([clerkId])
 }
 
+model TechTag {
+  id          String    @id @default(uuid())
+  name        String    @unique
+  description String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  projects    Project[] @relation("ProjectTechnologies")
+
+  @@index([name])
+}
+
+model DomainTag {
+  id          String    @id @default(uuid())
+  name        String    @unique
+  description String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  projects    Project[] @relation("ProjectDomains")
+
+  @@index([name])
+}
+
 model Project {
   id          String    @id @default(uuid())
   title       String
+  preview     String    @db.VarChar(120)
   description String
   githubUrl   String?
   demoUrl     String?
+  blogUrl     String?
   thumbnail   Image?    @relation("ProjectThumbnail", fields: [thumbnailId], references: [id])
   thumbnailId String?   @unique
   launchLead  Hacker    @relation("LaunchLead", fields: [launchLeadId], references: [id])
@@ -60,6 +84,10 @@ model Project {
   weeks       Week[]    // Many-to-many as projects can span multiple weeks
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
+  is_starred  Boolean   @default(false)
+  is_broken   Boolean   @default(false)
+  techTags    TechTag[] @relation("ProjectTechnologies")
+  domainTags  DomainTag[] @relation("ProjectDomains")
 
   @@index([launchLeadId])
   attendance Attendance[]
@@ -195,12 +223,14 @@ model Week {
 
 enum Role {
   NOT_SET
+  NEWBIE
   HACKER
+  LEADER
   ADMIN
-  NON_HACKER
 }
 
 enum ProjectStatus {
+  DRAFT
   PENDING
   APPROVED
 }

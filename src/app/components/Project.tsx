@@ -11,9 +11,23 @@ import { useTheme } from "../contexts/ThemeContext";
 type Project = {
   id: string;
   title: string;
+  preview: string;
   description: string;
   githubUrl?: string | null;
   demoUrl?: string | null;
+  blogUrl?: string | null;
+  techTags: Array<{
+    id: string;
+    name: string;
+    description? : string | null;
+  }>;
+  domainTags: Array<{
+    id: string;
+    name: string;
+    description? : string | null;
+  }>;
+  is_starred: boolean;
+  is_broken: boolean;
   thumbnail?: {
     url: string;
   } | null;
@@ -239,9 +253,37 @@ export default function ProjectCard() {
                     isDarkMode ? "text-gray-300" : "text-gray-600"
                   } mb-4`}
                 >
-                  {project.description}
+                  {project.preview}
                 </p>
               </Link>
+
+              {/* Tags Section */}
+              <div className="flex flex-wrap gap-2 mb-4">
+                {project.techTags.map((tag) => (
+                  <span
+                    key={tag.id}
+                    className={`px-2 py-1 rounded-full text-xs ${
+                      isDarkMode
+                        ? "bg-purple-900/50 text-purple-300"
+                        : "bg-indigo-100 text-indigo-700"
+                    }`}
+                  >
+                    {tag.name}
+                  </span>
+                ))}
+                {project.domainTags.map((tag) => (
+                  <span
+                    key={tag.id}
+                    className={`px-2 py-1 rounded-full text-xs ${
+                      isDarkMode
+                        ? "bg-gray-700 text-gray-300"
+                        : "bg-gray-100 text-gray-700"
+                    }`}
+                  >
+                    {tag.name}
+                  </span>
+                ))}
+              </div>
 
               {/* Team Section */}
               <div className="mb-4">
