@@ -43,9 +43,11 @@ export default function Home() {
           <div
             className="absolute inset-0 animate-scroll-vertical"
             style={{
-              backgroundImage: "url('/images/background_sundai.webp')",
-              backgroundSize: "100% auto",
-              backgroundRepeat: "repeat-y",
+              backgroundImage: "url('/images/background_sundai.svg')",
+              backgroundSize: "25% auto",
+              backgroundRepeat: "repeat",
+              WebkitMaskImage: "linear-gradient(to bottom, transparent, black 50%, transparent)",
+              maskImage: "linear-gradient(to bottom, transparent, black 50%, transparent)"
             }}
           />
 
