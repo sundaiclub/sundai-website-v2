@@ -7,6 +7,8 @@ import { useTheme } from "../../../contexts/ThemeContext";
 import { useUserContext } from "../../../contexts/UserContext";
 import { Project } from "../../../components/Project";
 import PermissionDenied from "../../../components/PermissionDenied";
+import TagSelector from "../../../components/TagSelector";
+import { XMarkIcon, PlusIcon, ArrowLeftIcon } from "@heroicons/react/24/outline";
 
 export default function ProjectEditPage() {
   const params = useParams();
@@ -19,6 +21,10 @@ export default function ProjectEditPage() {
   const [editableDescription, setEditableDescription] = useState("");
   const [saving, setSaving] = useState(false);
   const [updateSuccess, setUpdateSuccess] = useState(false);
+  const [availableTechTags, setAvailableTechTags] = useState<Project['techTags']>([]);
+  const [availableDomainTags, setAvailableDomainTags] = useState<Project['domainTags']>([]);
+  const [showTechTagModal, setShowTechTagModal] = useState(false);
+  const [showDomainTagModal, setShowDomainTagModal] = useState(false);
 
   useEffect(() => {
     const fetchProject = async () => {
@@ -49,7 +55,27 @@ export default function ProjectEditPage() {
     }
   }, [project]);
 
+  useEffect(() => {
+    const fetchTags = async () => {
+      try {
+        const [techResponse, domainResponse] = await Promise.all([
+          fetch('/api/tags/tech'),
+          fetch('/api/tags/domain')
+        ]);
+        const techData = await techResponse.json();
+        const domainData = await domainResponse.json();
+        setAvailableTechTags(techData);
+        setAvailableDomainTags(domainData);
+      } catch (error) {
+        console.error('Error fetching tags:', error);
+      }
+    };
+    fetchTags();
+  }, []);
+
   const handleSave = async () => {
+    if (!project) return;
+    
     setSaving(true);
     try {
       const response = await fetch(`/api/projects/${params.projectId}/edit`, {
@@ -60,6 +86,8 @@ export default function ProjectEditPage() {
         body: JSON.stringify({
           title: editableTitle,
           description: editableDescription,
+          techTags: project.techTags.map(tag => tag.id),
+          domainTags: project.domainTags.map(tag => tag.id),
         }),
       });
 
@@ -71,7 +99,6 @@ export default function ProjectEditPage() {
       setProject(updatedProject);
       setUpdateSuccess(true);
       
-      // Hide success message after 3 seconds
       setTimeout(() => {
         setUpdateSuccess(false);
       }, 3000);
@@ -80,6 +107,40 @@ export default function ProjectEditPage() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleRemoveTag = (tagId: string, type: 'tech' | 'domain') => {
+    if (!project) return;
+    
+    setProject({
+      ...project,
+      techTags: type === 'tech' 
+        ? project.techTags.filter(tag => tag.id !== tagId)
+        : project.techTags,
+      domainTags: type === 'domain'
+        ? project.domainTags.filter(tag => tag.id !== tagId)
+        : project.domainTags,
+    });
+  };
+
+  const handleAddTag = (tagId: string, type: 'tech' | 'domain') => {
+    if (!project) return;
+    
+    const tagToAdd = type === 'tech'
+      ? availableTechTags.find(tag => tag.id === tagId)
+      : availableDomainTags.find(tag => tag.id === tagId);
+
+    if (!tagToAdd) return;
+
+    setProject({
+      ...project,
+      techTags: type === 'tech'
+        ? [...project.techTags, tagToAdd]
+        : project.techTags,
+      domainTags: type === 'domain'
+        ? [...project.domainTags, tagToAdd]
+        : project.domainTags,
+    });
   };
 
   const allowedEdit = project && (
@@ -110,6 +171,17 @@ export default function ProjectEditPage() {
     >
       <div className={`max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 py-20`}>
         <div className="space-y-4">
+          <button
+            onClick={() => router.push(`/projects/${params.projectId}`)}
+            className={`flex items-center gap-2 px-4 py-2 transition-colors ${
+              isDarkMode 
+                ? "bg-gray-700 hover:bg-gray-600 text-gray-100" 
+                : "bg-gray-200 hover:bg-gray-300 text-gray-900"
+            } shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500`}
+          >
+            <ArrowLeftIcon className="h-5 w-5" />
+            Back to Project
+          </button>
           <div>
             <label className={`block text-sm font-medium ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
               Title
@@ -121,6 +193,88 @@ export default function ProjectEditPage() {
               className={`mt-1 block w-3/4 border ${isDarkMode ? "border-gray-600 bg-gray-800 text-gray-100" : "border-gray-300 bg-white text-gray-900"} rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 p-2`}
             />
           </div>
+          <div>
+            <label className={`block text-sm font-medium ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
+              Tech Tags
+            </label>
+            <div className="flex flex-wrap gap-2 mt-2">
+              {project?.techTags?.map((tag) => (
+                <span
+                  key={tag.id}
+                  className={`px-2 py-1 rounded-full text-xs flex items-center gap-2 ${
+                    isDarkMode
+                      ? "bg-purple-900/50 text-purple-300"
+                      : "bg-indigo-100 text-indigo-700"
+                  }`}
+                >
+                  {tag.name}
+                  <XMarkIcon
+                    className="h-4 w-4 cursor-pointer"
+                    onClick={() => handleRemoveTag(tag.id, 'tech')}
+                  />
+                </span>
+              ))}
+              <button
+                onClick={() => setShowTechTagModal(true)}
+                className={`px-2 py-1 rounded-full text-xs flex items-center ${
+                  isDarkMode
+                    ? "bg-purple-900/50 text-purple-300"
+                    : "bg-indigo-100 text-indigo-700"
+                }`}
+              >
+                <PlusIcon className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+          <div>
+            <label className={`block text-sm font-medium ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
+              Domain Tags
+            </label>
+            <div className="flex flex-wrap gap-2 mt-2">
+              {project?.domainTags?.map((tag) => (
+                <span
+                  key={tag.id}
+                  className={`px-2 py-1 rounded-full text-xs flex items-center gap-2 ${
+                    isDarkMode
+                      ? "bg-gray-700 text-gray-300"
+                      : "bg-gray-100 text-gray-700"
+                  }`}
+                >
+                  {tag.name}
+                  <XMarkIcon
+                    className="h-4 w-4 cursor-pointer"
+                    onClick={() => handleRemoveTag(tag.id, 'domain')}
+                  />
+                </span>
+              ))}
+              <button
+                onClick={() => setShowDomainTagModal(true)}
+                className={`px-2 py-1 rounded-full text-xs flex items-center ${
+                  isDarkMode
+                    ? "bg-gray-700 text-gray-300"
+                    : "bg-gray-100 text-gray-700"
+                }`}
+              >
+                <PlusIcon className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+          <TagSelector
+            show={showTechTagModal}
+            onClose={() => setShowTechTagModal(false)}
+            tags={availableTechTags}
+            selectedTags={project?.techTags || []}
+            onSelect={handleAddTag}
+            type="tech"
+          />
+          <TagSelector
+            show={showDomainTagModal}
+            onClose={() => setShowDomainTagModal(false)}
+            tags={availableDomainTags}
+            selectedTags={project?.domainTags || []}
+            onSelect={handleAddTag}
+            type="domain"
+          />
           <div>
             <label className={`block text-sm font-medium ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
               Description
@@ -138,7 +292,7 @@ export default function ProjectEditPage() {
               disabled={saving}
               className={`px-4 py-2 ${
                 isDarkMode ? "bg-purple-600 hover:bg-purple-700" : "bg-indigo-600 hover:bg-indigo-700"
-              } text-white rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 flex items-center space-x-2`}
+              } text-white shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 flex items-center space-x-2`}
             >
               {saving ? (
                 <>
@@ -149,18 +303,9 @@ export default function ProjectEditPage() {
                 <span>Save Changes</span>
               )}
             </button>
-
-            <button
-              onClick={() => router.push(`/projects/${params.projectId}`)}
-              className={`px-4 py-2 ${
-                isDarkMode ? "bg-gray-700 hover:bg-gray-600" : "bg-gray-200 hover:bg-gray-300"
-              } rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500`}
-            >
-              Back to Project
-            </button>
             
             {updateSuccess && (
-              <div className={`px-4 py-2 rounded-md ${
+              <div className={`px-4 py-2 ${
                 isDarkMode ? "bg-green-800 text-green-100" : "bg-green-100 text-green-800"
               }`}>
                 Changes saved successfully!

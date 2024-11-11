@@ -114,9 +114,13 @@ export default function ProjectDetail() {
             {allowedEdit && (
               <button
                 onClick={() => router.push(`/projects/${project.id}/edit`)}
-                className="absolute top-4 right-4 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors z-10"
+                className={`absolute top-4 right-4 px-6 py-3 transition-colors backdrop-blur-sm z-10
+                  ${isDarkMode 
+                    ? 'bg-white/20 text-white hover:bg-white/30' 
+                    : 'bg-black/20 text-white hover:bg-black/30'
+                  } font-medium`}
               >
-                Edit Project
+                Edit
               </button>
             )}
             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />

@@ -43,7 +43,7 @@ export async function PATCH(
     }
 
     const body = await req.json();
-    const updateData = {};
+    const updateData: any = {};
 
     if (body.title) updateData.title = body.title;
     if (body.preview) updateData.preview = body.preview;
@@ -57,11 +57,26 @@ export async function PATCH(
     if (body.startDate) updateData.startDate = new Date(body.startDate);
     if (body.endDate) updateData.endDate = new Date(body.endDate);
 
+    if (body.techTags) {
+      updateData.techTags = {
+        set: [], // First clear existing connections
+        connect: body.techTags.map((id: string) => ({ id })), // Then connect new ones
+      };
+    }
+    if (body.domainTags) {
+      updateData.domainTags = {
+        set: [], // First clear existing connections
+        connect: body.domainTags.map((id: string) => ({ id })), // Then connect new ones
+      };
+    }
+
     const updatedProject = await prisma.project.update({
       where: { id: params.projectId },
       data: updateData,
       include: {
         thumbnail: true,
+        techTags: true,
+        domainTags: true,
         launchLead: {
           include: {
             avatar: true,
