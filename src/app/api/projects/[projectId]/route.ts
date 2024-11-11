@@ -33,6 +33,8 @@ export async function GET(
             createdAt: true,
           },
         },
+        techTags: true,
+        domainTags: true,
       },
     });
 

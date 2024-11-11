@@ -1,4 +1,5 @@
 "use client";
+import React from "react";
 import ProjectGrid from "../components/Project";
 import { useTheme } from "../contexts/ThemeContext";
 import { useUserContext } from "../contexts/UserContext";

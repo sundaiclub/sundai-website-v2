@@ -8,7 +8,7 @@ import { HeartIcon as HeartIconSolid } from "@heroicons/react/24/solid";
 import { useUserContext } from "../contexts/UserContext";
 import { useTheme } from "../contexts/ThemeContext";
 
-type Project = {
+export type Project = {
   id: string;
   title: string;
   status: string;
