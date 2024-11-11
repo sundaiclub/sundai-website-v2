@@ -2,6 +2,8 @@
 import React from "react";
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { format } from 'date-fns';
+import toast from 'react-hot-toast';
 
 import { useTheme } from "../../../contexts/ThemeContext";
 import { useUserContext } from "../../../contexts/UserContext";
@@ -10,6 +12,44 @@ import PermissionDenied from "../../../components/PermissionDenied";
 import TagSelector from "../../../components/TagSelector";
 import { XMarkIcon, PlusIcon, ArrowLeftIcon } from "@heroicons/react/24/outline";
 
+const MAX_TITLE_LENGTH = 32;
+const MAX_PREVIEW_LENGTH = 100;
+
+function ButtonPanel({ params, router, isDarkMode, handleSave, saving }: 
+  { params: any, router: any, isDarkMode: boolean, 
+    handleSave: () => void, saving: boolean }) {
+  return (
+    <div className="flex items-center space-x-4 mt-4 text-sm">
+      <button
+          onClick={() => router.push(`/projects/${params.projectId}`)}
+          className={`flex items-center gap-2 px-4 py-2 transition-colors ${
+            isDarkMode 
+              ? "bg-gray-700 hover:bg-gray-600 text-gray-100" 
+              : "bg-gray-200 hover:bg-gray-300 text-gray-900"
+          } shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500`}
+        >
+        <ArrowLeftIcon className="h-5 w-5" /> Back to Project
+      </button>
+      <button
+        onClick={handleSave}
+        disabled={saving}
+        className={`px-4 py-2 ${
+          isDarkMode ? "bg-purple-600 hover:bg-purple-700" : "bg-indigo-600 hover:bg-indigo-700"
+        } text-white shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 flex items-center space-x-2`}
+      >
+        {saving ? (
+          <>
+            <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div>
+            <span>Saving...</span>
+          </>
+        ) : (
+          <span>Save Changes</span>
+        )}
+      </button>
+    </div>
+  );
+}
+
 export default function ProjectEditPage() {
   const params = useParams();
   const router = useRouter();
@@ -17,10 +57,13 @@ export default function ProjectEditPage() {
   const { isAdmin, userInfo } = useUserContext();
   const { isDarkMode } = useTheme();
   const [project, setProject] = useState<Project | null>(null);
+
   const [editableTitle, setEditableTitle] = useState("");
+  const [editablePreview, setEditablePreview] = useState("");
   const [editableDescription, setEditableDescription] = useState("");
+  const [editableStartDate, setEditableStartDate] = useState<Date | null>(null);
+
   const [saving, setSaving] = useState(false);
-  const [updateSuccess, setUpdateSuccess] = useState(false);
   const [availableTechTags, setAvailableTechTags] = useState<Project['techTags']>([]);
   const [availableDomainTags, setAvailableDomainTags] = useState<Project['domainTags']>([]);
   const [showTechTagModal, setShowTechTagModal] = useState(false);
@@ -52,6 +95,8 @@ export default function ProjectEditPage() {
     if (project) {
       setEditableTitle(project.title);
       setEditableDescription(project.description);
+      setEditablePreview(project.preview);
+      setEditableStartDate(project.startDate ? new Date(project.startDate) : null);
     }
   }, [project]);
 
@@ -86,6 +131,8 @@ export default function ProjectEditPage() {
         body: JSON.stringify({
           title: editableTitle,
           description: editableDescription,
+          preview: editablePreview,
+          startDate: editableStartDate?.toISOString() || null,
           techTags: project.techTags.map(tag => tag.id),
           domainTags: project.domainTags.map(tag => tag.id),
         }),
@@ -97,13 +144,10 @@ export default function ProjectEditPage() {
 
       const updatedProject = await response.json();
       setProject(updatedProject);
-      setUpdateSuccess(true);
-      
-      setTimeout(() => {
-        setUpdateSuccess(false);
-      }, 3000);
+      toast.success('Changes saved successfully!');
     } catch (error) {
       console.error("Error updating project:", error);
+      toast.error('Failed to save changes');
     } finally {
       setSaving(false);
     }
@@ -130,7 +174,37 @@ export default function ProjectEditPage() {
       ? availableTechTags.find(tag => tag.id === tagId)
       : availableDomainTags.find(tag => tag.id === tagId);
 
-    if (!tagToAdd) return;
+    if (!tagToAdd) {
+      const fetchTags = async () => {
+        try {
+          const response = await fetch(`/api/tags/${type}`);
+          const data = await response.json();
+          if (type === 'tech') {
+            setAvailableTechTags(data);
+            const newTag = data.find((tag: any) => tag.id === tagId);
+            if (newTag) {
+              setProject({
+                ...project,
+                techTags: [...project.techTags, newTag]
+              });
+            }
+          } else {
+            setAvailableDomainTags(data);
+            const newTag = data.find((tag: any) => tag.id === tagId);
+            if (newTag) {
+              setProject({
+                ...project,
+                domainTags: [...project.domainTags, newTag]
+              });
+            }
+          }
+        } catch (error) {
+          console.error('Error fetching updated tags:', error);
+        }
+      };
+      fetchTags();
+      return;
+    }
 
     setProject({
       ...project,
@@ -148,6 +222,12 @@ export default function ProjectEditPage() {
       (participant) => participant.hacker.id === userInfo?.id
     ) || (project.launchLead.id === userInfo?.id) || isAdmin
   );
+
+  const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.value.length <= MAX_TITLE_LENGTH) {
+      setEditableTitle(e.target.value);
+    }
+  };
 
   if (loading) {
     return (
@@ -171,17 +251,13 @@ export default function ProjectEditPage() {
     >
       <div className={`max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 py-20`}>
         <div className="space-y-4">
-          <button
-            onClick={() => router.push(`/projects/${params.projectId}`)}
-            className={`flex items-center gap-2 px-4 py-2 transition-colors ${
-              isDarkMode 
-                ? "bg-gray-700 hover:bg-gray-600 text-gray-100" 
-                : "bg-gray-200 hover:bg-gray-300 text-gray-900"
-            } shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500`}
-          >
-            <ArrowLeftIcon className="h-5 w-5" />
-            Back to Project
-          </button>
+        <ButtonPanel 
+              params={params} 
+              router={router} 
+              isDarkMode={isDarkMode} 
+              handleSave={handleSave} 
+              saving={saving} 
+            />
           <div>
             <label className={`block text-sm font-medium ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
               Title
@@ -189,9 +265,13 @@ export default function ProjectEditPage() {
             <input
               type="text"
               value={editableTitle}
-              onChange={(e) => setEditableTitle(e.target.value)}
+              onChange={handleTitleChange}
+              maxLength={MAX_TITLE_LENGTH}
               className={`mt-1 block w-3/4 border ${isDarkMode ? "border-gray-600 bg-gray-800 text-gray-100" : "border-gray-300 bg-white text-gray-900"} rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 p-2`}
             />
+            <span className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+              {editableTitle.length}/{MAX_TITLE_LENGTH} characters
+            </span>
           </div>
           <div>
             <label className={`block text-sm font-medium ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
@@ -277,7 +357,37 @@ export default function ProjectEditPage() {
           />
           <div>
             <label className={`block text-sm font-medium ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
-              Description
+              One Sentence Description
+            </label>
+            <textarea
+              value={editablePreview}
+              onChange={(e) => e.target.value.length <= MAX_PREVIEW_LENGTH && setEditablePreview(e.target.value)}
+              maxLength={MAX_PREVIEW_LENGTH}
+              className={`mt-1 block w-3/4 border ${isDarkMode ? "border-gray-600 bg-gray-800 text-gray-100" : "border-gray-300 bg-white text-gray-900"} rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 p-2`}
+              rows={2}
+            />
+            <span className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+              {editablePreview.length}/{MAX_PREVIEW_LENGTH} characters
+            </span>
+          </div>
+          <div>
+            <label className={`block text-sm font-medium ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
+              Start Date
+            </label>
+            <input
+              type="date"
+              value={editableStartDate ? format(editableStartDate, 'yyyy-MM-dd') : ''}
+              onChange={(e) => setEditableStartDate(e.target.value ? new Date(e.target.value) : null)}
+              className={`mt-1 block w-64 border ${
+                isDarkMode 
+                  ? "border-gray-600 bg-gray-800 text-gray-100 [color-scheme:dark] calendar-picker-indicator:filter-invert" 
+                  : "border-gray-300 bg-white text-gray-900 [color-scheme:light]"
+              } rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 p-2`}
+            />
+          </div>
+          <div>
+            <label className={`block text-sm font-medium ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
+              Full Description
             </label>
             <textarea
               value={editableDescription}
@@ -286,32 +396,14 @@ export default function ProjectEditPage() {
               rows={10}
             />
           </div>
-          <div className="flex items-center space-x-4 mt-4">
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className={`px-4 py-2 ${
-                isDarkMode ? "bg-purple-600 hover:bg-purple-700" : "bg-indigo-600 hover:bg-indigo-700"
-              } text-white shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 flex items-center space-x-2`}
-            >
-              {saving ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div>
-                  <span>Saving...</span>
-                </>
-              ) : (
-                <span>Save Changes</span>
-              )}
-            </button>
-            
-            {updateSuccess && (
-              <div className={`px-4 py-2 ${
-                isDarkMode ? "bg-green-800 text-green-100" : "bg-green-100 text-green-800"
-              }`}>
-                Changes saved successfully!
-              </div>
-            )}
-          </div>
+
+          <ButtonPanel 
+            params={params} 
+            router={router} 
+            isDarkMode={isDarkMode} 
+            handleSave={handleSave} 
+            saving={saving} 
+          />
         </div>
       </div>
     </div>
