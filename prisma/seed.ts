@@ -96,6 +96,7 @@ async function main() {
         It helps investors, entrepreneurs, and researchers understand market trends, identify potential partnerships, \
         and track the evolution of AI innovation across different sectors and regions.",
       status: ProjectStatus.APPROVED,
+      is_starred: true,
       domainTags: ["business", "analytics", "visualization"],
       techTags: ["llms", "rags", "data-visualization"],
     },
@@ -109,6 +110,7 @@ async function main() {
         topic-based matchmaking, and a unique scoring system that considers both debate performance and conversational chemistry.\
         Perfect for intellectuals who believe that the best relationships are built on engaging discussions and respectful disagreements.",
       status: ProjectStatus.APPROVED,
+      is_starred: true,
       domainTags: ["social", "dating", "education"],
       techTags: ["llms", "nlp", "matching-algorithms"],
     },
@@ -124,6 +126,7 @@ async function main() {
         while maintaining professionalism and educational value. Perfect for both individual developers looking to improve their skills\
         and teams wanting to maintain high code quality standards.",
       status: ProjectStatus.APPROVED,
+      is_starred: true,
       domainTags: ["developer-tools", "education"],
       techTags: ["llms", "code-analysis", "rags"],
     },
@@ -136,7 +139,7 @@ async function main() {
         The platform features real-time updates, detailed company profiles, funding history, and key metrics.\
         It helps investors, entrepreneurs, and researchers understand market trends, identify potential partnerships, \
         and track the evolution of AI innovation across different sectors and regions.",
-      status: ProjectStatus.PENDING,
+      status: ProjectStatus.APPROVED,
       domainTags: ["business", "analytics", "visualization"],
       techTags: ["llms", "rags", "data-visualization"],
     },
@@ -162,7 +165,7 @@ async function main() {
         The platform features real-time updates, detailed company profiles, funding history, and key metrics.\
         It helps investors, entrepreneurs, and researchers understand market trends, identify potential partnerships, \
         and track the evolution of AI innovation across different sectors and regions.",
-      status: ProjectStatus.PENDING,
+      status: ProjectStatus.DRAFT,
       domainTags: ["business", "analytics", "visualization"],
       techTags: ["llms", "rags", "data-visualization"],
     },
