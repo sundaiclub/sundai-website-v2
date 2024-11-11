@@ -21,10 +21,17 @@ export async function GET(
         select: {
             id: true,
             name: true,
-            description: true
+            description: true,
+            _count: {
+                select: {
+                    projects: true
+                }
+            }
         },
         orderBy: {
-            name: 'asc'
+            projects: {
+                _count: 'desc'
+            }
         }
     });
 

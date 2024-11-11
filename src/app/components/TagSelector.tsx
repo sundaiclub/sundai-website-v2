@@ -12,7 +12,7 @@ export default function TagSelector({
   }: {
     show: boolean;
     onClose: () => void;
-    tags: Array<{ id: string; name: string }>;
+    tags: Array<{ id: string; name: string; _count?: { projects: number } }>;
     selectedTags: Array<{ id: string }>;
     onSelect: (id: string, type: 'tech' | 'domain') => void;
     type: 'tech' | 'domain';
@@ -62,7 +62,8 @@ export default function TagSelector({
 
     const filteredTags = tags
       .filter(tag => !selectedTags.some(st => st.id === tag.id))
-      .filter(tag => tag.name.toLowerCase().includes(searchTerm.toLowerCase()));
+      .filter(tag => tag.name.toLowerCase().includes(searchTerm.toLowerCase()))
+      .sort((a, b) => (b.usageCount || 0) - (a.usageCount || 0));
 
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -110,7 +111,12 @@ export default function TagSelector({
                       : 'hover:bg-gray-100'
                   }`}
                 >
-                  {tag.name}
+                  <span>{tag.name}</span>
+                  <span className={`float-right ${
+                    isDarkMode ? 'text-gray-400' : 'text-gray-500'
+                  }`}>
+                    {tag._count?.projects || 0}
+                  </span>
                 </button>
               ))
             ) : (
