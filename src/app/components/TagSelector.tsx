@@ -1,5 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { useTheme } from "../contexts/ThemeContext";
+import { toast } from 'react-hot-toast';
 
 export default function TagSelector({ 
     show, 
@@ -27,7 +28,7 @@ export default function TagSelector({
       );
       
       if (isDuplicate) {
-        alert('A tag with this name already exists');
+        toast.error('A tag with this name already exists');
         return;
       }
 
@@ -46,12 +47,12 @@ export default function TagSelector({
         }
 
         const newTag = await response.json();
-        console.log(newTag)
+        toast.success('Tag created successfully');
         onSelect(newTag.id, type);
         onClose();
       } catch (error) {
         console.error('Error creating tag:', error);
-        alert('Failed to create tag');
+        toast.error('Failed to create tag');
       } finally {
         setIsCreating(false);
       }
