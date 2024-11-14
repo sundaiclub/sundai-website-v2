@@ -1,5 +1,5 @@
 "use client";
-import React from "react";
+import React, { useRef } from "react";
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { format } from 'date-fns';
@@ -62,12 +62,17 @@ export default function ProjectEditPage() {
   const [editablePreview, setEditablePreview] = useState("");
   const [editableDescription, setEditableDescription] = useState("");
   const [editableStartDate, setEditableStartDate] = useState<Date | null>(null);
+  const [editableGithubUrl, setEditableGithubUrl] = useState("");
+  const [editableDemoUrl, setEditableDemoUrl] = useState("");
+  const [editableBlogUrl, setEditableBlogUrl] = useState("");
 
   const [saving, setSaving] = useState(false);
   const [availableTechTags, setAvailableTechTags] = useState<Project['techTags']>([]);
   const [availableDomainTags, setAvailableDomainTags] = useState<Project['domainTags']>([]);
   const [showTechTagModal, setShowTechTagModal] = useState(false);
   const [showDomainTagModal, setShowDomainTagModal] = useState(false);
+
+  const formRef = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
     const fetchProject = async () => {
@@ -97,6 +102,9 @@ export default function ProjectEditPage() {
       setEditableDescription(project.description);
       setEditablePreview(project.preview);
       setEditableStartDate(project.startDate ? new Date(project.startDate) : null);
+      setEditableGithubUrl(project.githubUrl || "");
+      setEditableDemoUrl(project.demoUrl || "");
+      setEditableBlogUrl(project.blogUrl || "");
     }
   }, [project]);
 
@@ -121,6 +129,12 @@ export default function ProjectEditPage() {
   const handleSave = async () => {
     if (!project) return;
     
+    // Trigger form validation
+    if (formRef.current && !formRef.current.checkValidity()) {
+      formRef.current.reportValidity();
+      return;
+    }
+    
     setSaving(true);
     try {
       const response = await fetch(`/api/projects/${params.projectId}/edit`, {
@@ -135,6 +149,9 @@ export default function ProjectEditPage() {
           startDate: editableStartDate?.toISOString() || null,
           techTags: project.techTags.map(tag => tag.id),
           domainTags: project.domainTags.map(tag => tag.id),
+          githubUrl: editableGithubUrl,
+          demoUrl: editableDemoUrl,
+          blogUrl: editableBlogUrl,
         }),
       });
 
@@ -355,6 +372,37 @@ export default function ProjectEditPage() {
             onSelect={handleAddTag}
             type="domain"
           />
+          <div>
+            <label className={`block text-sm font-medium ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
+              Project URLs
+            </label>
+            <form ref={formRef} onSubmit={(e) => {
+              e.preventDefault();
+              handleSave();
+            }} className="space-y-4 mt-2">
+              <input
+                type="url"
+                placeholder="GitHub URL"
+                value={editableGithubUrl}
+                onChange={(e) => setEditableGithubUrl(e.target.value)}
+                className={`block w-3/4 border ${isDarkMode ? "border-gray-600 bg-gray-800 text-gray-100" : "border-gray-300 bg-white text-gray-900"} rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 p-2`}
+              />
+              <input
+                type="url"
+                placeholder="Demo URL"
+                value={editableDemoUrl}
+                onChange={(e) => setEditableDemoUrl(e.target.value)}
+                className={`block w-3/4 border ${isDarkMode ? "border-gray-600 bg-gray-800 text-gray-100" : "border-gray-300 bg-white text-gray-900"} rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 p-2`}
+              />
+              <input
+                type="url"
+                placeholder="Blog URL"
+                value={editableBlogUrl}
+                onChange={(e) => setEditableBlogUrl(e.target.value)}
+                className={`block w-3/4 border ${isDarkMode ? "border-gray-600 bg-gray-800 text-gray-100" : "border-gray-300 bg-white text-gray-900"} rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 p-2`}
+              />
+            </form>
+          </div>
           <div>
             <label className={`block text-sm font-medium ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
               One Sentence Description

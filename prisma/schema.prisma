@@ -66,8 +66,8 @@ model DomainTag {
 model Project {
   id          String    @id @default(uuid())
   title       String
-  preview     String    @db.VarChar(120)
-  description String
+  preview     String?    @db.VarChar(120)
+  description String?
   githubUrl   String?
   demoUrl     String?
   blogUrl     String?
@@ -225,6 +225,7 @@ enum Role {
   NOT_SET
   NEWBIE
   HACKER
+  SPONSOR
   LEADER
   ADMIN
 }

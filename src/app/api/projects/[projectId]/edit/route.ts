@@ -48,14 +48,15 @@ export async function PATCH(
     if (body.title) updateData.title = body.title;
     if (body.preview) updateData.preview = body.preview;
     if (body.description) updateData.description = body.description;
-    if (body.githubUrl) updateData.githubUrl = body.githubUrl;
-    if (body.demoUrl) updateData.demoUrl = body.demoUrl;
-    if (body.blogUrl) updateData.blogUrl = body.blogUrl;
     if (body.status) updateData.status = body.status;
     if (body.is_starred !== undefined) updateData.is_starred = body.is_starred;
     if (body.is_broken !== undefined) updateData.is_broken = body.is_broken;
     if (body.startDate) updateData.startDate = new Date(body.startDate);
     if (body.endDate) updateData.endDate = new Date(body.endDate);
+
+    updateData.githubUrl = body.githubUrl || null;
+    updateData.demoUrl = body.demoUrl || null;
+    updateData.blogUrl = body.blogUrl || null;
 
     if (body.techTags) {
       updateData.techTags = {
