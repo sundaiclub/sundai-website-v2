@@ -12,6 +12,7 @@ import { Project } from "../../../components/Project";
 import PermissionDenied from "../../../components/PermissionDenied";
 import TagSelector from "../../../components/TagSelector";
 import { XMarkIcon, PlusIcon, ArrowLeftIcon } from "@heroicons/react/24/outline";
+import { HackerSelector, ProjectRoles, Hacker, TeamMember } from "../../../components/HackerSelector";
 
 const MAX_TITLE_LENGTH = 32;
 const MAX_PREVIEW_LENGTH = 100;
@@ -78,6 +79,11 @@ export default function ProjectEditPage() {
 
   const formRef = useRef<HTMLFormElement>(null);
 
+  const [hackers, setHackers] = useState<Hacker[]>([]);
+  const [showTeamModal, setShowTeamModal] = useState(false);
+  const [showLaunchLeadModal, setShowLaunchLeadModal] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+
   useEffect(() => {
     const fetchProject = async () => {
       try {
@@ -131,6 +137,13 @@ export default function ProjectEditPage() {
     fetchTags();
   }, []);
 
+  useEffect(() => {
+    fetch("/api/hackers")
+      .then((res) => res.json())
+      .then((data) => setHackers(data))
+      .catch((error) => console.error("Error fetching hackers:", error));
+  }, []);
+
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -174,10 +187,13 @@ export default function ProjectEditPage() {
       formData.append('demoUrl', editableDemoUrl);
       formData.append('blogUrl', editableBlogUrl);
 
+      // Add team members data
+      formData.append('participants', JSON.stringify(project.participants));
+      formData.append('launchLeadId', project.launchLead.id);
+
       const response = await fetch(`/api/projects/${params.projectId}/edit`, {
         method: "PATCH",
         body: formData,
-        // Remove the Content-Type header - browser will set it automatically with boundary
       });
 
       if (!response.ok) {
@@ -257,6 +273,44 @@ export default function ProjectEditPage() {
       domainTags: type === 'domain'
         ? [...project.domainTags, tagToAdd]
         : project.domainTags,
+    });
+  };
+
+  const handleAddMember = (hacker: Hacker) => {
+    if (!project) return;
+    
+    // Add member locally
+    setProject({
+      ...project,
+      participants: [
+        ...project.participants,
+        {
+          role: "hacker",
+          hacker: hacker
+        }
+      ]
+    });
+  };
+
+  const handleRemoveMember = (hackerId: string) => {
+    if (!project) return;
+    
+    // Remove member locally
+    setProject({
+      ...project,
+      participants: project.participants.filter(
+        participant => participant.hacker.id !== hackerId
+      )
+    });
+  };
+
+  const handleChangeLaunchLead = (hacker: Hacker) => {
+    if (!project) return;
+    
+    // Update launch lead locally
+    setProject({
+      ...project,
+      launchLead: hacker
     });
   };
 
@@ -446,6 +500,103 @@ export default function ProjectEditPage() {
           </div>
           <div>
             <label className={`block font-medium ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
+              Team Members
+            </label>
+            {project?.launchLead.id === userInfo?.id || isAdmin ? (
+              <>
+                <div className="mt-2">
+                  <div className={`inline-flex items-center px-3 py-1 rounded-full text-sm cursor-pointer transition-colors ${
+                    isDarkMode 
+                      ? 'bg-purple-900/50 text-purple-100 hover:bg-purple-800/50' 
+                      : 'bg-purple-100 text-purple-800 hover:bg-purple-200'
+                  }`} onClick={() => setShowLaunchLeadModal(true)}>
+                    <span>{project?.launchLead.name}</span>
+                    <span className={`mx-1 ${isDarkMode ? 'text-purple-400' : 'text-purple-400'}`}>•</span>
+                    <span className={isDarkMode ? 'text-purple-300' : 'text-purple-600'}>Launch Lead</span>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {project?.participants.map((participant) => (
+                    <div
+                      key={participant.hacker.id}
+                      className={`flex items-center px-3 py-1 rounded-full text-sm ${
+                        isDarkMode 
+                          ? 'bg-gray-700 text-gray-100' 
+                          : 'bg-indigo-100 text-indigo-800'
+                      }`}
+                    >
+                      <span>{participant.hacker.name}</span>
+                      <span className={`mx-1 ${isDarkMode ? 'text-gray-400' : 'text-indigo-400'}`}>•</span>
+                      <span className={isDarkMode ? 'text-gray-300' : 'text-indigo-600'}>
+                        {ProjectRoles.find((r) => r.id === participant.role)?.label}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveMember(participant.hacker.id)}
+                        className={`ml-2 ${
+                          isDarkMode 
+                            ? 'text-gray-400 hover:text-gray-200' 
+                            : 'text-indigo-600 hover:text-indigo-800'
+                        }`}
+                      >
+                        <XMarkIcon className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => setShowTeamModal(true)}
+                    className={`text-sm font-medium ${
+                      isDarkMode 
+                        ? 'text-indigo-400 hover:text-indigo-300' 
+                        : 'text-indigo-600 hover:text-indigo-800'
+                    }`}
+                  >
+                    + Add Team Members
+                  </button>
+                </div>
+              </>
+            ) : (
+              <p className={`mt-2 text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+                Only the launch lead can add or delete team members. Contact <a 
+                  href={`/hacker/${project?.launchLead.id}`}
+                  className={`${isDarkMode ? "text-indigo-400 hover:text-indigo-300" : "text-indigo-600 hover:text-indigo-700"}`}
+                >
+                  {project?.launchLead.name}
+                </a> with this.
+              </p>
+            )}
+
+            <HackerSelector
+              showModal={showLaunchLeadModal}
+              setShowModal={setShowLaunchLeadModal}
+              isDarkMode={isDarkMode}
+              searchTerm={searchTerm}
+              setSearchTerm={setSearchTerm}
+              filteredHackers={hackers}
+              handleAddMember={handleChangeLaunchLead}
+              title="Change Launch Lead"
+              singleSelect={true}
+              selectedIds={project?.launchLead ? [project.launchLead.id] : []}
+            />
+
+            <HackerSelector
+              showModal={showTeamModal}
+              setShowModal={setShowTeamModal}
+              isDarkMode={isDarkMode}
+              searchTerm={searchTerm}
+              setSearchTerm={setSearchTerm}
+              filteredHackers={hackers.filter(
+                (hacker) => !project?.participants.some(p => p.hacker.id === hacker.id)
+              )}
+              handleAddMember={handleAddMember}
+              title="Add Team Members"
+              selectedIds={project?.participants.map(p => p.hacker.id) || []}
+            />
+          </div>
+          <div>
+            <label className={`block font-medium ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
               Start Date
             </label>
             <input
@@ -467,7 +618,7 @@ export default function ProjectEditPage() {
             </label>
             <div className="mt-1 flex items-center space-x-4">
               {thumbnailPreview && (
-                <div className="relative w-32 h-32">
+                <div className="relative w-32 aspect-video">
                   <Image
                     src={thumbnailPreview}
                     alt="Thumbnail preview"

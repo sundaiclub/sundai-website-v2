@@ -117,6 +117,34 @@ export async function PATCH(
       }
     }
 
+    const canManageTeam = user?.role === "ADMIN" || project.launchLeadId === user?.id;
+    
+    if (canManageTeam) {
+      const participantsJson = formData.get('participants');
+      const launchLeadId = formData.get('launchLeadId');
+
+      if (participantsJson) {
+        const participants = JSON.parse(participantsJson.toString());
+        
+        // Delete existing participants
+        await prisma.projectToParticipant.deleteMany({
+          where: { projectId: params.projectId }
+        });
+
+        // Add new participants
+        updateData.participants = {
+          create: participants.map((p: any) => ({
+            hackerId: p.hacker.id,
+            role: p.role
+          }))
+        };
+      }
+
+      if (launchLeadId) {
+        updateData.launchLeadId = launchLeadId.toString();
+      }
+    }
+
     const updatedProject = await prisma.project.update({
       where: { id: params.projectId },
       data: updateData,
