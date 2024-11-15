@@ -105,7 +105,15 @@ export async function PATCH(
     }
 
     const data = await request.json();
-    const allowedFields = ["name", "bio", "githubUrl", "phoneNumber"];
+    const allowedFields = [
+      "name",
+      "bio",
+      "githubUrl",
+      "phoneNumber",
+      "linkedinUrl",
+      "twitterUrl",
+      "username"
+    ];
 
     // Filter out any fields that aren't allowed to be updated
     const sanitizedData = Object.keys(data).reduce((acc, key) => {

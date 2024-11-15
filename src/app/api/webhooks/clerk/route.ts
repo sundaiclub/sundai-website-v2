@@ -44,7 +44,7 @@ async function handler(request: Request) {
   const eventType = evt.type;
 
   if (eventType === "user.created") {
-    const { id, email_addresses, first_name, last_name, image_url } = evt.data;
+    const { id, email_addresses, first_name, last_name, image_url, username } = evt.data;
     try {
       const emailUsername = email_addresses[0].email_address.split("@")[0];
       const name =
@@ -59,6 +59,7 @@ async function handler(request: Request) {
           name: name,
           clerkId: id,
           email: email_addresses[0].email_address,
+          username: username || emailUsername,
           role: "HACKER",
           ...(image_url && {
             avatar: {

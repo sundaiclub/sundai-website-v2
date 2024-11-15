@@ -17,9 +17,12 @@ model Hacker {
   id          String    @id @default(uuid())
   clerkId     String    @unique
   name        String
+  username    String?
   role        Role?
   bio         String?
   githubUrl   String?
+  linkedinUrl String?
+  twitterUrl  String?
   email       String?
   phoneNumber String?
   attended    Int       @default(0)
