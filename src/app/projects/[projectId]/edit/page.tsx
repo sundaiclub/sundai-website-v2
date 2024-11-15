@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
+import Image from "next/image";
 
 import { useTheme } from "../../../contexts/ThemeContext";
 import { useUserContext } from "../../../contexts/UserContext";
@@ -72,6 +73,9 @@ export default function ProjectEditPage() {
   const [showTechTagModal, setShowTechTagModal] = useState(false);
   const [showDomainTagModal, setShowDomainTagModal] = useState(false);
 
+  const [thumbnail, setThumbnail] = useState<File | null>(null);
+  const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null);
+
   const formRef = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
@@ -105,6 +109,7 @@ export default function ProjectEditPage() {
       setEditableGithubUrl(project.githubUrl || "");
       setEditableDemoUrl(project.demoUrl || "");
       setEditableBlogUrl(project.blogUrl || "");
+      setThumbnailPreview(project.thumbnail?.url || null);
     }
   }, [project]);
 
@@ -126,6 +131,18 @@ export default function ProjectEditPage() {
     fetchTags();
   }, []);
 
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setThumbnail(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setThumbnailPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const handleSave = async () => {
     if (!project) return;
     
@@ -137,22 +154,30 @@ export default function ProjectEditPage() {
     
     setSaving(true);
     try {
+      const formData = new FormData();
+      formData.append('title', editableTitle);
+      if (thumbnail) {
+        formData.append('thumbnail', thumbnail);
+      }
+      formData.append('description', editableDescription);
+      formData.append('preview', editablePreview);
+      if (editableStartDate) {
+        formData.append('startDate', editableStartDate.toISOString());
+      }
+      project.techTags.forEach(tag => {
+        formData.append('techTags[]', tag.id);
+      });
+      project.domainTags.forEach(tag => {
+        formData.append('domainTags[]', tag.id);
+      });
+      formData.append('githubUrl', editableGithubUrl);
+      formData.append('demoUrl', editableDemoUrl);
+      formData.append('blogUrl', editableBlogUrl);
+
       const response = await fetch(`/api/projects/${params.projectId}/edit`, {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          title: editableTitle,
-          description: editableDescription,
-          preview: editablePreview,
-          startDate: editableStartDate?.toISOString() || null,
-          techTags: project.techTags.map(tag => tag.id),
-          domainTags: project.domainTags.map(tag => tag.id),
-          githubUrl: editableGithubUrl,
-          demoUrl: editableDemoUrl,
-          blogUrl: editableBlogUrl,
-        }),
+        body: formData,
+        // Remove the Content-Type header - browser will set it automatically with boundary
       });
 
       if (!response.ok) {
@@ -432,6 +457,53 @@ export default function ProjectEditPage() {
                   : "border-gray-300 bg-white text-gray-900 [color-scheme:light]"
               } rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 p-2`}
             />
+          </div>
+          <div>
+            <label className={`block text-sm font-medium mb-1 ${
+              isDarkMode ? 'text-gray-300' : 'text-gray-700'
+            } font-fira-code`}>
+              Project Thumbnail
+            </label>
+            <div className="mt-1 flex items-center space-x-4">
+              {thumbnailPreview && (
+                <div className="relative w-32 h-32">
+                  <Image
+                    src={thumbnailPreview}
+                    alt="Thumbnail preview"
+                    fill
+                    className="object-cover rounded-lg"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setThumbnail(null);
+                      setThumbnailPreview(null);
+                    }}
+                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1"
+                  >
+                    <XMarkIcon className="h-4 w-4" />
+                  </button>
+                </div>
+              )}
+              <label className={`cursor-pointer px-4 py-2 rounded-md shadow-sm text-sm font-medium ${
+                isDarkMode 
+                  ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' 
+                  : 'bg-white text-gray-700 hover:bg-gray-50 border-2 border-gray-200 hover:border-gray-300'
+              }`}>
+                {thumbnailPreview ? "Change Image" : "Upload Image"}
+                <input
+                  type="file"
+                  className="hidden"
+                  accept="image/*"
+                  onChange={handleImageChange}
+                />
+              </label>
+            </div>
+            <p className={`mt-2 text-sm ${
+              isDarkMode ? 'text-gray-400' : 'text-gray-500'
+            }`}>
+              Recommended: 1200x630px or larger, 16:9 ratio
+            </p>
           </div>
           <div>
             <label className={`block text-sm font-medium ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>

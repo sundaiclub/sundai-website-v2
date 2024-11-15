@@ -102,6 +102,7 @@ export async function POST(req: Request) {
 
     let thumbnailImage = null;
     if (thumbnail) {
+      console.log("thumbnail", thumbnail);
       try {
         const uploadResult = await uploadToGCS(thumbnail);
 

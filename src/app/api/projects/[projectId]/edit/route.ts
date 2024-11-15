@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { PrismaClient } from "@prisma/client";
+import { uploadToGCS } from "@/lib/gcp-storage";
 
 const prisma = new PrismaClient();
 
@@ -42,33 +43,80 @@ export async function PATCH(
       return new NextResponse("Unauthorized", { status: 401 });
     }
 
-    const body = await req.json();
+    const formData = await req.formData();
     const updateData: any = {};
 
-    if (body.title) updateData.title = body.title;
-    if (body.preview) updateData.preview = body.preview;
-    if (body.description) updateData.description = body.description;
-    if (body.status) updateData.status = body.status;
-    if (body.is_starred !== undefined) updateData.is_starred = body.is_starred;
-    if (body.is_broken !== undefined) updateData.is_broken = body.is_broken;
-    if (body.startDate) updateData.startDate = new Date(body.startDate);
-    if (body.endDate) updateData.endDate = new Date(body.endDate);
+    const title = formData.get('title');
+    if (title) updateData.title = title.toString();
+    
+    const preview = formData.get('preview');
+    if (preview) updateData.preview = preview.toString();
+    
+    const description = formData.get('description');
+    if (description) updateData.description = description.toString();
+    
+    const status = formData.get('status');
+    if (status) updateData.status = status.toString();
+    
+    const startDate = formData.get('startDate');
+    if (startDate) updateData.startDate = new Date(startDate.toString());
+    
+    const endDate = formData.get('endDate');
+    if (endDate) updateData.endDate = new Date(endDate.toString());
 
-    updateData.githubUrl = body.githubUrl || null;
-    updateData.demoUrl = body.demoUrl || null;
-    updateData.blogUrl = body.blogUrl || null;
+    updateData.githubUrl = formData.get('githubUrl')?.toString() || null;
+    updateData.demoUrl = formData.get('demoUrl')?.toString() || null;
+    updateData.blogUrl = formData.get('blogUrl')?.toString() || null;
 
-    if (body.techTags) {
+    const isStarred = formData.get('is_starred');
+    if (isStarred !== null) updateData.is_starred = isStarred === 'true';
+    
+    const isBroken = formData.get('is_broken');
+    if (isBroken !== null) updateData.is_broken = isBroken === 'true';
+
+    const techTags = formData.getAll('techTags[]');
+    if (techTags.length > 0) {
       updateData.techTags = {
-        set: [], // First clear existing connections
-        connect: body.techTags.map((id: string) => ({ id })), // Then connect new ones
+        set: [],
+        connect: techTags.map((id) => ({ id: id.toString() })),
       };
     }
-    if (body.domainTags) {
+
+    const domainTags = formData.getAll('domainTags[]');
+    if (domainTags.length > 0) {
       updateData.domainTags = {
-        set: [], // First clear existing connections
-        connect: body.domainTags.map((id: string) => ({ id })), // Then connect new ones
+        set: [],
+        connect: domainTags.map((id) => ({ id: id.toString() })),
       };
+    }
+
+    const thumbnail = formData.get('thumbnail') as File | null;
+    if (thumbnail && thumbnail instanceof File) {
+      try {
+        const uploadResult = await uploadToGCS(thumbnail);
+        
+        const newImage = await prisma.image.create({
+          data: {
+            key: uploadResult.filename,
+            bucket: process.env.GOOGLE_CLOUD_BUCKET!,
+            url: uploadResult.url,
+            filename: thumbnail.name,
+            mimeType: thumbnail.type || "application/octet-stream",
+            size: thumbnail.size,
+            width: undefined,
+            height: undefined,
+            alt: title?.toString() || '',
+            description: description?.toString() || '',
+          },
+        });
+
+        updateData.thumbnail = {
+          connect: { id: newImage.id }
+        };
+      } catch (error) {
+        console.error("Error uploading thumbnail:", error);
+        return new NextResponse("Error uploading thumbnail", { status: 500 });
+      }
     }
 
     const updatedProject = await prisma.project.update({
