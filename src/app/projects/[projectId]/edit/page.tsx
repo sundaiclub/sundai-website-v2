@@ -187,6 +187,7 @@ export default function ProjectEditPage() {
       const updatedProject = await response.json();
       setProject(updatedProject);
       toast.success('Changes saved successfully!');
+      router.push(`/projects/${params.projectId}`);
     } catch (error) {
       console.error("Error updating project:", error);
       toast.error('Failed to save changes');
@@ -510,7 +511,7 @@ export default function ProjectEditPage() {
               Full Description
             </label>
             <span className={` text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
-              Supports Markdown !
+              Supports <a href="https://www.markdownguide.org/basic-syntax" target="_blank" rel="noopener noreferrer">Markdown</a>! Try embedding images by hosting them somewhere publicly and linking with the <a href="https://www.markdownguide.org/basic-syntax/#images" target="_blank" rel="noopener noreferrer">Markdown syntax</a>.
             </span>
             <textarea
               value={editableDescription}

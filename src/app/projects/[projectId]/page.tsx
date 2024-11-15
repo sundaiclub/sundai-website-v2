@@ -8,7 +8,8 @@ import { HeartIcon } from "@heroicons/react/24/outline";
 import { HeartIcon as HeartIconSolid } from "@heroicons/react/24/solid";
 import { useTheme } from "../../contexts/ThemeContext";
 import ReactMarkdown from 'react-markdown';
-
+import { CheckIcon, XMarkIcon } from "@heroicons/react/24/solid";
+import toast from 'react-hot-toast';
 import { Project } from "../../components/Project";
 
 export default function ProjectDetail() {
@@ -20,6 +21,7 @@ export default function ProjectDetail() {
   const [isLiked, setIsLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
   const { isDarkMode } = useTheme();
+  const [isProjectDraft, setIsProjectDraft] = useState(false);
 
   const allowedEdit = project && (
     project.participants.some(
@@ -56,6 +58,12 @@ export default function ProjectDetail() {
     }
   }, [project, userInfo]);
 
+  useEffect(() => {
+    if (project) {
+      setIsProjectDraft(project.status === "DRAFT");
+    }
+  }, [project]);
+
   const handleLike = async () => {
     if (!userInfo) {
       alert("Please sign in to like projects");
@@ -73,6 +81,52 @@ export default function ProjectDetail() {
       }
     } catch (error) {
       console.error("Error toggling like:", error);
+    }
+  };
+
+  const handleSubmit = async () => {
+    try {
+      const response = await fetch(`/api/projects/${project?.id}/submit`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ status: 'APPROVED' })
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || 'Failed to submit project');
+      }
+
+      setIsProjectDraft(false);
+      toast.success('Project submitted successfully. Now it is visible to the public.');
+    } catch (error) {
+      console.error('Error submitting project:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to submit project');
+    }
+  };
+
+  const handleDelist = async () => {
+    try {
+      const response = await fetch(`/api/projects/${project?.id}/submit`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ status: 'DRAFT' })
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || 'Failed to delist project');
+      }
+
+      setIsProjectDraft(true);
+      toast.success('Project delisted successfully. Now it is hidden from the public.');
+    } catch (error) {
+      console.error('Error delisting project:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to delist project');
     }
   };
 
@@ -113,16 +167,36 @@ export default function ProjectDetail() {
               priority
             />
             {allowedEdit && (
-              <button
-                onClick={() => router.push(`/projects/${project.id}/edit`)}
-                className={`absolute top-4 right-4 px-6 py-3 transition-colors backdrop-blur-sm z-10
-                  ${isDarkMode 
-                    ? 'bg-white/20 text-white hover:bg-white/30' 
-                    : 'bg-black/20 text-white hover:bg-black/30'
-                  } font-medium`}
-              >
-                Edit
-              </button>
+              <div className="absolute top-4 right-4 flex gap-2 z-10">
+                <button
+                  onClick={() => router.push(`/projects/${project.id}/edit`)}
+                  className={`text-sm px-6 py-3 transition-colors backdrop-blur-sm
+                    ${isDarkMode 
+                      ? 'bg-white/20 text-white hover:bg-white/30' 
+                      : 'bg-white/20 text-white hover:bg-black/30'
+                    } font-medium`}
+                >
+                  Edit
+                </button>
+                {isProjectDraft && (
+                  <button
+                    onClick={handleSubmit}
+                    className={`text-sm px-6 py-3 transition-colors backdrop-blur-sm flex items-center gap-2
+                      bg-green-800 hover:bg-green-600 text-white cursor-pointer font-medium`}
+                  >
+                    Submit <CheckIcon className="h-5 w-5" />
+                  </button>
+                )}
+                {!isProjectDraft && (
+                  <button
+                    onClick={handleDelist}
+                    className={`text-sm px-6 py-3 transition-colors backdrop-blur-sm flex items-center gap-2
+                        bg-red-700 hover:bg-red-500 text-white cursor-pointer font-medium`}
+                  >
+                    Delist <XMarkIcon className="h-5 w-5" />
+                  </button>
+                )}
+              </div>
             )}
             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
             <div className="absolute bottom-0 p-6 md:p-10 text-white w-full">
