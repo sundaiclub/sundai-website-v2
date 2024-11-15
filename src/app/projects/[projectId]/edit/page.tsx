@@ -305,13 +305,30 @@ export default function ProjectEditPage() {
   };
 
   const handleChangeLaunchLead = (hacker: Hacker) => {
-    if (!project) return;
+    if (!project || !userInfo) return;
     
-    // Update launch lead locally
-    setProject({
+    // Show warning if changing from self
+    if (project.launchLead.id === userInfo.id && hacker.id !== userInfo.id) {
+      if (!confirm("Warning: If you change the launch lead from yourself, you will lose access to managing team members after saving. Continue?")) {
+        return;
+      }
+    }
+
+    // Create updated project state
+    const updatedProject = {
       ...project,
-      launchLead: hacker
-    });
+      launchLead: hacker,
+      participants: [
+        // Keep all existing participants except the new launch lead
+        ...project.participants.filter(p => p.hacker.id !== hacker.id),
+        // Add current launch lead to participants if changing from self
+        ...(project.launchLead.id === userInfo.id ? [
+          { role: "hacker", hacker: project.launchLead }
+        ] : [])
+      ]
+    };
+    
+    setProject(updatedProject);
   };
 
   const allowedEdit = project && (

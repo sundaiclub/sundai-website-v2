@@ -96,6 +96,20 @@ type EditableFields = {
   phoneNumber: string;
 };
 
+// Add this helper function at the top of the file, after the types
+const getStatusBadgeClasses = (status: string) => {
+  switch (status) {
+    case 'DRAFT':
+      return 'bg-gray-500';
+    case 'PENDING':
+      return 'bg-orange-500';
+    case 'APPROVED':
+      return 'bg-green-500';
+    default:
+      return 'bg-gray-500';
+  }
+};
+
 export default function HackerProfile() {
   const params = useParams();
   const { user } = useUser();
@@ -549,11 +563,9 @@ export default function HackerProfile() {
                             {project.likes?.length || 0}
                           </span>
                         </div>
-                        {project.status === "PENDING" && (
-                          <div className="absolute top-2 right-2 px-2 py-1 bg-yellow-500 text-white text-sm rounded-full">
-                            Pending
-                          </div>
-                        )}
+                        <div className={`absolute top-2 right-2 px-2 py-1 ${getStatusBadgeClasses(project.status)} text-white text-sm rounded-full`}>
+                          {project.status.charAt(0) + project.status.slice(1).toLowerCase()}
+                        </div>
                       </div>
                       <div className="p-4">
                         <h3
@@ -609,11 +621,9 @@ export default function HackerProfile() {
                       <div className="absolute bottom-2 left-2 px-2 py-1 bg-indigo-600 text-white text-sm rounded-full">
                         {role}
                       </div>
-                      {project.status === "PENDING" && (
-                        <div className="absolute top-2 right-2 px-2 py-1 bg-yellow-500 text-white text-sm rounded-full">
-                          Pending
-                        </div>
-                      )}
+                      <div className={`absolute top-2 right-2 px-2 py-1 ${getStatusBadgeClasses(project.status)} text-white text-sm rounded-full`}>
+                        {project.status.charAt(0) + project.status.slice(1).toLowerCase()}
+                      </div>
                       <div className="absolute top-2 left-2 flex items-center space-x-1 bg-black/50 px-2 py-1 rounded-full">
                         <HeartIcon className="h-4 w-4 text-white" />
                         <span className="text-white text-sm">
@@ -693,11 +703,9 @@ export default function HackerProfile() {
                             {project.launchLead.name}
                           </span>
                         </div>
-                        {project.status === "PENDING" && (
-                          <div className="absolute top-2 right-2 px-2 py-1 bg-yellow-500 text-white text-sm rounded-full">
-                            Pending
-                          </div>
-                        )}
+                        <div className={`absolute top-2 right-2 px-2 py-1 ${getStatusBadgeClasses(project.status)} text-white text-sm rounded-full`}>
+                          {project.status.charAt(0) + project.status.slice(1).toLowerCase()}
+                        </div>
                       </div>
                       <div className="p-4">
                         <div className="flex justify-between items-start mb-2">
