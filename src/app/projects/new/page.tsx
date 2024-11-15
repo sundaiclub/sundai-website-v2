@@ -3,18 +3,11 @@ import React, { useState, useEffect } from "react";
 import { useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { XMarkIcon } from "@heroicons/react/24/solid";
-import Image from "next/image";
+import toast from 'react-hot-toast';
 import { useTheme } from '../../contexts/ThemeContext';
+import {HackerSelector, ProjectRoles, Hacker, TeamMember} from '../../components/HackerSelector';
 
-type Hacker = {
-  id: string;
-  name: string;
-  email: string;
-};
-
-type TeamMember = Hacker & {
-  role: string;
-};
+const MAX_PREVIEW_LENGTH = 120;
 
 export default function NewProject() {
   const { user } = useUser();
@@ -26,24 +19,13 @@ export default function NewProject() {
   const [searchTerm, setSearchTerm] = useState("");
   const [project, setProject] = useState({
     title: "",
-    description: "",
-    githubUrl: "",
-    demoUrl: "",
+    preview: "",
     launchLeadId: "",
     members: [] as string[],
   });
-  const [selectedRole, setSelectedRole] = useState("developer");
-  const [thumbnail, setThumbnail] = useState<File | null>(null);
-  const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null);
+  const [selectedRole, setSelectedRole] = useState("hacker");
   const { isDarkMode } = useTheme();
-
-  const roles = [
-    { id: "developer", label: "Developer" },
-    { id: "designer", label: "Designer" },
-    { id: "pm", label: "Product Manager" },
-    { id: "researcher", label: "Researcher" },
-    { id: "other", label: "Other" },
-  ];
+  const [showLaunchLeadModal, setShowLaunchLeadModal] = useState(false);
 
   useEffect(() => {
     fetch("/api/hackers")
@@ -51,6 +33,18 @@ export default function NewProject() {
       .then((data) => setHackers(data))
       .catch((error) => console.error("Error fetching hackers:", error));
   }, []);
+
+  useEffect(() => {
+    if (user) {
+      const currentUserInHackers = hackers.find(h => h.email === user.primaryEmailAddress?.emailAddress);
+      if (currentUserInHackers) {
+        setProject(prev => ({
+          ...prev,
+          launchLeadId: currentUserInHackers.id
+        }));
+      }
+    }
+  }, [user, hackers]);
 
   const filteredHackers = hackers.filter(
     (hacker) =>
@@ -78,27 +72,15 @@ export default function NewProject() {
     }));
   };
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setThumbnail(file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setThumbnailPreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) {
-      alert("Please sign in to create a project");
+      toast.error("Please sign in to create a project");
       return;
     }
 
     if (!project.launchLeadId) {
-      alert("Please select a launch lead");
+      toast.error("Please select a launch lead");
       return;
     }
 
@@ -106,9 +88,7 @@ export default function NewProject() {
     try {
       const formData = new FormData();
       formData.append("title", project.title);
-      formData.append("description", project.description);
-      formData.append("githubUrl", project.githubUrl || "");
-      formData.append("demoUrl", project.demoUrl || "");
+      formData.append("preview", project.preview);
       formData.append("launchLeadId", project.launchLeadId);
       formData.append(
         "members",
@@ -120,23 +100,28 @@ export default function NewProject() {
         )
       );
 
-      if (thumbnail) {
-        formData.append("thumbnail", thumbnail);
-      }
-
       const response = await fetch("/api/projects", {
         method: "POST",
         body: formData,
       });
 
-      if (response.ok) {
-        router.push("/");
-      } else {
-        alert("Failed to create project");
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        console.error("Failed to create project", {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorData
+        });
+        toast.error(errorData?.message || "Failed to create project");
+        return;
       }
+
+      const projectData = await response.json();
+      toast.success("Project created successfully");
+      router.push(`/projects/${projectData.id}/edit`);
     } catch (error) {
       console.error("Error creating project:", error);
-      alert("Error creating project");
+      toast.error("Error creating project");
     } finally {
       setLoading(false);
     }
@@ -175,25 +160,33 @@ export default function NewProject() {
             } font-fira-code`}>
               Launch Lead *
             </label>
-            <select
-              id="launchLeadId"
-              name="launchLeadId"
-              required
-              value={project.launchLeadId}
-              onChange={handleChange}
-              className={`mt-1 block w-full px-3 py-2 rounded-md shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 ${
-                isDarkMode 
-                  ? 'bg-gray-700 border-gray-600 text-gray-100' 
-                  : 'bg-white border-2 border-gray-200 text-gray-900 hover:border-gray-300'
-              } font-fira-code`}
-            >
-              <option value="">Select Launch Lead</option>
-              {hackers.map((hacker) => (
-                <option key={hacker.id} value={hacker.id}>
-                  {hacker.name} ({hacker.email})
-                </option>
-              ))}
-            </select>
+            <div className="relative">
+              {project.launchLeadId ? (
+                <div
+                  onClick={() => setShowLaunchLeadModal(true)}
+                  className={`inline-flex items-center px-3 py-1 rounded-full text-sm cursor-pointer transition-colors ${
+                    isDarkMode 
+                      ? 'bg-purple-900/50 text-purple-100 hover:bg-purple-800/50' 
+                      : 'bg-purple-100 text-purple-800 hover:bg-purple-200'
+                  }`}
+                >
+                  <span>{hackers.find(h => h.id === project.launchLeadId)?.name}</span>
+                  <span className={`mx-1 ${isDarkMode ? 'text-purple-400' : 'text-purple-400'}`}>•</span>
+                  <span className={isDarkMode ? 'text-purple-300' : 'text-purple-600'}>Launch Lead</span>
+                </div>
+              ) : (
+                <div
+                  onClick={() => setShowLaunchLeadModal(true)}
+                  className={`inline-flex items-center px-3 py-1 rounded-full text-sm cursor-pointer transition-colors ${
+                    isDarkMode 
+                      ? 'bg-purple-900/50 text-purple-100 hover:bg-purple-800/50' 
+                      : 'bg-purple-100 text-purple-800 hover:bg-purple-200'
+                  }`}
+                >
+                  <span>Select Launch Lead</span>
+                </div>
+              )}
+            </div>
           </div>
 
           <div>
@@ -222,6 +215,39 @@ export default function NewProject() {
           </div>
 
           <div>
+            <label
+              htmlFor="preview"
+              className={`block text-sm font-medium mb-1 ${
+                isDarkMode ? 'text-gray-300' : 'text-gray-700'
+              } font-fira-code`}
+            >
+              Brief Description *
+            </label>
+            <div className="relative">
+              <input
+                type="text"
+                id="preview"
+                name="preview"
+                required
+                maxLength={MAX_PREVIEW_LENGTH}
+                value={project.preview}
+                onChange={handleChange}
+                className={`mt-1 block w-full px-3 py-2 rounded-md shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 ${
+                  isDarkMode 
+                    ? 'bg-gray-700 border-gray-600 text-gray-100' 
+                    : 'bg-white border-2 border-gray-200 text-gray-900 hover:border-gray-300'
+                } font-fira-code`}
+                placeholder="Brief description of your project (max 120 characters)"
+              />
+              <span className={`absolute right-2 bottom-2 text-sm ${
+                isDarkMode ? "text-gray-400" : "text-gray-600"
+              }`}>
+                {project.preview.length}/{MAX_PREVIEW_LENGTH}
+              </span>
+            </div>
+          </div>
+
+          <div>
             <label className={`block text-sm font-medium mb-1 ${
               isDarkMode ? 'text-gray-300' : 'text-gray-700'
             } font-fira-code`}>
@@ -240,7 +266,7 @@ export default function NewProject() {
                   <span>{member.name}</span>
                   <span className={`mx-1 ${isDarkMode ? 'text-gray-400' : 'text-indigo-400'}`}>•</span>
                   <span className={isDarkMode ? 'text-gray-300' : 'text-indigo-600'}>
-                    {roles.find((r) => r.id === member.role)?.label}
+                    {ProjectRoles.find((r) => r.id === member.role)?.label}
                   </span>
                   <button
                     type="button"
@@ -290,115 +316,33 @@ export default function NewProject() {
         </form>
       </div>
 
-      {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className={`rounded-lg p-6 w-full max-w-md m-4 ${
-            isDarkMode ? 'bg-gray-800' : 'bg-white'
-          }`}>
-            <div className="flex justify-between items-center mb-4">
-              <h2 className={`text-xl font-semibold font-space-mono ${
-                isDarkMode ? 'text-gray-100' : 'text-gray-900'
-              }`}>
-                Add Team Members
-              </h2>
-              <button
-                onClick={() => setShowModal(false)}
-                className={`${
-                  isDarkMode ? 'text-gray-400 hover:text-gray-200' : 'text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                <XMarkIcon className="h-6 w-6" />
-              </button>
-            </div>
+      <HackerSelector
+        showModal={showLaunchLeadModal}
+        setShowModal={setShowLaunchLeadModal}
+        isDarkMode={isDarkMode}
+        searchTerm={searchTerm}
+        setSearchTerm={setSearchTerm}
+        filteredHackers={hackers}
+        handleAddMember={(hacker) => {
+          setProject(prev => ({ ...prev, launchLeadId: hacker.id }));
+          setShowLaunchLeadModal(false);
+        }}
+        title="Select Launch Lead"
+        singleSelect={true}
+        selectedIds={project.launchLeadId ? [project.launchLeadId] : []}
+      />
 
-            {/* <div className="mb-4">
-              <label className={`block text-sm font-medium mb-1 ${
-                isDarkMode ? 'text-gray-300' : 'text-gray-700'
-              } font-fira-code`}>
-                Role
-              </label>
-              <div className="flex flex-wrap gap-2">
-                {roles.map((role) => (
-                  <button
-                    key={role.id}
-                    type="button"
-                    onClick={() => setSelectedRole(role.id)}
-                    className={`px-3 py-1 rounded-full text-sm ${
-                      selectedRole === role.id
-                        ? "bg-indigo-600 text-white"
-                        : isDarkMode 
-                          ? "bg-gray-700 text-gray-300 hover:bg-gray-600"
-                          : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                    }`}
-                  >
-                    {role.label}
-                  </button>
-                ))}
-              </div>
-            </div> */}
-
-            <input
-              type="text"
-              placeholder="Search members..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className={`w-full px-3 py-2 rounded-md shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 ${
-                isDarkMode 
-                  ? 'bg-gray-700 border-gray-600 text-gray-100' 
-                  : 'bg-white border-2 border-gray-200 text-gray-900 hover:border-gray-300'
-              } font-fira-code`}
-            />
-
-            <div className="max-h-60 overflow-y-auto">
-              {filteredHackers.map((hacker) => (
-                <button
-                  key={hacker.id}
-                  onClick={() => handleAddMember(hacker)}
-                  className={`w-full text-left px-4 py-2 rounded-md flex items-center justify-between group ${
-                    isDarkMode 
-                      ? 'hover:bg-gray-700' 
-                      : 'hover:bg-gray-100'
-                  }`}
-                >
-                  <div>
-                    <div className={isDarkMode ? 'text-gray-100' : 'text-gray-900 font-medium'}>
-                      {hacker.name}
-                    </div>
-                    <div className={isDarkMode ? 'text-gray-400' : 'text-gray-500'}>
-                      {hacker.email}
-                    </div>
-                  </div>
-                  {/* <span className={`opacity-0 group-hover:opacity-100 transition-opacity ${
-                    isDarkMode ? 'text-indigo-400' : 'text-indigo-600'
-                  }`}>
-                    Add as {roles.find((r) => r.id === selectedRole)?.label}
-                  </span> */}
-                </button>
-              ))}
-              {filteredHackers.length === 0 && (
-                <p className={`text-center py-4 ${
-                  isDarkMode ? 'text-gray-400' : 'text-gray-500'
-                }`}>
-                  No members found
-                </p>
-              )}
-            </div>
-
-            <div className="mt-4 flex justify-end">
-              <button
-                onClick={() => setShowModal(false)}
-                className={`px-4 py-2 rounded-md ${
-                  isDarkMode 
-                    ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' 
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                Done
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <HackerSelector
+        showModal={showModal}
+        setShowModal={setShowModal}
+        isDarkMode={isDarkMode}
+        searchTerm={searchTerm}
+        setSearchTerm={setSearchTerm}
+        filteredHackers={filteredHackers}
+        handleAddMember={handleAddMember}
+        title="Add Team Members"
+        selectedIds={selectedMembers.map(m => m.id)}
+      />
     </div>
   );
 }
