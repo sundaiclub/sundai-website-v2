@@ -189,7 +189,7 @@ export default function ProjectEditPage() {
 
       // Add team members data
       formData.append('participants', JSON.stringify(project.participants));
-      formData.append('launchLeadId', project.launchLead.id);
+      formData.append('launchLead', project.launchLead.id);
 
       const response = await fetch(`/api/projects/${params.projectId}/edit`, {
         method: "PATCH",
