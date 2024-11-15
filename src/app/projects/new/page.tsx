@@ -32,13 +32,13 @@ export default function NewProject() {
     launchLeadId: "",
     members: [] as string[],
   });
-  const [selectedRole, setSelectedRole] = useState("engineer");
+  const [selectedRole, setSelectedRole] = useState("developer");
   const [thumbnail, setThumbnail] = useState<File | null>(null);
   const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null);
   const { isDarkMode } = useTheme();
 
   const roles = [
-    { id: "engineer", label: "Engineer" },
+    { id: "developer", label: "Developer" },
     { id: "designer", label: "Designer" },
     { id: "pm", label: "Product Manager" },
     { id: "researcher", label: "Researcher" },
@@ -222,79 +222,6 @@ export default function NewProject() {
           </div>
 
           <div>
-            <label
-              htmlFor="description"
-              className={`block text-sm font-medium mb-1 ${
-                isDarkMode ? 'text-gray-300' : 'text-gray-700'
-              } font-fira-code`}
-            >
-              Description *
-            </label>
-            <textarea
-              id="description"
-              name="description"
-              required
-              rows={4}
-              value={project.description}
-              onChange={handleChange}
-              className={`mt-1 block w-full px-3 py-2 rounded-md shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 ${
-                isDarkMode 
-                  ? 'bg-gray-700 border-gray-600 text-gray-100' 
-                  : 'bg-white border-2 border-gray-200 text-gray-900 hover:border-gray-300'
-              } font-fira-code`}
-              placeholder="Describe your project"
-            />
-          </div>
-
-          <div>
-            <label
-              htmlFor="githubUrl"
-              className={`block text-sm font-medium mb-1 ${
-                isDarkMode ? 'text-gray-300' : 'text-gray-700'
-              } font-fira-code`}
-            >
-              GitHub URL
-            </label>
-            <input
-              type="url"
-              id="githubUrl"
-              name="githubUrl"
-              value={project.githubUrl}
-              onChange={handleChange}
-              className={`mt-1 block w-full px-3 py-2 rounded-md shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 ${
-                isDarkMode 
-                  ? 'bg-gray-700 border-gray-600 text-gray-100' 
-                  : 'bg-white border-2 border-gray-200 text-gray-900 hover:border-gray-300'
-              } font-fira-code`}
-              placeholder="https://github.com/username/project"
-            />
-          </div>
-
-          <div>
-            <label
-              htmlFor="demoUrl"
-              className={`block text-sm font-medium mb-1 ${
-                isDarkMode ? 'text-gray-300' : 'text-gray-700'
-              } font-fira-code`}
-            >
-              Demo URL
-            </label>
-            <input
-              type="url"
-              id="demoUrl"
-              name="demoUrl"
-              value={project.demoUrl}
-              onChange={handleChange}
-              className={`mt-1 block w-full px-3 py-2 rounded-md shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 ${
-                isDarkMode 
-                  ? 'bg-gray-700 border-gray-600 text-gray-100' 
-                  : 'bg-white border-2 border-gray-200 text-gray-900 hover:border-gray-300'
-              } font-fira-code`}
-              placeholder="https://your-demo-url.com"
-            />
-          </div>
-
-          <div>
             <label className={`block text-sm font-medium mb-1 ${
               isDarkMode ? 'text-gray-300' : 'text-gray-700'
             } font-fira-code`}>
@@ -342,54 +269,6 @@ export default function NewProject() {
             </button>
           </div>
 
-          <div>
-            <label className={`block text-sm font-medium mb-1 ${
-              isDarkMode ? 'text-gray-300' : 'text-gray-700'
-            } font-fira-code`}>
-              Project Thumbnail
-            </label>
-            <div className="mt-1 flex items-center space-x-4">
-              {thumbnailPreview && (
-                <div className="relative w-32 h-32">
-                  <Image
-                    src={thumbnailPreview}
-                    alt="Thumbnail preview"
-                    fill
-                    className="object-cover rounded-lg"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setThumbnail(null);
-                      setThumbnailPreview(null);
-                    }}
-                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1"
-                  >
-                    <XMarkIcon className="h-4 w-4" />
-                  </button>
-                </div>
-              )}
-              <label className={`cursor-pointer px-4 py-2 rounded-md shadow-sm text-sm font-medium ${
-                isDarkMode 
-                  ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' 
-                  : 'bg-white text-gray-700 hover:bg-gray-50 border-2 border-gray-200 hover:border-gray-300'
-              }`}>
-                {thumbnailPreview ? "Change Image" : "Upload Image"}
-                <input
-                  type="file"
-                  className="hidden"
-                  accept="image/*"
-                  onChange={handleImageChange}
-                />
-              </label>
-            </div>
-            <p className={`mt-2 text-sm ${
-              isDarkMode ? 'text-gray-400' : 'text-gray-500'
-            }`}>
-              Recommended: 1200x630px or larger, 16:9 ratio
-            </p>
-          </div>
-
           <div className="flex justify-end pt-4">
             <button
               type="submit"
@@ -432,7 +311,7 @@ export default function NewProject() {
               </button>
             </div>
 
-            <div className="mb-4">
+            {/* <div className="mb-4">
               <label className={`block text-sm font-medium mb-1 ${
                 isDarkMode ? 'text-gray-300' : 'text-gray-700'
               } font-fira-code`}>
@@ -456,7 +335,7 @@ export default function NewProject() {
                   </button>
                 ))}
               </div>
-            </div>
+            </div> */}
 
             <input
               type="text"
@@ -489,11 +368,11 @@ export default function NewProject() {
                       {hacker.email}
                     </div>
                   </div>
-                  <span className={`opacity-0 group-hover:opacity-100 transition-opacity ${
+                  {/* <span className={`opacity-0 group-hover:opacity-100 transition-opacity ${
                     isDarkMode ? 'text-indigo-400' : 'text-indigo-600'
                   }`}>
                     Add as {roles.find((r) => r.id === selectedRole)?.label}
-                  </span>
+                  </span> */}
                 </button>
               ))}
               {filteredHackers.length === 0 && (

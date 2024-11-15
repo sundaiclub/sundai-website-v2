@@ -182,7 +182,7 @@ export default function ProjectDetail() {
                   <button
                     onClick={handleSubmit}
                     className={`text-sm px-6 py-3 transition-colors backdrop-blur-sm flex items-center gap-2
-                      bg-green-800 hover:bg-green-600 text-white cursor-pointer font-medium`}
+                      bg-green-500/50 hover:bg-green-300/50 text-white cursor-pointer font-medium`}
                   >
                     Submit <CheckIcon className="h-5 w-5" />
                   </button>
@@ -191,7 +191,7 @@ export default function ProjectDetail() {
                   <button
                     onClick={handleDelist}
                     className={`text-sm px-6 py-3 transition-colors backdrop-blur-sm flex items-center gap-2
-                        bg-red-700 hover:bg-red-500 text-white cursor-pointer font-medium`}
+                        bg-red-500/50 hover:bg-red-300/50 text-white cursor-pointer font-medium`}
                   >
                     Delist <XMarkIcon className="h-5 w-5" />
                   </button>

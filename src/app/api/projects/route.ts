@@ -1,9 +1,8 @@
-import { PrismaClient, ProjectStatus } from "@prisma/client";
+import { ProjectStatus } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { uploadToGCS } from "@/lib/gcp-storage";
-
-const prisma = new PrismaClient();
+import prisma from "@/lib/prisma";
 
 export async function GET(req: Request) {
   try {
