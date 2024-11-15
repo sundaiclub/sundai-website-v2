@@ -7,6 +7,7 @@ import { useUserContext } from "../../contexts/UserContext";
 import { HeartIcon } from "@heroicons/react/24/outline";
 import { HeartIcon as HeartIconSolid } from "@heroicons/react/24/solid";
 import { useTheme } from "../../contexts/ThemeContext";
+import ReactMarkdown from 'react-markdown';
 
 import { Project } from "../../components/Project";
 
@@ -246,14 +247,16 @@ export default function ProjectDetail() {
                     ))}
                   </div>
 
-                  <div className="prose max-w-none mb-8">
-                    <p
-                      className={`text-lg ${
-                        isDarkMode ? "text-gray-300" : "text-gray-700"
+                  <div className="prose prose-lg max-w-none mb-8">
+                    <ReactMarkdown
+                      className={`prose prose-lg max-w-none mb-8 ${
+                        isDarkMode 
+                          ? 'prose-invert prose-pre:bg-gray-800 prose-a:text-indigo-400 hover:prose-a:text-indigo-300' 
+                          : 'prose-gray prose-pre:bg-gray-100 prose-a:text-indigo-600 hover:prose-a:text-indigo-700'
                       }`}
                     >
                       {project.description}
-                    </p>
+                    </ReactMarkdown>
                   </div>
                 </div>
 
