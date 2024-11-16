@@ -138,7 +138,7 @@ function ProjectCard({ project, userInfo, handleLike, isDarkMode, show_status }:
                 isDarkMode ? "text-gray-400" : "text-gray-500"
               } mt-1`}
             >
-              Created {new Date(project.createdAt).toLocaleDateString()}
+              Hacked on {new Date(project.startDate).toLocaleDateString()}
             </p>
           </div>
           <div className="flex items-center space-x-2">
