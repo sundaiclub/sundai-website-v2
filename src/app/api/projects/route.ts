@@ -95,9 +95,9 @@ export async function POST(req: Request) {
       }, { status: 400 });
     }
 
-    if (preview.length > 120) {
+    if (preview.length > 100) {
       return NextResponse.json({ 
-        message: "Preview must be 120 characters or less" 
+        message: "Preview must be 100 characters or less" 
       }, { status: 400 });
     }
 

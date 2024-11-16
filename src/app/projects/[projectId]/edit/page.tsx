@@ -691,7 +691,7 @@ export default function ProjectEditPage() {
             <p className={`mt-2 text-sm ${
               isDarkMode ? 'text-gray-400' : 'text-gray-500'
             }`}>
-              Recommended: 1200x630px or larger, 16:9 ratio
+              Recommended: 1280x720px or larger, 16:9 ratio
             </p>
           </div>
           <div>
