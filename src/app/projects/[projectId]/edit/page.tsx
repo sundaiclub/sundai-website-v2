@@ -167,6 +167,17 @@ export default function ProjectEditPage() {
     }
   };
 
+  const handleThumbnailDelete = () => {
+    setThumbnail(null);
+    setThumbnailPreview(null);
+    if (project?.thumbnail) {
+      setProject({
+        ...project,
+        thumbnail: null
+      });
+    }
+  };
+
   const handleSave = async () => {
     if (!project) return;
     
@@ -201,6 +212,8 @@ export default function ProjectEditPage() {
       // Add team members data
       formData.append('participants', JSON.stringify(project.participants));
       formData.append('launchLead', project.launchLead.id);
+
+      formData.append('deleteThumbnail', (!thumbnail && thumbnailPreview === null).toString());
 
       const response = await fetch(`/api/projects/${params.projectId}/edit`, {
         method: "PATCH",
@@ -666,10 +679,7 @@ export default function ProjectEditPage() {
                   />
                   <button
                     type="button"
-                    onClick={() => {
-                      setThumbnail(null);
-                      setThumbnailPreview(null);
-                    }}
+                    onClick={handleThumbnailDelete}
                     className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1"
                   >
                     <XMarkIcon className="h-4 w-4" />

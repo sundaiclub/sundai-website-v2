@@ -88,8 +88,14 @@ export async function PATCH(
       };
     }
 
+    const deleteThumbnail = formData.get('deleteThumbnail') === 'true';
     const thumbnail = formData.get('thumbnail') as File | null;
-    if (thumbnail && thumbnail instanceof File) {
+
+    if (deleteThumbnail) {
+      updateData.thumbnail = {
+        disconnect: true
+      };
+    } else if (thumbnail && thumbnail instanceof File) {
       try {
         const uploadResult = await uploadToGCS(thumbnail);
         
