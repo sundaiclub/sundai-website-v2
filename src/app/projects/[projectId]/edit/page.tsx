@@ -630,7 +630,16 @@ export default function ProjectEditPage() {
             <input
               type="date"
               value={editableStartDate ? format(editableStartDate, 'yyyy-MM-dd') : ''}
-              onChange={(e) => setEditableStartDate(e.target.value ? new Date(e.target.value) : null)}
+              onChange={(e) => {
+                if (!e.target.value) {
+                  setEditableStartDate(null);
+                  return;
+                }
+                // Create date using ISO format to preserve exact date
+                const [year, month, day] = e.target.value.split('-');
+                const date = new Date(Number(year), Number(month) - 1, Number(day));
+                setEditableStartDate(date);
+              }}
               className={`mt-1 block w-64 border${
                 isDarkMode 
                   ? "border-gray-600 bg-gray-800 text-gray-100 [color-scheme:dark] calendar-picker-indicator:filter-invert" 
