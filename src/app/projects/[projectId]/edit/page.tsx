@@ -711,7 +711,7 @@ export default function ProjectEditPage() {
               Full Description
             </label>
             <span className={` text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
-              Supports <a href="https://www.markdownguide.org/basic-syntax" target="_blank" rel="noopener noreferrer">Markdown</a>! Try embedding images by hosting them somewhere publicly and linking with the <a href="https://www.markdownguide.org/basic-syntax/#images" target="_blank" rel="noopener noreferrer">Markdown syntax</a>.
+              Supports <a href="https://www.markdownguide.org/basic-syntax" target="_blank" rel="noopener noreferrer">Markdown</a>! Try embedding images by hosting them on <a href="https://imgbb.com/" target="_blank" rel="noopener noreferrer">ImgBB</a> and linking with the <a href="https://www.markdownguide.org/basic-syntax/#images" target="_blank" rel="noopener noreferrer">Markdown syntax</a>.
             </span>
             <textarea
               value={editableDescription}
