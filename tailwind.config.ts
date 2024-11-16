@@ -55,35 +55,77 @@ const config: Config = {
       typography: {
         DEFAULT: {
           css: {
-            a: {
-              color: '#4f46e5', // indigo-600
-              '&:hover': {
-                color: '#4338ca', // indigo-700
-              },
+            // Override all spacing
+            '--tw-prose-body': 'inherit',
+            '--tw-prose-headings': 'inherit',
+            '--tw-prose-lead': 'inherit',
+            '--tw-prose-links': '#4f46e5',
+            '--tw-prose-bold': 'inherit',
+            '--tw-prose-counters': 'inherit',
+            '--tw-prose-bullets': 'inherit',
+            '--tw-prose-hr': 'inherit',
+            '--tw-prose-quotes': 'inherit',
+            '--tw-prose-quote-borders': 'inherit',
+            '--tw-prose-captions': 'inherit',
+            '--tw-prose-code': 'inherit',
+            '--tw-prose-pre-code': 'inherit',
+            '--tw-prose-pre-bg': 'inherit',
+            '--tw-prose-th-borders': 'inherit',
+            '--tw-prose-td-borders': 'inherit',
+
+            // Reset spacing
+            '> *': {
+              marginTop: '0.5em !important',
+              marginBottom: '0.5em !important',
+            },
+
+            // Individual element styles
+            p: {
+              fontFamily: '"Montserrat", sans-serif',
+              fontSize: '0.8rem',
+              marginTop: '0.5em !important',
+              marginBottom: '0.5em !important',
+            },
+            'h1, h2, h3, h4': {
+              marginTop: '1em !important',
+              marginBottom: '0.5em !important',
             },
             h1: {
               color: 'inherit',
               fontFamily: '"Montserrat", serif',
-              fontSize: '2.75rem', // 6xl
+              fontSize: '1.5rem',
             },
             h2: {
               color: 'inherit',
               fontFamily: '"Montserrat", serif',
-              fontSize: '2rem', // 5xl
+              fontSize: '1.25rem',
             },
             h3: {
               color: 'inherit',
               fontFamily: '"Montserrat", serif',
-              fontSize: '1.7rem', // 4xl
+              fontSize: '1rem',
             },
             h4: {
               color: 'inherit',
               fontFamily: '"Montserrat", serif',
-              fontSize: '1.35rem', // 3xl
+              fontSize: '0.9rem',
             },
-            p: {
+            'ol, ul': {
+              fontSize: '0.8rem',
               fontFamily: '"Montserrat", sans-serif',
-              fontSize: '0.8rem', // base
+              marginTop: '0.5em !important',
+              marginBottom: '0.5em !important',
+              paddingLeft: '1em !important',
+            },
+            li: {
+              fontSize: '0.8rem',
+              fontFamily: '"Montserrat", sans-serif',
+              marginTop: '0.2em !important',
+              marginBottom: '0.2em !important',
+            },
+            'li > *': {
+              marginTop: '0 !important',
+              marginBottom: '0 !important',
             },
           },
         },
