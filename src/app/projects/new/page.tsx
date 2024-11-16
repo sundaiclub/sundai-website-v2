@@ -26,6 +26,8 @@ export default function NewProject() {
   const [selectedRole, setSelectedRole] = useState("hacker");
   const { isDarkMode } = useTheme();
   const [showLaunchLeadModal, setShowLaunchLeadModal] = useState(false);
+  const [teamSearchTerm, setTeamSearchTerm] = useState("");
+  const [leadSearchTerm, setLeadSearchTerm] = useState("");
 
   useEffect(() => {
     fetch("/api/hackers")
@@ -46,11 +48,14 @@ export default function NewProject() {
     }
   }, [user, hackers]);
 
-  const filteredHackers = hackers.filter(
-    (hacker) =>
-      !selectedMembers.find((member) => member.id === hacker.id) &&
-      (hacker.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        hacker.email.toLowerCase().includes(searchTerm.toLowerCase()))
+  const filteredTeamHackers = hackers.filter(hacker =>
+    hacker.name.toLowerCase().includes(teamSearchTerm.toLowerCase()) ||
+    hacker.email.toLowerCase().includes(teamSearchTerm.toLowerCase())
+  );
+
+  const filteredLeadHackers = hackers.filter(hacker =>
+    hacker.name.toLowerCase().includes(leadSearchTerm.toLowerCase()) ||
+    hacker.email.toLowerCase().includes(leadSearchTerm.toLowerCase())
   );
 
   const handleAddMember = (hacker: Hacker) => {
@@ -320,9 +325,9 @@ export default function NewProject() {
         showModal={showLaunchLeadModal}
         setShowModal={setShowLaunchLeadModal}
         isDarkMode={isDarkMode}
-        searchTerm={searchTerm}
-        setSearchTerm={setSearchTerm}
-        filteredHackers={hackers}
+        searchTerm={leadSearchTerm}
+        setSearchTerm={setLeadSearchTerm}
+        filteredHackers={filteredLeadHackers}
         handleAddMember={(hacker) => {
           setProject(prev => ({ ...prev, launchLeadId: hacker.id }));
           setShowLaunchLeadModal(false);
@@ -336,9 +341,9 @@ export default function NewProject() {
         showModal={showModal}
         setShowModal={setShowModal}
         isDarkMode={isDarkMode}
-        searchTerm={searchTerm}
-        setSearchTerm={setSearchTerm}
-        filteredHackers={filteredHackers}
+        searchTerm={teamSearchTerm}
+        setSearchTerm={setTeamSearchTerm}
+        filteredHackers={filteredTeamHackers}
         handleAddMember={handleAddMember}
         title="Add Team Members"
         selectedIds={selectedMembers.map(m => m.id)}

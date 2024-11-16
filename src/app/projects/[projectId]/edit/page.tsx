@@ -82,7 +82,18 @@ export default function ProjectEditPage() {
   const [hackers, setHackers] = useState<Hacker[]>([]);
   const [showTeamModal, setShowTeamModal] = useState(false);
   const [showLaunchLeadModal, setShowLaunchLeadModal] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
+  const [teamSearchTerm, setTeamSearchTerm] = useState("");
+  const [leadSearchTerm, setLeadSearchTerm] = useState("");
+
+  const filteredTeamHackers = hackers.filter(hacker =>
+    hacker.name.toLowerCase().includes(teamSearchTerm.toLowerCase()) ||
+    hacker.email.toLowerCase().includes(teamSearchTerm.toLowerCase())
+  );
+
+  const filteredLeadHackers = hackers.filter(hacker =>
+    hacker.name.toLowerCase().includes(leadSearchTerm.toLowerCase()) ||
+    hacker.email.toLowerCase().includes(leadSearchTerm.toLowerCase())
+  );
 
   useEffect(() => {
     const fetchProject = async () => {
@@ -589,9 +600,9 @@ export default function ProjectEditPage() {
               showModal={showLaunchLeadModal}
               setShowModal={setShowLaunchLeadModal}
               isDarkMode={isDarkMode}
-              searchTerm={searchTerm}
-              setSearchTerm={setSearchTerm}
-              filteredHackers={hackers}
+              searchTerm={leadSearchTerm}
+              setSearchTerm={setLeadSearchTerm}
+              filteredHackers={filteredLeadHackers}
               handleAddMember={handleChangeLaunchLead}
               title="Change Launch Lead"
               singleSelect={true}
@@ -602,9 +613,9 @@ export default function ProjectEditPage() {
               showModal={showTeamModal}
               setShowModal={setShowTeamModal}
               isDarkMode={isDarkMode}
-              searchTerm={searchTerm}
-              setSearchTerm={setSearchTerm}
-              filteredHackers={hackers.filter(
+              searchTerm={teamSearchTerm}
+              setSearchTerm={setTeamSearchTerm}
+              filteredHackers={filteredTeamHackers.filter(
                 (hacker) => !project?.participants.some(p => p.hacker.id === hacker.id)
               )}
               handleAddMember={handleAddMember}
