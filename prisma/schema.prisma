@@ -21,8 +21,10 @@ model Hacker {
   role        Role?
   bio         String?
   githubUrl   String?
-  linkedinUrl String?
+  discordName String?
   twitterUrl  String?
+  linkedinUrl String?
+  websiteUrl  String?
   email       String?
   phoneNumber String?
   attended    Int       @default(0)

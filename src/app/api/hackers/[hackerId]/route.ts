@@ -112,7 +112,9 @@ export async function PATCH(
       "phoneNumber",
       "linkedinUrl",
       "twitterUrl",
-      "username"
+      "username",
+      "discordName",
+      "websiteUrl"
     ];
 
     // Filter out any fields that aren't allowed to be updated
