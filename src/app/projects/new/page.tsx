@@ -59,18 +59,18 @@ export default function NewProject() {
     hacker.email.toLowerCase().includes(leadSearchTerm.toLowerCase())
   );
 
-  const handleAddMember = (hacker: Hacker) => {
+  const handleAddMember = (hacker: Hacker, role: string) => {
     if (selectedMembers.some(member => member.id === hacker.id)) {
       toast.error("This team member has already been added");
       return;
     }
 
-    setSelectedMembers([...selectedMembers, { ...hacker, role: selectedRole }]);
+    setSelectedMembers([...selectedMembers, { ...hacker, role }]);
     setProject((prev) => ({
       ...prev,
       members: [...prev.members, hacker.id],
     }));
-    setSearchTerm("");
+    setTeamSearchTerm("");
   };
 
   const handleRemoveMember = (hackerId: string) => {
@@ -343,6 +343,7 @@ export default function NewProject() {
         title="Select Launch Lead"
         singleSelect={true}
         selectedIds={project.launchLeadId ? [project.launchLeadId] : []}
+        showRoleSelector={false}
       />
 
       <HackerSelector
@@ -351,10 +352,13 @@ export default function NewProject() {
         isDarkMode={isDarkMode}
         searchTerm={teamSearchTerm}
         setSearchTerm={setTeamSearchTerm}
-        filteredHackers={filteredTeamHackers}
-        handleAddMember={handleAddMember}
+        filteredHackers={filteredTeamHackers.filter(
+          (hacker) => !selectedMembers.some(m => m.id === hacker.id)
+        )}
         title="Add Team Members"
         selectedIds={selectedMembers.map(m => m.id)}
+        showRoleSelector={true}
+        onAddMemberWithRole={handleAddMember}
       />
     </div>
   );

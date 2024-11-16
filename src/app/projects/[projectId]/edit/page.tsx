@@ -287,16 +287,16 @@ export default function ProjectEditPage() {
     });
   };
 
-  const handleAddMember = (hacker: Hacker) => {
+  const handleAddMember = (hacker: Hacker, role: string) => {
     if (!project) return;
     
-    // Add member locally
+    // Add member locally with the specified role
     setProject({
       ...project,
       participants: [
         ...project.participants,
         {
-          role: "hacker",
+          role: role,
           hacker: hacker
         }
       ]
@@ -607,6 +607,7 @@ export default function ProjectEditPage() {
               title="Change Launch Lead"
               singleSelect={true}
               selectedIds={project?.launchLead ? [project.launchLead.id] : []}
+              showRoleSelector={false} // Disable role selector for launch lead
             />
 
             <HackerSelector
@@ -618,9 +619,10 @@ export default function ProjectEditPage() {
               filteredHackers={filteredTeamHackers.filter(
                 (hacker) => !project?.participants.some(p => p.hacker.id === hacker.id)
               )}
-              handleAddMember={handleAddMember}
               title="Add Team Members"
               selectedIds={project?.participants.map(p => p.hacker.id) || []}
+              showRoleSelector={true}
+              onAddMemberWithRole={handleAddMember}
             />
           </div>
           <div>

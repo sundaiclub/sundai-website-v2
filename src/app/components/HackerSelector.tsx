@@ -1,10 +1,12 @@
 import { XMarkIcon } from "@heroicons/react/24/solid";
+import { useState } from 'react';
 
 export const ProjectRoles = [
     { id: "hacker", label: "Hacker" },
     { id: "developer", label: "Developer" },
+    { id: "caio", label: "Chief AI" },
     { id: "designer", label: "Designer" },
-    { id: "pm", label: "Product Manager" },
+    { id: "business", label: "Business" },
     { id: "researcher", label: "Researcher" },
     { id: "other", label: "Other" },
   ];
@@ -26,10 +28,12 @@ interface HackerSelectorProps {
   searchTerm: string;
   setSearchTerm: (term: string) => void;
   filteredHackers: Hacker[];
-  handleAddMember: (hacker: Hacker) => void;
   title?: string;
   singleSelect?: boolean;
   selectedIds?: string[];
+  showRoleSelector?: boolean;
+  handleAddMember?: (hacker: Hacker) => void;
+  onAddMemberWithRole?: (hacker: Hacker, role: string) => void;
 }
 
 export function HackerSelector({
@@ -43,7 +47,22 @@ export function HackerSelector({
   title = "Select Hackers",
   singleSelect = false,
   selectedIds = [],
+  showRoleSelector = false,
+  onAddMemberWithRole,
 }: HackerSelectorProps) {
+  const [selectedRole, setSelectedRole] = useState(ProjectRoles[0].id);
+
+  const handleHackerClick = (hacker: Hacker) => {
+    if (showRoleSelector && onAddMemberWithRole) {
+      onAddMemberWithRole(hacker, selectedRole);
+    } else if (handleAddMember) {
+      handleAddMember(hacker);
+    }
+    if (!singleSelect) {
+      setShowModal(false);
+    }
+  };
+
   if (!showModal) return null;
 
   return (
@@ -79,13 +98,41 @@ export function HackerSelector({
           } font-fira-code`}
         />
 
+        {showRoleSelector && (
+          <div className="mb-4">
+            <label className={`block text-sm font-medium mb-1 ${
+              isDarkMode ? 'text-gray-300' : 'text-gray-700'
+            } font-fira-code`}>
+              Role
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {ProjectRoles.map((role) => (
+                <button
+                  key={role.id}
+                  type="button"
+                  onClick={() => setSelectedRole(role.id)}
+                  className={`px-3 py-1 rounded-full text-sm ${
+                    selectedRole === role.id
+                      ? "bg-indigo-600 text-white"
+                      : isDarkMode 
+                        ? "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                  }`}
+                >
+                  {role.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="max-h-60 overflow-y-auto mt-4">
           {filteredHackers.map((hacker) => {
             const isSelected = selectedIds.includes(hacker.id);
             return (
               <button
                 key={hacker.id}
-                onClick={() => handleAddMember(hacker)}
+                onClick={() => handleHackerClick(hacker)}
                 className={`w-full text-left px-4 py-2 rounded-md flex items-center justify-between group ${
                   isDarkMode 
                     ? isSelected
