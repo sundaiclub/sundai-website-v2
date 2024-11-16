@@ -14,6 +14,9 @@ const nextConfig = {
       "storage.googleapis.com",
     ],
   },
+  experimental: {
+    esmExternals: 'loose'
+  }
 };
 
 export default nextConfig;

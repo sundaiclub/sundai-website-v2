@@ -225,7 +225,9 @@ export default function WeeksPage() {
                           <Image
                             src={
                               project.thumbnail?.url ||
-                              "/images/projects_screenshots/week-25.jpg"
+                              (isDarkMode
+                                ? "/images/default_project_thumbnail_dark.svg"
+                                : "/images/default_project_thumbnail_light.svg")
                             }
                             alt={project.title}
                             fill

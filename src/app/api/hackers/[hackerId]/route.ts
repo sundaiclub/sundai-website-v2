@@ -1,8 +1,6 @@
-import { PrismaClient } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
-
-const prisma = new PrismaClient();
+import prisma from "@/lib/prisma";
 
 export async function GET(
   request: Request,
@@ -107,7 +105,17 @@ export async function PATCH(
     }
 
     const data = await request.json();
-    const allowedFields = ["name", "bio", "githubUrl", "phoneNumber"];
+    const allowedFields = [
+      "name",
+      "bio",
+      "githubUrl",
+      "phoneNumber",
+      "linkedinUrl",
+      "twitterUrl",
+      "username",
+      "discordName",
+      "websiteUrl"
+    ];
 
     // Filter out any fields that aren't allowed to be updated
     const sanitizedData = Object.keys(data).reduce((acc, key) => {

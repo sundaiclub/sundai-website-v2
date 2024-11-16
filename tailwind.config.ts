@@ -52,9 +52,47 @@ const config: Config = {
           "100%": { "background-position": "50% 200%" },
         },
       },
+      typography: {
+        DEFAULT: {
+          css: {
+            a: {
+              color: '#4f46e5', // indigo-600
+              '&:hover': {
+                color: '#4338ca', // indigo-700
+              },
+            },
+            h1: {
+              color: 'inherit',
+              fontFamily: '"Montserrat", serif',
+              fontSize: '2.75rem', // 6xl
+            },
+            h2: {
+              color: 'inherit',
+              fontFamily: '"Montserrat", serif',
+              fontSize: '2rem', // 5xl
+            },
+            h3: {
+              color: 'inherit',
+              fontFamily: '"Montserrat", serif',
+              fontSize: '1.7rem', // 4xl
+            },
+            h4: {
+              color: 'inherit',
+              fontFamily: '"Montserrat", serif',
+              fontSize: '1.35rem', // 3xl
+            },
+            p: {
+              fontFamily: '"Montserrat", sans-serif',
+              fontSize: '0.8rem', // base
+            },
+          },
+        },
+      },
     },
   },
-  plugins: [],
+  plugins: [
+    require('@tailwindcss/typography'),
+  ],
   darkMode: "class", // Enable dark mode
 };
 

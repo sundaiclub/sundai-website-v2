@@ -17,9 +17,14 @@ model Hacker {
   id          String    @id @default(uuid())
   clerkId     String    @unique
   name        String
+  username    String?
   role        Role?
   bio         String?
   githubUrl   String?
+  discordName String?
+  twitterUrl  String?
+  linkedinUrl String?
+  websiteUrl  String?
   email       String?
   phoneNumber String?
   attended    Int       @default(0)
@@ -66,8 +71,8 @@ model DomainTag {
 model Project {
   id          String    @id @default(uuid())
   title       String
-  preview     String    @db.VarChar(120)
-  description String
+  preview     String?    @db.VarChar(120)
+  description String?
   githubUrl   String?
   demoUrl     String?
   blogUrl     String?
@@ -225,6 +230,7 @@ enum Role {
   NOT_SET
   NEWBIE
   HACKER
+  SPONSOR
   LEADER
   ADMIN
 }

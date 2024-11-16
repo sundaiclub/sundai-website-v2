@@ -1,9 +1,8 @@
-import { PrismaClient, ProjectStatus } from "@prisma/client";
+import { ProjectStatus } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { uploadToGCS } from "@/lib/gcp-storage";
-
-const prisma = new PrismaClient();
+import prisma from "@/lib/prisma";
 
 export async function GET(req: Request) {
   try {
@@ -81,11 +80,26 @@ export async function POST(req: Request) {
 
     const formData = await req.formData();
     const title = formData.get("title") as string;
-    const description = formData.get("description") as string;
-    const githubUrl = formData.get("githubUrl") as string;
-    const demoUrl = formData.get("demoUrl") as string;
+    const preview = formData.get("preview") as string;
     const members = JSON.parse(formData.get("members") as string);
-    const thumbnail = formData.get("thumbnail") as File | null;
+
+    if (!title) {
+      return NextResponse.json({ 
+        message: "Title is required" 
+      }, { status: 400 });
+    }
+
+    if (!preview) {
+      return NextResponse.json({ 
+        message: "Preview is required" 
+      }, { status: 400 });
+    }
+
+    if (preview.length > 100) {
+      return NextResponse.json({ 
+        message: "Preview must be 100 characters or less" 
+      }, { status: 400 });
+    }
 
     // Get the hacker using clerkId
     const hacker = await prisma.hacker.findUnique({
@@ -94,36 +108,6 @@ export async function POST(req: Request) {
 
     if (!hacker) {
       return new NextResponse("Hacker not found", { status: 404 });
-    }
-
-    if (!title || !description) {
-      return new NextResponse("Missing required fields", { status: 400 });
-    }
-
-    let thumbnailImage = null;
-    if (thumbnail) {
-      try {
-        const uploadResult = await uploadToGCS(thumbnail);
-
-        // Create image record with all required fields
-        thumbnailImage = await prisma.image.create({
-          data: {
-            key: uploadResult.filename,
-            bucket: process.env.GOOGLE_CLOUD_BUCKET!,
-            url: uploadResult.url,
-            filename: thumbnail.name,
-            mimeType: thumbnail.type || "application/octet-stream",
-            size: thumbnail.size,
-            width: undefined,
-            height: undefined,
-            alt: title,
-            description: description,
-          },
-        });
-      } catch (error) {
-        console.error("Error uploading thumbnail:", error);
-        return new NextResponse("Error uploading thumbnail", { status: 500 });
-      }
     }
 
     // Get or create current week
@@ -164,12 +148,11 @@ export async function POST(req: Request) {
     const project = await prisma.project.create({
       data: {
         title,
-        description,
-        githubUrl,
-        demoUrl,
+        preview,
         launchLeadId: hacker.id,
-        status: "PENDING",
-        thumbnailId: thumbnailImage?.id,
+        status: "DRAFT",
+        is_broken: false,
+        is_starred: true,
         weeks: {
           connect: {
             id: currentWeek.id,

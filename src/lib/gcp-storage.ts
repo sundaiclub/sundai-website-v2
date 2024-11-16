@@ -16,7 +16,6 @@ const credentials = JSON.parse(
 const storage = new Storage({
   credentials,
 });
-console.log("it's working");
 const bucket = storage.bucket(process.env.GOOGLE_CLOUD_BUCKET);
 
 export async function uploadToGCS(
