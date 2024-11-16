@@ -462,10 +462,21 @@ export default function ProjectGrid({ showStarredOnly = false, statusFilter="APP
     ? projects.filter((project) => project.is_starred)
     : projects;
 
+  // Sort projects by startDate (newest first) and then by createdAt
+  const sortedProjects = [...filteredProjects].sort((a, b) => {
+    // Compare startDate first
+    const dateComparison = new Date(b.startDate).getTime() - new Date(a.startDate).getTime();
+    // If startDates are equal, compare createdAt
+    if (dateComparison === 0) {
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    }
+    return dateComparison;
+  });
+
   return (
     <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 py-6 sm:py-12">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-        {filteredProjects.map((project) => (
+        {sortedProjects.map((project) => (
           <ProjectCard
             key={project.id}
             project={project}
