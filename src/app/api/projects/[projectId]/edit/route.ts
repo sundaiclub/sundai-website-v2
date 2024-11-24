@@ -130,7 +130,9 @@ export async function PATCH(
       const launchLeadId = formData.get('launchLead');
 
       if (launchLeadId) {
-        updateData.launchLeadId = launchLeadId.toString();
+        updateData.launchLead = {
+          connect: { id: launchLeadId.toString() }
+        };
       }
 
       if (participantsJson) {
@@ -144,7 +146,7 @@ export async function PATCH(
         // Add new participants, excluding the launch lead
         updateData.participants = {
           create: participants
-            .filter((p: any) => p.hacker.id !== updateData.launchLeadId)
+            .filter((p: any) => p.hacker.id !== launchLeadId)
             .map((p: any) => ({
               hackerId: p.hacker.id,
               role: p.role
