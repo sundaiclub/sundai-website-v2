@@ -461,7 +461,9 @@ export default function HackerProfile() {
                           isDarkMode ? "text-gray-300" : "text-gray-600"
                         } max-w-2xl font-fira-code`}
                       >
-                        {hacker.bio}
+                        {hacker.bio.length > 100 
+                          ? `${hacker.bio.substring(0, 100)}...` 
+                          : hacker.bio}
                       </p>
                     )}
                   </>

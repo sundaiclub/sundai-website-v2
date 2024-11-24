@@ -44,6 +44,7 @@ export type Project = {
     hacker: {
       id: string;
       name: string;
+      bio?: string | null;
       avatar?: {
         url: string;
       } | null;

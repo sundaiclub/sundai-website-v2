@@ -458,14 +458,10 @@ export default function ProjectDetail() {
                                   {participant.role}
                                 </p>
                                 {participant.hacker.bio && (
-                                  <p
-                                    className={`text-sm mt-1 line-clamp-2 ${
-                                      isDarkMode
-                                        ? "text-gray-400"
-                                        : "text-gray-500"
-                                    }`}
-                                  >
-                                    {participant.hacker.bio}
+                                  <p className={`text-sm mt-1 line-clamp-2 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
+                                    {(participant.hacker as any).bio?.length > 50 
+                                      ? `${(participant.hacker as any).bio.substring(0, 50)}...` 
+                                      : (participant.hacker as any).bio}
                                   </p>
                                 )}
                               </div>
