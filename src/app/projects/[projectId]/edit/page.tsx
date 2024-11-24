@@ -345,14 +345,17 @@ export default function ProjectEditPage() {
       participants: [
         // Keep all existing participants except the new launch lead
         ...project.participants.filter(p => p.hacker.id !== hacker.id),
-        // Add current launch lead to participants if changing from self
-        ...(project.launchLead.id === userInfo.id ? [
-          { role: "hacker", hacker: project.launchLead }
-        ] : [])
+        // Add the previous launch lead as a hacker if they're not already in the team
+        ...((!project.participants.some(p => p.hacker.id === project.launchLead.id) && 
+            project.launchLead.id !== hacker.id) ? [{
+          role: "hacker",
+          hacker: project.launchLead
+        }] : [])
       ]
     };
     
     setProject(updatedProject);
+    setShowLaunchLeadModal(false); // Close the modal after selection
   };
 
   const allowedEdit = project && (

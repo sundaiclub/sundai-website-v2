@@ -127,7 +127,11 @@ export async function PATCH(
     
     if (canManageTeam) {
       const participantsJson = formData.get('participants');
-      const launchLeadId = formData.get('launchLeadId');
+      const launchLeadId = formData.get('launchLead');
+
+      if (launchLeadId) {
+        updateData.launchLeadId = launchLeadId.toString();
+      }
 
       if (participantsJson) {
         const participants = JSON.parse(participantsJson.toString());
@@ -137,17 +141,15 @@ export async function PATCH(
           where: { projectId: params.projectId }
         });
 
-        // Add new participants
+        // Add new participants, excluding the launch lead
         updateData.participants = {
-          create: participants.map((p: any) => ({
-            hackerId: p.hacker.id,
-            role: p.role
-          }))
+          create: participants
+            .filter((p: any) => p.hacker.id !== updateData.launchLeadId)
+            .map((p: any) => ({
+              hackerId: p.hacker.id,
+              role: p.role
+            }))
         };
-      }
-
-      if (launchLeadId) {
-        updateData.launchLeadId = launchLeadId.toString();
       }
     }
 
