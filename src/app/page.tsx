@@ -44,7 +44,7 @@ export default function Home() {
             className="absolute inset-0 animate-scroll-vertical"
             style={{
               backgroundImage: "url('/images/background_sundai.svg')",
-              backgroundSize: "25% auto",
+              backgroundSize: "300px auto",
               backgroundRepeat: "repeat",
               WebkitMaskImage: "linear-gradient(to bottom, transparent, black 50%, transparent)",
               maskImage: "linear-gradient(to bottom, transparent, black 50%, transparent)"
@@ -75,14 +75,14 @@ export default function Home() {
               </p>
 
               <div
-                className={`grid grid-cols-3 gap-4 items-center max-w-lg mx-auto mb-12 ${
+                className={`grid grid-cols-1 sm:grid-cols-3 gap-4 items-center max-w-lg mx-auto mb-12 ${
                   isDarkMode
                     ? "bg-gray-800 shadow-[inset_0_2px_4px_rgba(0,0,0,0.3)]"
                     : "bg-gray-100 shadow-[inset_0_2px_4px_rgba(0,0,0,0.1)]"
-                } rounded-xl p-6`}
+                } rounded-xl p-4 sm:p-6`}
               >
                 <motion.div
-                  className="flex justify-center items-center relative rounded-lg p-4 "
+                  className="flex justify-center items-center relative rounded-lg p-2 sm:p-4"
                   variants={stompVariants}
                   initial="hidden"
                   animate={isTypingDone ? "visible" : "hidden"}
@@ -91,14 +91,14 @@ export default function Home() {
                   <Image
                     src="/images/affiliations/mit_logo_std_rgb_silver-gray.svg"
                     style={{ filter: "brightness(1.2)" }}
-                    className="w-24 h-24 opacity-90"
+                    className="w-16 h-16 sm:w-24 sm:h-24 opacity-90"
                     alt="Logo MIT"
                     width={96}
                     height={96}
                   />
                 </motion.div>
                 <div
-                  className={`text-xl font-mono h-full mt-8 text-center px-4 py-2 rounded-lg ${
+                  className={`text-base sm:text-xl font-mono h-full mt-2 sm:mt-8 text-center px-2 sm:px-4 py-1 sm:py-2 rounded-lg ${
                     isDarkMode ? "text-gray-200" : "text-gray-800"
                   }`}
                 >
@@ -115,7 +115,7 @@ export default function Home() {
                   />
                 </div>
                 <motion.div
-                  className="flex justify-center items-center relative  rounded-lg p-4 "
+                  className="flex justify-center items-center relative rounded-lg p-2 sm:p-4"
                   variants={stompVariants}
                   initial="hidden"
                   animate={isTypingDone ? "visible" : "hidden"}
@@ -123,7 +123,7 @@ export default function Home() {
                 >
                   <Image
                     src="/images/affiliations/harvard-university-seeklogo.svg"
-                    className="w-20 h-20 opacity-90"
+                    className="w-14 h-14 sm:w-20 sm:h-20 opacity-90"
                     style={{ filter: "grayscale(100%)" }}
                     alt="Logo Harvard"
                     width={80}
