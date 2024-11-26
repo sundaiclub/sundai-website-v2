@@ -21,16 +21,16 @@ export async function PATCH(
       return new NextResponse("Unauthorized", { status: 401 });
     }
 
-    const { status } = await req.json();
+    const { is_starred } = await req.json();
 
     const updatedProject = await prisma.project.update({
       where: { id: params.projectId },
-      data: { status },
+      data: { is_starred },
     });
 
     return NextResponse.json(updatedProject);
   } catch (error) {
-    console.error("[PROJECT_STATUS_UPDATE]", error);
+    console.error("[PROJECT_STAR_UPDATE]", error);
     return new NextResponse("Internal Error", { status: 500 });
   }
-}
+} 

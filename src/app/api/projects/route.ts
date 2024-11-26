@@ -152,7 +152,7 @@ export async function POST(req: Request) {
         launchLeadId: hacker.id,
         status: "DRAFT",
         is_broken: false,
-        is_starred: true,
+        is_starred: false,
         weeks: {
           connect: {
             id: currentWeek.id,

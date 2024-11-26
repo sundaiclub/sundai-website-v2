@@ -50,6 +50,8 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
             throw new Error("Failed to fetch hacker profile");
           const profileData = await profileResponse.json();
 
+          const isUserAdmin = profileData.role === "ADMIN";
+          setIsAdmin(isUserAdmin);
           setUserInfo({
             id: profileData.id,
             name: profileData.name,
@@ -59,16 +61,16 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
             bio: profileData.bio,
             githubUrl: profileData.githubUrl,
             phoneNumber: profileData.phoneNumber,
-            likes: profileData.likes, // Include likes from the profile data
+            likes: profileData.likes,
           });
-
-          setIsAdmin(profileData.role === "ADMIN");
         } catch (error) {
           console.error("Error fetching user info:", error);
+          setIsAdmin(false);
         } finally {
           setLoading(false);
         }
       } else if (isLoaded) {
+        setIsAdmin(false);
         setLoading(false);
       }
     };

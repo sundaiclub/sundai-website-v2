@@ -7,11 +7,13 @@ import { HeartIcon } from "@heroicons/react/24/outline";
 import { HeartIcon as HeartIconSolid } from "@heroicons/react/24/solid";
 import { useUserContext } from "../contexts/UserContext";
 import { useTheme } from "../contexts/ThemeContext";
+import { Listbox, Transition } from '@headlessui/react';
+import { ChevronUpDownIcon } from '@heroicons/react/24/solid';
 
 export type Project = {
   id: string;
   title: string;
-  status: string;
+  status: 'DRAFT' | 'PENDING' | 'APPROVED';
   preview: string;
   description: string;
   githubUrl?: string | null;
@@ -60,13 +62,18 @@ export type Project = {
   updatedAt: string;
 };
 
-function ProjectCard({ project, userInfo, handleLike, isDarkMode, show_status, show_team = true }: {
+const STATUS_OPTIONS = ['DRAFT', 'PENDING', 'APPROVED'] as const;
+
+function ProjectCard({ project, userInfo, handleLike, isDarkMode, show_status, show_team = true, onStatusChange, onStarredChange, isAdmin }: {
   project: Project;
   userInfo: any;
   handleLike: (e: React.MouseEvent, projectId: string, isLiked: boolean) => void;
   isDarkMode: boolean;
   show_status: boolean;
   show_team?: boolean;
+  onStatusChange?: (projectId: string, newStatus: string) => void;
+  onStarredChange?: (projectId: string, isStarred: boolean) => void;
+  isAdmin?: boolean;
 }) {
   return (
     <div
@@ -94,30 +101,85 @@ function ProjectCard({ project, userInfo, handleLike, isDarkMode, show_status, s
         </Link>
         {show_status && (
           <div className="absolute top-2 right-2 flex space-x-2">
-            <div
-              className={`px-2 py-1 rounded-full text-xs ${
-                project.is_starred
-                  ? "bg-yellow-300 text-yellow-800"
-                  : "bg-gray-300 text-gray-800"
-              }`}
-            >
-              {project.is_starred ? "Starred" : "Not Starred"}
-            </div>
-            <div
-              className={`px-2 py-1 rounded-full text-xs ${
-                project.status === "DRAFT"
-                  ? "bg-gray-300 text-gray-800"
-                  : project.status === "PENDING"
-                  ? "bg-orange-300 text-orange-800"
-                  : project.status === "APPROVED"
-                  ? "bg-green-300 text-green-800"
-                  : isDarkMode
-                  ? "bg-purple-900 text-purple-300"
-                  : "bg-indigo-100 text-indigo-700"
-              }`}
-            >
-              {project.status}
-            </div>
+            {isAdmin ? (
+              <>
+                <button
+                  onClick={() => onStarredChange?.(project.id, !project.is_starred)}
+                  className={`px-2 py-1 rounded-full text-xs cursor-pointer ${
+                    project.is_starred
+                      ? "bg-yellow-300 text-yellow-800 hover:bg-yellow-400"
+                      : "bg-gray-300 text-gray-800 hover:bg-gray-400"
+                  }`}
+                >
+                  {project.is_starred ? "Starred" : "Not Starred"}
+                </button>
+                
+                <Listbox value={project.status} onChange={(newStatus) => onStatusChange?.(project.id, newStatus)}>
+                  <div className="relative">
+                    <Listbox.Button className={`px-2 py-1 rounded-full text-xs flex items-center ${
+                      project.status === "DRAFT"
+                        ? "bg-gray-300 text-gray-800"
+                        : project.status === "PENDING"
+                        ? "bg-orange-300 text-orange-800"
+                        : "bg-green-300 text-green-800"
+                    }`}>
+                      <span>{project.status}</span>
+                      <ChevronUpDownIcon className="h-4 w-4 ml-1" />
+                    </Listbox.Button>
+                    <Transition
+                      enter="transition duration-100 ease-out"
+                      enterFrom="transform scale-95 opacity-0"
+                      enterTo="transform scale-100 opacity-100"
+                      leave="transition duration-75 ease-out"
+                      leaveFrom="transform scale-100 opacity-100"
+                      leaveTo="transform scale-95 opacity-0"
+                    >
+                      <Listbox.Options className="absolute right-0 mt-1 w-32 bg-white rounded-md shadow-lg z-10">
+                        {STATUS_OPTIONS.map((status) => (
+                          <Listbox.Option
+                            key={status}
+                            value={status}
+                            className={({ active }) =>
+                              `${active ? 'bg-indigo-100' : 'bg-white'} 
+                               cursor-pointer select-none relative py-2 px-4`
+                            }
+                          >
+                            {status}
+                          </Listbox.Option>
+                        ))}
+                      </Listbox.Options>
+                    </Transition>
+                  </div>
+                </Listbox>
+              </>
+            ) : (
+              <>
+                <div
+                  className={`px-2 py-1 rounded-full text-xs ${
+                    project.is_starred
+                      ? "bg-yellow-300 text-yellow-800"
+                      : "bg-gray-300 text-gray-800"
+                  }`}
+                >
+                  {project.is_starred ? "Starred" : "Not Starred"}
+                </div>
+                <div
+                  className={`px-2 py-1 rounded-full text-xs ${
+                    project.status === "DRAFT"
+                      ? "bg-gray-300 text-gray-800"
+                      : project.status === "PENDING"
+                      ? "bg-orange-300 text-orange-800"
+                      : project.status === "APPROVED"
+                      ? "bg-green-300 text-green-800"
+                      : isDarkMode
+                      ? "bg-purple-900 text-purple-300"
+                      : "bg-indigo-100 text-indigo-700"
+                  }`}
+                >
+                  {project.status}
+                </div>
+              </>
+            )}
           </div>
         )}
       </div>
@@ -329,23 +391,40 @@ function ProjectCard({ project, userInfo, handleLike, isDarkMode, show_status, s
         )}
 
         {/* Links - Modified to stick to bottom */}
-        <div className="flex space-x-4 mt-auto pt-4 border-t border-gray-200">
-          {project.demoUrl && (
+        <div className="flex justify-between mt-auto pt-4 border-t border-gray-200">
+          <div className="flex-1">
+            {project.demoUrl && (
+              <Link
+                href={project.demoUrl}
+                className={`${
+                  isDarkMode
+                    ? "text-purple-400 hover:text-purple-300"
+                    : "text-indigo-600 hover:text-indigo-800"
+                } text-xs sm:text-sm font-medium`}
+                target="_blank"
+              >
+                View Demo →
+              </Link>
+            )}
+          </div>
+          <div className="flex-1 text-center">
+            {project.githubUrl && (
+              <Link
+                href={project.githubUrl}
+                className={`${
+                  isDarkMode
+                    ? "text-gray-400 hover:text-gray-300"
+                    : "text-gray-600 hover:text-gray-800"
+                } text-xs sm:text-sm font-medium`}
+                target="_blank"
+              >
+                GitHub →
+              </Link>
+            )}
+          </div>
+          <div className="flex-1 text-right">
             <Link
-              href={project.demoUrl}
-              className={`${
-                isDarkMode
-                  ? "text-purple-400 hover:text-purple-300"
-                  : "text-indigo-600 hover:text-indigo-800"
-              } text-xs sm:text-sm font-medium`}
-              target="_blank"
-            >
-              View Demo →
-            </Link>
-          )}
-          {project.githubUrl && (
-            <Link
-              href={project.githubUrl}
+              href={`/projects/${project.id}`}
               className={`${
                 isDarkMode
                   ? "text-gray-400 hover:text-gray-300"
@@ -353,20 +432,9 @@ function ProjectCard({ project, userInfo, handleLike, isDarkMode, show_status, s
               } text-xs sm:text-sm font-medium`}
               target="_blank"
             >
-              GitHub →
+              More Info →
             </Link>
-          )}
-          <Link
-            href={`/projects/${project.id}`}
-            className={`${
-              isDarkMode
-                ? "text-gray-400 hover:text-gray-300"
-                : "text-gray-600 hover:text-gray-800"
-            } text-xs sm:text-sm font-medium`}
-            target="_blank"
-          >
-            More Info →
-          </Link>
+          </div>
         </div>
       </div>
     </div>
@@ -441,23 +509,47 @@ export default function ProjectGrid({ showStarredOnly = false, statusFilter="APP
     }
   };
 
-  const handleMoveToPending = async (projectId: string) => {
+  const handleStatusChange = async (projectId: string, newStatus: string) => {
     if (!isAdmin) return;
 
     try {
       const response = await fetch(`/api/projects/${projectId}/status`, {
-        method: "PATCH",
+        method: 'PATCH',
         headers: {
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ status: "PENDING" }),
+        body: JSON.stringify({ status: newStatus }),
       });
 
       if (response.ok) {
-        setProjects(projects.filter((p) => p.id !== projectId));
+        setProjects(projects.map(p => 
+          p.id === projectId ? { ...p, status: newStatus } : p
+        ));
       }
     } catch (error) {
-      console.error("Error updating project status:", error);
+      console.error('Error updating project status:', error);
+    }
+  };
+
+  const handleStarredChange = async (projectId: string, isStarred: boolean) => {
+    if (!isAdmin) return;
+
+    try {
+      const response = await fetch(`/api/projects/${projectId}/star`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ is_starred: isStarred }),
+      });
+
+      if (response.ok) {
+        setProjects(projects.map(p => 
+          p.id === projectId ? { ...p, is_starred: isStarred } : p
+        ));
+      }
+    } catch (error) {
+      console.error('Error updating project starred status:', error);
     }
   };
 
@@ -500,6 +592,9 @@ export default function ProjectGrid({ showStarredOnly = false, statusFilter="APP
             isDarkMode={isDarkMode}
             show_status={show_status}
             show_team={show_team}
+            onStatusChange={handleStatusChange}
+            onStarredChange={handleStarredChange}
+            isAdmin={isAdmin}
           />
         ))}
       </div>
