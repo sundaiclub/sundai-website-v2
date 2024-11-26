@@ -183,7 +183,7 @@ export default function Home() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 1.3 }}
         >
-          <ProjectGrid showStarredOnly={true}/>
+          <ProjectGrid showStarredOnly={true} show_team={false} />
         </motion.div>
       </section>
       <motion.footer

@@ -60,12 +60,13 @@ export type Project = {
   updatedAt: string;
 };
 
-function ProjectCard({ project, userInfo, handleLike, isDarkMode, show_status }: {
+function ProjectCard({ project, userInfo, handleLike, isDarkMode, show_status, show_team = true }: {
   project: Project;
   userInfo: any;
   handleLike: (e: React.MouseEvent, projectId: string, isLiked: boolean) => void;
   isDarkMode: boolean;
   show_status: boolean;
+  show_team?: boolean;
 }) {
   return (
     <div
@@ -74,7 +75,7 @@ function ProjectCard({ project, userInfo, handleLike, isDarkMode, show_status }:
         isDarkMode
           ? "bg-gray-800 hover:shadow-purple-400/20"
           : "bg-white hover:shadow-xl"
-      } rounded-lg shadow-lg overflow-hidden transition-shadow relative`}
+      } rounded-lg shadow-lg overflow-hidden transition-shadow relative flex flex-col h-full`}
     >
       <div className="relative h-40 sm:h-48">
         <Link href={`/projects/${project.id}`}>
@@ -120,7 +121,7 @@ function ProjectCard({ project, userInfo, handleLike, isDarkMode, show_status }:
           </div>
         )}
       </div>
-      <div className="p-4 sm:p-6">
+      <div className="p-4 sm:p-6 flex-1 flex flex-col">
         <div className="flex justify-between items-start mb-4">
           <div>
             <Link href={`/projects/${project.id}`}>
@@ -164,9 +165,9 @@ function ProjectCard({ project, userInfo, handleLike, isDarkMode, show_status }:
                 ) : (
                   <HeartIcon className="h-7 w-7" />
                 )}
-                <span className="absolute -bottom-4 left-1/2 -translate-x-1/2 text-sm">
+                {/* <span className="absolute -bottom-4 left-1/2 -translate-x-1/2 text-sm">
                   {project.likes.length}
-                </span>
+                </span> */}
               </div>
             </button>
           </div>
@@ -211,75 +212,23 @@ function ProjectCard({ project, userInfo, handleLike, isDarkMode, show_status }:
         </div>
 
         {/* Team Section */}
-        <div className="mb-4">
-          <h4
-            className={`text-xs sm:text-sm font-semibold ${
-              isDarkMode ? "text-gray-300" : "text-gray-700"
-            } mb-2`}
-          >
-            Team
-          </h4>
-          <div className="space-y-2">
-            {/* Launch Lead */}
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                {project.launchLead.avatar ? (
-                  <Image
-                    src={project.launchLead.avatar.url}
-                    alt={project.launchLead.name}
-                    width={28}
-                    height={28}
-                    className="rounded-full"
-                  />
-                ) : (
-                  <div
-                    className={`w-7 h-7 ${
-                      isDarkMode ? "bg-purple-900" : "bg-indigo-100"
-                    } rounded-full flex items-center justify-center`}
-                  >
-                    <span
-                      className={`${
-                        isDarkMode ? "text-purple-400" : "text-indigo-600"
-                      } text-xs`}
-                    >
-                      {project.launchLead.name[0]}
-                    </span>
-                  </div>
-                )}
-              </div>
-              <div className="ml-2 sm:ml-3">
-                <Link href={`/hacker/${project.launchLead.id}`}>
-                  <p
-                    className={`text-xs sm:text-sm font-medium ${
-                      isDarkMode
-                        ? "text-gray-200 hover:text-purple-400"
-                        : "text-gray-900 hover:text-indigo-600"
-                    } transition-colors`}
-                  >
-                    {project.launchLead.name}
-                  </p>
-                </Link>
-                <p
-                  className={`text-xs ${
-                    isDarkMode ? "text-purple-400" : "text-indigo-600"
-                  }`}
-                >
-                  Launch Lead
-                </p>
-              </div>
-            </div>
-
-            {/* Other Participants */}
-            {project.participants.map((participant) => (
-              <div
-                key={participant.hacker.id}
-                className="flex items-center"
-              >
+        {show_team && (
+          <div className="mb-4">
+            <h4
+              className={`text-xs sm:text-sm font-semibold ${
+                isDarkMode ? "text-gray-300" : "text-gray-700"
+              } mb-2`}
+            >
+              Team
+            </h4>
+            <div className="space-y-2">
+              {/* Launch Lead */}
+              <div className="flex items-center">
                 <div className="flex-shrink-0">
-                  {participant.hacker.avatar ? (
+                  {project.launchLead.avatar ? (
                     <Image
-                      src={participant.hacker.avatar.url}
-                      alt={participant.hacker.name}
+                      src={project.launchLead.avatar.url}
+                      alt={project.launchLead.name}
                       width={28}
                       height={28}
                       className="rounded-full"
@@ -287,21 +236,21 @@ function ProjectCard({ project, userInfo, handleLike, isDarkMode, show_status }:
                   ) : (
                     <div
                       className={`w-7 h-7 ${
-                        isDarkMode ? "bg-gray-700" : "bg-gray-100"
+                        isDarkMode ? "bg-purple-900" : "bg-indigo-100"
                       } rounded-full flex items-center justify-center`}
                     >
                       <span
                         className={`${
-                          isDarkMode ? "text-gray-300" : "text-gray-600"
+                          isDarkMode ? "text-purple-400" : "text-indigo-600"
                         } text-xs`}
                       >
-                        {participant.hacker.name[0]}
+                        {project.launchLead.name[0]}
                       </span>
                     </div>
                   )}
                 </div>
                 <div className="ml-2 sm:ml-3">
-                  <Link href={`/hacker/${participant.hacker.id}`}>
+                  <Link href={`/hacker/${project.launchLead.id}`}>
                     <p
                       className={`text-xs sm:text-sm font-medium ${
                         isDarkMode
@@ -309,24 +258,78 @@ function ProjectCard({ project, userInfo, handleLike, isDarkMode, show_status }:
                           : "text-gray-900 hover:text-indigo-600"
                       } transition-colors`}
                     >
-                      {participant.hacker.name}
+                      {project.launchLead.name}
                     </p>
                   </Link>
                   <p
                     className={`text-xs ${
-                      isDarkMode ? "text-gray-400" : "text-gray-500"
+                      isDarkMode ? "text-purple-400" : "text-indigo-600"
                     }`}
                   >
-                    {participant.role}
+                    Launch Lead
                   </p>
                 </div>
               </div>
-            ))}
-          </div>
-        </div>
 
-        {/* Links */}
-        <div className="flex space-x-4 mt-4 pt-4 border-t border-gray-200">
+              {/* Other Participants */}
+              {project.participants.map((participant) => (
+                <div
+                  key={participant.hacker.id}
+                  className="flex items-center"
+                >
+                  <div className="flex-shrink-0">
+                    {participant.hacker.avatar ? (
+                      <Image
+                        src={participant.hacker.avatar.url}
+                        alt={participant.hacker.name}
+                        width={28}
+                        height={28}
+                        className="rounded-full"
+                      />
+                    ) : (
+                      <div
+                        className={`w-7 h-7 ${
+                          isDarkMode ? "bg-gray-700" : "bg-gray-100"
+                        } rounded-full flex items-center justify-center`}
+                      >
+                        <span
+                          className={`${
+                            isDarkMode ? "text-gray-300" : "text-gray-600"
+                          } text-xs`}
+                        >
+                          {participant.hacker.name[0]}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="ml-2 sm:ml-3">
+                    <Link href={`/hacker/${participant.hacker.id}`}>
+                      <p
+                        className={`text-xs sm:text-sm font-medium ${
+                          isDarkMode
+                            ? "text-gray-200 hover:text-purple-400"
+                            : "text-gray-900 hover:text-indigo-600"
+                        } transition-colors`}
+                      >
+                        {participant.hacker.name}
+                      </p>
+                    </Link>
+                    <p
+                      className={`text-xs ${
+                        isDarkMode ? "text-gray-400" : "text-gray-500"
+                      }`}
+                    >
+                      {participant.role}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Links - Modified to stick to bottom */}
+        <div className="flex space-x-4 mt-auto pt-4 border-t border-gray-200">
           {project.demoUrl && (
             <Link
               href={project.demoUrl}
@@ -353,13 +356,24 @@ function ProjectCard({ project, userInfo, handleLike, isDarkMode, show_status }:
               GitHub →
             </Link>
           )}
+          <Link
+            href={`/projects/${project.id}`}
+            className={`${
+              isDarkMode
+                ? "text-gray-400 hover:text-gray-300"
+                : "text-gray-600 hover:text-gray-800"
+            } text-xs sm:text-sm font-medium`}
+            target="_blank"
+          >
+            More Info →
+          </Link>
         </div>
       </div>
     </div>
   );
 }
 
-export default function ProjectGrid({ showStarredOnly = false, statusFilter="APPROVED", show_status = false}) {
+export default function ProjectGrid({ showStarredOnly = false, statusFilter="APPROVED", show_status = false, show_team = true }) {
   const { user } = useUser();
   const { isAdmin, userInfo } = useUserContext();
   const [projects, setProjects] = useState<Project[]>([]);
@@ -485,6 +499,7 @@ export default function ProjectGrid({ showStarredOnly = false, statusFilter="APP
             handleLike={handleLike}
             isDarkMode={isDarkMode}
             show_status={show_status}
+            show_team={show_team}
           />
         ))}
       </div>
