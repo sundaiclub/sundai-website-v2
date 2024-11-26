@@ -6,7 +6,6 @@ import { UserButton, SignInButton, useUser } from "@clerk/nextjs";
 import { usePathname } from "next/navigation";
 import Image from "next/image";
 
-import ThemeToggle from './ThemeToggle';
 import { useTheme } from '../contexts/ThemeContext';
 
 const Navbar = () => {
@@ -153,9 +152,6 @@ const Navbar = () => {
                   </span>
                 </SignInButton>
               )}
-            </div>
-            <div className={`${isPWA ? "mx-2 p-1" : "mx-1"} px-3 flex justify-center`}>
-              <ThemeToggle />
             </div>
           </div>
         </div>
