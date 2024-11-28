@@ -15,8 +15,8 @@ const SORT_OPTIONS: SortOption[] = [
     label: "Newest First",
     value: "newest",
     sortFn: (a: Project, b: Project) => {
-      const dateA = new Date(a.createdAt).getTime();
-      const dateB = new Date(b.createdAt).getTime();
+      const dateA = new Date(a.startDate).getTime();
+      const dateB = new Date(b.startDate).getTime();
       return isNaN(dateB) || isNaN(dateA) ? 0 : dateB - dateA;
     }
   },
@@ -24,8 +24,8 @@ const SORT_OPTIONS: SortOption[] = [
     label: "Oldest First",
     value: "oldest",
     sortFn: (a: Project, b: Project) => {
-      const dateA = new Date(a.createdAt).getTime();
-      const dateB = new Date(b.createdAt).getTime();
+      const dateA = new Date(a.startDate).getTime();
+      const dateB = new Date(b.startDate).getTime();
       return isNaN(dateB) || isNaN(dateA) ? 0 : dateA - dateB;
     }
   },
@@ -162,17 +162,17 @@ export default function ProjectSearch({
   }, [filteredProjects, onFilteredProjectsChange]);
 
   return (
-    <div className="mb-6 space-y-6">
+    <div className="mb-6 space-y-4 sm:space-y-6">
       {/* Search and Filter Section */}
-      <div className="bg-gray-800/50 p-4 rounded-xl border border-gray-700/50 space-y-4">
-        {/* Search Bar with Filter Button */}
-        <div className="flex gap-2">
+      <div className="bg-gray-800/50 p-3 sm:p-4 rounded-xl border border-gray-700/50 space-y-3 sm:space-y-4">
+        {/* Search Bar and Sort - Stack on mobile, row on desktop */}
+        <div className="flex flex-col sm:flex-row gap-2">
           <div className="relative flex-1">
             <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
             <input
               type="text"
               placeholder="Search projects..."
-              className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-gray-700 
+              className="w-full pl-10 pr-4 py-2 sm:py-2.5 rounded-lg border border-gray-700 
                 bg-gray-800 text-gray-100 placeholder-gray-400
                 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500
                 transition-colors duration-200"
@@ -181,15 +181,15 @@ export default function ProjectSearch({
             />
           </div>
 
-          {/* Sort Dropdown */}
+          {/* Sort Dropdown - Full width on mobile */}
           <Listbox value={sortBy} onChange={setSortBy}>
-            <div className="relative w-[200px]">
-              <ListboxButton className="w-full flex items-center justify-between px-4 py-2.5 
+            <div className="relative w-full sm:w-[200px]">
+              <ListboxButton className="w-full flex items-center justify-between px-4 py-2 sm:py-2.5 
                 border border-gray-700 rounded-lg bg-gray-800 text-gray-100
                 hover:bg-gray-750 transition-colors duration-200">
                 <span className="flex items-center gap-2">
                   <FunnelIcon className="h-5 w-5 text-gray-400" />
-                  {sortBy.label}
+                  <span className="text-sm sm:text-base">{sortBy.label}</span>
                 </span>
                 <ChevronUpDownIcon className="h-5 w-5 text-gray-400" />
               </ListboxButton>
@@ -222,38 +222,40 @@ export default function ProjectSearch({
           </Listbox>
         </div>
 
-        {/* Tag Selection Area */}
+        {/* Tag Selection Area - Adjust spacing and button sizes */}
         <div className="space-y-2">
-          <div className="flex items-center gap-2 text-sm text-gray-400">
-            <span>Filter by tags:</span>
-            <button
-              onClick={() => setShowTechTagModal(true)}
-              className="px-3 py-1.5 rounded-lg text-sm bg-purple-900/30 text-purple-300 
-                hover:bg-purple-900/50 transition-colors duration-200 flex items-center gap-1"
-            >
-              <span>+ Tech Stack</span>
-            </button>
-            <button
-              onClick={() => setShowDomainTagModal(true)}
-              className="px-3 py-1.5 rounded-lg text-sm bg-gray-700/50 text-gray-300 
-                hover:bg-gray-700/70 transition-colors duration-200 flex items-center gap-1"
-            >
-              <span>+ Domain</span>
-            </button>
+          <div className="flex flex-wrap items-center gap-2 text-sm text-gray-400">
+            <span className="mr-1">Filter by tags:</span>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => setShowTechTagModal(true)}
+                className="flex-1 sm:flex-none px-3 py-1.5 rounded-lg text-sm bg-purple-900/30 text-purple-300 
+                  hover:bg-purple-900/50 transition-colors duration-200 flex items-center justify-center gap-1"
+              >
+                <span>+ Tech Stack</span>
+              </button>
+              <button
+                onClick={() => setShowDomainTagModal(true)}
+                className="flex-1 sm:flex-none px-3 py-1.5 rounded-lg text-sm bg-gray-700/50 text-gray-300 
+                  hover:bg-gray-700/70 transition-colors duration-200 flex items-center justify-center gap-1"
+              >
+                <span>+ Domain</span>
+              </button>
+            </div>
           </div>
 
-          {/* Selected Tags Display */}
+          {/* Selected Tags Display - Improve wrapping and spacing */}
           {(selectedTechTags.length > 0 || selectedDomainTags.length > 0) && (
-            <div className="flex flex-wrap gap-2 pt-2">
+            <div className="flex flex-wrap gap-1.5 sm:gap-2 pt-2">
               {selectedTechTags.map((tagName) => (
                 <span
                   key={tagName}
-                  className="px-3 py-1.5 rounded-lg text-sm flex items-center gap-2 
+                  className="px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-xs sm:text-sm flex items-center gap-1 sm:gap-2 
                     bg-purple-900/30 text-purple-300 border border-purple-800/30"
                 >
                   {tagName}
                   <XMarkIcon
-                    className="h-4 w-4 cursor-pointer hover:text-purple-200 transition-colors duration-200"
+                    className="h-3.5 w-3.5 sm:h-4 sm:w-4 cursor-pointer hover:text-purple-200 transition-colors duration-200"
                     onClick={() => setSelectedTechTags(tags => tags.filter(t => t !== tagName))}
                   />
                 </span>
@@ -261,12 +263,12 @@ export default function ProjectSearch({
               {selectedDomainTags.map((tagName) => (
                 <span
                   key={tagName}
-                  className="px-3 py-1.5 rounded-lg text-sm flex items-center gap-2 
+                  className="px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-xs sm:text-sm flex items-center gap-1 sm:gap-2 
                     bg-gray-700/50 text-gray-300 border border-gray-600/30"
                 >
                   {tagName}
                   <XMarkIcon
-                    className="h-4 w-4 cursor-pointer hover:text-gray-200 transition-colors duration-200"
+                    className="h-3.5 w-3.5 sm:h-4 sm:w-4 cursor-pointer hover:text-gray-200 transition-colors duration-200"
                     onClick={() => setSelectedDomainTags(tags => tags.filter(t => t !== tagName))}
                   />
                 </span>
@@ -276,8 +278,8 @@ export default function ProjectSearch({
         </div>
       </div>
 
-      {/* Results Count */}
-      <div className="text-sm text-gray-400 flex items-center gap-2">
+      {/* Results Count - Adjust text size */}
+      <div className="text-xs sm:text-sm text-gray-400 flex items-center gap-2">
         <span className="font-medium text-gray-300">{filteredProjects.length}</span> 
         projects found
       </div>

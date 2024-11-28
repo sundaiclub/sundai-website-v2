@@ -478,7 +478,15 @@ export default function ProjectGrid({
         const queryParam = statusFilter === "ALL" ? "" : `?status=${statusFilter}`;
         const response = await fetch(`/api/projects${queryParam}`);
         const data = await response.json();
-        setProjects(data);
+        
+        // Sort projects by startDate (newest first) before setting state
+        const sortedProjects = [...data].sort((a, b) => {
+          const dateA = new Date(a.startDate).getTime();
+          const dateB = new Date(b.startDate).getTime();
+          return isNaN(dateB) || isNaN(dateA) ? 0 : dateB - dateA;
+        });
+        
+        setProjects(sortedProjects);
       } catch (error) {
         console.error("Error fetching projects:", error);
       } finally {
