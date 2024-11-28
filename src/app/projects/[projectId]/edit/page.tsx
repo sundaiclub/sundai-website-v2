@@ -239,15 +239,25 @@ export default function ProjectEditPage() {
   const handleRemoveTag = (tagId: string, type: 'tech' | 'domain') => {
     if (!project) return;
     
-    setProject({
+    // Create updated project with current editable values
+    const updatedProject = {
       ...project,
+      title: editableTitle,
+      preview: editablePreview,
+      description: editableDescription,
+      startDate: editableStartDate,
+      githubUrl: editableGithubUrl,
+      demoUrl: editableDemoUrl,
+      blogUrl: editableBlogUrl,
       techTags: type === 'tech' 
         ? project.techTags.filter(tag => tag.id !== tagId)
         : project.techTags,
       domainTags: type === 'domain'
         ? project.domainTags.filter(tag => tag.id !== tagId)
         : project.domainTags,
-    });
+    };
+    
+    setProject(updatedProject);
   };
 
   const handleAddTag = (tagId: string, type: 'tech' | 'domain') => {
@@ -291,6 +301,7 @@ export default function ProjectEditPage() {
 
     setProject({
       ...project,
+      startDate: editableStartDate || new Date(),
       techTags: type === 'tech'
         ? [...project.techTags, tagToAdd]
         : project.techTags,

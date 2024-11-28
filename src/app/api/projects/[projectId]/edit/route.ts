@@ -90,20 +90,14 @@ export async function PATCH(
     if (isBroken !== null) updateData.is_broken = isBroken === 'true';
 
     const techTags = formData.getAll('techTags[]');
-    if (techTags.length > 0) {
-      updateData.techTags = {
-        set: [],
-        connect: techTags.map((id) => ({ id: id.toString() })),
-      };
-    }
+    updateData.techTags = {
+      set: techTags.map((id) => ({ id: id.toString() }))
+    };
 
     const domainTags = formData.getAll('domainTags[]');
-    if (domainTags.length > 0) {
-      updateData.domainTags = {
-        set: [],
-        connect: domainTags.map((id) => ({ id: id.toString() })),
-      };
-    }
+    updateData.domainTags = {
+      set: domainTags.map((id) => ({ id: id.toString() }))
+    };
 
     const deleteThumbnail = formData.get('deleteThumbnail') === 'true';
     const thumbnail = formData.get('thumbnail') as File | null;
