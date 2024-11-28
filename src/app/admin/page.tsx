@@ -20,7 +20,7 @@ export default function AllProjectsList() {
             <h1 className="text-3xl font-bold">
               Full list of projects in Sundai
             </h1>
-            <ProjectGrid show_status={true} statusFilter="ALL"/>
+            <ProjectGrid show_status={true} statusFilter="ALL" showSearch={true}/>
           </div>
         ) : (
           <div className="text-center text-red-500">

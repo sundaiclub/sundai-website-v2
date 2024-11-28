@@ -8,7 +8,8 @@ export default function TagSelector({
     tags, 
     selectedTags, 
     onSelect,
-    type 
+    type,
+    allowCreate = true
   }: {
     show: boolean;
     onClose: () => void;
@@ -16,6 +17,7 @@ export default function TagSelector({
     selectedTags: Array<{ id: string }>;
     onSelect: (id: string, type: 'tech' | 'domain') => void;
     type: 'tech' | 'domain';
+    allowCreate?: boolean;
   }) {
     const [searchTerm, setSearchTerm] = useState("");
     const [isCreating, setIsCreating] = useState(false);
@@ -83,7 +85,7 @@ export default function TagSelector({
           />
 
           <div className="max-h-[40vh] overflow-y-auto">
-            {searchTerm && (
+            {allowCreate && searchTerm && (
               <button
                 onClick={() => handleCreateTag(searchTerm)}
                 disabled={isCreating}

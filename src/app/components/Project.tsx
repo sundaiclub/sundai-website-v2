@@ -10,6 +10,7 @@ import { useTheme } from "../contexts/ThemeContext";
 import { Listbox, Transition } from '@headlessui/react';
 import { ChevronUpDownIcon } from '@heroicons/react/24/solid';
 import { toast } from 'react-hot-toast';
+import ProjectSearch from "./ProjectSearch";
 
 export type Project = {
   id: string;
@@ -450,12 +451,26 @@ function ProjectCard({ project, userInfo, handleLike, isDarkMode, show_status, s
   );
 }
 
-export default function ProjectGrid({ showStarredOnly = false, statusFilter="APPROVED", show_status = false, show_team = true }) {
+export default function ProjectGrid({ 
+  showStarredOnly = false, 
+  statusFilter = "APPROVED", 
+  show_status = false, 
+  show_team = true,
+  showSearch = false
+}) {
   const { user } = useUser();
   const { isAdmin, userInfo } = useUserContext();
   const [projects, setProjects] = useState<Project[]>([]);
+  const [filteredProjects, setFilteredProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const { isDarkMode } = useTheme();
+
+  // Update projects when they're loaded
+  useEffect(() => {
+    if (projects.length > 0) {
+      setFilteredProjects(projects);
+    }
+  }, [projects]);
 
   useEffect(() => {
     async function fetchProjects() {
@@ -582,25 +597,20 @@ export default function ProjectGrid({ showStarredOnly = false, statusFilter="APP
     );
   }
 
-  const filteredProjects = showStarredOnly
-    ? projects.filter((project) => project.is_starred)
-    : projects;
-
-  // Sort projects by startDate (newest first) and then by createdAt
-  const sortedProjects = [...filteredProjects].sort((a, b) => {
-    // Compare startDate first
-    const dateComparison = new Date(b.startDate).getTime() - new Date(a.startDate).getTime();
-    // If startDates are equal, compare createdAt
-    if (dateComparison === 0) {
-      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-    }
-    return dateComparison;
-  });
+  const displayProjects = showStarredOnly
+    ? filteredProjects.filter((project) => project.is_starred)
+    : filteredProjects;
 
   return (
     <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 py-6 sm:py-12">
+      {showSearch && (
+        <ProjectSearch 
+          projects={projects} 
+          onFilteredProjectsChange={setFilteredProjects} 
+        />
+      )}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-        {sortedProjects.map((project) => (
+        {displayProjects.map((project) => (
           <ProjectCard
             key={project.id}
             project={project}

@@ -8,6 +8,10 @@
   --background-end-rgb: 255, 255, 255;
 }
 
+html {
+  scrollbar-gutter: stable;
+}
+
 @media (prefers-color-scheme: dark) {
   :root {
     --foreground-rgb: 255, 255, 255;
@@ -24,6 +28,7 @@ body {
       rgb(var(--background-end-rgb))
     )
     rgb(var(--background-start-rgb));
+  overflow-y: scroll !important;
 }
 
 @layer utilities {
@@ -86,4 +91,17 @@ body {
     @apply flex-shrink-0;
     scroll-snap-align: start;
   }
+}
+
+body::-webkit-scrollbar {
+  width: 8px;
+}
+
+body::-webkit-scrollbar-track {
+  background: #1f2937;
+}
+
+body::-webkit-scrollbar-thumb {
+  background-color: #4b5563;
+  border-radius: 4px;
 }

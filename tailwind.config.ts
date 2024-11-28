@@ -134,6 +134,7 @@ const config: Config = {
   },
   plugins: [
     require('@tailwindcss/typography'),
+    require('tailwindcss-scrollbar')
   ],
   darkMode: "class", // Enable dark mode
 };

@@ -13,12 +13,9 @@ export default function AllProjectsList() {
     >
       <div className={`max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 py-20`}>
         <div className="flex flex-col space-y-4 mb-8">
-          <h1 className="text-3xl font-bold">
-            Full list of projects in Sundai
-          </h1>
         </div>
 
-        <ProjectGrid/>
+        <ProjectGrid showSearch={true}/>
       </div>
     </div>
   );
