@@ -1,4 +1,4 @@
-# Sundai Website v2
+# Sundai Website v2!
 
 This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
 
@@ -78,5 +78,3 @@ Service Account: p199983032721-yeh8ti@gcp-sa-cloud-sql.iam.gserviceaccount.com
 ```
 
 To connect locally, update your .env file with the correct DATABASE_URL.
-# v2-sundai
-# v2-sundai

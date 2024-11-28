@@ -9,6 +9,7 @@ import { useUserContext } from "../contexts/UserContext";
 import { useTheme } from "../contexts/ThemeContext";
 import { Listbox, Transition } from '@headlessui/react';
 import { ChevronUpDownIcon } from '@heroicons/react/24/solid';
+import { toast } from 'react-hot-toast';
 
 export type Project = {
   id: string;
@@ -134,14 +135,22 @@ function ProjectCard({ project, userInfo, handleLike, isDarkMode, show_status, s
                       leaveFrom="transform scale-100 opacity-100"
                       leaveTo="transform scale-95 opacity-0"
                     >
-                      <Listbox.Options className="absolute right-0 mt-1 w-32 bg-white rounded-md shadow-lg z-10">
+                      <Listbox.Options className={`absolute right-0 mt-1 w-32 rounded-md shadow-lg z-10 ${
+                        isDarkMode ? 'bg-gray-800 border border-gray-700' : 'bg-white'
+                      }`}>
                         {STATUS_OPTIONS.map((status) => (
                           <Listbox.Option
                             key={status}
                             value={status}
                             className={({ active }) =>
-                              `${active ? 'bg-indigo-100' : 'bg-white'} 
-                               cursor-pointer select-none relative py-2 px-4`
+                              `${active 
+                                ? isDarkMode 
+                                  ? 'bg-gray-700 text-purple-400' 
+                                  : 'bg-indigo-100 text-indigo-900'
+                                : isDarkMode
+                                  ? 'bg-gray-800 text-gray-300'
+                                  : 'bg-white text-gray-900'
+                              } cursor-pointer select-none relative py-2 px-4`
                             }
                           >
                             {status}
@@ -494,7 +503,7 @@ export default function ProjectGrid({ showStarredOnly = false, statusFilter="APP
                   : [
                       ...project.likes,
                       {
-                        hackerId: userInfo.id,
+                        hackerId: userInfo?.id || '',
                         createdAt: new Date().toISOString(),
                       },
                     ],
@@ -523,11 +532,15 @@ export default function ProjectGrid({ showStarredOnly = false, statusFilter="APP
 
       if (response.ok) {
         setProjects(projects.map(p => 
-          p.id === projectId ? { ...p, status: newStatus } : p
+          p.id === projectId ? { ...p, status: newStatus as "DRAFT" | "PENDING" | "APPROVED" } : p
         ));
+        toast.success('Project status updated successfully');
+      } else {
+        toast.error('Failed to update project status');
       }
     } catch (error) {
       console.error('Error updating project status:', error);
+      toast.error('Failed to update project status');
     }
   };
 
@@ -547,9 +560,13 @@ export default function ProjectGrid({ showStarredOnly = false, statusFilter="APP
         setProjects(projects.map(p => 
           p.id === projectId ? { ...p, is_starred: isStarred } : p
         ));
+        toast.success(`Project ${isStarred ? 'starred' : 'unstarred'} successfully`);
+      } else {
+        toast.error(`Failed to ${isStarred ? 'star' : 'unstar'} project`);
       }
     } catch (error) {
       console.error('Error updating project starred status:', error);
+      toast.error(`Failed to ${isStarred ? 'star' : 'unstar'} project`);
     }
   };
 

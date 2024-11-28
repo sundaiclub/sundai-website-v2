@@ -32,8 +32,9 @@ export async function PATCH(
       select: { id: true, role: true },
     });
 
+    const isAdmin = user?.role === "ADMIN";
     const canEdit = 
-      user?.role === "ADMIN" ||
+      isAdmin ||
       project.launchLeadId === user?.id ||
       project.participants.some(p => p.hacker.id === user?.id);
 
@@ -44,6 +45,28 @@ export async function PATCH(
     const formData = await req.formData();
     const updateData: any = {};
 
+    const newStatus = formData.get('status');
+    if (newStatus) {
+      const currentStatus = project.status;
+      
+      if (newStatus === "APPROVED" && !isAdmin) {
+        return new NextResponse("Only admins can approve projects", { status: 403 });
+      }
+      
+      if (!isAdmin && currentStatus === "PENDING" && newStatus !== "PENDING") {
+        return new NextResponse("Only admins can change status of pending projects", { status: 403 });
+      }
+
+      updateData.status = newStatus.toString();
+    }
+
+    const isStarred = formData.get('is_starred');
+    if (isStarred !== null && !isAdmin) {
+      return new NextResponse("Only admins can change starred status", { status: 403 });
+    } else if (isStarred !== null) {
+      updateData.is_starred = isStarred === 'true';
+    }
+
     const title = formData.get('title');
     if (title) updateData.title = title.toString();
     
@@ -52,9 +75,6 @@ export async function PATCH(
     
     const description = formData.get('description');
     if (description) updateData.description = description.toString();
-    
-    const status = formData.get('status');
-    if (status) updateData.status = status.toString();
     
     const startDate = formData.get('startDate');
     if (startDate) updateData.startDate = new Date(startDate.toString());
@@ -65,9 +85,6 @@ export async function PATCH(
     updateData.githubUrl = formData.get('githubUrl')?.toString() || null;
     updateData.demoUrl = formData.get('demoUrl')?.toString() || null;
     updateData.blogUrl = formData.get('blogUrl')?.toString() || null;
-
-    const isStarred = formData.get('is_starred');
-    if (isStarred !== null) updateData.is_starred = isStarred === 'true';
     
     const isBroken = formData.get('is_broken');
     if (isBroken !== null) updateData.is_broken = isBroken === 'true';
@@ -138,12 +155,10 @@ export async function PATCH(
       if (participantsJson) {
         const participants = JSON.parse(participantsJson.toString());
         
-        // Delete existing participants
         await prisma.projectToParticipant.deleteMany({
           where: { projectId: params.projectId }
         });
 
-        // Add new participants, excluding the launch lead
         updateData.participants = {
           create: participants
             .filter((p: any) => p.hacker.id !== launchLeadId)
