@@ -42,6 +42,8 @@ model Hacker {
   verifiedAttendances  Attendance[] @relation("AttendanceVerifications")
   totalMinutesAttended Int          @default(0)
   lastAttendance      DateTime?
+  apiKeys     ApiKey[]  @relation("OwnedKeys")
+  apiKeyUsers ApiKeyUser[]
 
   @@index([clerkId])
 }
@@ -247,4 +249,38 @@ enum NotificationType {
   NEW_LIKE
   NEW_MEMBER
   CUSTOM
+}
+
+model ApiKey {
+  id          String    @id @default(uuid())
+  key         String    @unique
+  name        String    // A friendly name for the key
+  ownerId     String    // The admin who created this key
+  owner       Hacker    @relation("OwnedKeys", fields: [ownerId], references: [id])
+  users       ApiKeyUser[] // Users who can use this key
+  maxUsers    Int       @default(10)
+  usageLimit  Int?      // Optional total usage limit
+  lastUsed    DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  expiresAt   DateTime?
+  isRevoked   Boolean   @default(false)
+
+  @@index([key])
+  @@index([ownerId])
+}
+
+model ApiKeyUser {
+  id          String    @id @default(uuid())
+  apiKey      ApiKey    @relation(fields: [apiKeyId], references: [id])
+  apiKeyId    String
+  hacker      Hacker    @relation(fields: [hackerId], references: [id])
+  hackerId    String
+  usageCount  Int       @default(0)
+  lastUsed    DateTime?
+  addedAt     DateTime  @default(now())
+
+  @@unique([apiKeyId, hackerId])
+  @@index([hackerId])
+  @@index([apiKeyId])
 }
