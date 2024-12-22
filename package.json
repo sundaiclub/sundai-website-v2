@@ -9,7 +9,9 @@
     "lint": "next lint",
     "seed": "ts-node --compiler-options '{\"module\":\"CommonJS\"}' prisma/seed.ts",
     "postinstall": "prisma generate",
-    "vercel-build": "prisma generate && prisma migrate deploy && next build"
+    "vercel-build": "prisma generate && prisma migrate deploy && next build",
+    "db:backup": "./scripts/backup_db.sh",
+    "db:restore": "./scripts/restore_db.sh"
   },
   "dependencies": {
     "@clerk/nextjs": "^5.7.2",
