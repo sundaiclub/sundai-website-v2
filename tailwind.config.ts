@@ -72,6 +72,7 @@ const config: Config = {
             '--tw-prose-pre-bg': 'inherit',
             '--tw-prose-th-borders': 'inherit',
             '--tw-prose-td-borders': 'inherit',
+            
 
             // Reset spacing
             '> *': {
@@ -81,8 +82,8 @@ const config: Config = {
 
             // Individual element styles
             p: {
-              fontFamily: '"Montserrat", sans-serif',
-              fontSize: '0.8rem',
+              fontFamily: '"Arial", sans-serif',
+              fontSize: '1rem',
               marginTop: '0.5em !important',
               marginBottom: '0.5em !important',
             },
@@ -92,34 +93,28 @@ const config: Config = {
             },
             h1: {
               color: 'inherit',
-              fontFamily: '"Montserrat", serif',
-              fontSize: '1.5rem',
+              fontSize: '2.0rem !important',
             },
             h2: {
               color: 'inherit',
-              fontFamily: '"Montserrat", serif',
-              fontSize: '1.25rem',
+              fontSize: '1.3rem !important',
             },
             h3: {
               color: 'inherit',
-              fontFamily: '"Montserrat", serif',
-              fontSize: '1rem',
+              fontSize: '1.2rem !important',
             },
             h4: {
               color: 'inherit',
-              fontFamily: '"Montserrat", serif',
-              fontSize: '0.9rem',
+              fontSize: '0.9rem !important',
             },
             'ol, ul': {
-              fontSize: '0.8rem',
-              fontFamily: '"Montserrat", sans-serif',
+              fontSize: '1rem !important',
               marginTop: '0.5em !important',
               marginBottom: '0.5em !important',
               paddingLeft: '1em !important',
             },
             li: {
-              fontSize: '0.8rem',
-              fontFamily: '"Montserrat", sans-serif',
+              fontSize: '1rem !important',
               marginTop: '0.2em !important',
               marginBottom: '0.2em !important',
             },
@@ -127,6 +122,9 @@ const config: Config = {
               marginTop: '0 !important',
               marginBottom: '0 !important',
             },
+
+            // Apply Montserrat font to all elements within prose
+            fontFamily: '"Montserrat", sans-serif',
           },
         },
       },
