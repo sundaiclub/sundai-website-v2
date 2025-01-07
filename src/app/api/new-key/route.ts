@@ -31,11 +31,35 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Hacker not found" }, { status: 404 });
     }
 
-    // Get token using the split-key template
+    // Update metadata before generating token
+    try {
+      const response = await fetch(
+        `https://api.clerk.com/v1/users/${userId}/metadata`,
+        {
+          method: "PATCH",
+          headers: {
+            Authorization: `Bearer ${process.env.CLERK_SECRET_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            public_metadata: {
+              role: hacker.role,
+              hackerId: hacker.id,
+            },
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        console.error("[CLERK_METADATA_UPDATE]", await response.text());
+      }
+    } catch (metadataError) {
+      console.error("[CLERK_METADATA_UPDATE]", metadataError);
+      // Continue with token generation since this is just metadata sync
+    }
+
     const token = await getToken({
-      expiresInSeconds: validatedExpiration,
       template: "split-key",
-      // Note: Clerk handles token expiration through the template configuration
     });
 
     if (!token) {
