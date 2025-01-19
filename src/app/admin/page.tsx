@@ -1,10 +1,10 @@
 "use client";
 import React from "react";
-import ProjectGrid from "../components/Project";
+import SubmissionGrid from "../components/Submission";
 import { useTheme } from "../contexts/ThemeContext";
 import { useUserContext } from "../contexts/UserContext";
 
-export default function AllProjectsList() {
+export default function AdminSubmissionsList() {
   const { isDarkMode } = useTheme();
   const { isAdmin, userInfo } = useUserContext();
 
@@ -18,9 +18,13 @@ export default function AllProjectsList() {
         {isAdmin ? (
           <div className="flex flex-col space-y-4 mb-8">
             <h1 className="text-3xl font-bold">
-              Full list of projects in Sundai
+              Full list of submissions in Sundai
             </h1>
-            <ProjectGrid show_status={true} statusFilter="ALL" showSearch={true}/>
+            <SubmissionGrid
+              show_status={true}
+              statusFilter="ALL"
+              showSearch={true}
+            />
           </div>
         ) : (
           <div className="text-center text-red-500">

@@ -3,7 +3,7 @@ import { auth } from "@clerk/nextjs/server";
 import prisma from "@/lib/prisma";
 
 export async function GET(
-  request: Request,
+  req: Request,
   { params }: { params: { hackerId: string } }
 ) {
   try {
@@ -11,31 +11,31 @@ export async function GET(
       where: { id: params.hackerId },
       include: {
         avatar: true,
-        ledProjects: {
+        // Get submissions where they are the launch lead
+        ledSubmissions: {
           include: {
             thumbnail: true,
-            likes: true,
-          },
-          orderBy: {
-            createdAt: "desc",
-          },
-        },
-        projects: {
-          include: {
-            project: {
+            launchLead: {
               include: {
-                thumbnail: true,
-                likes: true,
+                avatar: true,
               },
             },
-          },
-          orderBy: {
-            createdAt: "desc",
+            participants: {
+              include: {
+                hacker: {
+                  include: {
+                    avatar: true,
+                  },
+                },
+              },
+            },
+            likes: true,
           },
         },
-        likes: {
+        // Get submissions where they are a participant
+        submissionParticipations: {
           include: {
-            project: {
+            submission: {
               include: {
                 thumbnail: true,
                 launchLead: {
@@ -43,40 +43,31 @@ export async function GET(
                     avatar: true,
                   },
                 },
+                participants: {
+                  include: {
+                    hacker: {
+                      include: {
+                        avatar: true,
+                      },
+                    },
+                  },
+                },
                 likes: true,
               },
             },
-          },
-          orderBy: {
-            createdAt: "desc",
           },
         },
       },
     });
 
     if (!hacker) {
-      return NextResponse.json({ error: "Hacker not found" }, { status: 404 });
+      return new NextResponse("Hacker not found", { status: 404 });
     }
 
-    const transformedHacker = {
-      ...hacker,
-      likedProjects: hacker.likes.map((like) => ({
-        createdAt: like.createdAt,
-        project: like.project,
-      })),
-    };
-
-    if (transformedHacker.likes) {
-      delete (transformedHacker as any).likes;
-    }
-
-    return NextResponse.json(transformedHacker);
+    return NextResponse.json(hacker);
   } catch (error) {
-    console.error("Error fetching hacker:", error);
-    return NextResponse.json(
-      { error: "Error fetching hacker" },
-      { status: 500 }
-    );
+    console.error("[HACKER_GET]", error);
+    return new NextResponse("Internal Error", { status: 500 });
   }
 }
 
@@ -114,7 +105,7 @@ export async function PATCH(
       "twitterUrl",
       "username",
       "discordName",
-      "websiteUrl"
+      "websiteUrl",
     ];
 
     // Filter out any fields that aren't allowed to be updated
@@ -130,30 +121,19 @@ export async function PATCH(
       data: sanitizedData,
       include: {
         avatar: true,
-        ledProjects: {
+        ledSubmissions: {
           include: {
             thumbnail: true,
-          },
-          orderBy: {
-            createdAt: "desc",
-          },
-        },
-        projects: {
-          include: {
-            project: {
+            launchLead: {
               include: {
-                thumbnail: true,
-                likes: true,
+                avatar: true,
               },
             },
           },
-          orderBy: {
-            createdAt: "desc",
-          },
         },
-        likes: {
+        submissionParticipations: {
           include: {
-            project: {
+            submission: {
               include: {
                 thumbnail: true,
                 launchLead: {
@@ -163,9 +143,6 @@ export async function PATCH(
                 },
               },
             },
-          },
-          orderBy: {
-            createdAt: "desc",
           },
         },
       },

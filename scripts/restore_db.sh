@@ -23,7 +23,7 @@ gunzip -c "$BACKUP_FILE" > "$TEMP_FILE"
 
 # Restore database
 echo "Restoring database from: $TEMP_FILE"
-docker compose exec -T postgres psql -U postgres learn_anything < "$TEMP_FILE"
+docker compose exec -T postgres psql -U postgres sundai_db < "$TEMP_FILE"
 
 # Clean up
 echo "Cleaning up..."

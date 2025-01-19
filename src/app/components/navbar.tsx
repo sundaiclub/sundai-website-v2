@@ -6,7 +6,7 @@ import { UserButton, SignInButton, useUser } from "@clerk/nextjs";
 import { usePathname } from "next/navigation";
 import Image from "next/image";
 
-import { useTheme } from '../contexts/ThemeContext';
+import { useTheme } from "../contexts/ThemeContext";
 
 const Navbar = () => {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -58,8 +58,8 @@ const Navbar = () => {
             ? "bg-gray-900 shadow-md opacity-90"
             : "bg-gray-900"
           : isScrolled
-            ? "bg-[#E5E5E5] shadow-md opacity-90"
-            : "bg-[#E5E5E5]"
+          ? "bg-[#E5E5E5] shadow-md opacity-90"
+          : "bg-[#E5E5E5]"
       }`}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -72,22 +72,37 @@ const Navbar = () => {
               }`}
             >
               <Image
-                src={isDarkMode ? "/images/logos/sundai_logo_dark_horizontal.svg" : "/images/logos/sundai_logo_light_horizontal.svg"}
+                src={
+                  isDarkMode
+                    ? "/images/logos/sundai_logo_dark_horizontal.svg"
+                    : "/images/logos/sundai_logo_light_horizontal.svg"
+                }
                 alt="Sundai Club Logo"
                 width={150}
                 height={100}
                 className="transition-transform duration-300 transform group-hover:scale-110 mr-2"
               />
             </Link>
-            
           </div>
           <button
             onClick={() => setIsMenuOpen(!isMenuOpen)}
             className="md:hidden p-2"
           >
-            <div className={`w-6 h-0.5 mb-1.5 transition-all ${isDarkMode ? 'bg-white' : 'bg-black'} ${isMenuOpen ? 'transform rotate-45 translate-y-2' : ''}`}></div>
-            <div className={`w-6 h-0.5 mb-1.5 ${isDarkMode ? 'bg-white' : 'bg-black'} ${isMenuOpen ? 'opacity-0' : ''}`}></div>
-            <div className={`w-6 h-0.5 ${isDarkMode ? 'bg-white' : 'bg-black'} ${isMenuOpen ? 'transform -rotate-45 -translate-y-2' : ''}`}></div>
+            <div
+              className={`w-6 h-0.5 mb-1.5 transition-all ${
+                isDarkMode ? "bg-white" : "bg-black"
+              } ${isMenuOpen ? "transform rotate-45 translate-y-2" : ""}`}
+            ></div>
+            <div
+              className={`w-6 h-0.5 mb-1.5 ${
+                isDarkMode ? "bg-white" : "bg-black"
+              } ${isMenuOpen ? "opacity-0" : ""}`}
+            ></div>
+            <div
+              className={`w-6 h-0.5 ${isDarkMode ? "bg-white" : "bg-black"} ${
+                isMenuOpen ? "transform -rotate-45 -translate-y-2" : ""
+              }`}
+            ></div>
           </button>
           <div className="hidden md:flex items-center">
             <Link
@@ -96,7 +111,11 @@ const Navbar = () => {
                 isPWA ? "px-4 py-3" : "px-3 py-2"
               } mx-2 rounded-lg active:bg-indigo-100`}
             >
-              <span className={`text-sm font-fira-code ${isDarkMode ? 'text-gray-200' : 'text-black'} hover:text-indigo-700 dark:hover:text-indigo-500 transition duration-300`}>
+              <span
+                className={`text-sm font-fira-code ${
+                  isDarkMode ? "text-gray-200" : "text-black"
+                } hover:text-indigo-700 dark:hover:text-indigo-500 transition duration-300`}
+              >
                 Get Involved
               </span>
             </Link>
@@ -106,21 +125,28 @@ const Navbar = () => {
                 isPWA ? "px-4 py-3" : "px-3 py-2"
               } mx-2 rounded-lg active:bg-indigo-100`}
             >
-              <span className={`text-sm font-fira-code ${isDarkMode ? 'text-gray-200' : 'text-black'} hover:text-indigo-700 dark:hover:text-indigo-500 transition duration-300`}>
+              <span
+                className={`text-sm font-fira-code ${
+                  isDarkMode ? "text-gray-200" : "text-black"
+                } hover:text-indigo-700 dark:hover:text-indigo-500 transition duration-300`}
+              >
                 All Projects
               </span>
             </Link>
-            
-            
+
             {isSignedIn && (
               <>
                 <Link
-                  href="/projects/new"
+                  href="/submissions/new"
                   className={`${
                     isPWA ? "px-4 py-3" : "px-3 py-2"
                   } mx-2 rounded-lg active:bg-indigo-100`}
                 >
-                  <span className={`text-sm font-fira-code ${isDarkMode ? 'text-gray-200' : 'text-black'} hover:text-indigo-700 dark:hover:text-indigo-500 transition duration-300`}>
+                  <span
+                    className={`text-sm font-fira-code ${
+                      isDarkMode ? "text-gray-200" : "text-black"
+                    } hover:text-indigo-700 dark:hover:text-indigo-500 transition duration-300`}
+                  >
                     New Project
                   </span>
                 </Link>
@@ -131,7 +157,11 @@ const Navbar = () => {
                     isPWA ? "px-4 py-3" : "px-3 py-2"
                   } mx-2 rounded-lg active:bg-indigo-100`}
                 >
-                  <span className={`text-sm font-fira-code ${isDarkMode ? 'text-gray-200' : 'text-black'} hover:text-indigo-700 dark:hover:text-indigo-500 transition duration-300`}>
+                  <span
+                    className={`text-sm font-fira-code ${
+                      isDarkMode ? "text-gray-200" : "text-black"
+                    } hover:text-indigo-700 dark:hover:text-indigo-500 transition duration-300`}
+                  >
                     My Profile
                   </span>
                 </Link>
@@ -164,13 +194,17 @@ const Navbar = () => {
             </div>
           </div>
         </div>
-        <div className={`md:hidden ${isMenuOpen ? 'block' : 'hidden'} pb-4`}>
+        <div className={`md:hidden ${isMenuOpen ? "block" : "hidden"} pb-4`}>
           <Link
             href="/join"
             className="block px-4 py-2 rounded-lg"
             onClick={() => setIsMenuOpen(false)}
           >
-            <span className={`text-sm font-fira-code ${isDarkMode ? 'text-gray-200' : 'text-black'} hover:text-indigo-700 dark:hover:text-indigo-500`}>
+            <span
+              className={`text-sm font-fira-code ${
+                isDarkMode ? "text-gray-200" : "text-black"
+              } hover:text-indigo-700 dark:hover:text-indigo-500`}
+            >
               Get Involved
             </span>
           </Link>
@@ -179,19 +213,27 @@ const Navbar = () => {
             className="block px-4 py-2 rounded-lg"
             onClick={() => setIsMenuOpen(false)}
           >
-            <span className={`text-sm font-fira-code ${isDarkMode ? 'text-gray-200' : 'text-black'} hover:text-indigo-700 dark:hover:text-indigo-500`}>
+            <span
+              className={`text-sm font-fira-code ${
+                isDarkMode ? "text-gray-200" : "text-black"
+              } hover:text-indigo-700 dark:hover:text-indigo-500`}
+            >
               All Projects
             </span>
           </Link>
-          
+
           {isSignedIn && (
             <>
               <Link
-                href="/projects/new"
+                href="/submissions/new"
                 className="block px-4 py-2 rounded-lg"
                 onClick={() => setIsMenuOpen(false)}
               >
-                <span className={`text-sm font-fira-code ${isDarkMode ? 'text-gray-200' : 'text-black'} hover:text-indigo-700 dark:hover:text-indigo-500`}>
+                <span
+                  className={`text-sm font-fira-code ${
+                    isDarkMode ? "text-gray-200" : "text-black"
+                  } hover:text-indigo-700 dark:hover:text-indigo-500`}
+                >
                   New Project
                 </span>
               </Link>
@@ -200,13 +242,17 @@ const Navbar = () => {
                 className="block px-4 py-2 rounded-lg"
                 onClick={() => setIsMenuOpen(false)}
               >
-                <span className={`text-sm font-fira-code ${isDarkMode ? 'text-gray-200' : 'text-black'} hover:text-indigo-700 dark:hover:text-indigo-500`}>
+                <span
+                  className={`text-sm font-fira-code ${
+                    isDarkMode ? "text-gray-200" : "text-black"
+                  } hover:text-indigo-700 dark:hover:text-indigo-500`}
+                >
                   My Profile
                 </span>
               </Link>
             </>
           )}
-          
+
           <div className="px-4 py-2">
             {isSignedIn ? (
               <UserButton

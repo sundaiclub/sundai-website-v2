@@ -2,16 +2,18 @@
 import Link from "next/link";
 import Image from "next/image";
 import { motion } from "framer-motion";
-import ProjectGrid from "./components/Project";
+import SubmissionGrid from "./components/Submission";
 import Typewriter from "typewriter-effect";
 import { useState, useEffect } from "react";
 import { usePullToRefresh } from "./hooks/usePullToRefresh";
 import { useTheme } from "./contexts/ThemeContext";
-
+import { useUser } from "@clerk/nextjs";
 export default function Home() {
   const [isTypingDone, setIsTypingDone] = useState(false);
   const { isDarkMode } = useTheme();
-
+  const { user } = useUser();
+  console.log(user);
+  console.log(isDarkMode);
   usePullToRefresh();
 
   const stompVariants = {
@@ -46,8 +48,10 @@ export default function Home() {
               backgroundImage: "url('/images/background_sundai.svg')",
               backgroundSize: "300px auto",
               backgroundRepeat: "repeat",
-              WebkitMaskImage: "linear-gradient(to bottom, transparent, black 50%, transparent)",
-              maskImage: "linear-gradient(to bottom, transparent, black 50%, transparent)"
+              WebkitMaskImage:
+                "linear-gradient(to bottom, transparent, black 50%, transparent)",
+              maskImage:
+                "linear-gradient(to bottom, transparent, black 50%, transparent)",
             }}
           />
 
@@ -64,116 +68,46 @@ export default function Home() {
                   isDarkMode ? "text-gray-100" : "text-gray-900"
                 }`}
               >
-                Sundai
+                MIT IAP 2025
               </h1>
               <p
                 className={`text-base sm:text-lg md:text-xl mb-8 max-w-xl mx-auto font-fira-code ${
                   isDarkMode ? "text-gray-300" : "text-gray-700"
                 }`}
               >
-                Building & Launching AI Prototypes Every Sunday.
+                How to ship almost anything with AI
               </p>
 
               <div
-                className={`grid grid-cols-1 sm:grid-cols-3 gap-4 items-center max-w-lg mx-auto mb-12 ${
+                className={`grid grid-cols-2 sm:grid-cols-4 gap-4 items-center max-w-2xl mx-auto mb-12 ${
                   isDarkMode
                     ? "bg-gray-800 shadow-[inset_0_2px_4px_rgba(0,0,0,0.3)]"
                     : "bg-gray-100 shadow-[inset_0_2px_4px_rgba(0,0,0,0.1)]"
                 } rounded-xl p-4 sm:p-6`}
               >
-                <motion.div
-                  className="flex justify-center items-center relative rounded-lg p-2 sm:p-4"
-                  variants={stompVariants}
-                  initial="hidden"
-                  animate={isTypingDone ? "visible" : "hidden"}
-                  transition={{ delay: 0.2 }}
-                >
-                  <Image
-                    src="/images/affiliations/mit_logo_std_rgb_silver-gray.svg"
-                    style={{ filter: "brightness(1.2)" }}
-                    className="w-16 h-16 sm:w-24 sm:h-24 opacity-90"
-                    alt="Logo MIT"
-                    width={96}
-                    height={96}
-                  />
-                </motion.div>
-                <div
-                  className={`text-base sm:text-xl font-mono h-full mt-2 sm:mt-8 text-center px-2 sm:px-4 py-1 sm:py-2 rounded-lg ${
-                    isDarkMode ? "text-gray-200" : "text-gray-800"
-                  }`}
-                >
-                  <Typewriter
-                    onInit={(typewriter) => {
-                      typewriter
-                        .changeDelay(70)
-                        .typeString("We are hackers from")
-                        .callFunction(() => {
-                          setIsTypingDone(true);
-                        })
-                        .start();
-                    }}
-                  />
-                </div>
-                <motion.div
-                  className="flex justify-center items-center relative rounded-lg p-2 sm:p-4"
-                  variants={stompVariants}
-                  initial="hidden"
-                  animate={isTypingDone ? "visible" : "hidden"}
-                  transition={{ delay: 0.4 }}
-                >
-                  <Image
-                    src="/images/affiliations/harvard-university-seeklogo.svg"
-                    className="w-14 h-14 sm:w-20 sm:h-20 opacity-90"
-                    style={{ filter: "grayscale(100%)" }}
-                    alt="Logo Harvard"
-                    width={80}
-                    height={80}
-                  />
-                </motion.div>
+                <CourseDetail title="Class" value="6.S093" />
+                <CourseDetail title="Level" value="Undergraduate" />
+                <CourseDetail title="Units" value="6" />
+                <CourseDetail title="Grading" value="P/F" />
               </div>
 
-              <motion.div
-                className="flex justify-center"
-                initial={{ opacity: 0, y: -20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, delay: 0.8 }}
+              <div
+                className={`inline-block ${
+                  isDarkMode ? "text-gray-300" : "text-gray-700"
+                } text-lg font-mono mb-12`}
               >
-                {/* <Link href="/projects/new">
-                  <motion.span
-                    className={`gap-4 btn-xl btn-purple group/btn btn-border-dark rounded-full ${
-                      isDarkMode
-                        ? "bg-indigo-700 hover:bg-indigo-600"
-                        : "bg-indigo-600 hover:bg-indigo-700"
-                    } text-white font-semibold text-base md:text-lg py-3 px-6 md:px-8 transition duration-300 cursor-pointer flex items-center justify-center`}
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                  >
-                    Get Started{" "}
-                    <div className="flex items-center opacity-50 group-hover/btn:opacity-100 transition-opacity ml-2">
-                      <svg
-                        role="img"
-                        viewBox="0 0 16 16"
-                        width="0"
-                        height="10"
-                        fill="currentColor"
-                        className="w-0 group-hover/btn:w-[0.7em] h-[0.7em] -mr-[0.7em] ease-out duration-200 transition-all transform-gpu"
-                      >
-                        <path d="M1 9h14a1 1 0 000-2H1a1 1 0 000 2z"></path>
-                      </svg>
-                      <svg
-                        role="img"
-                        viewBox="0 0 16 16"
-                        width="10"
-                        height="10"
-                        fill="currentColor"
-                        className="size-[0.7em]"
-                      >
-                        <path d="M7.293 1.707L13.586 8l-6.293 6.293a1 1 0 001.414 1.414l7-7a.999.999 0 000-1.414l-7-7a1 1 0 00-1.414 1.414z"></path>
-                      </svg>
-                    </div>
-                  </motion.span>
-                </Link> */}
-              </motion.div>
+                <Typewriter
+                  onInit={(typewriter) => {
+                    typewriter
+                      .changeDelay(70)
+                      .typeString("Jan 20 - Jan 27")
+                      .callFunction(() => {
+                        setIsTypingDone(true);
+                      })
+                      .start();
+                  }}
+                />
+              </div>
             </motion.div>
           </div>
         </div>
@@ -183,8 +117,26 @@ export default function Home() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 1.3 }}
         >
-          <ProjectGrid showStarredOnly={true} show_team={false} />
+          <SubmissionGrid showStarredOnly={true} />
         </motion.div>
+      </section>
+      {/* Featured Projects Section */}
+      <section className="py-12 sm:py-16">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <h2
+            className={`text-3xl font-bold mb-8 ${
+              isDarkMode ? "text-gray-100" : "text-gray-900"
+            }`}
+          >
+            Featured Projects
+          </h2>
+          <SubmissionGrid
+            showStarredOnly={false}
+            show_status={false}
+            show_team={true}
+            showSearch={false}
+          />
+        </div>
       </section>
       <motion.footer
         initial={{ opacity: 0 }}
@@ -289,6 +241,26 @@ export default function Home() {
           </div>
         </div>
       </motion.footer>
+    </div>
+  );
+}
+
+function CourseDetail({ title, value }: { title: string; value: string }) {
+  const { isDarkMode } = useTheme();
+  return (
+    <div className={`text-center p-2`}>
+      <p
+        className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}
+      >
+        {title}
+      </p>
+      <p
+        className={`text-lg font-bold ${
+          isDarkMode ? "text-gray-100" : "text-gray-900"
+        }`}
+      >
+        {value}
+      </p>
     </div>
   );
 }

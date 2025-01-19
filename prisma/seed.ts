@@ -1,19 +1,19 @@
-const { PrismaClient, Role, ProjectStatus } = require("@prisma/client");
+const { PrismaClient, Role, SubmissionStatus } = require("@prisma/client");
 
 const prisma = new PrismaClient();
 
 async function main() {
   // Clean up existing data
   await prisma.attendance.deleteMany({});
-  await prisma.projectToParticipant.deleteMany({});
-  await prisma.projectLike.deleteMany({});
+  await prisma.submissionToParticipant.deleteMany({});
+  await prisma.submissionLike.deleteMany({});
   await prisma.domainTag.deleteMany({});
   await prisma.techTag.deleteMany({});
-  await prisma.project.deleteMany({});
+  await prisma.submission.deleteMany({});
   await prisma.hacker.deleteMany({});
   await prisma.week.deleteMany({});
 
-  // First, create a week for the projects
+  // First, create a week for the submissions
   const currentWeek = await prisma.week.create({
     data: {
       number: 1,
@@ -84,39 +84,42 @@ async function main() {
 
   const [connor, sam, serge, artem, vlad] = users;
 
-  // Projects data with titles, descriptions, and tags
-  const projectsData = [
+  // Submissions data with titles, descriptions, and tags
+  const submissionsData = [
     {
       title: "AI Startup Map",
-      preview: "Interactive visualization platform mapping the global AI startup ecosystem.",
+      preview:
+        "Interactive visualization platform mapping the global AI startup ecosystem.",
       description:
         "An innovative platform that provides a comprehensive, interactive visualization of the global AI startup landscape.\
         Users can explore startups by industry vertical, funding stage, technology stack, and geographical location\
         The platform features real-time updates, detailed company profiles, funding history, and key metrics.\
         It helps investors, entrepreneurs, and researchers understand market trends, identify potential partnerships, \
         and track the evolution of AI innovation across different sectors and regions.",
-      status: ProjectStatus.APPROVED,
+      status: SubmissionStatus.APPROVED,
       is_starred: true,
       domainTags: ["business", "analytics", "visualization"],
       techTags: ["llms", "rags", "data-visualization"],
     },
     {
       title: "Dater Debater",
-      preview: "Dating app that matches users based on their debate skills and argumentative compatibility.",
+      preview:
+        "Dating app that matches users based on their debate skills and argumentative compatibility.",
       description:
         "A revolutionary dating platform that matches users based on their debate skills and intellectual compatibility.\
         Users engage in structured debates on various topics, from philosophy to pop culture, while an AI system analyzes\
         their argumentation style, logical consistency, and emotional intelligence. The app features real-time debate rooms,\
         topic-based matchmaking, and a unique scoring system that considers both debate performance and conversational chemistry.\
         Perfect for intellectuals who believe that the best relationships are built on engaging discussions and respectful disagreements.",
-      status: ProjectStatus.APPROVED,
+      status: SubmissionStatus.APPROVED,
       is_starred: true,
       domainTags: ["social", "dating", "education"],
       techTags: ["llms", "nlp", "matching-algorithms"],
     },
     {
       title: "Sundai Roast",
-      preview: "AI-powered code review platform that provides constructive criticism and improvement suggestions.",
+      preview:
+        "AI-powered code review platform that provides constructive criticism and improvement suggestions.",
       description:
         "An advanced AI-powered code review platform that revolutionizes the way developers receive feedback on their code.\
         The system analyzes code quality, patterns, and potential improvements using state-of-the-art language models.\
@@ -125,47 +128,50 @@ async function main() {
         the reasoning behind each suggestion. With its unique 'roast' style, it delivers feedback in an engaging and memorable way,\
         while maintaining professionalism and educational value. Perfect for both individual developers looking to improve their skills\
         and teams wanting to maintain high code quality standards.",
-      status: ProjectStatus.APPROVED,
+      status: SubmissionStatus.APPROVED,
       is_starred: true,
       domainTags: ["developer-tools", "education"],
       techTags: ["llms", "code-analysis", "rags"],
     },
     {
       title: "Clip Cut",
-      preview: "Interactive visualization platform mapping the global AI startup ecosystem.",
+      preview:
+        "Interactive visualization platform mapping the global AI startup ecosystem.",
       description:
         "An innovative platform that provides a comprehensive, interactive visualization of the global AI startup landscape.\
         Users can explore startups by industry vertical, funding stage, technology stack, and geographical location\
         The platform features real-time updates, detailed company profiles, funding history, and key metrics.\
         It helps investors, entrepreneurs, and researchers understand market trends, identify potential partnerships, \
         and track the evolution of AI innovation across different sectors and regions.",
-      status: ProjectStatus.APPROVED,
+      status: SubmissionStatus.APPROVED,
       domainTags: ["business", "analytics", "visualization"],
       techTags: ["llms", "rags", "data-visualization"],
     },
     {
       title: "Sundai Travel",
-      preview: "Interactive visualization platform mapping the global AI startup ecosystem.",
+      preview:
+        "Interactive visualization platform mapping the global AI startup ecosystem.",
       description:
         "An innovative platform that provides a comprehensive, interactive visualization of the global AI startup landscape.\
         Users can explore startups by industry vertical, funding stage, technology stack, and geographical location\
         The platform features real-time updates, detailed company profiles, funding history, and key metrics.\
         It helps investors, entrepreneurs, and researchers understand market trends, identify potential partnerships, \
         and track the evolution of AI innovation across different sectors and regions.",
-      status: ProjectStatus.PENDING,
+      status: SubmissionStatus.PENDING,
       domainTags: ["business", "analytics", "visualization"],
       techTags: ["llms", "rags", "data-visualization"],
     },
     {
       title: "TikTok to Arxiv",
-      preview: "Interactive visualization platform mapping the global AI startup ecosystem.",
+      preview:
+        "Interactive visualization platform mapping the global AI startup ecosystem.",
       description:
         "An innovative platform that provides a comprehensive, interactive visualization of the global AI startup landscape.\
         Users can explore startups by industry vertical, funding stage, technology stack, and geographical location\
         The platform features real-time updates, detailed company profiles, funding history, and key metrics.\
         It helps investors, entrepreneurs, and researchers understand market trends, identify potential partnerships, \
         and track the evolution of AI innovation across different sectors and regions.",
-      status: ProjectStatus.DRAFT,
+      status: SubmissionStatus.DRAFT,
       domainTags: ["business", "analytics", "visualization"],
       techTags: ["llms", "rags", "data-visualization"],
     },
@@ -178,9 +184,10 @@ async function main() {
     return shuffled.slice(0, count);
   };
 
-  // Create projects with random leads, participants, and tags
-  for (const projectData of projectsData) {
-    const { domainTags, techTags, ...projectDataWithoutTags } = projectData;
+  // Create submissions with random leads, participants, and tags
+  for (const submissionData of submissionsData) {
+    const { domainTags, techTags, ...submissionDataWithoutTags } =
+      submissionData;
     const launchLead = users[Math.floor(Math.random() * users.length)];
     const participantCount = Math.floor(Math.random() * 3) + 2;
     const participants = getRandomParticipants(launchLead.id, participantCount);
@@ -193,10 +200,12 @@ async function main() {
       await prisma.techTag.deleteMany({ where: { name: tag } });
     }
 
-    await prisma.project.create({
+    await prisma.submission.create({
       data: {
-        ...projectDataWithoutTags,
+        ...submissionDataWithoutTags,
         launchLeadId: launchLead.id,
+        status: SubmissionStatus.APPROVED,
+        is_starred: true,
         weeks: {
           connect: {
             id: currentWeek.id,

@@ -42,6 +42,9 @@ model Hacker {
   verifiedAttendances  Attendance[] @relation("AttendanceVerifications")
   totalMinutesAttended Int          @default(0)
   lastAttendance      DateTime?
+  submissionParticipations SubmissionToParticipant[]
+  ledSubmissions          Submission[] @relation("SubmissionLaunchLead")
+  submissionLikes         SubmissionLike[]
 
   @@index([clerkId])
 }
@@ -53,6 +56,7 @@ model TechTag {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   projects    Project[] @relation("ProjectTechnologies")
+  submissions Submission[] @relation("SubmissionTechnologies")
 
   @@index([name])
 }
@@ -64,6 +68,7 @@ model DomainTag {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   projects    Project[] @relation("ProjectDomains")
+  submissions Submission[] @relation("SubmissionDomains")
 
   @@index([name])
 }
@@ -86,16 +91,16 @@ model Project {
   endDate     DateTime?
   status      ProjectStatus @default(PENDING)
   likes       ProjectLike[]
-  weeks       Week[]    // Many-to-many as projects can span multiple weeks
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   is_starred  Boolean   @default(false)
   is_broken   Boolean   @default(false)
   techTags    TechTag[] @relation("ProjectTechnologies")
   domainTags  DomainTag[] @relation("ProjectDomains")
+  weeks       Week[]
+  attendance  Attendance[]
 
   @@index([launchLeadId])
-  attendance Attendance[]
 }
 
 model ProjectToParticipant {
@@ -131,6 +136,8 @@ model Image {
   projectThumbnail Project? @relation("ProjectThumbnail")
   projectImages    Project? @relation("ProjectImages", fields: [projectId], references: [id])
   projectId        String?
+  
+  submissionThumbnail Submission? @relation("SubmissionThumbnail")
   
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
@@ -211,16 +218,17 @@ enum AttendanceStatus {
 }
 
 model Week {
-  id          String    @id @default(uuid())
-  number      Int       // Week number (1, 2, 3, etc.)
+  id          String       @id @default(uuid())
+  number      Int
   startDate   DateTime
   endDate     DateTime
-  theme       String?   // Optional theme for the week
+  theme       String?
   description String?
-  projects    Project[] // Projects started this week
-  attendance  Attendance[] // Attendance records for this week
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  submissions Submission[]
+  projects    Project[]
+  attendance  Attendance[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
 
   @@unique([number])
   @@index([startDate, endDate])
@@ -247,4 +255,63 @@ enum NotificationType {
   NEW_LIKE
   NEW_MEMBER
   CUSTOM
+}
+
+enum SubmissionStatus {
+  DRAFT
+  PENDING
+  APPROVED
+}
+
+model Submission {
+  id          String           @id @default(cuid())
+  title       String
+  preview     String
+  description String
+  githubUrl   String?
+  demoUrl     String?
+  blogUrl     String?
+  thumbnail   Image?          @relation("SubmissionThumbnail", fields: [thumbnailId], references: [id])
+  thumbnailId String?         @unique
+  launchLead  Hacker          @relation("SubmissionLaunchLead", fields: [launchLeadId], references: [id])
+  launchLeadId String
+  participants SubmissionToParticipant[]
+  
+  likes       SubmissionLike[]
+  weeks       Week[]
+  status      SubmissionStatus @default(DRAFT)
+  is_starred  Boolean         @default(false)
+  is_broken   Boolean         @default(false)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  
+  techTags    TechTag[]      @relation("SubmissionTechnologies")
+  domainTags  DomainTag[]    @relation("SubmissionDomains")
+
+  @@index([launchLeadId])
+}
+
+model SubmissionToParticipant {
+  id           String     @id @default(uuid())
+  submission   Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  submissionId String
+  hacker       Hacker     @relation(fields: [hackerId], references: [id], onDelete: Cascade)
+  hackerId     String
+  role         String     // DEVELOPER, DESIGNER, PM
+  createdAt    DateTime   @default(now())
+
+  @@unique([submissionId, hackerId])
+  @@index([hackerId])
+}
+
+model SubmissionLike {
+  id           String     @id @default(uuid())
+  submission   Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  submissionId String
+  hacker       Hacker     @relation(fields: [hackerId], references: [id], onDelete: Cascade)
+  hackerId     String
+  createdAt    DateTime   @default(now())
+
+  @@unique([submissionId, hackerId])
+  @@index([hackerId])
 }

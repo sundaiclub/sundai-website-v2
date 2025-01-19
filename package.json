@@ -11,7 +11,7 @@
     "postinstall": "prisma generate",
     "vercel-build": "prisma generate && prisma migrate deploy && next build",
     "db:backup": "./scripts/backup_db.sh",
-    "db:restore": "./scripts/restore_db.sh"
+    "db:restore": "chmod +x scripts/restore_db.sh && ./scripts/restore_db.sh"
   },
   "dependencies": {
     "@clerk/nextjs": "^5.7.2",
