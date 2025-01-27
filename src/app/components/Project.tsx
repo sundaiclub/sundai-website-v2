@@ -343,8 +343,8 @@ function ProjectCard({ project, userInfo, handleLike, isDarkMode, show_status, s
                 </div>
               </div>
 
-              {/* Other Participants */}
-              {project.participants.map((participant) => (
+              {/* Other Participants - Limited to 4 (plus Launch Lead = 5 total) */}
+              {project.participants.slice(0, 4).map((participant) => (
                 <div
                   key={participant.hacker.id}
                   className="flex items-center"
@@ -396,6 +396,15 @@ function ProjectCard({ project, userInfo, handleLike, isDarkMode, show_status, s
                   </div>
                 </div>
               ))}
+              
+              {/* Show count of additional members if any */}
+              {project.participants.length > 4 && (
+                <div className={`text-xs ${
+                  isDarkMode ? "text-gray-400" : "text-gray-500"
+                } mt-2`}>
+                  +{project.participants.length - 4} more team members
+                </div>
+              )}
             </div>
           </div>
         )}
