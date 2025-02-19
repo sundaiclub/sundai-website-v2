@@ -472,7 +472,7 @@ export default function HackerProfile() {
             </div>
 
             {/* Contact & Links */}
-            {!isEditing && (
+            {/* {!isEditing && (
               <div className="flex flex-wrap gap-4 justify-center sm:justify-start">
                 {hacker.githubUrl && (
                   <Link
@@ -604,7 +604,7 @@ export default function HackerProfile() {
                   </Link>
                 )}
               </div>
-            )}
+            )} */}
           </div>
         </div>
 
