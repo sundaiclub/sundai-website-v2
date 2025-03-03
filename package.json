@@ -19,6 +19,7 @@
     "@headlessui/react": "^2.2.0",
     "@heroicons/react": "^2.1.5",
     "@prisma/client": "^5.21.1",
+    "@vercel/analytics": "^1.5.0",
     "chart.js": "^4.4.4",
     "date-fns": "^4.1.0",
     "framer-motion": "^11.11.1",

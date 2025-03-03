@@ -6,6 +6,7 @@ import Navbar from "./components/navbar";
 import { ClerkProvider } from "@clerk/nextjs";
 import { UserProvider } from "./contexts/UserContext";
 import { ThemeProvider } from './contexts/ThemeContext';
+import { Analytics } from "@vercel/analytics/react"
 import { PostHogProvider } from './providers'
 import { Providers } from './components/Providers';
 import { Space_Mono, Fira_Code } from 'next/font/google'
@@ -53,6 +54,7 @@ export default function RootLayout({
               overscrollBehavior: "none",
             }}
           >
+            <Analytics/>
             <Script src="https://www.googletagmanager.com/gtag/js?id=G-HV7HE6PBDD" strategy="afterInteractive" />
             <Script id="google-analytics" strategy="afterInteractive">
               {`
