@@ -40,6 +40,9 @@ export default function RootLayout({
     <ClerkProvider>
       <UserProvider>
         <html lang="en">
+          <head>
+            <meta name="apple-mobile-web-app-title" content="Sundai" />
+          </head>
           <body
             className={`${inter.className} h-screen ${spaceMono.variable} ${firaCode.variable}`}
             style={{
