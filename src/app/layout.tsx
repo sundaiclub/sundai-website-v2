@@ -6,8 +6,10 @@ import Navbar from "./components/navbar";
 import { ClerkProvider } from "@clerk/nextjs";
 import { UserProvider } from "./contexts/UserContext";
 import { ThemeProvider } from './contexts/ThemeContext';
+import { PostHogProvider } from './providers'
 import { Providers } from './components/Providers';
 import { Space_Mono, Fira_Code } from 'next/font/google'
+import Script from 'next/script';
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -37,9 +39,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <ClerkProvider>
-      <UserProvider>
-        <html lang="en">
+    <PostHogProvider>
+      <ClerkProvider>
+        <UserProvider>
+          <html lang="en">
           <head>
             <meta name="apple-mobile-web-app-title" content="Sundai" />
           </head>
@@ -50,6 +53,15 @@ export default function RootLayout({
               overscrollBehavior: "none",
             }}
           >
+            <Script src="https://www.googletagmanager.com/gtag/js?id=G-HV7HE6PBDD" strategy="afterInteractive" />
+            <Script id="google-analytics" strategy="afterInteractive">
+              {`
+                window.dataLayer = window.dataLayer || [];
+                function gtag(){dataLayer.push(arguments);}
+                gtag('js', new Date());
+                gtag('config', 'G-HV7HE6PBDD');
+              `}
+            </Script>
             <Providers>
               <Navbar />
               <div className="origin-top-left min-h-screen pt-16">
@@ -60,5 +72,6 @@ export default function RootLayout({
         </html>
       </UserProvider>
     </ClerkProvider>
+  </PostHogProvider>
   );
 }
