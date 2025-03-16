@@ -200,7 +200,7 @@ export default function Home() {
           <div className="flex flex-col md:flex-row justify-between items-center">
             {/* Copyright notice - Left aligned */}
             <p className="text-sm md:text-base order-2 md:order-1 mt-4 md:mt-0">
-              &copy; 2024 Sundai Club. All rights reserved.
+              &copy; 2025 Sundai Club. All rights reserved.
             </p>
 
             {/* Social links - Right aligned */}
