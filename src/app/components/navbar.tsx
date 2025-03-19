@@ -111,6 +111,16 @@ const Navbar = () => {
               </span>
             </Link>
             
+            <Link
+              href="/events"
+              className={`${
+                isPWA ? "px-4 py-3" : "px-3 py-2"
+              } mx-2 rounded-lg active:bg-indigo-100`}
+            >
+              <span className={`text-sm font-fira-code ${isDarkMode ? 'text-gray-200' : 'text-black'} hover:text-indigo-700 dark:hover:text-indigo-500 transition duration-300`}>
+                Events
+              </span>
+            </Link>
             
             {isSignedIn && (
               <>
@@ -181,6 +191,16 @@ const Navbar = () => {
           >
             <span className={`text-sm font-fira-code ${isDarkMode ? 'text-gray-200' : 'text-black'} hover:text-indigo-700 dark:hover:text-indigo-500`}>
               All Projects
+            </span>
+          </Link>
+          
+          <Link
+            href="/events"
+            className="block px-4 py-2 rounded-lg"
+            onClick={() => setIsMenuOpen(false)}
+          >
+            <span className={`text-sm font-fira-code ${isDarkMode ? 'text-gray-200' : 'text-black'} hover:text-indigo-700 dark:hover:text-indigo-500`}>
+              Events
             </span>
           </Link>
           
