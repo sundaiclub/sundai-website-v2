@@ -20,7 +20,6 @@ export function PostHogProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <PHProvider client={posthog}>
-      <SuspendedPostHogPageView />
       {children}
     </PHProvider>
   )
