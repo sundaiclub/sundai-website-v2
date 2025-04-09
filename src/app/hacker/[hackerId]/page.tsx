@@ -8,6 +8,7 @@ import { Cog6ToothIcon } from "@heroicons/react/24/outline";
 import { HeartIcon } from "@heroicons/react/24/solid";
 import { PencilIcon, XMarkIcon, CheckIcon } from "@heroicons/react/24/outline";
 import { useTheme } from "../../contexts/ThemeContext";
+import { swapFirstLetters } from "../../utils/nameUtils";
 
 type HackerProfile = {
   id: string;
@@ -285,14 +286,14 @@ export default function HackerProfile() {
                 {hacker.avatar ? (
                   <Image
                     src={hacker.avatar.url}
-                    alt={hacker.name}
+                    alt={swapFirstLetters(hacker.name)}
                     fill
                     className="object-cover"
                   />
                 ) : (
                   <div className="w-full h-full bg-indigo-100 flex items-center justify-center">
                     <span className="text-4xl sm:text-6xl font-bold text-indigo-600">
-                      {hacker.name[0]}
+                      {swapFirstLetters(hacker.name)[0]}
                     </span>
                   </div>
                 )}
@@ -444,7 +445,7 @@ export default function HackerProfile() {
                           isDarkMode ? "text-gray-100" : "text-gray-900"
                         }`}
                       >
-                        {hacker.name}
+                        {swapFirstLetters(hacker.name)}
                       </h1>
                       {isOwnProfile && (
                         <button

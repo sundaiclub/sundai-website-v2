@@ -11,6 +11,7 @@ import ReactMarkdown from 'react-markdown';
 import { CheckIcon, XMarkIcon } from "@heroicons/react/24/solid";
 import toast from 'react-hot-toast';
 import { Project } from "../../components/Project";
+import { swapFirstLetters } from "../../utils/nameUtils";
 
 export default function ProjectDetail() {
   const params = useParams();
@@ -426,14 +427,14 @@ export default function ProjectDetail() {
                                 {participant.hacker.avatar ? (
                                   <Image
                                     src={participant.hacker.avatar.url}
-                                    alt={participant.hacker.name}
+                                    alt={swapFirstLetters(participant.hacker.name)}
                                     fill
                                     className="rounded-full object-cover"
                                   />
                                 ) : (
                                   <div className="w-full h-full bg-gray-100 rounded-full flex items-center justify-center">
                                     <span className="text-gray-600 text-lg font-semibold text-gray-900">
-                                      {participant.hacker.name[0]}
+                                      {swapFirstLetters(participant.hacker.name)[0]}
                                     </span>
                                   </div>
                                 )}
@@ -446,8 +447,8 @@ export default function ProjectDetail() {
                                       : "text-gray-900"
                                   }`}
                                 >
-                                  {participant.hacker.name}
-                                </h4>
+                                  {swapFirstLetters(participant.hacker.name)}
+                                </h4> 
                                 <p
                                   className={`text-sm ${
                                     isDarkMode
@@ -455,7 +456,7 @@ export default function ProjectDetail() {
                                       : "text-gray-600"
                                   }`}
                                 >
-                                  {participant.role}
+                                  {participant.role === "hacker" ? "builder" : participant.role}
                                 </p>
                                 {participant.hacker.bio && (
                                   <p className={`text-sm mt-1 line-clamp-2 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>

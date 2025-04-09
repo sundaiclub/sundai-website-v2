@@ -18,7 +18,7 @@ export async function POST(
     });
 
     if (!hacker) {
-      return new NextResponse("Hacker not found", { status: 404 });
+      return new NextResponse("Builder not found", { status: 404 });
     }
 
     const { role } = await request.json();

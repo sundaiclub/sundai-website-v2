@@ -69,7 +69,7 @@ export async function DELETE(
     });
 
     if (!hacker) {
-      return new NextResponse("Hacker not found", { status: 404 });
+      return new NextResponse("Builder not found", { status: 404 });
     }
 
     // Get the project to check ownership

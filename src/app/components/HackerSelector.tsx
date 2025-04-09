@@ -2,7 +2,7 @@ import { XMarkIcon } from "@heroicons/react/24/solid";
 import { useState } from 'react';
 
 export const ProjectRoles = [
-    { id: "hacker", label: "Hacker" },
+    { id: "hacker", label: "Builder" },
     { id: "developer", label: "Developer" },
     { id: "caio", label: "Chief AI" },
     { id: "designer", label: "Designer" },

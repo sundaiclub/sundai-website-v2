@@ -11,6 +11,7 @@ import { Listbox, Transition } from '@headlessui/react';
 import { ChevronUpDownIcon } from '@heroicons/react/24/solid';
 import { toast } from 'react-hot-toast';
 import ProjectSearch from "./ProjectSearch";
+import { swapFirstLetters } from "../utils/nameUtils";
 
 export type Project = {
   id: string;
@@ -330,7 +331,7 @@ function ProjectCard({ project, userInfo, handleLike, isDarkMode, show_status, s
                           : "text-gray-900 hover:text-indigo-600"
                       } transition-colors`}
                     >
-                      {project.launchLead.name}
+                      {swapFirstLetters(project.launchLead.name)}
                     </p>
                   </Link>
                   <p
@@ -353,7 +354,7 @@ function ProjectCard({ project, userInfo, handleLike, isDarkMode, show_status, s
                     {participant.hacker.avatar ? (
                       <Image
                         src={participant.hacker.avatar.url}
-                        alt={participant.hacker.name}
+                        alt={swapFirstLetters(participant.hacker.name)}
                         width={28}
                         height={28}
                         className="rounded-full"
@@ -369,7 +370,7 @@ function ProjectCard({ project, userInfo, handleLike, isDarkMode, show_status, s
                             isDarkMode ? "text-gray-300" : "text-gray-600"
                           } text-xs`}
                         >
-                          {participant.hacker.name[0]}
+                          {swapFirstLetters(participant.hacker.name)[0]}
                         </span>
                       </div>
                     )}
@@ -383,7 +384,7 @@ function ProjectCard({ project, userInfo, handleLike, isDarkMode, show_status, s
                             : "text-gray-900 hover:text-indigo-600"
                         } transition-colors`}
                       >
-                        {participant.hacker.name}
+                        {swapFirstLetters(participant.hacker.name)}
                       </p>
                     </Link>
                     <p
@@ -391,7 +392,7 @@ function ProjectCard({ project, userInfo, handleLike, isDarkMode, show_status, s
                         isDarkMode ? "text-gray-400" : "text-gray-500"
                       }`}
                     >
-                      {participant.role}
+                      {participant.role === "hacker" ? "builder" : participant.role}
                     </p>
                   </div>
                 </div>

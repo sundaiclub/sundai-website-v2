@@ -106,7 +106,7 @@ export default function Home() {
                     onInit={(typewriter) => {
                       typewriter
                         .changeDelay(70)
-                        .typeString("We are hackers from")
+                        .typeString("We are builders from")
                         .callFunction(() => {
                           setIsTypingDone(true);
                         })

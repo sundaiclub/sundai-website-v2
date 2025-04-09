@@ -21,7 +21,7 @@ export async function GET(request: Request) {
 
       if (!hacker) {
         return NextResponse.json(
-          { error: "Hacker not found" },
+          { error: "Builder not found" },
           { status: 404 }
         );
       }
@@ -41,9 +41,9 @@ export async function GET(request: Request) {
 
     return NextResponse.json(hackers);
   } catch (error) {
-    console.error("Error fetching hackers:", error);
+    console.error("Error fetching builder:", error);
     return NextResponse.json(
-      { error: "Error fetching hackers" },
+      { error: "Error fetching builder" },
       { status: 500 }
     );
   }

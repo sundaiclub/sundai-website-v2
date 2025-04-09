@@ -13,6 +13,7 @@ import PermissionDenied from "../../../components/PermissionDenied";
 import TagSelector from "../../../components/TagSelector";
 import { XMarkIcon, PlusIcon, ArrowLeftIcon } from "@heroicons/react/24/outline";
 import { HackerSelector, ProjectRoles, Hacker, TeamMember } from "../../../components/HackerSelector";
+import { swapFirstLetters } from "../../../utils/nameUtils";
 
 const MAX_TITLE_LENGTH = 32;
 const MAX_PREVIEW_LENGTH = 100;
@@ -581,7 +582,7 @@ export default function ProjectEditPage() {
                           : 'bg-indigo-100 text-indigo-800'
                       }`}
                     >
-                      <span>{participant.hacker.name}</span>
+                      <span>{swapFirstLetters(participant.hacker.name)}</span>
                       <span className={`mx-1 ${isDarkMode ? 'text-gray-400' : 'text-indigo-400'}`}>•</span>
                       <span className={isDarkMode ? 'text-gray-300' : 'text-indigo-600'}>
                         {ProjectRoles.find((r) => r.id === participant.role)?.label}

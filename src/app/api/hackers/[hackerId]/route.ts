@@ -55,7 +55,7 @@ export async function GET(
     });
 
     if (!hacker) {
-      return NextResponse.json({ error: "Hacker not found" }, { status: 404 });
+      return NextResponse.json({ error: "Builder not found" }, { status: 404 });
     }
 
     const transformedHacker = {
@@ -96,7 +96,7 @@ export async function PATCH(
     });
 
     if (!requestingHacker) {
-      return new NextResponse("Hacker not found", { status: 404 });
+      return new NextResponse("Builder not found", { status: 404 });
     }
 
     // Check if the hacker is updating their own profile
@@ -173,9 +173,9 @@ export async function PATCH(
 
     return NextResponse.json(updatedHacker);
   } catch (error) {
-    console.error("Error updating hacker:", error);
+    console.error("Error updating builder:", error);
     return NextResponse.json(
-      { error: "Error updating hacker" },
+      { error: "Error updating builder" },
       { status: 500 }
     );
   }
