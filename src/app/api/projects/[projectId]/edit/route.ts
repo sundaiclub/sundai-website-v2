@@ -100,37 +100,53 @@ export async function PATCH(
     };
 
     const deleteThumbnail = formData.get('deleteThumbnail') === 'true';
-    const thumbnail = formData.get('thumbnail') as File | null;
+    const thumbnail = formData.get('thumbnail');
 
     if (deleteThumbnail) {
       updateData.thumbnail = {
         disconnect: true
       };
-    } else if (thumbnail && thumbnail instanceof File) {
-      try {
-        const uploadResult = await uploadToGCS(thumbnail);
-        
-        const newImage = await prisma.image.create({
-          data: {
-            key: uploadResult.filename,
-            bucket: process.env.GOOGLE_CLOUD_BUCKET!,
-            url: uploadResult.url,
-            filename: thumbnail.name,
-            mimeType: thumbnail.type || "application/octet-stream",
-            size: thumbnail.size,
-            width: undefined,
-            height: undefined,
-            alt: title?.toString() || '',
-            description: description?.toString() || '',
-          },
-        });
+    } else if (thumbnail && typeof thumbnail !== 'string') {
+      if ('size' in thumbnail && 'type' in thumbnail && 'name' in thumbnail) {
+        try {
+          let fileBuffer: Buffer | undefined;
+          if (thumbnail instanceof Blob) {
+            fileBuffer = Buffer.from(await thumbnail.arrayBuffer());
+          }
 
-        updateData.thumbnail = {
-          connect: { id: newImage.id }
-        };
-      } catch (error) {
-        console.error("Error uploading thumbnail:", error);
-        return new NextResponse("Error uploading thumbnail", { status: 500 });
+          const uploadResult = await uploadToGCS({
+            name: thumbnail.name,
+            type: thumbnail.type,
+            arrayBuffer: async () => fileBuffer || await thumbnail.arrayBuffer(),
+          } as any);
+          
+          const newImage = await prisma.image.create({
+            data: {
+              key: uploadResult.filename,
+              bucket: process.env.GOOGLE_CLOUD_BUCKET!,
+              url: uploadResult.url,
+              filename: thumbnail.name,
+              mimeType: thumbnail.type || "application/octet-stream",
+              size: thumbnail.size,
+              width: undefined,
+              height: undefined,
+              alt: title?.toString() || '',
+              description: description?.toString() || '',
+            },
+          });
+
+          console.log('Created image:', {
+            url: newImage.url,
+            filename: newImage.filename
+          });
+
+          updateData.thumbnail = {
+            connect: { id: newImage.id }
+          };
+        } catch (error) {
+          console.error("Error uploading thumbnail:", error);
+          return new NextResponse("Error uploading thumbnail", { status: 500 });
+        }
       }
     }
 

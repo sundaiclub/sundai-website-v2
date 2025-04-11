@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 import Image from "next/image";
+import type { FormEvent } from 'react';
 
 import { useTheme } from "../../../contexts/ThemeContext";
 import { useUserContext } from "../../../contexts/UserContext";
@@ -17,6 +18,12 @@ import { swapFirstLetters } from "../../../utils/nameUtils";
 
 const MAX_TITLE_LENGTH = 32;
 const MAX_PREVIEW_LENGTH = 100;
+
+interface UploadResponse {
+  url: string;
+  success: boolean;
+  message?: string;
+}
 
 function ButtonPanel({ params, router, isDarkMode, handleSave, saving }: 
   { params: any, router: any, isDarkMode: boolean, 
@@ -179,6 +186,33 @@ export default function ProjectEditPage() {
     }
   };
 
+  const handleImageUpload = async (file: File): Promise<string> => {
+    try {
+      const formData = new FormData();
+      formData.append('image', file);
+      
+      const response = await fetch('/api/uploads/image', {
+        method: 'POST',
+        body: formData,
+      });
+      
+      const data: UploadResponse = await response.json();
+      
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || 'Upload failed');
+      }
+      
+      if (!data.url) {
+        throw new Error('No URL in response');
+      }
+      
+      return data.url;
+    } catch (error) {
+      console.error('Error in handleImageUpload:', error);
+      throw error;
+    }
+  };
+
   const handleSave = async () => {
     if (!project) return;
     
@@ -258,7 +292,10 @@ export default function ProjectEditPage() {
         : project.domainTags,
     };
     
-    setProject(updatedProject);
+    setProject({
+      ...updatedProject,
+      startDate: updatedProject.startDate || new Date(),
+    });
   };
 
   const handleAddTag = (tagId: string, type: 'tech' | 'domain') => {
@@ -725,13 +762,113 @@ export default function ProjectEditPage() {
             <label className={`block font-medium ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
               Full Description
             </label>
-            <span className={` text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
-              Supports <a href="https://www.markdownguide.org/basic-syntax" target="_blank" rel="noopener noreferrer">Markdown</a>! Try embedding images by hosting them on <a href="https://imgbb.com/" target="_blank" rel="noopener noreferrer">ImgBB</a> and linking with the <a href="https://www.markdownguide.org/basic-syntax/#images" target="_blank" rel="noopener noreferrer">Markdown syntax</a>.
-            </span>
+            <div className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"} mb-2`}>
+              <p>Supports Markdown! You can:</p>
+              <ul className="list-disc ml-4 mt-1">
+                <li>Paste images directly into the editor</li>
+                <li>Drag and drop images</li>
+                <li>Use markdown image syntax: ![alt text](image url)</li>
+              </ul>
+            </div>
             <textarea
               value={editableDescription}
-              onChange={(e) => setEditableDescription(e.target.value)}
-              className={`mt-1 block w-3/4 border ${isDarkMode ? "border-gray-600 bg-gray-800 text-gray-100" : "border-gray-300 bg-white text-gray-900"} rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 p-2`}
+              onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setEditableDescription(e.target.value)}
+              onPaste={async (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+                const items = e.clipboardData?.items;
+                if (!items) return;
+                
+                const textarea = e.currentTarget;
+                textarea.focus(); // Ensure textarea is focused before paste
+                
+                for (let i = 0; i < items.length; i++) {
+                  const item = items[i];
+                  if (!item || item.type.indexOf('image') === -1) continue;
+                  
+                  e.preventDefault();
+                  const file = item.getAsFile();
+                  if (!file) continue;
+                  
+                  const loadingToast = toast.loading('Uploading image...');
+                  
+                  try {
+                    const url = await handleImageUpload(file);
+                    
+                    // Get cursor position after ensuring focus
+                    const cursorPos = textarea.selectionStart || textarea.value.length;
+                    
+                    // Create markdown with newlines
+                    const imageMarkdown = `\n![${file.name}](${url})\n`;
+                    const newText = 
+                      editableDescription.slice(0, cursorPos) + 
+                      imageMarkdown + 
+                      editableDescription.slice(cursorPos);
+                    
+                    setEditableDescription(newText);
+                    
+                    // Update cursor position after state update
+                    setTimeout(() => {
+                      textarea.focus();
+                      const newPosition = cursorPos + imageMarkdown.length;
+                      textarea.setSelectionRange(newPosition, newPosition);
+                    }, 0);
+                    
+                    toast.success('Image uploaded successfully', { id: loadingToast });
+                  } catch (error) {
+                    console.error('Error in paste handler:', error);
+                    toast.error(
+                      error instanceof Error ? error.message : 'Failed to upload image',
+                      { id: loadingToast }
+                    );
+                  }
+                }
+              }}
+              onDragOver={(e: React.DragEvent<HTMLTextAreaElement>) => {
+                e.preventDefault();
+              }}
+              onDrop={async (e: React.DragEvent<HTMLTextAreaElement>) => {
+                e.preventDefault();
+                
+                const files = Array.from(e.dataTransfer.files);
+                const imageFile = files.find(file => file.type.startsWith('image/'));
+                
+                if (!imageFile) return;
+                
+                const loadingToast = toast.loading('Uploading image...');
+                
+                try {
+                  const url = await handleImageUpload(imageFile);
+                  
+                  const textarea = e.currentTarget;
+                  const cursorPos = typeof textarea.selectionStart === 'number'
+                    ? textarea.selectionStart
+                    : textarea.value.length;
+                  
+                  const imageMarkdown = `\n![${imageFile.name}](${url})\n`;
+                  const newText = 
+                    editableDescription.slice(0, cursorPos) + 
+                    imageMarkdown + 
+                    editableDescription.slice(cursorPos);
+                  
+                  setEditableDescription(newText);
+                  
+                  requestAnimationFrame(() => {
+                    textarea.focus();
+                    const newPosition = cursorPos + imageMarkdown.length;
+                    textarea.setSelectionRange(newPosition, newPosition);
+                  });
+                  
+                  toast.success('Image uploaded successfully', { id: loadingToast });
+                } catch (error) {
+                  console.error('Error in drop handler:', error);
+                  toast.error(
+                    error instanceof Error ? error.message : 'Failed to upload image',
+                    { id: loadingToast }
+                  );
+                }
+              }}
+              className={`mt-1 block w-3/4 border ${
+                isDarkMode ? "border-gray-600 bg-gray-800 text-gray-100" : "border-gray-300 bg-white text-gray-900"
+              } rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 p-2`}
               rows={10}
             />
           </div>
