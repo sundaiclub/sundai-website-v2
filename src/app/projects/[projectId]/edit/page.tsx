@@ -766,7 +766,6 @@ export default function ProjectEditPage() {
               <p>Supports Markdown! You can:</p>
               <ul className="list-disc ml-4 mt-1">
                 <li>Paste images directly into the editor</li>
-                <li>Drag and drop images</li>
                 <li>Use markdown image syntax: ![alt text](image url)</li>
               </ul>
             </div>
