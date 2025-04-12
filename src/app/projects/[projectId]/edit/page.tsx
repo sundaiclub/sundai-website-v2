@@ -5,6 +5,15 @@ import { useParams, useRouter } from "next/navigation";
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 import Image from "next/image";
+import { useCallback } from 'react';
+import {
+  BoldIcon,
+  ItalicIcon,
+  ListBulletIcon,
+  PhotoIcon,
+  LinkIcon,
+  CodeBracketIcon
+} from "@heroicons/react/24/outline";
 
 import { useTheme } from "../../../contexts/ThemeContext";
 import { useUserContext } from "../../../contexts/UserContext";
@@ -53,6 +62,17 @@ function ButtonPanel({ params, router, isDarkMode, handleSave, saving }:
   );
 }
 
+// Add a helper function for getting the file name from a URL
+function getImageNameFromUrl(url: string): string {
+  try {
+    const filename = url.split('/').pop() || '';
+    // Remove UUID prefix and decode URL-safe characters
+    return decodeURIComponent(filename.replace(/^[a-f0-9-]+-/, ''));
+  } catch {
+    return 'image';
+  }
+}
+
 export default function ProjectEditPage() {
   const params = useParams();
   const router = useRouter();
@@ -64,7 +84,7 @@ export default function ProjectEditPage() {
   const [editableTitle, setEditableTitle] = useState("");
   const [editablePreview, setEditablePreview] = useState("");
   const [editableDescription, setEditableDescription] = useState("");
-  const [editableStartDate, setEditableStartDate] = useState<Date | null>(null);
+  const [editableStartDate, setEditableStartDate] = useState<Date>(new Date());
   const [editableGithubUrl, setEditableGithubUrl] = useState("");
   const [editableDemoUrl, setEditableDemoUrl] = useState("");
   const [editableBlogUrl, setEditableBlogUrl] = useState("");
@@ -123,7 +143,7 @@ export default function ProjectEditPage() {
       setEditableTitle(project.title);
       setEditableDescription(project.description);
       setEditablePreview(project.preview);
-      setEditableStartDate(project.startDate ? new Date(project.startDate) : null);
+      setEditableStartDate(project.startDate ? new Date(project.startDate) : new Date());
       setEditableGithubUrl(project.githubUrl || "");
       setEditableDemoUrl(project.demoUrl || "");
       setEditableBlogUrl(project.blogUrl || "");
@@ -197,9 +217,7 @@ export default function ProjectEditPage() {
       }
       formData.append('description', editableDescription);
       formData.append('preview', editablePreview);
-      if (editableStartDate) {
-        formData.append('startDate', editableStartDate.toISOString());
-      }
+      formData.append('startDate', editableStartDate.toISOString());
       project.techTags.forEach(tag => {
         formData.append('techTags[]', tag.id);
       });
@@ -279,6 +297,7 @@ export default function ProjectEditPage() {
             if (newTag) {
               setProject({
                 ...project,
+                startDate: project.startDate || new Date(),
                 techTags: [...project.techTags, newTag]
               });
             }
@@ -288,6 +307,7 @@ export default function ProjectEditPage() {
             if (newTag) {
               setProject({
                 ...project,
+                startDate: project.startDate || new Date(),
                 domainTags: [...project.domainTags, newTag]
               });
             }
@@ -302,7 +322,7 @@ export default function ProjectEditPage() {
 
     setProject({
       ...project,
-      startDate: editableStartDate || new Date(),
+      startDate: project.startDate || new Date(),
       techTags: type === 'tech'
         ? [...project.techTags, tagToAdd]
         : project.techTags,
@@ -662,7 +682,7 @@ export default function ProjectEditPage() {
               value={editableStartDate ? format(editableStartDate, 'yyyy-MM-dd') : ''}
               onChange={(e) => {
                 if (!e.target.value) {
-                  setEditableStartDate(null);
+                  setEditableStartDate(new Date());
                   return;
                 }
                 // Create date using ISO format to preserve exact date
@@ -725,14 +745,309 @@ export default function ProjectEditPage() {
             <label className={`block font-medium ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
               Full Description
             </label>
-            <span className={` text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
-              Supports <a href="https://www.markdownguide.org/basic-syntax" target="_blank" rel="noopener noreferrer">Markdown</a>! Try embedding images by hosting them on <a href="https://imgbb.com/" target="_blank" rel="noopener noreferrer">ImgBB</a> and linking with the <a href="https://www.markdownguide.org/basic-syntax/#images" target="_blank" rel="noopener noreferrer">Markdown syntax</a>.
+            <span className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+              Supports <a href="https://www.markdownguide.org/basic-syntax" target="_blank" rel="noopener noreferrer">Markdown</a>! Use the toolbar.
             </span>
+            <div className={`mt-2 flex gap-2 ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
+              <button
+                type="button"
+                onClick={() => {
+                  const textarea = document.getElementById('description-textarea') as HTMLTextAreaElement;
+                  const start = textarea.selectionStart;
+                  const end = textarea.selectionEnd;
+                  const text = textarea.value;
+                  const selectedText = text.substring(start, end);
+                  const replacement = selectedText ? `**${selectedText}**` : '**Bold text**';
+                  setEditableDescription(
+                    text.substring(0, start) + replacement + text.substring(end)
+                  );
+                  setTimeout(() => {
+                    textarea.focus();
+                    if (selectedText) {
+                      textarea.selectionStart = start + 2;
+                      textarea.selectionEnd = start + 2 + selectedText.length;
+                    } else {
+                      textarea.selectionStart = start + 2;
+                      textarea.selectionEnd = start + 10;
+                    }
+                  }, 0);
+                }}
+                className={`p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700`}
+                title="Bold (Ctrl+B)"
+              >
+                <BoldIcon className="h-5 w-5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const textarea = document.getElementById('description-textarea') as HTMLTextAreaElement;
+                  const start = textarea.selectionStart;
+                  const end = textarea.selectionEnd;
+                  const text = textarea.value;
+                  const selectedText = text.substring(start, end);
+                  const replacement = selectedText ? `*${selectedText}*` : '*Italic text*';
+                  setEditableDescription(
+                    text.substring(0, start) + replacement + text.substring(end)
+                  );
+                  setTimeout(() => {
+                    textarea.focus();
+                    if (selectedText) {
+                      textarea.selectionStart = start + 1;
+                      textarea.selectionEnd = start + 1 + selectedText.length;
+                    } else {
+                      textarea.selectionStart = start + 1;
+                      textarea.selectionEnd = start + 11;
+                    }
+                  }, 0);
+                }}
+                className={`p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700`}
+                title="Italic (Ctrl+I)"
+              >
+                <ItalicIcon className="h-5 w-5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const textarea = document.getElementById('description-textarea') as HTMLTextAreaElement;
+                  const start = textarea.selectionStart;
+                  const end = textarea.selectionEnd;
+                  const text = textarea.value;
+                  const selectedText = text.substring(start, end);
+                  const replacement = selectedText ? `[${selectedText}](url)` : '[Link](url)';
+                  setEditableDescription(
+                    text.substring(0, start) + replacement + text.substring(end)
+                  );
+                  setTimeout(() => {
+                    textarea.focus();
+                    if (selectedText) {
+                      textarea.selectionStart = start + selectedText.length + 3;
+                      textarea.selectionEnd = start + selectedText.length + 6;
+                    } else {
+                      textarea.selectionStart = start + 7;
+                      textarea.selectionEnd = start + 10;
+                    }
+                  }, 0);
+                }}
+                className={`p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700`}
+                title="Add Link"
+              >
+                <LinkIcon className="h-5 w-5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const textarea = document.getElementById('description-textarea') as HTMLTextAreaElement;
+                  const start = textarea.selectionStart;
+                  const end = textarea.selectionEnd;
+                  const text = textarea.value;
+                  const selectedText = text.substring(start, end);
+                  const replacement = `\`${selectedText}\``;
+                  setEditableDescription(
+                    text.substring(0, start) + replacement + text.substring(end)
+                  );
+                  setTimeout(() => {
+                    textarea.focus();
+                    textarea.selectionStart = start + 1;
+                    textarea.selectionEnd = start + 1 + selectedText.length;
+                  }, 0);
+                }}
+                className={`p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700`}
+                title="Inline Code"
+              >
+                <CodeBracketIcon className="h-5 w-5" />
+              </button>
+              <label
+                className={`p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer`}
+                title="Upload Image"
+              >
+                <PhotoIcon className="h-5 w-5" />
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      try {
+                        const loadingToast = toast.loading('Uploading image...');
+                        const formData = new FormData();
+                        formData.append('file', file);
+
+                        const response = await fetch('/api/uploads/image', {
+                          method: 'POST',
+                          body: formData,
+                        });
+
+                        if (!response.ok) {
+                          throw new Error('Failed to upload image');
+                        }
+
+                        const data = await response.json();
+                        toast.dismiss(loadingToast);
+                        toast.success('Image uploaded successfully');
+
+                        const textarea = document.getElementById('description-textarea') as HTMLTextAreaElement;
+                        const start = textarea.selectionStart;
+                        const text = textarea.value;
+                        const imageMarkdown = `![Image](${data.url})`;
+                        setEditableDescription(
+                          text.substring(0, start) + imageMarkdown + text.substring(start)
+                        );
+                        
+                        setTimeout(() => {
+                          textarea.focus();
+                          textarea.selectionStart = textarea.selectionEnd = start + imageMarkdown.length;
+                        }, 0);
+                      } catch (error) {
+                        console.error('Error uploading image:', error);
+                        toast.error('Failed to upload image');
+                      }
+                    }
+                  }}
+                />
+              </label>
+            </div>
             <textarea
+              id="description-textarea"
               value={editableDescription}
               onChange={(e) => setEditableDescription(e.target.value)}
-              className={`mt-1 block w-3/4 border ${isDarkMode ? "border-gray-600 bg-gray-800 text-gray-100" : "border-gray-300 bg-white text-gray-900"} rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 p-2`}
-              rows={10}
+              onKeyDown={(e) => {
+                // Handle keyboard shortcuts
+                if (e.ctrlKey || e.metaKey) {
+                  const textarea = e.currentTarget;
+                  const start = textarea.selectionStart;
+                  const end = textarea.selectionEnd;
+                  const text = textarea.value;
+                  const selectedText = text.substring(start, end);
+
+                  switch (e.key.toLowerCase()) {
+                    case 'b':
+                      e.preventDefault();
+                      const boldText = `**${selectedText}**`;
+                      setEditableDescription(
+                        text.substring(0, start) + boldText + text.substring(end)
+                      );
+                      setTimeout(() => {
+                        textarea.selectionStart = start + 2;
+                        textarea.selectionEnd = start + 2 + selectedText.length;
+                      }, 0);
+                      break;
+                    case 'i':
+                      e.preventDefault();
+                      const italicText = `*${selectedText}*`;
+                      setEditableDescription(
+                        text.substring(0, start) + italicText + text.substring(end)
+                      );
+                      setTimeout(() => {
+                        textarea.selectionStart = start + 1;
+                        textarea.selectionEnd = start + 1 + selectedText.length;
+                      }, 0);
+                      break;
+                  }
+                }
+              }}
+              onPaste={async (e) => {
+                const items = Array.from(e.clipboardData?.items || []);
+                const imageItem = items.find(item => item.type.startsWith('image/'));
+                
+                if (imageItem) {
+                  e.preventDefault();
+                  const file = imageItem.getAsFile();
+                  if (file) {
+                    try {
+                      const loadingToast = toast.loading('Uploading image...');
+                      const formData = new FormData();
+                      formData.append('file', file);
+
+                      const response = await fetch('/api/uploads/image', {
+                        method: 'POST',
+                        body: formData,
+                      });
+
+                      if (!response.ok) {
+                        throw new Error('Failed to upload image');
+                      }
+
+                      const data = await response.json();
+                      toast.dismiss(loadingToast);
+                      toast.success('Image uploaded successfully');
+
+                      const textarea = e.currentTarget;
+                      const start = textarea.selectionStart;
+                      const text = textarea.value;
+                      const imageMarkdown = `![Image](${data.url})`;
+                      setEditableDescription(
+                        text.substring(0, start) + imageMarkdown + text.substring(start)
+                      );
+                      
+                      setTimeout(() => {
+                        textarea.selectionStart = textarea.selectionEnd = start + imageMarkdown.length;
+                        textarea.focus();
+                      }, 0);
+                    } catch (error) {
+                      console.error('Error uploading image:', error);
+                      toast.error('Failed to upload image');
+                    }
+                  }
+                }
+              }}
+              onDragOver={(e) => {
+                e.preventDefault();
+                e.currentTarget.classList.add('border-indigo-500');
+              }}
+              onDragLeave={(e) => {
+                e.preventDefault();
+                e.currentTarget.classList.remove('border-indigo-500');
+              }}
+              onDrop={async (e) => {
+                e.preventDefault();
+                e.currentTarget.classList.remove('border-indigo-500');
+                
+                const file = e.dataTransfer.files[0];
+                if (file && file.type.startsWith('image/')) {
+                  try {
+                    const loadingToast = toast.loading('Uploading image...');
+                    const formData = new FormData();
+                    formData.append('file', file);
+
+                    const response = await fetch('/api/uploads/image', {
+                      method: 'POST',
+                      body: formData,
+                    });
+
+                    if (!response.ok) {
+                      throw new Error('Failed to upload image');
+                    }
+
+                    const data = await response.json();
+                    toast.dismiss(loadingToast);
+                    toast.success('Image uploaded successfully');
+
+                    const textarea = e.currentTarget;
+                    const start = textarea.selectionStart;
+                    const text = textarea.value;
+                    const imageMarkdown = `![Image](${data.url})`;
+                    setEditableDescription(
+                      text.substring(0, start) + imageMarkdown + text.substring(start)
+                    );
+                    
+                    setTimeout(() => {
+                      textarea.selectionStart = textarea.selectionEnd = start + imageMarkdown.length;
+                      textarea.focus();
+                    }, 0);
+                  } catch (error) {
+                    console.error('Error uploading image:', error);
+                    toast.error('Failed to upload image');
+                  }
+                }
+              }}
+              className={`mt-1 block w-full border ${
+                isDarkMode 
+                  ? "border-gray-600 bg-gray-800 text-gray-100" 
+                  : "border-gray-300 bg-white text-gray-900"
+              } rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 p-2`}
+              rows={15}
+              placeholder="Write your project description here..."
             />
           </div>
 
