@@ -1003,6 +1003,29 @@ export default function ProjectEditPage() {
                 e.preventDefault();
                 e.currentTarget.classList.remove('border-indigo-500');
                 
+                // Check for URLs in the drop data
+                const urlData = e.dataTransfer.getData('text/uri-list') || e.dataTransfer.getData('text/plain');
+                if (urlData && (urlData.startsWith('http://') || urlData.startsWith('https://'))) {
+                  // Check if it's an image URL by looking at the extension
+                  const isImageUrl = /\.(jpg|jpeg|png|gif|webp)$/i.test(urlData);
+                  if (isImageUrl) {
+                    const textarea = e.currentTarget;
+                    const start = textarea.selectionStart;
+                    const text = textarea.value;
+                    const imageMarkdown = `![Image](${urlData})`;
+                    setEditableDescription(
+                      text.substring(0, start) + imageMarkdown + text.substring(start)
+                    );
+                    
+                    setTimeout(() => {
+                      textarea.selectionStart = textarea.selectionEnd = start + imageMarkdown.length;
+                      textarea.focus();
+                    }, 0);
+                    return;
+                  }
+                }
+
+                // Handle file drops (existing functionality)
                 const file = e.dataTransfer.files[0];
                 if (file && file.type.startsWith('image/')) {
                   try {
