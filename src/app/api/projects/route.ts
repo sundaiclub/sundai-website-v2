@@ -9,8 +9,17 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const status = searchParams.get("status");
 
+    // Determine hack_type based on environment
+    const isResearchSite = process.env.IS_RESEARCH_SITE === 'true';
+    const hack_type = isResearchSite ? 'RESEARCH' : 'REGULAR';
+
     const projects = await prisma.project.findMany({
-      where: status ? { status: status as ProjectStatus } : undefined,
+      where: {
+        AND: [
+          status ? { status: status as ProjectStatus } : {},
+          { hack_type }
+        ]
+      },
       include: {
         thumbnail: {
           select: {
@@ -144,6 +153,10 @@ export async function POST(req: Request) {
       });
     }
 
+    // Determine hack_type based on environment
+    const isResearchSite = process.env.IS_RESEARCH_SITE === 'true';
+    const hack_type = isResearchSite ? 'RESEARCH' : 'REGULAR';
+
     // Create project with participants and thumbnail
     const project = await prisma.project.create({
       data: {
@@ -151,6 +164,7 @@ export async function POST(req: Request) {
         preview,
         launchLeadId: hacker.id,
         status: "DRAFT",
+        hack_type,
         is_broken: false,
         is_starred: false,
         weeks: {

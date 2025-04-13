@@ -85,6 +85,7 @@ model Project {
   startDate   DateTime  @default(now())
   endDate     DateTime?
   status      ProjectStatus @default(PENDING)
+  hack_type   HackType? @default(REGULAR)
   likes       ProjectLike[]
   weeks       Week[]    // Many-to-many as projects can span multiple weeks
   createdAt   DateTime  @default(now())
@@ -247,4 +248,9 @@ enum NotificationType {
   NEW_LIKE
   NEW_MEMBER
   CUSTOM
+}
+
+enum HackType {
+  REGULAR
+  RESEARCH
 }
