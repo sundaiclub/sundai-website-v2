@@ -1,11 +1,10 @@
 "use client";
-import React, { useRef } from "react";
-import { useEffect, useState } from "react";
+import React, { useRef, useState } from "react";
+import { useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { format } from 'date-fns';
-import toast from 'react-hot-toast';
+import { format } from "date-fns";
+import toast from "react-hot-toast";
 import Image from "next/image";
-import { useCallback } from 'react';
 import {
   BoldIcon,
   ItalicIcon,
@@ -21,25 +20,43 @@ import { Project } from "../../../components/Project";
 import PermissionDenied from "../../../components/PermissionDenied";
 import TagSelector from "../../../components/TagSelector";
 import { XMarkIcon, PlusIcon, ArrowLeftIcon } from "@heroicons/react/24/outline";
-import { HackerSelector, ProjectRoles, Hacker, TeamMember } from "../../../components/HackerSelector";
+import { HackerSelector, ProjectRoles, Hacker } from "../../../components/HackerSelector";
 import { swapFirstLetters } from "../../../utils/nameUtils";
 
 const MAX_TITLE_LENGTH = 32;
 const MAX_PREVIEW_LENGTH = 100;
 
-function ButtonPanel({ params, router, isDarkMode, handleSave, saving }: 
-  { params: any, router: any, isDarkMode: boolean, 
-    handleSave: () => void, saving: boolean }) {
+/* --- Helper: Upload Image to GCS --- */
+const uploadImage = async (file: File): Promise<string> => {
+  const loadingToast = toast.loading("Uploading image...");
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("filename", file.name);
+
+  const response = await fetch("/api/uploads/image", {
+    method: "POST",
+    body: formData,
+  });
+  toast.dismiss(loadingToast);
+  if (!response.ok) {
+    throw new Error("Failed to upload image");
+  }
+  const data = await response.json();
+  return data.url;
+};
+
+function ButtonPanel({ params, router, isDarkMode, handleSave, saving }:
+  { params: any, router: any, isDarkMode: boolean, handleSave: () => void, saving: boolean }) {
   return (
     <div className="flex items-center space-x-4 mt-4">
       <button
-          onClick={() => router.push(`/projects/${params.projectId}`)}
-          className={`flex items-center gap-2 px-4 py-2 transition-colors ${
-            isDarkMode 
-              ? "bg-gray-700 hover:bg-gray-600 text-gray-100" 
-              : "bg-gray-200 hover:bg-gray-300 text-gray-900"
-          } shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500`}
-        >
+        onClick={() => router.push(`/projects/${params.projectId}`)}
+        className={`flex items-center gap-2 px-4 py-2 transition-colors ${
+          isDarkMode 
+            ? "bg-gray-700 hover:bg-gray-600 text-gray-100" 
+            : "bg-gray-200 hover:bg-gray-300 text-gray-900"
+        } shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500`}
+      >
         <ArrowLeftIcon className="h-5 w-5" /> Back to Project
       </button>
       <button
@@ -62,14 +79,13 @@ function ButtonPanel({ params, router, isDarkMode, handleSave, saving }:
   );
 }
 
-// Add a helper function for getting the file name from a URL
+// Helper to extract image name from URL (if needed)
 function getImageNameFromUrl(url: string): string {
   try {
-    const filename = url.split('/').pop() || '';
-    // Remove UUID prefix and decode URL-safe characters
-    return decodeURIComponent(filename.replace(/^[a-f0-9-]+-/, ''));
+    const filename = url.split("/").pop() || "";
+    return decodeURIComponent(filename.replace(/^[a-f0-9-]+-/, ""));
   } catch {
-    return 'image';
+    return "image";
   }
 }
 
@@ -90,8 +106,8 @@ export default function ProjectEditPage() {
   const [editableBlogUrl, setEditableBlogUrl] = useState("");
 
   const [saving, setSaving] = useState(false);
-  const [availableTechTags, setAvailableTechTags] = useState<Project['techTags']>([]);
-  const [availableDomainTags, setAvailableDomainTags] = useState<Project['domainTags']>([]);
+  const [availableTechTags, setAvailableTechTags] = useState<Project["techTags"]>([]);
+  const [availableDomainTags, setAvailableDomainTags] = useState<Project["domainTags"]>([]);
   const [showTechTagModal, setShowTechTagModal] = useState(false);
   const [showDomainTagModal, setShowDomainTagModal] = useState(false);
 
@@ -155,15 +171,15 @@ export default function ProjectEditPage() {
     const fetchTags = async () => {
       try {
         const [techResponse, domainResponse] = await Promise.all([
-          fetch('/api/tags/tech'),
-          fetch('/api/tags/domain')
+          fetch("/api/tags/tech"),
+          fetch("/api/tags/domain")
         ]);
         const techData = await techResponse.json();
         const domainData = await domainResponse.json();
         setAvailableTechTags(techData);
         setAvailableDomainTags(domainData);
       } catch (error) {
-        console.error('Error fetching tags:', error);
+        console.error("Error fetching tags:", error);
       }
     };
     fetchTags();
@@ -192,47 +208,44 @@ export default function ProjectEditPage() {
     setThumbnail(null);
     setThumbnailPreview(null);
     if (project?.thumbnail) {
-      setProject({
-        ...project,
-        thumbnail: null
-      });
+      setProject({ ...project, thumbnail: null });
     }
   };
 
   const handleSave = async () => {
     if (!project) return;
-    
+
     // Trigger form validation
     if (formRef.current && !formRef.current.checkValidity()) {
       formRef.current.reportValidity();
       return;
     }
-    
+
     setSaving(true);
     try {
       const formData = new FormData();
-      formData.append('title', editableTitle);
+      formData.append("title", editableTitle);
       if (thumbnail) {
-        formData.append('thumbnail', thumbnail);
+        formData.append("thumbnail", thumbnail);
       }
-      formData.append('description', editableDescription);
-      formData.append('preview', editablePreview);
-      formData.append('startDate', editableStartDate.toISOString());
+      formData.append("description", editableDescription);
+      formData.append("preview", editablePreview);
+      formData.append("startDate", editableStartDate.toISOString());
       project.techTags.forEach(tag => {
-        formData.append('techTags[]', tag.id);
+        formData.append("techTags[]", tag.id);
       });
       project.domainTags.forEach(tag => {
-        formData.append('domainTags[]', tag.id);
+        formData.append("domainTags[]", tag.id);
       });
-      formData.append('githubUrl', editableGithubUrl);
-      formData.append('demoUrl', editableDemoUrl);
-      formData.append('blogUrl', editableBlogUrl);
+      formData.append("githubUrl", editableGithubUrl);
+      formData.append("demoUrl", editableDemoUrl);
+      formData.append("blogUrl", editableBlogUrl);
 
       // Add team members data
-      formData.append('participants', JSON.stringify(project.participants));
-      formData.append('launchLead', project.launchLead.id);
+      formData.append("participants", JSON.stringify(project.participants));
+      formData.append("launchLead", project.launchLead.id);
 
-      formData.append('deleteThumbnail', (!thumbnail && thumbnailPreview === null).toString());
+      formData.append("deleteThumbnail", (!thumbnail && thumbnailPreview === null).toString());
 
       const response = await fetch(`/api/projects/${params.projectId}/edit`, {
         method: "PATCH",
@@ -245,20 +258,18 @@ export default function ProjectEditPage() {
 
       const updatedProject = await response.json();
       setProject(updatedProject);
-      toast.success('Changes saved successfully!');
+      toast.success("Changes saved successfully!");
       router.push(`/projects/${params.projectId}`);
     } catch (error) {
       console.error("Error updating project:", error);
-      toast.error('Failed to save changes');
+      toast.error("Failed to save changes");
     } finally {
       setSaving(false);
     }
   };
 
-  const handleRemoveTag = (tagId: string, type: 'tech' | 'domain') => {
+  const handleRemoveTag = (tagId: string, type: "tech" | "domain") => {
     if (!project) return;
-    
-    // Create updated project with current editable values
     const updatedProject = {
       ...project,
       title: editableTitle,
@@ -268,30 +279,27 @@ export default function ProjectEditPage() {
       githubUrl: editableGithubUrl,
       demoUrl: editableDemoUrl,
       blogUrl: editableBlogUrl,
-      techTags: type === 'tech' 
-        ? project.techTags.filter(tag => tag.id !== tagId)
-        : project.techTags,
-      domainTags: type === 'domain'
-        ? project.domainTags.filter(tag => tag.id !== tagId)
-        : project.domainTags,
+      techTags: type === "tech" ? project.techTags.filter(tag => tag.id !== tagId) : project.techTags,
+      domainTags: type === "domain" ? project.domainTags.filter(tag => tag.id !== tagId) : project.domainTags,
     };
-    
+
     setProject(updatedProject);
   };
 
-  const handleAddTag = (tagId: string, type: 'tech' | 'domain') => {
+  const handleAddTag = (tagId: string, type: "tech" | "domain") => {
     if (!project) return;
-    
-    const tagToAdd = type === 'tech'
-      ? availableTechTags.find(tag => tag.id === tagId)
-      : availableDomainTags.find(tag => tag.id === tagId);
+
+    const tagToAdd =
+      type === "tech"
+        ? availableTechTags.find(tag => tag.id === tagId)
+        : availableDomainTags.find(tag => tag.id === tagId);
 
     if (!tagToAdd) {
       const fetchTags = async () => {
         try {
           const response = await fetch(`/api/tags/${type}`);
           const data = await response.json();
-          if (type === 'tech') {
+          if (type === "tech") {
             setAvailableTechTags(data);
             const newTag = data.find((tag: any) => tag.id === tagId);
             if (newTag) {
@@ -313,7 +321,7 @@ export default function ProjectEditPage() {
             }
           }
         } catch (error) {
-          console.error('Error fetching updated tags:', error);
+          console.error("Error fetching updated tags:", error);
         }
       };
       fetchTags();
@@ -323,35 +331,21 @@ export default function ProjectEditPage() {
     setProject({
       ...project,
       startDate: project.startDate || new Date(),
-      techTags: type === 'tech'
-        ? [...project.techTags, tagToAdd]
-        : project.techTags,
-      domainTags: type === 'domain'
-        ? [...project.domainTags, tagToAdd]
-        : project.domainTags,
+      techTags: type === "tech" ? [...project.techTags, tagToAdd] : project.techTags,
+      domainTags: type === "domain" ? [...project.domainTags, tagToAdd] : project.domainTags,
     });
   };
 
   const handleAddMember = (hacker: Hacker, role: string) => {
     if (!project) return;
-    
-    // Add member locally with the specified role
     setProject({
       ...project,
-      participants: [
-        ...project.participants,
-        {
-          role: role,
-          hacker: hacker
-        }
-      ]
+      participants: [...project.participants, { role, hacker }]
     });
   };
 
   const handleRemoveMember = (hackerId: string) => {
     if (!project) return;
-    
-    // Remove member locally
     setProject({
       ...project,
       participants: project.participants.filter(
@@ -362,37 +356,30 @@ export default function ProjectEditPage() {
 
   const handleChangeLaunchLead = (hacker: Hacker) => {
     if (!project || !userInfo) return;
-    
-    // Show warning if changing from self
     if (project.launchLead.id === userInfo.id && hacker.id !== userInfo.id) {
       if (!confirm("Warning: If you change the launch lead from yourself, you will lose access to managing team members after saving. Continue?")) {
         return;
       }
     }
-
-    // Create updated project state
     const updatedProject = {
       ...project,
       launchLead: hacker,
       participants: [
-        // Keep all existing participants except the new launch lead
         ...project.participants.filter(p => p.hacker.id !== hacker.id),
-        // Add the previous launch lead as a hacker if they're not already in the team
-        ...((!project.participants.some(p => p.hacker.id === project.launchLead.id) && 
-            project.launchLead.id !== hacker.id) ? [{
+        ...((!project.participants.some(p => p.hacker.id === project.launchLead.id) &&
+          project.launchLead.id !== hacker.id) ? [{
           role: "hacker",
           hacker: project.launchLead
         }] : [])
       ]
     };
-    
     setProject(updatedProject);
-    setShowLaunchLeadModal(false); // Close the modal after selection
+    setShowLaunchLeadModal(false);
   };
 
   const allowedEdit = project && (
     project.participants.some(
-      (participant) => participant.hacker.id === userInfo?.id
+      participant => participant.hacker.id === userInfo?.id
     ) || (project.launchLead.id === userInfo?.id) || isAdmin
   );
 
@@ -405,32 +392,26 @@ export default function ProjectEditPage() {
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-screen">
-        <div
-          className={`animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 ${
-            isDarkMode ? "border-purple-400" : "border-indigo-600"
-          }`}
-        ></div>
+        <div className={`animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 ${isDarkMode ? "border-purple-400" : "border-indigo-600"}`}></div>
       </div>
     );
   }
 
-  if (!allowedEdit) { return (<PermissionDenied/>); }
+  if (!allowedEdit) { 
+    return (<PermissionDenied />);
+  }
 
   return (
-    <div
-      className={` justify-center items-center min-h-screen ${
-        isDarkMode ? "bg-gray-900 text-gray-100" : "bg-white text-gray-900"
-      } font-space-mono`}
-    >
-      <div className={`max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 py-20`}>
+    <div className={`justify-center items-center min-h-screen ${isDarkMode ? "bg-gray-900 text-gray-100" : "bg-white text-gray-900"} font-space-mono`}>
+      <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 py-20">
         <div className="space-y-4">
-        <ButtonPanel 
-              params={params} 
-              router={router} 
-              isDarkMode={isDarkMode} 
-              handleSave={handleSave} 
-              saving={saving} 
-            />
+          <ButtonPanel
+            params={params}
+            router={router}
+            isDarkMode={isDarkMode}
+            handleSave={handleSave}
+            saving={saving}
+          />
           <div>
             <label className={`block font-medium ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
               Title
@@ -442,7 +423,7 @@ export default function ProjectEditPage() {
               maxLength={MAX_TITLE_LENGTH}
               className={`mt-1 block w-3/4 border ${isDarkMode ? "border-gray-600 bg-gray-800 text-gray-100" : "border-gray-300 bg-white text-gray-900"} rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 p-2`}
             />
-            <span className={` text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+            <span className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
               {editableTitle.length}/{MAX_TITLE_LENGTH} characters
             </span>
           </div>
@@ -454,26 +435,18 @@ export default function ProjectEditPage() {
               {project?.techTags?.map((tag) => (
                 <span
                   key={tag.id}
-                  className={`px-2 py-1 rounded-full text-sm flex items-center gap-2 ${
-                    isDarkMode
-                      ? "bg-purple-900/50 text-purple-300"
-                      : "bg-indigo-100 text-indigo-700"
-                  }`}
+                  className={`px-2 py-1 rounded-full text-sm flex items-center gap-2 ${isDarkMode ? "bg-purple-900/50 text-purple-300" : "bg-indigo-100 text-indigo-700"}`}
                 >
                   {tag.name}
                   <XMarkIcon
                     className="h-4 w-4 cursor-pointer"
-                    onClick={() => handleRemoveTag(tag.id, 'tech')}
+                    onClick={() => handleRemoveTag(tag.id, "tech")}
                   />
                 </span>
               ))}
               <button
                 onClick={() => setShowTechTagModal(true)}
-                className={`px-2 py-1 rounded-full text-sm flex items-center ${
-                  isDarkMode
-                    ? "bg-purple-900/50 text-purple-300"
-                    : "bg-indigo-100 text-indigo-700"
-                }`}
+                className={`px-2 py-1 rounded-full text-sm flex items-center ${isDarkMode ? "bg-purple-900/50 text-purple-300" : "bg-indigo-100 text-indigo-700"}`}
               >
                 <PlusIcon className="h-4 w-4" />
               </button>
@@ -487,26 +460,18 @@ export default function ProjectEditPage() {
               {project?.domainTags?.map((tag) => (
                 <span
                   key={tag.id}
-                  className={`px-2 py-1 rounded-full text-sm flex items-center gap-2 ${
-                    isDarkMode
-                      ? "bg-gray-700 text-gray-300"
-                      : "bg-gray-100 text-gray-700"
-                  }`}
+                  className={`px-2 py-1 rounded-full text-sm flex items-center gap-2 ${isDarkMode ? "bg-gray-700 text-gray-300" : "bg-gray-100 text-gray-700"}`}
                 >
                   {tag.name}
                   <XMarkIcon
                     className="h-4 w-4 cursor-pointer"
-                    onClick={() => handleRemoveTag(tag.id, 'domain')}
+                    onClick={() => handleRemoveTag(tag.id, "domain")}
                   />
                 </span>
               ))}
               <button
                 onClick={() => setShowDomainTagModal(true)}
-                className={`px-2 py-1 rounded-full text-sm flex items-center ${
-                  isDarkMode
-                    ? "bg-gray-700 text-gray-300"
-                    : "bg-gray-100 text-gray-700"
-                }`}
+                className={`px-2 py-1 rounded-full text-sm flex items-center ${isDarkMode ? "bg-gray-700 text-gray-300" : "bg-gray-100 text-gray-700"}`}
               >
                 <PlusIcon className="h-4 w-4" />
               </button>
@@ -532,10 +497,7 @@ export default function ProjectEditPage() {
             <label className={`block font-medium ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
               Project URLs
             </label>
-            <form ref={formRef} onSubmit={(e) => {
-              e.preventDefault();
-              handleSave();
-            }} className="space-y-4 mt-2">
+            <form ref={formRef} onSubmit={(e) => { e.preventDefault(); handleSave(); }} className="space-y-4 mt-2">
               <input
                 type="url"
                 placeholder="GitHub URL"
@@ -581,14 +543,13 @@ export default function ProjectEditPage() {
             {project?.launchLead.id === userInfo?.id || isAdmin ? (
               <>
                 <div className="mt-2">
-                  <div className={`inline-flex items-center px-3 py-1 rounded-full text-sm cursor-pointer transition-colors ${
-                    isDarkMode 
-                      ? 'bg-purple-900/50 text-purple-100 hover:bg-purple-800/50' 
-                      : 'bg-purple-100 text-purple-800 hover:bg-purple-200'
-                  }`} onClick={() => setShowLaunchLeadModal(true)}>
+                  <div
+                    className={`inline-flex items-center px-3 py-1 rounded-full text-sm cursor-pointer transition-colors ${isDarkMode ? "bg-purple-900/50 text-purple-100 hover:bg-purple-800/50" : "bg-purple-100 text-purple-800 hover:bg-purple-200"}`}
+                    onClick={() => setShowLaunchLeadModal(true)}
+                  >
                     <span>{project?.launchLead.name}</span>
-                    <span className={`mx-1 ${isDarkMode ? 'text-purple-400' : 'text-purple-400'}`}>•</span>
-                    <span className={isDarkMode ? 'text-purple-300' : 'text-purple-600'}>Launch Lead</span>
+                    <span className={`mx-1 ${isDarkMode ? "text-purple-400" : "text-purple-400"}`}>•</span>
+                    <span className={isDarkMode ? "text-purple-300" : "text-purple-600"}>Launch Lead</span>
                   </div>
                 </div>
 
@@ -596,25 +557,17 @@ export default function ProjectEditPage() {
                   {project?.participants.map((participant) => (
                     <div
                       key={participant.hacker.id}
-                      className={`flex items-center px-3 py-1 rounded-full text-sm ${
-                        isDarkMode 
-                          ? 'bg-gray-700 text-gray-100' 
-                          : 'bg-indigo-100 text-indigo-800'
-                      }`}
+                      className={`flex items-center px-3 py-1 rounded-full text-sm ${isDarkMode ? "bg-gray-700 text-gray-100" : "bg-indigo-100 text-indigo-800"}`}
                     >
                       <span>{swapFirstLetters(participant.hacker.name)}</span>
-                      <span className={`mx-1 ${isDarkMode ? 'text-gray-400' : 'text-indigo-400'}`}>•</span>
-                      <span className={isDarkMode ? 'text-gray-300' : 'text-indigo-600'}>
+                      <span className={`mx-1 ${isDarkMode ? "text-gray-400" : "text-indigo-400"}`}>•</span>
+                      <span className={isDarkMode ? "text-gray-300" : "text-indigo-600"}>
                         {ProjectRoles.find((r) => r.id === participant.role)?.label}
                       </span>
                       <button
                         type="button"
                         onClick={() => handleRemoveMember(participant.hacker.id)}
-                        className={`ml-2 ${
-                          isDarkMode 
-                            ? 'text-gray-400 hover:text-gray-200' 
-                            : 'text-indigo-600 hover:text-indigo-800'
-                        }`}
+                        className={`ml-2 ${isDarkMode ? "text-gray-400 hover:text-gray-200" : "text-indigo-600 hover:text-indigo-800"}`}
                       >
                         <XMarkIcon className="h-4 w-4" />
                       </button>
@@ -623,11 +576,7 @@ export default function ProjectEditPage() {
                   <button
                     type="button"
                     onClick={() => setShowTeamModal(true)}
-                    className={`text-sm font-medium ${
-                      isDarkMode 
-                        ? 'text-indigo-400 hover:text-indigo-300' 
-                        : 'text-indigo-600 hover:text-indigo-800'
-                    }`}
+                    className={`text-sm font-medium ${isDarkMode ? "text-indigo-400 hover:text-indigo-300" : "text-indigo-600 hover:text-indigo-800"}`}
                   >
                     + Add Team Members
                   </button>
@@ -635,12 +584,11 @@ export default function ProjectEditPage() {
               </>
             ) : (
               <p className={`mt-2 text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
-                Only the launch lead can add or delete team members. Contact <a 
-                  href={`/hacker/${project?.launchLead.id}`}
-                  className={`${isDarkMode ? "text-indigo-400 hover:text-indigo-300" : "text-indigo-600 hover:text-indigo-700"}`}
-                >
+                Only the launch lead can add or delete team members. Contact{" "}
+                <a href={`/hacker/${project?.launchLead.id}`} className={`${isDarkMode ? "text-indigo-400 hover:text-indigo-300" : "text-indigo-600 hover:text-indigo-700"}`}>
                   {project?.launchLead.name}
-                </a> with this.
+                </a>{" "}
+                with this.
               </p>
             )}
 
@@ -655,7 +603,7 @@ export default function ProjectEditPage() {
               title="Change Launch Lead"
               singleSelect={true}
               selectedIds={project?.launchLead ? [project.launchLead.id] : []}
-              showRoleSelector={false} // Disable role selector for launch lead
+              showRoleSelector={false}
             />
 
             <HackerSelector
@@ -664,9 +612,7 @@ export default function ProjectEditPage() {
               isDarkMode={isDarkMode}
               searchTerm={teamSearchTerm}
               setSearchTerm={setTeamSearchTerm}
-              filteredHackers={filteredTeamHackers.filter(
-                (hacker) => !project?.participants.some(p => p.hacker.id === hacker.id)
-              )}
+              filteredHackers={filteredTeamHackers.filter(hacker => !project?.participants.some(p => p.hacker.id === hacker.id))}
               title="Add Team Members"
               selectedIds={project?.participants.map(p => p.hacker.id) || []}
               showRoleSelector={true}
@@ -679,28 +625,25 @@ export default function ProjectEditPage() {
             </label>
             <input
               type="date"
-              value={editableStartDate ? format(editableStartDate, 'yyyy-MM-dd') : ''}
+              value={editableStartDate ? format(editableStartDate, "yyyy-MM-dd") : ""}
               onChange={(e) => {
                 if (!e.target.value) {
                   setEditableStartDate(new Date());
                   return;
                 }
-                // Create date using ISO format to preserve exact date
-                const [year, month, day] = e.target.value.split('-');
+                const [year, month, day] = e.target.value.split("-");
                 const date = new Date(Number(year), Number(month) - 1, Number(day));
                 setEditableStartDate(date);
               }}
               className={`mt-1 block w-64 border${
-                isDarkMode 
-                  ? "border-gray-600 bg-gray-800 text-gray-100 [color-scheme:dark] calendar-picker-indicator:filter-invert" 
+                isDarkMode
+                  ? "border-gray-600 bg-gray-800 text-gray-100 [color-scheme:dark] calendar-picker-indicator:filter-invert"
                   : "border-gray-300 bg-white text-gray-900 [color-scheme:light]"
               } rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 p-2`}
             />
           </div>
           <div>
-            <label className={`block font-medium mb-1 ${
-              isDarkMode ? 'text-gray-300' : 'text-gray-700'
-            } font-fira-code`}>
+            <label className={`block font-medium mb-1 ${isDarkMode ? "text-gray-300" : "text-gray-700"} font-fira-code`}>
               Project Thumbnail
             </label>
             <div className="mt-1 flex items-center space-x-4">
@@ -721,23 +664,16 @@ export default function ProjectEditPage() {
                   </button>
                 </div>
               )}
-              <label className={`cursor-pointer px-4 py-2 rounded-md shadow-sm font-medium ${
-                isDarkMode 
-                  ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' 
-                  : 'bg-white text-gray-700 hover:bg-gray-50 border-2 border-gray-200 hover:border-gray-300'
-              }`}>
+              <label
+                className={`cursor-pointer px-4 py-2 rounded-md shadow-sm font-medium ${
+                  isDarkMode ? "bg-gray-700 text-gray-300 hover:bg-gray-600" : "bg-white text-gray-700 hover:bg-gray-50 border-2 border-gray-200 hover:border-gray-300"
+                }`}
+              >
                 {thumbnailPreview ? "Change Image" : "Upload Image"}
-                <input
-                  type="file"
-                  className="hidden"
-                  accept="image/*"
-                  onChange={handleImageChange}
-                />
+                <input type="file" className="hidden" accept="image/*" onChange={handleImageChange} />
               </label>
             </div>
-            <p className={`mt-2 text-sm ${
-              isDarkMode ? 'text-gray-400' : 'text-gray-500'
-            }`}>
+            <p className={`mt-2 text-sm ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
               Recommended: 1280x720px or larger, 16:9 ratio
             </p>
           </div>
@@ -746,21 +682,23 @@ export default function ProjectEditPage() {
               Full Description
             </label>
             <span className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
-              Supports <a href="https://www.markdownguide.org/basic-syntax" target="_blank" rel="noopener noreferrer">Markdown</a>! Use the toolbar.
+              Supports{" "}
+              <a href="https://www.markdownguide.org/basic-syntax" target="_blank" rel="noopener noreferrer">
+                Markdown
+              </a>
+              ! Use the toolbar.
             </span>
             <div className={`mt-2 flex gap-2 ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
               <button
                 type="button"
                 onClick={() => {
-                  const textarea = document.getElementById('description-textarea') as HTMLTextAreaElement;
+                  const textarea = document.getElementById("description-textarea") as HTMLTextAreaElement;
                   const start = textarea.selectionStart;
                   const end = textarea.selectionEnd;
                   const text = textarea.value;
                   const selectedText = text.substring(start, end);
-                  const replacement = selectedText ? `**${selectedText}**` : '**Bold text**';
-                  setEditableDescription(
-                    text.substring(0, start) + replacement + text.substring(end)
-                  );
+                  const replacement = selectedText ? `**${selectedText}**` : "**Bold text**";
+                  setEditableDescription(text.substring(0, start) + replacement + text.substring(end));
                   setTimeout(() => {
                     textarea.focus();
                     if (selectedText) {
@@ -780,15 +718,13 @@ export default function ProjectEditPage() {
               <button
                 type="button"
                 onClick={() => {
-                  const textarea = document.getElementById('description-textarea') as HTMLTextAreaElement;
+                  const textarea = document.getElementById("description-textarea") as HTMLTextAreaElement;
                   const start = textarea.selectionStart;
                   const end = textarea.selectionEnd;
                   const text = textarea.value;
                   const selectedText = text.substring(start, end);
-                  const replacement = selectedText ? `*${selectedText}*` : '*Italic text*';
-                  setEditableDescription(
-                    text.substring(0, start) + replacement + text.substring(end)
-                  );
+                  const replacement = selectedText ? `*${selectedText}*` : "*Italic text*";
+                  setEditableDescription(text.substring(0, start) + replacement + text.substring(end));
                   setTimeout(() => {
                     textarea.focus();
                     if (selectedText) {
@@ -808,15 +744,13 @@ export default function ProjectEditPage() {
               <button
                 type="button"
                 onClick={() => {
-                  const textarea = document.getElementById('description-textarea') as HTMLTextAreaElement;
+                  const textarea = document.getElementById("description-textarea") as HTMLTextAreaElement;
                   const start = textarea.selectionStart;
                   const end = textarea.selectionEnd;
                   const text = textarea.value;
                   const selectedText = text.substring(start, end);
-                  const replacement = selectedText ? `[${selectedText}](url)` : '[Link](url)';
-                  setEditableDescription(
-                    text.substring(0, start) + replacement + text.substring(end)
-                  );
+                  const replacement = selectedText ? `[${selectedText}](url)` : "[Link](url)";
+                  setEditableDescription(text.substring(0, start) + replacement + text.substring(end));
                   setTimeout(() => {
                     textarea.focus();
                     if (selectedText) {
@@ -836,15 +770,13 @@ export default function ProjectEditPage() {
               <button
                 type="button"
                 onClick={() => {
-                  const textarea = document.getElementById('description-textarea') as HTMLTextAreaElement;
+                  const textarea = document.getElementById("description-textarea") as HTMLTextAreaElement;
                   const start = textarea.selectionStart;
                   const end = textarea.selectionEnd;
                   const text = textarea.value;
                   const selectedText = text.substring(start, end);
                   const replacement = `\`${selectedText}\``;
-                  setEditableDescription(
-                    text.substring(0, start) + replacement + text.substring(end)
-                  );
+                  setEditableDescription(text.substring(0, start) + replacement + text.substring(end));
                   setTimeout(() => {
                     textarea.focus();
                     textarea.selectionStart = start + 1;
@@ -869,38 +801,19 @@ export default function ProjectEditPage() {
                     const file = e.target.files?.[0];
                     if (file) {
                       try {
-                        const loadingToast = toast.loading('Uploading image...');
-                        const formData = new FormData();
-                        formData.append('file', file);
-
-                        const response = await fetch('/api/uploads/image', {
-                          method: 'POST',
-                          body: formData,
-                        });
-
-                        if (!response.ok) {
-                          throw new Error('Failed to upload image');
-                        }
-
-                        const data = await response.json();
-                        toast.dismiss(loadingToast);
-                        toast.success('Image uploaded successfully');
-
-                        const textarea = document.getElementById('description-textarea') as HTMLTextAreaElement;
+                        const imageUrl = await uploadImage(file);
+                        const textarea = document.getElementById("description-textarea") as HTMLTextAreaElement;
                         const start = textarea.selectionStart;
                         const text = textarea.value;
-                        const imageMarkdown = `![Image](${data.url})`;
-                        setEditableDescription(
-                          text.substring(0, start) + imageMarkdown + text.substring(start)
-                        );
-                        
+                        const imageMarkdown = `![Image](${imageUrl})`;
+                        setEditableDescription(text.substring(0, start) + imageMarkdown + text.substring(start));
                         setTimeout(() => {
                           textarea.focus();
                           textarea.selectionStart = textarea.selectionEnd = start + imageMarkdown.length;
                         }, 0);
                       } catch (error) {
-                        console.error('Error uploading image:', error);
-                        toast.error('Failed to upload image');
+                        console.error("Error uploading image:", error);
+                        toast.error("Failed to upload image");
                       }
                     }
                   }}
@@ -912,32 +825,26 @@ export default function ProjectEditPage() {
               value={editableDescription}
               onChange={(e) => setEditableDescription(e.target.value)}
               onKeyDown={(e) => {
-                // Handle keyboard shortcuts
                 if (e.ctrlKey || e.metaKey) {
                   const textarea = e.currentTarget;
                   const start = textarea.selectionStart;
                   const end = textarea.selectionEnd;
                   const text = textarea.value;
                   const selectedText = text.substring(start, end);
-
                   switch (e.key.toLowerCase()) {
-                    case 'b':
+                    case "b":
                       e.preventDefault();
                       const boldText = `**${selectedText}**`;
-                      setEditableDescription(
-                        text.substring(0, start) + boldText + text.substring(end)
-                      );
+                      setEditableDescription(text.substring(0, start) + boldText + text.substring(end));
                       setTimeout(() => {
                         textarea.selectionStart = start + 2;
                         textarea.selectionEnd = start + 2 + selectedText.length;
                       }, 0);
                       break;
-                    case 'i':
+                    case "i":
                       e.preventDefault();
                       const italicText = `*${selectedText}*`;
-                      setEditableDescription(
-                        text.substring(0, start) + italicText + text.substring(end)
-                      );
+                      setEditableDescription(text.substring(0, start) + italicText + text.substring(end));
                       setTimeout(() => {
                         textarea.selectionStart = start + 1;
                         textarea.selectionEnd = start + 1 + selectedText.length;
@@ -948,84 +855,44 @@ export default function ProjectEditPage() {
               }}
               onPaste={async (e) => {
                 const items = Array.from(e.clipboardData?.items || []);
-                const imageItem = items.find(item => item.type.startsWith('image/'));
-                
+                const imageItem = items.find(item => item.type.startsWith("image/"));
                 if (imageItem) {
                   e.preventDefault();
                   const file = imageItem.getAsFile();
                   if (file) {
                     try {
-                      const loadingToast = toast.loading('Uploading image...');
-                      const formData = new FormData();
-                      formData.append('file', file);
-
-                      const response = await fetch('/api/uploads/image', {
-                        method: 'POST',
-                        body: formData,
-                      });
-
-                      if (!response.ok) {
-                        throw new Error('Failed to upload image');
-                      }
-
-                      const data = await response.json();
-                      toast.dismiss(loadingToast);
-                      toast.success('Image uploaded successfully');
-
+                      const imageUrl = await uploadImage(file);
                       const textarea = e.currentTarget;
                       const start = textarea.selectionStart;
                       const text = textarea.value;
-                      const imageMarkdown = `![Image](${data.url})`;
-                      setEditableDescription(
-                        text.substring(0, start) + imageMarkdown + text.substring(start)
-                      );
-                      
+                      const imageMarkdown = `![Image](${imageUrl})`;
+                      setEditableDescription(text.substring(0, start) + imageMarkdown + text.substring(start));
                       setTimeout(() => {
                         textarea.selectionStart = textarea.selectionEnd = start + imageMarkdown.length;
                         textarea.focus();
                       }, 0);
                     } catch (error) {
-                      console.error('Error uploading image:', error);
-                      toast.error('Failed to upload image');
+                      console.error("Error uploading image:", error);
+                      toast.error("Failed to upload image");
                     }
                   }
                 }
               }}
               onDragOver={(e) => {
                 e.preventDefault();
-                e.currentTarget.classList.add('border-indigo-500');
+                e.currentTarget.classList.add("border-indigo-500");
               }}
               onDragLeave={(e) => {
                 e.preventDefault();
-                e.currentTarget.classList.remove('border-indigo-500');
+                e.currentTarget.classList.remove("border-indigo-500");
               }}
               onDrop={async (e) => {
                 e.preventDefault();
                 e.currentTarget.classList.remove('border-indigo-500');
-                
-                // Check for URLs in the drop data
-                const urlData = e.dataTransfer.getData('text/uri-list') || e.dataTransfer.getData('text/plain');
-                if (urlData && (urlData.startsWith('http://') || urlData.startsWith('https://'))) {
-                  // Check if it's an image URL by looking at the extension
-                  const isImageUrl = /\.(jpg|jpeg|png|gif|webp)$/i.test(urlData);
-                  if (isImageUrl) {
-                    const textarea = e.currentTarget;
-                    const start = textarea.selectionStart;
-                    const text = textarea.value;
-                    const imageMarkdown = `![Image](${urlData})`;
-                    setEditableDescription(
-                      text.substring(0, start) + imageMarkdown + text.substring(start)
-                    );
-                    
-                    setTimeout(() => {
-                      textarea.selectionStart = textarea.selectionEnd = start + imageMarkdown.length;
-                      textarea.focus();
-                    }, 0);
-                    return;
-                  }
-                }
+                const textarea = e.currentTarget;
+                textarea.focus(); // Ensure textarea is focused before accessing selection
 
-                // Handle file drops (existing functionality)
+                // First check for image files
                 const file = e.dataTransfer.files[0];
                 if (file && file.type.startsWith('image/')) {
                   try {
@@ -1046,44 +913,61 @@ export default function ProjectEditPage() {
                     toast.dismiss(loadingToast);
                     toast.success('Image uploaded successfully');
 
-                    const textarea = e.currentTarget;
-                    const start = textarea.selectionStart;
+                    const start = textarea.selectionStart || textarea.value.length;
                     const text = textarea.value;
-                    const imageMarkdown = `![Image](${data.url})`;
+                    const imageMarkdown = `![${file.name}](${data.url})`;
                     setEditableDescription(
                       text.substring(0, start) + imageMarkdown + text.substring(start)
                     );
                     
-                    setTimeout(() => {
-                      textarea.selectionStart = textarea.selectionEnd = start + imageMarkdown.length;
-                      textarea.focus();
-                    }, 0);
+                    const newPosition = start + imageMarkdown.length;
+                    textarea.selectionStart = newPosition;
+                    textarea.selectionEnd = newPosition;
+                    return;
                   } catch (error) {
                     console.error('Error uploading image:', error);
                     toast.error('Failed to upload image');
+                    return;
+                  }
+                }
+
+                // Then check for URLs
+                const urlData = e.dataTransfer.getData('text/uri-list') || e.dataTransfer.getData('text/plain');
+                if (urlData && (urlData.startsWith('http://') || urlData.startsWith('https://'))) {
+                  const isImageUrl = /\.(jpg|jpeg|png|gif|webp)$/i.test(urlData);
+                  if (isImageUrl) {
+                    const start = textarea.selectionStart || textarea.value.length;
+                    const text = textarea.value;
+                    const filename = urlData.split('/').pop() || 'image';
+                    const imageMarkdown = `![${filename}](${urlData})`;
+                    setEditableDescription(
+                      text.substring(0, start) + imageMarkdown + text.substring(start)
+                    );
+                    
+                    const newPosition = start + imageMarkdown.length;
+                    textarea.selectionStart = newPosition;
+                    textarea.selectionEnd = newPosition;
                   }
                 }
               }}
               className={`mt-1 block w-full border ${
-                isDarkMode 
-                  ? "border-gray-600 bg-gray-800 text-gray-100" 
+                isDarkMode
+                  ? "border-gray-600 bg-gray-800 text-gray-100"
                   : "border-gray-300 bg-white text-gray-900"
               } rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 p-2`}
               rows={15}
               placeholder="Write your project description here..."
             />
           </div>
-
-          <ButtonPanel 
-            params={params} 
-            router={router} 
-            isDarkMode={isDarkMode} 
-            handleSave={handleSave} 
-            saving={saving} 
+          <ButtonPanel
+            params={params}
+            router={router}
+            isDarkMode={isDarkMode}
+            handleSave={handleSave}
+            saving={saving}
           />
         </div>
       </div>
     </div>
   );
 }
-
