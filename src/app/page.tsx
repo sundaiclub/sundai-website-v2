@@ -203,6 +203,22 @@ export default function Home() {
               &copy; 2025 Sundai Club. All rights reserved.
             </p>
 
+            {/* Foundation link - Center aligned */}
+            <p className="text-sm md:text-base order-1 md:order-2 mb-4 md:mb-0">
+              <a 
+                href="https://sundai.foundation" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className={`${
+                  isDarkMode 
+                    ? "text-gray-200 hover:text-indigo-400" 
+                    : "text-gray-700 hover:text-indigo-600"
+                } transition duration-300`}
+              >
+                More about Sundai
+              </a>
+            </p>
+
             {/* Social links - Right aligned */}
             <ul className="flex justify-center order-1 md:order-2">
               {/* GitHub */}
