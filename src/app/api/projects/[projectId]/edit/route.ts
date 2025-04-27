@@ -85,7 +85,9 @@ export async function PATCH(
     updateData.githubUrl = formData.get('githubUrl')?.toString() || null;
     updateData.demoUrl = formData.get('demoUrl')?.toString() || null;
     updateData.blogUrl = formData.get('blogUrl')?.toString() || null;
-    
+    updateData.phUrl = formData.get('phUrl')?.toString() || null;
+    updateData.videoUrl = formData.get('videoUrl')?.toString() || null;
+
     const isBroken = formData.get('is_broken');
     if (isBroken !== null) updateData.is_broken = isBroken === 'true';
 
