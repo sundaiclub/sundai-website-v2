@@ -11,6 +11,7 @@ import ReactMarkdown from 'react-markdown';
 import { CheckIcon, XMarkIcon } from "@heroicons/react/24/solid";
 import toast from 'react-hot-toast';
 import { Project } from "../../components/Project";
+import { GitHubButton } from "../../components/GitHubButton";
 import { swapFirstLetters } from "../../utils/nameUtils";
 
 export default function ProjectDetail() {
@@ -21,6 +22,7 @@ export default function ProjectDetail() {
   const [loading, setLoading] = useState(true);
   const [isLiked, setIsLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
+  const [isStarred, setIsStarred] = useState(false);
   const { isDarkMode } = useTheme();
   const [isProjectDraft, setIsProjectDraft] = useState(false);
 
@@ -228,7 +230,7 @@ export default function ProjectDetail() {
                     </span>
                   </div>
                 </div>
-                <div className="mt-4 md:mt-0">
+                <div className="mt-4 md:mt-0 flex gap-2">
                   <button
                     onClick={handleLike}
                     className="flex items-center gap-2 bg-white/20 backdrop-blur-sm px-6 py-3 rounded-full hover:bg-white/30 transition-colors"
@@ -240,6 +242,9 @@ export default function ProjectDetail() {
                     )}
                     <span className="text-lg">{likeCount}</span>
                   </button>
+                  {project?.githubUrl && (
+                    <GitHubButton url={project.githubUrl} className="" />
+                  )}
                 </div>
               </div>
             </div>
@@ -264,19 +269,6 @@ export default function ProjectDetail() {
                         target="_blank"
                       >
                         View Demo
-                      </Link>
-                    )}
-                    {project.githubUrl && (
-                      <Link
-                        href={project.githubUrl}
-                        className={`px-6 py-3 rounded-lg transition-colors ${
-                          isDarkMode
-                            ? "bg-gray-700 hover:bg-gray-600"
-                            : "bg-gray-800 hover:bg-gray-900"
-                        } text-white text-lg`}
-                        target="_blank"
-                      >
-                        GitHub
                       </Link>
                     )}
                     {project.blogUrl && (
