@@ -16,12 +16,27 @@ const getGhStarCount = async (url: string): Promise<number | null> => {
     if (parts.length >= 2) {
       const username = parts[0];
       const repo = parts[1].replace('.git', '');
-      const response = await fetch(`https://api.github.com/repos/${username}/${repo}`);
+      
+      const headers: Record<string, string> = {
+        'Accept': 'application/vnd.github.v3+json'
+      };
+      
+      if (process.env.NEXT_PUBLIC_GITHUB_TOKEN) {
+        headers['Authorization'] = `Bearer ${process.env.NEXT_PUBLIC_GITHUB_TOKEN}`;
+        headers['X-GitHub-Api-Version'] = '2022-11-28';
+      }
+      
+      const response = await fetch(`https://api.github.com/repos/${username}/${repo}`, { headers });
+      if (!response.ok) {
+        console.error('GitHub API request failed:', await response.text());
+        return null;
+      }
       const data = await response.json();
       return data.stargazers_count;
     }
     return null;
   } catch (error) {
+    console.error('Error fetching GitHub stars:', error);
     return null;
   }
 }
