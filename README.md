@@ -2,12 +2,11 @@
 
 A modern platform for managing hackathons, tracking attendance, showcasing projects, and connecting the hacker community. Built with Next.js, TypeScript, and PostgreSQL.
 
-Reach out to @godeva or @arteml0178 on discord with any quesions.
-
 ## 📝 Contributing
 
 Want to contribute? Check out our [GitHub Issues](https://github.com/sundaiclub/sundai-website-v2/issues) for ways to help! Look for issues labeled `good first issue` or `help wanted` to get started.
 
+Reach out to @godeva or @arteml0178 on discord with any quesions.
 
 ## 📋 Table of Contents
 
@@ -202,18 +201,6 @@ npm run dev          # Start development server
 npm run build        # Build for production
 npm run lint         # Run linting
 ```
-
-## 📖 Feature Documentation
-
-| Feature | Description | Key Pages |
-|---------|-------------|-----------|
-| [👥 User Onboarding](#user-onboarding) | Clerk authentication & profile setup | `/join`, `/me` |
-| [🛠️ Project Management](#project-management) | Create, edit, join projects | `/projects`, `/projects/new` |
-| [📊 Attendance System](#attendance-system) | QR code check-ins & tracking | `/attendance` |
-| [🏆 Project Showcase](#project-showcase) | Browse & discover projects | `/projects`, `/` |
-| [👑 Admin Portal](#admin-portal) | User & project management | `/admin` |
-| [🔔 Notifications](#notifications) | Push notification system | Service Worker |
-| [📱 PWA Features](#pwa-features) | Mobile-first responsive design | Manifest, SW |
 
 ## 🔑 Required External Services Setup
 
