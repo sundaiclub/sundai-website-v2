@@ -1,80 +1,232 @@
-# Sundai Website v2
+# 🚀 Sundai Club - Hackathon & Project Management Platform
 
-This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+A modern platform for managing hackathons, tracking attendance, showcasing projects, and connecting the hacker community. Built with Next.js, TypeScript, and PostgreSQL.
 
-## Getting Started!
+## 📝 Contributing
 
-### 1. Start the Database
+Want to contribute? Check out our [GitHub Issues](https://github.com/sundaiclub/sundai-website-v2/issues) for ways to help! Look for issues labeled `good first issue` or `help wanted` to get started.
 
-First, start the PostgreSQL database using Docker:
+Reach out to @godeva or @arteml0178 on discord with any quesions.
+
+## 📋 Table of Contents
+
+- [🚀 Quick Start Guide for First-Time Setup](#-quick-start-guide-for-first-time-setup)
+  - [Prerequisites](#prerequisites)
+  - [1. Clone & Install Dependencies](#1-clone--install-dependencies)
+  - [2. Start Docker Desktop](#2-start-docker-desktop)
+  - [3. Environment Setup](#3-environment-setup)
+  - [4. Database Setup](#4-database-setup)
+  - [5. Start Development Server](#5-start-development-server)
+- [🏗️ Architecture Overview](#️-architecture-overview)
+- [🔧 Troubleshooting](#-troubleshooting)
+- [📖 Feature Documentation](#-feature-documentation)
+- [🔑 Required External Services Setup](#-required-external-services-setup)
+- [🚀 Learn More](#-learn-more)
+
+## 🚀 Quick Start Guide for First-Time Setup
+
+### Prerequisites
+
+Before starting, ensure you have:
+
+- **Node.js 18+** and npm installed
+- **Docker Desktop** installed AND running (not just installed!)
+- **Git** for version control
+- **Clerk Account** - Sign up at [clerk.com](https://clerk.com) for authentication
+- **Google Cloud Project** - For file storage (optional for local development)
+
+### 1. Clone & Install Dependencies
 
 ```bash
-# Start the database
-docker-compose up -d
-
-# To stop the database
-docker-compose down
-
-# To view database logs
-docker-compose logs -f postgres
+git clone [your-repo-url]
+cd sundai-website-v2
+npm install
 ```
 
-The database will be available at:
+### 2. Start Docker Desktop
 
-- Host: localhost
-- Port: 5432
-- User: postgres
-- Password: postgres
-- Database: sundai_db
-
-### 2. Run the Development Server
+⚠️ **Critical Step**: Docker Desktop must be running before proceeding!
 
 ```bash
-# Install dependencies
-npm install
+# On macOS - open Docker Desktop
+open -a Docker
 
-# Run database migrations
-npx prisma migrate dev
+# On Windows - start Docker Desktop from Start menu
+# On Linux - start docker service
+sudo systemctl start docker
 
-# Seed the database (optional)
+# Verify Docker is running
+docker info
+```
+
+### 3. Environment Setup
+
+#### Required Third-Party Services:
+
+**Clerk Authentication** (Required):
+1. Sign up at [clerk.com](https://clerk.com)
+2. Create a new application
+3. Get your publishable key and secret key from the dashboard
+
+**Google Cloud Storage** (Optional for local development):
+1. Create Google Cloud Project
+2. Enable Cloud Storage API
+3. Create a storage bucket
+4. Set up service account with storage permissions
+
+#### Create `.env.local` file:
+
+```bash
+# Database (for local development)
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/sundai_db"
+
+# Clerk Authentication - GET THESE FROM YOUR CLERK DASHBOARD
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY="pk_test_your_actual_key_here"
+CLERK_SECRET_KEY="sk_test_your_actual_secret_here"
+CLERK_WEBHOOK_SECRET="whsec_your_webhook_secret_here"
+
+# Google Cloud Storage (optional for local development)
+GOOGLE_CLOUD_BUCKET="your-bucket-name"
+
+# PostHog Analytics (optional for local development)
+NEXT_PUBLIC_POSTHOG_KEY="your_posthog_key"
+NEXT_PUBLIC_POSTHOG_HOST="https://us.i.posthog.com"
+```
+
+### 4. Database Setup
+
+```bash
+# Start PostgreSQL database container
+docker-compose up -d
+
+# Verify database is running
+docker-compose ps
+
+# Apply all database migrations
+npx prisma migrate deploy
+
+# Seed database with sample data
 npx prisma db seed
+```
 
-# Start the development server
+### 5. Start Development Server
+
+```bash
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+🎉 **Success!** Visit [http://localhost:3000](http://localhost:3000) to see the application!
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 🏗️ Architecture Overview
 
-This project uses [`next/font`](https://nextjs.org/docs/basic-features/font-optimization) to automatically optimize and load Inter, a custom Google Font.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js/) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/deployment) for more details.
-
-## Database Connection
-
-The application connects to a Google Cloud SQL PostgreSQL instance:
-
-```bash
-# Connection Details
-Host: 34.148.221.200
-Port: 5432
-Database: sundai_db
-Instance: sundai-club-434220:us-east1:club-site-main
-Service Account: p199983032721-yeh8ti@gcp-sa-cloud-sql.iam.gserviceaccount.com
+```mermaid
+graph TD
+    A[Next.js Frontend] --> B[API Routes]
+    B --> C[Prisma ORM]
+    C --> D[PostgreSQL Database]
+    B --> E[Clerk Authentication]
+    B --> F[Google Cloud Storage]
+    B --> G[Push Notifications]
+    A --> H[PostHog Analytics]
 ```
 
-To connect locally, update your .env file with the correct DATABASE_URL.
+**Tech Stack:**
+- **Frontend**: Next.js 14 with TypeScript, Tailwind CSS, Framer Motion
+- **Backend**: Next.js API routes with Prisma ORM
+- **Database**: PostgreSQL with Docker for local development
+- **Authentication**: Clerk for user management
+- **File Storage**: Google Cloud Storage for images
+- **Analytics**: PostHog for user tracking
+
+## 🔧 Troubleshooting
+
+### Common First-Time Setup Issues:
+
+#### "Docker daemon not running"
+```bash
+# Solution: Start Docker Desktop first
+open -a Docker  # macOS
+# Wait for Docker Desktop to fully start (check system tray), then retry
+```
+
+#### "Environment variable not found: DATABASE_URL"
+```bash
+# Solution: Ensure .env.local file exists with correct variables
+cat .env.local  # Check if file exists and has DATABASE_URL
+```
+
+#### "Database connection failed"
+```bash
+# Solution: Ensure PostgreSQL container is running
+docker-compose ps
+# If not running:
+docker-compose up -d
+```
+
+#### "Clerk authentication errors"
+```bash
+# Solution: Get real API keys from Clerk dashboard
+# 1. Go to https://clerk.com
+# 2. Create new application
+# 3. Copy ACTUAL API keys (not placeholder text) to .env.local
+```
+
+#### "Missing CLERK_ENCRYPTION_KEY" warning
+```bash
+# This is a deprecation warning, app will still work
+# Add to .env.local if you want to remove the warning:
+CLERK_ENCRYPTION_KEY="your_encryption_key_from_clerk_dashboard"
+```
+
+### Development Commands:
+
+```bash
+# Database management
+docker-compose logs -f postgres    # View database logs
+docker-compose down               # Stop database
+docker-compose down -v            # Stop and remove database data
+
+# Database reset (careful!)
+docker-compose down -v
+docker-compose up -d
+npx prisma migrate deploy
+npx prisma db seed
+
+# Database backup/restore
+npm run db:backup
+npm run db:restore
+
+# Development
+npm run dev          # Start development server
+npm run build        # Build for production
+npm run lint         # Run linting
+```
+
+## 🔑 Required External Services Setup
+
+### Clerk Authentication Setup:
+1. Sign up at [clerk.com](https://clerk.com)
+2. Create a new application
+3. Copy your publishable key and secret key to `.env.local`
+4. Add webhook endpoint for user sync: `[your-domain]/api/webhooks/clerk`
+5. Configure sign-in/sign-up flows in Clerk dashboard
+
+### Google Cloud Storage Setup (Optional):
+1. Create Google Cloud Project
+2. Enable Cloud Storage API
+3. Create a storage bucket
+4. Set up service account with storage permissions
+5. Download service account key JSON file and add to project
+
+## 🚀 Learn More
+
+To learn more about the technologies used:
+
+- [Next.js Documentation](https://nextjs.org/docs) - Learn about Next.js features and API
+- [Prisma Documentation](https://www.prisma.io/docs) - Database ORM and migrations
+- [Clerk Documentation](https://clerk.com/docs) - Authentication and user management
+- [Tailwind CSS](https://tailwindcss.com/docs) - Utility-first CSS framework
+
+---
+
+Built with ❤️ by the Sundai Club team
