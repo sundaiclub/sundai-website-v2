@@ -15,6 +15,7 @@ Reach out to @godeva or @arteml0178 on discord with any quesions.
   - [1. Clone & Install Dependencies](#1-clone--install-dependencies)
   - [2. Start Docker Desktop](#2-start-docker-desktop)
   - [3. Environment Setup](#3-environment-setup)
+    - [3.5 Environment Setup](#3.5-setting-up-your-profile-for-testing)
   - [4. Database Setup](#4-database-setup)
   - [5. Start Development Server](#5-start-development-server)
 - [🏗️ Architecture Overview](#️-architecture-overview)
