@@ -68,6 +68,35 @@ docker info
 2. Create a new application
 3. Get your publishable key and secret key from the dashboard
 
+After setting up Clerk authentication, you'll need to add yourself to the database so your profile works correctly.
+Once you've signed up with Clerk, you need to get your actual Clerk User ID:
+
+Edit `prisma/seed.ts` and add yourself to the users array:
+
+```typescript
+// Add this to the users array in prisma/seed.ts
+prisma.hacker.create({
+  data: {
+    name: "Your Full Name",           // Replace with your name
+    clerkId: "user_your_clerk_id",    // Replace with your actual Clerk ID from Step 1
+    role: Role.ADMIN,                 // or Role.HACKER
+    bio: "New developer on the team",
+    email: "your.email@example.com",  // Replace with your email
+  },
+}),
+```
+
+if you already ran prisma beforehand plaese do the following, otherwise skip this step
+
+```bash
+# Reset and reseed the database with your profile included
+npx prisma migrate reset --force
+npx prisma db seed
+```
+
+**Now your profile should work!** Visit `/me` or click on your profile to see your hacker profile page.
+
+
 **Google Cloud Storage** (Optional for local development):
 1. Create Google Cloud Project
 2. Enable Cloud Storage API
