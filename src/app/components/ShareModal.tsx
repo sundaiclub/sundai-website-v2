@@ -29,8 +29,27 @@ export default function ShareModal({ showModal, setShowModal, project, userInfo,
   const generateContent = async () => {
     setIsGenerating(true);
     try {
-      // TODO: This will be implemented in part 3 with the API endpoint
-      // For now, we'll create a basic template
+      const response = await fetch(`/api/projects/${project.id}/share`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          platform: selectedPlatform,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to generate content: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      setGeneratedContent(data.content);
+      setCustomContent(data.content);
+    } catch (error) {
+      console.error('Error generating content:', error);
+      
+      // Fallback to basic template on error
       const teamNames = [
         project.launchLead.name, 
         ...project.participants.map(p => p.hacker.name)
@@ -58,8 +77,6 @@ ${links}
 
       setGeneratedContent(content);
       setCustomContent(content);
-    } catch (error) {
-      console.error('Error generating content:', error);
     } finally {
       setIsGenerating(false);
     }
