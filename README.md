@@ -2,6 +2,13 @@
 
 A modern platform for managing hackathons, tracking attendance, showcasing projects, and connecting the hacker community. Built with Next.js, TypeScript, and PostgreSQL.
 
+Reach out to @godeva or @arteml0178 on discord with any quesions.
+
+## 📝 Contributing
+
+Want to contribute? Check out our [GitHub Issues](https://github.com/sundaiclub/sundai-website-v2/issues) for ways to help! Look for issues labeled `good first issue` or `help wanted` to get started.
+
+
 ## 📋 Table of Contents
 
 - [🚀 Quick Start Guide for First-Time Setup](#-quick-start-guide-for-first-time-setup)
@@ -16,7 +23,6 @@ A modern platform for managing hackathons, tracking attendance, showcasing proje
 - [📖 Feature Documentation](#-feature-documentation)
 - [🔑 Required External Services Setup](#-required-external-services-setup)
 - [🚀 Learn More](#-learn-more)
-- [📝 Contributing](#-contributing)
 
 ## 🚀 Quick Start Guide for First-Time Setup
 
@@ -233,11 +239,6 @@ To learn more about the technologies used:
 - [Prisma Documentation](https://www.prisma.io/docs) - Database ORM and migrations
 - [Clerk Documentation](https://clerk.com/docs) - Authentication and user management
 - [Tailwind CSS](https://tailwindcss.com/docs) - Utility-first CSS framework
-
-
-## 📝 Contributing
-
-Want to contribute? Check out our [GitHub Issues](https://github.com/sundaiclub/sundai-website-v2/issues) for ways to help! Look for issues labeled `good first issue` or `help wanted` to get started.
 
 ---
 
