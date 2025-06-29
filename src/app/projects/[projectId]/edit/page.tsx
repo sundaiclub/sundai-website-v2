@@ -104,6 +104,8 @@ export default function ProjectEditPage() {
   const [editableGithubUrl, setEditableGithubUrl] = useState("");
   const [editableDemoUrl, setEditableDemoUrl] = useState("");
   const [editableBlogUrl, setEditableBlogUrl] = useState("");
+  const [editablePhUrl, setEditablePhUrl] = useState("");
+  const [editableVideoUrl, setEditableVideoUrl] = useState("");
 
   const [saving, setSaving] = useState(false);
   const [availableTechTags, setAvailableTechTags] = useState<Project["techTags"]>([]);
@@ -163,6 +165,8 @@ export default function ProjectEditPage() {
       setEditableGithubUrl(project.githubUrl || "");
       setEditableDemoUrl(project.demoUrl || "");
       setEditableBlogUrl(project.blogUrl || "");
+      setEditablePhUrl(project.phUrl || "");
+      setEditableVideoUrl(project.videoUrl || "");
       setThumbnailPreview(project.thumbnail?.url || null);
     }
   }, [project]);
@@ -240,6 +244,8 @@ export default function ProjectEditPage() {
       formData.append("githubUrl", editableGithubUrl);
       formData.append("demoUrl", editableDemoUrl);
       formData.append("blogUrl", editableBlogUrl);
+      formData.append("phUrl", editablePhUrl);
+      formData.append("videoUrl", editableVideoUrl);
 
       // Add team members data
       formData.append("participants", JSON.stringify(project.participants));
@@ -517,6 +523,20 @@ export default function ProjectEditPage() {
                 placeholder="Blog URL"
                 value={editableBlogUrl}
                 onChange={(e) => setEditableBlogUrl(e.target.value)}
+                className={`block w-3/4 border ${isDarkMode ? "border-gray-600 bg-gray-800 text-gray-100" : "border-gray-300 bg-white text-gray-900"} rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 p-2`}
+              />
+              <input
+                type="url"
+                placeholder="Product Hunt URL"
+                value={editablePhUrl}
+                onChange={(e) => setEditablePhUrl(e.target.value)}
+                className={`block w-3/4 border ${isDarkMode ? "border-gray-600 bg-gray-800 text-gray-100" : "border-gray-300 bg-white text-gray-900"} rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 p-2`}
+              />
+              <input
+                type="url"
+                placeholder="YouTube Video URL (starting with https://youtu.be/)"
+                value={editableVideoUrl}
+                onChange={(e) => setEditableVideoUrl(e.target.value)}
                 className={`block w-3/4 border ${isDarkMode ? "border-gray-600 bg-gray-800 text-gray-100" : "border-gray-300 bg-white text-gray-900"} rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 p-2`}
               />
             </form>

@@ -76,6 +76,8 @@ model Project {
   githubUrl   String?
   demoUrl     String?
   blogUrl     String?
+  phUrl       String?
+  videoUrl    String?
   thumbnail   Image?    @relation("ProjectThumbnail", fields: [thumbnailId], references: [id])
   thumbnailId String?   @unique
   launchLead  Hacker    @relation("LaunchLead", fields: [launchLeadId], references: [id])

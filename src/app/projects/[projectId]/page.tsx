@@ -292,6 +292,19 @@ export default function ProjectDetail() {
                         Blogpost
                       </Link>
                     )}
+                    {project.phUrl && (
+                      <Link
+                        href={project.phUrl}
+                        className={`px-6 py-3 rounded-lg transition-colors ${
+                          isDarkMode
+                            ? "bg-gray-700 hover:bg-gray-600"
+                            : "bg-gray-800 hover:bg-gray-900"
+                        } text-white text-lg`}
+                        target="_blank"
+                      >
+                        ProductHunt ▲
+                      </Link>
+                    )}
                   </div>
                   
                   {/* Tags Section */}
@@ -472,6 +485,30 @@ export default function ProjectDetail() {
                       </div>
                     </div>
                   </div>
+
+                  {/* Video Section */}
+                  {project.videoUrl && (
+                    <div className="mt-8">
+                      <h2
+                        className={`text-2xl font-bold mb-6 ${
+                          isDarkMode ? "text-gray-100" : "text-gray-900"
+                        }`}
+                      >
+                        Video
+                      </h2>
+                      <div className="aspect-w-16 aspect-h-9">
+                        <iframe
+                          src={project.videoUrl.includes('youtu.be') 
+                            ? `https://www.youtube.com/embed/${project.videoUrl.split('youtu.be/')[1]?.split('&')[0]}`
+                            : project.videoUrl}
+                          title="Project Demo Video"
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                          allowFullScreen
+                          className="w-full h-full rounded-lg"
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
