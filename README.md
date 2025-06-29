@@ -2,6 +2,22 @@
 
 A modern platform for managing hackathons, tracking attendance, showcasing projects, and connecting the hacker community. Built with Next.js, TypeScript, and PostgreSQL.
 
+## 📋 Table of Contents
+
+- [🚀 Quick Start Guide for First-Time Setup](#-quick-start-guide-for-first-time-setup)
+  - [Prerequisites](#prerequisites)
+  - [1. Clone & Install Dependencies](#1-clone--install-dependencies)
+  - [2. Start Docker Desktop](#2-start-docker-desktop)
+  - [3. Environment Setup](#3-environment-setup)
+  - [4. Database Setup](#4-database-setup)
+  - [5. Start Development Server](#5-start-development-server)
+- [🏗️ Architecture Overview](#️-architecture-overview)
+- [🔧 Troubleshooting](#-troubleshooting)
+- [📖 Feature Documentation](#-feature-documentation)
+- [🔑 Required External Services Setup](#-required-external-services-setup)
+- [🚀 Learn More](#-learn-more)
+- [📝 Contributing](#-contributing)
+
 ## 🚀 Quick Start Guide for First-Time Setup
 
 ### Prerequisites
@@ -218,17 +234,10 @@ To learn more about the technologies used:
 - [Clerk Documentation](https://clerk.com/docs) - Authentication and user management
 - [Tailwind CSS](https://tailwindcss.com/docs) - Utility-first CSS framework
 
-## 📦 Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme).
-
-**Important**: Make sure to add all environment variables to your Vercel project settings before deploying.
-
-Check out the [Next.js deployment documentation](https://nextjs.org/docs/deployment) for more details.
 
 ## 📝 Contributing
 
-Please read [CONTRIBUTING.md](CONTRIBUTING.md) for details on our code of conduct and the process for submitting pull requests.
+Want to contribute? Check out our [GitHub Issues](https://github.com/sundaiclub/sundai-website-v2/issues) for ways to help! Look for issues labeled `good first issue` or `help wanted` to get started.
 
 ---
 
