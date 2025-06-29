@@ -11,6 +11,7 @@ import ReactMarkdown from 'react-markdown';
 import { CheckIcon, XMarkIcon } from "@heroicons/react/24/solid";
 import toast from 'react-hot-toast';
 import { Project } from "../../components/Project";
+import { GitHubButton } from "../../components/GitHubButton";
 import { swapFirstLetters } from "../../utils/nameUtils";
 
 export default function ProjectDetail() {
@@ -21,6 +22,7 @@ export default function ProjectDetail() {
   const [loading, setLoading] = useState(true);
   const [isLiked, setIsLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
+  const [isStarred, setIsStarred] = useState(false);
   const { isDarkMode } = useTheme();
   const [isProjectDraft, setIsProjectDraft] = useState(false);
 
@@ -228,7 +230,7 @@ export default function ProjectDetail() {
                     </span>
                   </div>
                 </div>
-                <div className="mt-4 md:mt-0">
+                <div className="mt-4 md:mt-0 flex gap-2">
                   <button
                     onClick={handleLike}
                     className="flex items-center gap-2 bg-white/20 backdrop-blur-sm px-6 py-3 rounded-full hover:bg-white/30 transition-colors"
@@ -240,6 +242,9 @@ export default function ProjectDetail() {
                     )}
                     <span className="text-lg">{likeCount}</span>
                   </button>
+                  {project?.githubUrl && (
+                    <GitHubButton url={project.githubUrl} className="" />
+                  )}
                 </div>
               </div>
             </div>
@@ -266,19 +271,6 @@ export default function ProjectDetail() {
                         View Demo
                       </Link>
                     )}
-                    {project.githubUrl && (
-                      <Link
-                        href={project.githubUrl}
-                        className={`px-6 py-3 rounded-lg transition-colors ${
-                          isDarkMode
-                            ? "bg-gray-700 hover:bg-gray-600"
-                            : "bg-gray-800 hover:bg-gray-900"
-                        } text-white text-lg`}
-                        target="_blank"
-                      >
-                        GitHub
-                      </Link>
-                    )}
                     {project.blogUrl && (
                       <Link
                         href={project.blogUrl}
@@ -290,6 +282,19 @@ export default function ProjectDetail() {
                         target="_blank"
                       >
                         Blogpost
+                      </Link>
+                    )}
+                    {project.phUrl && (
+                      <Link
+                        href={project.phUrl}
+                        className={`px-6 py-3 rounded-lg transition-colors ${
+                          isDarkMode
+                            ? "bg-gray-700 hover:bg-gray-600"
+                            : "bg-gray-800 hover:bg-gray-900"
+                        } text-white text-lg`}
+                        target="_blank"
+                      >
+                        ProductHunt ▲
                       </Link>
                     )}
                   </div>
@@ -472,6 +477,30 @@ export default function ProjectDetail() {
                       </div>
                     </div>
                   </div>
+
+                  {/* Video Section */}
+                  {project.videoUrl && (
+                    <div className="mt-8">
+                      <h2
+                        className={`text-2xl font-bold mb-6 ${
+                          isDarkMode ? "text-gray-100" : "text-gray-900"
+                        }`}
+                      >
+                        Video
+                      </h2>
+                      <div className="aspect-w-16 aspect-h-9">
+                        <iframe
+                          src={project.videoUrl.includes('youtu.be') 
+                            ? `https://www.youtube.com/embed/${project.videoUrl.split('youtu.be/')[1]?.split('&')[0]}`
+                            : project.videoUrl}
+                          title="Project Demo Video"
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                          allowFullScreen
+                          className="w-full h-full rounded-lg"
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
