@@ -2,16 +2,6 @@
 
 A modern platform for managing hackathons, tracking attendance, showcasing projects, and connecting the hacker community. Built with Next.js, TypeScript, and PostgreSQL.
 
-## ✨ Features Overview
-
-- 👥 **Hacker Profiles** - Personal portfolios with GitHub, Discord, LinkedIn integration
-- 🛠️ **Project Management** - Create, join, and showcase hackathon projects
-- 📊 **Attendance Tracking** - QR code-based check-ins with admin verification
-- 🏆 **Project Showcase** - Browse and discover community projects with likes/stars
-- 🎯 **Tech & Domain Tags** - Categorize projects by technology and domain
-- 🔔 **Push Notifications** - Stay updated on new projects and activity
-- 👑 **Admin Portal** - Manage users, approve projects, and track engagement
-
 ## 🚀 Quick Start Guide for First-Time Setup
 
 ### Prerequisites
