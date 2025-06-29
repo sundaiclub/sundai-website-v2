@@ -547,7 +547,7 @@ export default function ProjectEditPage() {
                     className={`inline-flex items-center px-3 py-1 rounded-full text-sm cursor-pointer transition-colors ${isDarkMode ? "bg-purple-900/50 text-purple-100 hover:bg-purple-800/50" : "bg-purple-100 text-purple-800 hover:bg-purple-200"}`}
                     onClick={() => setShowLaunchLeadModal(true)}
                   >
-                    <span>{project?.launchLead.name}</span>
+                    <span>{swapFirstLetters(project?.launchLead.name)}</span>
                     <span className={`mx-1 ${isDarkMode ? "text-purple-400" : "text-purple-400"}`}>•</span>
                     <span className={isDarkMode ? "text-purple-300" : "text-purple-600"}>Launch Lead</span>
                   </div>
@@ -586,7 +586,7 @@ export default function ProjectEditPage() {
               <p className={`mt-2 text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
                 Only the launch lead can add or delete team members. Contact{" "}
                 <a href={`/hacker/${project?.launchLead.id}`} className={`${isDarkMode ? "text-indigo-400 hover:text-indigo-300" : "text-indigo-600 hover:text-indigo-700"}`}>
-                  {project?.launchLead.name}
+                  {swapFirstLetters(project?.launchLead.name)}
                 </a>{" "}
                 with this.
               </p>

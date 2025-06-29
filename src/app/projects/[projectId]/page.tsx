@@ -391,7 +391,7 @@ export default function ProjectDetail() {
                                 isDarkMode ? "text-gray-100" : "text-gray-900"
                               }`}
                             >
-                              {project.launchLead.name}
+                              {swapFirstLetters(project.launchLead.name)}
                             </h4>
                             <p className="text-sm text-indigo-600">
                               Launch Lead
