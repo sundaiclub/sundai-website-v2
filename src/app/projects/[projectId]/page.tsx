@@ -5,13 +5,14 @@ import Image from "next/image";
 import Link from "next/link";
 import { useUserContext } from "../../contexts/UserContext";
 import { HeartIcon } from "@heroicons/react/24/outline";
-import { HeartIcon as HeartIconSolid } from "@heroicons/react/24/solid";
+import { HeartIcon as HeartIconSolid, ShareIcon } from "@heroicons/react/24/solid";
 import { useTheme } from "../../contexts/ThemeContext";
 import ReactMarkdown from 'react-markdown';
 import { CheckIcon, XMarkIcon } from "@heroicons/react/24/solid";
 import toast from 'react-hot-toast';
 import { Project } from "../../components/Project";
 import { swapFirstLetters } from "../../utils/nameUtils";
+import ShareModal from "../../components/ShareModal";
 
 export default function ProjectDetail() {
   const params = useParams();
@@ -23,6 +24,7 @@ export default function ProjectDetail() {
   const [likeCount, setLikeCount] = useState(0);
   const { isDarkMode } = useTheme();
   const [isProjectDraft, setIsProjectDraft] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
 
   const allowedEdit = project && (
     project.participants.some(
@@ -292,6 +294,17 @@ export default function ProjectDetail() {
                         Blogpost
                       </Link>
                     )}
+                    <button
+                      onClick={() => setShowShareModal(true)}
+                      className={`px-6 py-3 rounded-lg transition-colors flex items-center gap-2 ${
+                        isDarkMode
+                          ? "bg-green-700 hover:bg-green-600"
+                          : "bg-green-600 hover:bg-green-700"
+                      } text-white text-lg`}
+                    >
+                      <ShareIcon className="h-5 w-5" />
+                      Share Project
+                    </button>
                   </div>
                   
                   {/* Tags Section */}
@@ -478,6 +491,17 @@ export default function ProjectDetail() {
           </div>
         </div>
       </div>
+      
+      {/* Share Modal */}
+      {project && (
+        <ShareModal
+          showModal={showShareModal}
+          setShowModal={setShowShareModal}
+          project={project}
+          userInfo={userInfo}
+          isDarkMode={isDarkMode}
+        />
+      )}
     </div>
   );
 }
