@@ -15,7 +15,6 @@ Reach out to @godeva or @arteml0178 on discord with any quesions.
   - [1. Clone & Install Dependencies](#1-clone--install-dependencies)
   - [2. Start Docker Desktop](#2-start-docker-desktop)
   - [3. Environment Setup](#3-environment-setup)
-    - [3.5 Environment Setup](#3.5-setting-up-your-profile-for-testing)
   - [4. Database Setup](#4-database-setup)
   - [5. Start Development Server](#5-start-development-server)
 - [🏗️ Architecture Overview](#️-architecture-overview)
@@ -69,31 +68,8 @@ docker info
 2. Create a new application
 3. Get your publishable key and secret key from the dashboard
 
-### 3.5. Setting Up Your Profile for Testing
-
 After setting up Clerk authentication, you'll need to add yourself to the database so your profile works correctly.
-
-#### Step 1: Find Your Clerk User ID
-
-Once you've signed up with Clerk, you need to get your actual Clerk ID:
-
-1. Start the development server: `npm run dev`
-2. Visit [http://localhost:3000](http://localhost:3000) and sign in with Clerk
-3. Add this temporary code to any page you can access (like `src/app/page.tsx`):
-
-```typescript
-import { useUser } from "@clerk/nextjs";
-
-// Inside your component, add this temporarily:
-const { user } = useUser();
-console.log("Your Clerk ID:", user?.id);
-```
-
-4. Check your browser's developer console to see your Clerk ID
-5. Copy this ID - you'll need it for the next step
-6. Remove the temporary code after copying your ID
-
-#### Step 2: Add Yourself to the Seed Data
+Once you've signed up with Clerk, you need to get your actual Clerk User ID:
 
 Edit `prisma/seed.ts` and add yourself to the users array:
 
@@ -110,27 +86,7 @@ prisma.hacker.create({
 }),
 ```
 
-#### Step 3: Add GitHub/Demo Links to Projects (Optional)
-
-If you want to test the share feature later, update the `projectsData` array in `prisma/seed.ts` to include realistic links:
-
-```typescript
-// Example project with all link types
-{
-  title: "AI Startup Map",
-  preview: "Interactive visualization platform mapping the global AI startup ecosystem.",
-  description: "An innovative platform that provides a comprehensive, interactive visualization...",
-  githubUrl: "https://github.com/sundai-club/ai-startup-map",
-  demoUrl: "https://ai-startup-map.vercel.app", 
-  blogUrl: "https://sundai.club/blog/ai-startup-map",
-  status: ProjectStatus.APPROVED,
-  is_starred: true,
-  domainTags: ["business", "analytics", "visualization"],
-  techTags: ["llms", "rags", "data-visualization"],
-},
-```
-
-#### Step 4: Reset Database with Your Profile
+if you already ran prisma beforehand plaese do the following, otherwise skip this step
 
 ```bash
 # Reset and reseed the database with your profile included
@@ -138,13 +94,8 @@ npx prisma migrate reset --force
 npx prisma db seed
 ```
 
-✅ **Now your profile should work!** Visit `/me` or click on your profile to see your hacker profile page.
+**Now your profile should work!** Visit `/me` or click on your profile to see your hacker profile page.
 
-#### Quick Alternative for Testing
-
-If you want to test immediately without finding your Clerk ID, you can temporarily use one of the existing test accounts by creating a new Clerk account with the email `kandibober.lukoianov@gmail.com` - this profile already exists in the seed data.
-
-⚠️ **Remember**: After onboarding new team members, they should add their actual Clerk IDs to the seed file so everyone's profiles work correctly in local development.
 
 **Google Cloud Storage** (Optional for local development):
 1. Create Google Cloud Project
