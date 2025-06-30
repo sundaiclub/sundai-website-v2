@@ -1,33 +1,7 @@
 import { Project } from "@/app/components/Project";
 
-// Enhanced project type for share content with social URLs
-export interface ProjectWithSocials extends Omit<Project, 'launchLead' | 'participants'> {
-  launchLead: {
-    id: string;
-    name: string;
-    twitterUrl?: string | null;
-    linkedinUrl?: string | null;
-    avatar?: {
-      url: string;
-    } | null;
-  };
-  participants: Array<{
-    role: string;
-    hacker: {
-      id: string;
-      name: string;
-      bio?: string | null;
-      twitterUrl?: string | null;
-      linkedinUrl?: string | null;
-      avatar?: {
-        url: string;
-      } | null;
-    };
-  }>;
-}
-
 export interface ShareContentRequest {
-  project: ProjectWithSocials;
+  project: Project;
   userInfo: any;
   platform: 'twitter' | 'linkedin' | 'reddit';
   isTeamMember: boolean;
@@ -52,40 +26,35 @@ const PLATFORM_STYLES = {
 };
 
 // Platform-specific team tagging helper
-function formatTeamNames(teamMembers: Array<{name: string, twitterUrl?: string | null, linkedinUrl?: string | null}>, platform: string): string {
-  switch (platform) {
-    case 'linkedin':
-      return teamMembers.map(member => {
-        if (member.linkedinUrl) {
-          // Extract LinkedIn username from URL or use full URL
-          const linkedinMatch = member.linkedinUrl.match(/linkedin\.com\/in\/([^\/\?]+)/);
-          return linkedinMatch ? `@${linkedinMatch[1]}` : member.linkedinUrl;
+function formatTeamNames(teamMembers: any[], platform: string): string {
+  const getUsername = (person: any, platform: string) => {
+    switch (platform) {
+      case 'twitter':
+        if (person.twitterUrl) {
+          // Extract username from Twitter URL (twitter.com/username or x.com/username)
+          const match = person.twitterUrl.match(/(?:twitter\.com|x\.com)\/([^/?]+)/);
+          return match ? `@${match[1]}` : `@${person.name.split(' ')[0].toLowerCase()}`;
         }
-        // Fallback to name-based format
-        return `@${member.name.toLowerCase().replace(/\s+/g, '-')}`;
-      }).join(', ');
+        return `@${person.name.split(' ')[0].toLowerCase()}`;
       
-    case 'twitter':
-      return teamMembers.map(member => {
-        if (member.twitterUrl) {
-          // Extract Twitter username from URL
-          const twitterMatch = member.twitterUrl.match(/twitter\.com\/([^\/\?]+)|x\.com\/([^\/\?]+)/);
-          const username = twitterMatch ? (twitterMatch[1] || twitterMatch[2]) : null;
-          return username ? `@${username}` : `@${member.name.split(' ')[0].toLowerCase()}`;
+      case 'linkedin':
+        if (person.linkedinUrl) {
+          // Extract username from LinkedIn URL (linkedin.com/in/username)
+          const match = person.linkedinUrl.match(/linkedin\.com\/in\/([^/?]+)/);
+          return match ? `@${match[1]}` : `@${person.name.toLowerCase().replace(/\s+/g, '-')}`;
         }
-        // Fallback to name-based format
-        return `@${member.name.split(' ')[0].toLowerCase()}`;
-      }).join(', ');
+        return `@${person.name.toLowerCase().replace(/\s+/g, '-')}`;
       
-    case 'reddit':
-      return teamMembers.map(member => {
-        // Reddit doesn't have direct social integration, use name-based
-        return `u/${member.name.split(' ')[0].toLowerCase()}`;
-      }).join(', ');
+      case 'reddit':
+        // Reddit doesn't have URLs in our schema, use name-based format
+        return `u/${person.name.split(' ')[0].toLowerCase()}`;
       
-    default:
-      return teamMembers.map(member => member.name).join(', ');
-  }
+      default:
+        return person.name;
+    }
+  };
+
+  return teamMembers.map(person => getUsername(person, platform)).join(', ');
 }
 
 export async function generateShareContent({
@@ -95,19 +64,10 @@ export async function generateShareContent({
   isTeamMember,
 }: ShareContentRequest): Promise<ShareContentResponse> {
   const teamMembers = [
-    {
-      name: project.launchLead.name,
-      twitterUrl: project.launchLead.twitterUrl,
-      linkedinUrl: project.launchLead.linkedinUrl,
-    },
-    ...project.participants.map(p => ({
-      name: p.hacker.name,
-      twitterUrl: p.hacker.twitterUrl,
-      linkedinUrl: p.hacker.linkedinUrl,
-    }))
+    project.launchLead,
+    ...project.participants.map(p => p.hacker)
   ];
   
-  const teamNames = teamMembers.map(member => member.name);
   const formattedTeamNames = formatTeamNames(teamMembers, platform);
   const perspective = isTeamMember ? "first-person as a team member" : "third-person promoting Sundai";
   const characterLimit = PLATFORM_LIMITS[platform];
@@ -118,14 +78,14 @@ export async function generateShareContent({
 Project: ${project.title}
 Description: ${project.preview}
 Full Description: ${project.description}
-Team: ${teamNames.join(', ')}
+Team: ${teamMembers.map(p => p.name).join(', ')}
 Launch Lead: ${project.launchLead.name}
 
 Platform-specific tagging for ${platform}:
-${platform === 'linkedin' ? '- Tag people with @firstname-lastname format or real LinkedIn handles' : ''}
-${platform === 'twitter' ? '- Tag people with @username format from their Twitter URLs' : ''}
+${platform === 'linkedin' ? '- Tag people with their actual @username from LinkedIn profiles' : ''}
+${platform === 'twitter' ? '- Tag people with their actual @username from Twitter profiles' : ''}
 ${platform === 'reddit' ? '- Tag people with u/username format, avoid hashtags' : ''}
-Formatted team tags: ${formattedTeamNames}
+Formatted team tags (with real social handles): ${formattedTeamNames}
 
 Links available:
 ${project.demoUrl ? `- Demo: ${project.demoUrl}` : ''}
@@ -138,9 +98,9 @@ Requirements:
 - ${isTeamMember ? 'Start with "We just built..." or similar first-person language' : 'Mention "The team at Sundai built..." to promote Sundai'}
 - Keep under ${characterLimit} characters
 - Include relevant emojis
-- Use the formatted team tags: ${formattedTeamNames}
+- Use the real social handles: ${formattedTeamNames}
 - ${platform === 'reddit' ? 'Avoid hashtags, use plain text' : 'Add appropriate hashtags'}
-- Include team member names with proper platform formatting
+- Include team member names with their actual social handles when available
 - Mention the links
 - Make it engaging and viral-worthy
 - End with link to https://www.sundai.club/projects for more projects
@@ -203,16 +163,8 @@ function generateFallbackContent({
   isTeamMember,
 }: ShareContentRequest): ShareContentResponse {
   const teamMembers = [
-    {
-      name: project.launchLead.name,
-      twitterUrl: project.launchLead.twitterUrl,
-      linkedinUrl: project.launchLead.linkedinUrl,
-    },
-    ...project.participants.map(p => ({
-      name: p.hacker.name,
-      twitterUrl: p.hacker.twitterUrl,
-      linkedinUrl: p.hacker.linkedinUrl,
-    }))
+    project.launchLead,
+    ...project.participants.map(p => p.hacker)
   ];
 
   const formattedTeamNames = formatTeamNames(teamMembers, platform);
@@ -249,4 +201,4 @@ function generateFallbackContent({
     hashtags: platform === 'reddit' ? [] : hashtags,
     characterCount: content.length,
   };
-}
+} 

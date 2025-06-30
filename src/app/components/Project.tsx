@@ -40,6 +40,8 @@ export type Project = {
   launchLead: {
     id: string;
     name: string;
+    twitterUrl?: string | null;
+    linkedinUrl?: string | null;
     avatar?: {
       url: string;
     } | null;
@@ -50,6 +52,8 @@ export type Project = {
       id: string;
       name: string;
       bio?: string | null;
+      twitterUrl?: string | null;
+      linkedinUrl?: string | null;
       avatar?: {
         url: string;
       } | null;
