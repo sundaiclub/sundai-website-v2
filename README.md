@@ -1,6 +1,6 @@
-# 🚀 Sundai Club - Hackathon & Project Management Platform
+# 🚀 Sundai Club
 
-A modern platform for managing hackathons, tracking attendance, showcasing projects, and connecting the hacker community. Built with Next.js, TypeScript, and PostgreSQL.
+This is the code for sundai.club platform.
 
 ## 📝 Contributing
 
