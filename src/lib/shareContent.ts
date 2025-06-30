@@ -91,6 +91,7 @@ Links available:
 ${project.demoUrl ? `- Demo: ${project.demoUrl}` : ''}
 ${project.githubUrl ? `- GitHub: ${project.githubUrl}` : ''}
 ${project.blogUrl ? `- Blog: ${project.blogUrl}` : ''}
+- Project Page: https://www.sundai.club/projects/${project.id}
 
 Write from ${perspective}. Style should be ${style}.
 
@@ -101,7 +102,7 @@ Requirements:
 - Use the real social handles: ${formattedTeamNames}
 - ${platform === 'reddit' ? 'Avoid hashtags, use plain text' : 'Add appropriate hashtags'}
 - Include team member names with their actual social handles when available
-- Mention the links
+- Mention the links including the project page
 - Make it engaging and viral-worthy
 - End with link to https://www.sundai.club/projects for more projects
 
@@ -175,6 +176,7 @@ function generateFallbackContent({
   const links = [
     project.demoUrl && `🔗 Demo: ${project.demoUrl}`,
     project.githubUrl && `💻 Code: ${project.githubUrl}`,
+    `📄 Project: https://www.sundai.club/projects/${project.id}`,
     `🌟 More projects: https://www.sundai.club/projects`
   ].filter(Boolean).join('\n');
 

@@ -62,6 +62,7 @@ export default function ShareModal({ showModal, setShowModal, project, userInfo,
       const links = [
         project.demoUrl && `🔗 Demo: ${project.demoUrl}`,
         project.githubUrl && `💻 Code: ${project.githubUrl}`,
+        `📄 Project: https://www.sundai.club/projects/${project.id}`,
         `🌟 More projects: https://www.sundai.club/projects`
       ].filter(Boolean).join('\n');
 
