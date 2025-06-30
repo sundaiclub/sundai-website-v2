@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import prisma from "@/lib/prisma";
-import { generateShareContent } from "@/lib/shareContent";
+import { generateShareContent, ProjectWithSocials } from "@/lib/shareContent";
 
 export async function POST(
   req: Request,
@@ -37,6 +37,8 @@ export async function POST(
           select: {
             id: true,
             name: true,
+            twitterUrl: true,
+            linkedinUrl: true,
             avatar: {
               select: {
                 url: true,
@@ -51,6 +53,8 @@ export async function POST(
                 id: true,
                 name: true,
                 bio: true,
+                twitterUrl: true,
+                linkedinUrl: true,
                 avatar: {
                   select: {
                     url: true,
@@ -97,7 +101,7 @@ export async function POST(
                         project.launchLeadId === currentUser.id;
 
     // Generate content using Gemini API
-    const projectData = {
+    const projectData: ProjectWithSocials = {
       id: project.id,
       title: project.title,
       preview: project.preview || project.title,
@@ -108,6 +112,8 @@ export async function POST(
       launchLead: {
         id: project.launchLead.id,
         name: project.launchLead.name,
+        twitterUrl: project.launchLead.twitterUrl,
+        linkedinUrl: project.launchLead.linkedinUrl,
         avatar: project.launchLead.avatar,
       },
       participants: project.participants.map(p => ({
@@ -116,6 +122,8 @@ export async function POST(
           id: p.hacker.id,
           name: p.hacker.name,
           bio: p.hacker.bio,
+          twitterUrl: p.hacker.twitterUrl,
+          linkedinUrl: p.hacker.linkedinUrl,
           avatar: p.hacker.avatar,
         },
       })),
@@ -136,7 +144,7 @@ export async function POST(
     };
 
     const shareContent = await generateShareContent({
-      project: projectData as any, // Type assertion to bypass strict typing
+      project: projectData,
       userInfo: currentUser,
       platform: platform as 'twitter' | 'linkedin' | 'reddit',
       isTeamMember,

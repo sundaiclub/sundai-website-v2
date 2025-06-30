@@ -62,7 +62,7 @@ export default function ShareModal({ showModal, setShowModal, project, userInfo,
       const links = [
         project.demoUrl && `🔗 Demo: ${project.demoUrl}`,
         project.githubUrl && `💻 Code: ${project.githubUrl}`,
-        `🌟 More projects: https://sundai.com`
+        `🌟 More projects: https://www.sundai.club/projects`
       ].filter(Boolean).join('\n');
 
       const content = `${intro}
@@ -92,9 +92,9 @@ ${links}
     }
   };
 
-  const handleShare = (platform: string) => {
+  const handleShare = async (platform: string) => {
     const encodedContent = encodeURIComponent(customContent);
-    const encodedUrl = encodeURIComponent(project.demoUrl || `https://sundai.com/projects/${project.id}`);
+    const encodedUrl = encodeURIComponent(project.demoUrl || `https://www.sundai.club/projects/${project.id}`);
     
     let shareUrl = '';
     switch (platform) {

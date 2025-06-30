@@ -1,7 +1,33 @@
 import { Project } from "@/app/components/Project";
 
+// Enhanced project type for share content with social URLs
+export interface ProjectWithSocials extends Omit<Project, 'launchLead' | 'participants'> {
+  launchLead: {
+    id: string;
+    name: string;
+    twitterUrl?: string | null;
+    linkedinUrl?: string | null;
+    avatar?: {
+      url: string;
+    } | null;
+  };
+  participants: Array<{
+    role: string;
+    hacker: {
+      id: string;
+      name: string;
+      bio?: string | null;
+      twitterUrl?: string | null;
+      linkedinUrl?: string | null;
+      avatar?: {
+        url: string;
+      } | null;
+    };
+  }>;
+}
+
 export interface ShareContentRequest {
-  project: Project;
+  project: ProjectWithSocials;
   userInfo: any;
   platform: 'twitter' | 'linkedin' | 'reddit';
   isTeamMember: boolean;
@@ -25,17 +51,64 @@ const PLATFORM_STYLES = {
   reddit: "informative, community-focused, with technical details that would interest developers",
 };
 
+// Platform-specific team tagging helper
+function formatTeamNames(teamMembers: Array<{name: string, twitterUrl?: string | null, linkedinUrl?: string | null}>, platform: string): string {
+  switch (platform) {
+    case 'linkedin':
+      return teamMembers.map(member => {
+        if (member.linkedinUrl) {
+          // Extract LinkedIn username from URL or use full URL
+          const linkedinMatch = member.linkedinUrl.match(/linkedin\.com\/in\/([^\/\?]+)/);
+          return linkedinMatch ? `@${linkedinMatch[1]}` : member.linkedinUrl;
+        }
+        // Fallback to name-based format
+        return `@${member.name.toLowerCase().replace(/\s+/g, '-')}`;
+      }).join(', ');
+      
+    case 'twitter':
+      return teamMembers.map(member => {
+        if (member.twitterUrl) {
+          // Extract Twitter username from URL
+          const twitterMatch = member.twitterUrl.match(/twitter\.com\/([^\/\?]+)|x\.com\/([^\/\?]+)/);
+          const username = twitterMatch ? (twitterMatch[1] || twitterMatch[2]) : null;
+          return username ? `@${username}` : `@${member.name.split(' ')[0].toLowerCase()}`;
+        }
+        // Fallback to name-based format
+        return `@${member.name.split(' ')[0].toLowerCase()}`;
+      }).join(', ');
+      
+    case 'reddit':
+      return teamMembers.map(member => {
+        // Reddit doesn't have direct social integration, use name-based
+        return `u/${member.name.split(' ')[0].toLowerCase()}`;
+      }).join(', ');
+      
+    default:
+      return teamMembers.map(member => member.name).join(', ');
+  }
+}
+
 export async function generateShareContent({
   project,
   userInfo,
   platform,
   isTeamMember,
 }: ShareContentRequest): Promise<ShareContentResponse> {
-  const teamNames = [
-    project.launchLead.name,
-    ...project.participants.map(p => p.hacker.name)
+  const teamMembers = [
+    {
+      name: project.launchLead.name,
+      twitterUrl: project.launchLead.twitterUrl,
+      linkedinUrl: project.launchLead.linkedinUrl,
+    },
+    ...project.participants.map(p => ({
+      name: p.hacker.name,
+      twitterUrl: p.hacker.twitterUrl,
+      linkedinUrl: p.hacker.linkedinUrl,
+    }))
   ];
   
+  const teamNames = teamMembers.map(member => member.name);
+  const formattedTeamNames = formatTeamNames(teamMembers, platform);
   const perspective = isTeamMember ? "first-person as a team member" : "third-person promoting Sundai";
   const characterLimit = PLATFORM_LIMITS[platform];
   const style = PLATFORM_STYLES[platform];
@@ -48,6 +121,12 @@ Full Description: ${project.description}
 Team: ${teamNames.join(', ')}
 Launch Lead: ${project.launchLead.name}
 
+Platform-specific tagging for ${platform}:
+${platform === 'linkedin' ? '- Tag people with @firstname-lastname format or real LinkedIn handles' : ''}
+${platform === 'twitter' ? '- Tag people with @username format from their Twitter URLs' : ''}
+${platform === 'reddit' ? '- Tag people with u/username format, avoid hashtags' : ''}
+Formatted team tags: ${formattedTeamNames}
+
 Links available:
 ${project.demoUrl ? `- Demo: ${project.demoUrl}` : ''}
 ${project.githubUrl ? `- GitHub: ${project.githubUrl}` : ''}
@@ -59,11 +138,12 @@ Requirements:
 - ${isTeamMember ? 'Start with "We just built..." or similar first-person language' : 'Mention "The team at Sundai built..." to promote Sundai'}
 - Keep under ${characterLimit} characters
 - Include relevant emojis
-- Add appropriate hashtags
-- Include team member names
+- Use the formatted team tags: ${formattedTeamNames}
+- ${platform === 'reddit' ? 'Avoid hashtags, use plain text' : 'Add appropriate hashtags'}
+- Include team member names with proper platform formatting
 - Mention the links
 - Make it engaging and viral-worthy
-- End with link to sundai.com for more projects
+- End with link to https://www.sundai.club/projects for more projects
 
 Generate only the post content, no explanations.`;
 
@@ -122,11 +202,20 @@ function generateFallbackContent({
   platform,
   isTeamMember,
 }: ShareContentRequest): ShareContentResponse {
-  const teamNames = [
-    project.launchLead.name,
-    ...project.participants.map(p => p.hacker.name)
-  ].join(', ');
+  const teamMembers = [
+    {
+      name: project.launchLead.name,
+      twitterUrl: project.launchLead.twitterUrl,
+      linkedinUrl: project.launchLead.linkedinUrl,
+    },
+    ...project.participants.map(p => ({
+      name: p.hacker.name,
+      twitterUrl: p.hacker.twitterUrl,
+      linkedinUrl: p.hacker.linkedinUrl,
+    }))
+  ];
 
+  const formattedTeamNames = formatTeamNames(teamMembers, platform);
   const intro = isTeamMember 
     ? `🚀 We just built ${project.title}!` 
     : `🚀 Check out ${project.title} built by the team at Sundai!`;
@@ -134,7 +223,7 @@ function generateFallbackContent({
   const links = [
     project.demoUrl && `🔗 Demo: ${project.demoUrl}`,
     project.githubUrl && `💻 Code: ${project.githubUrl}`,
-    `🌟 More projects: https://sundai.com`
+    `🌟 More projects: https://www.sundai.club/projects`
   ].filter(Boolean).join('\n');
 
   const hashtags = ['Sundai', 'TechProjects', 'Innovation', 'BuildInPublic'];
@@ -143,21 +232,21 @@ function generateFallbackContent({
   let content;
   switch (platform) {
     case 'twitter':
-      content = `${intro}\n\n${project.preview}\n\nBuilt by: ${teamNames}\n\n${links}\n\n${hashtagString}`;
+      content = `${intro}\n\n${project.preview}\n\nBuilt by: ${formattedTeamNames}\n\n${links}\n\n${hashtagString}`;
       break;
     case 'linkedin':
-      content = `${intro}\n\n${project.preview}\n\nOur amazing team (${teamNames}) worked together to create something special. This project showcases the innovative spirit at Sundai.\n\n${links}\n\n${hashtagString} #TeamWork #Innovation`;
+      content = `${intro}\n\n${project.preview}\n\nOur amazing team (${formattedTeamNames}) worked together to create something special. This project showcases the innovative spirit at Sundai.\n\n${links}\n\n${hashtagString} #TeamWork #Innovation`;
       break;
     case 'reddit':
-      content = `${intro}\n\n${project.preview}\n\nTechnical Details:\n${project.description.substring(0, 500)}...\n\nTeam: ${teamNames}\n\n${links}\n\nCheck out more projects at sundai.com`;
+      content = `${intro}\n\n${project.preview}\n\nTechnical Details:\n${project.description.substring(0, 500)}...\n\nTeam: ${formattedTeamNames}\n\n${links}\n\nCheck out more projects at https://www.sundai.club/projects`;
       break;
     default:
-      content = `${intro}\n\n${project.preview}\n\nBuilt by: ${teamNames}\n\n${links}\n\n${hashtagString}`;
+      content = `${intro}\n\n${project.preview}\n\nBuilt by: ${formattedTeamNames}\n\n${links}\n\n${hashtagString}`;
   }
 
   return {
     content,
-    hashtags,
+    hashtags: platform === 'reddit' ? [] : hashtags,
     characterCount: content.length,
   };
-} 
+}
