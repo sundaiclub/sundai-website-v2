@@ -102,7 +102,7 @@ ${links}
         shareUrl = `https://twitter.com/intent/tweet?text=${encodedContent}`;
         break;
       case 'linkedin':
-        shareUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${encodedUrl}&summary=${encodedContent}`;
+        shareUrl = ` https://www.linkedin.com/feed/?shareActive=true&text=${encodedContent}`;
         break;
       case 'reddit':
         shareUrl = `https://reddit.com/submit?url=${encodedUrl}&title=${encodeURIComponent(project.title)}`;
