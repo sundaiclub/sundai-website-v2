@@ -329,45 +329,12 @@ export default function ProjectSearch({
           </Listbox>
         </div>
 
-        {/* Date Range Filters */}
-        <div className="flex flex-col sm:flex-row gap-2">
-          <div className="flex-1">
-            <label className="block text-xs text-gray-400 mb-1">From Date</label>
-            <div className="relative">
-              <CalendarIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-              <input
-                type="date"
-                className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-700 
-                  bg-gray-800 text-gray-100 
-                  focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500
-                  transition-colors duration-200"
-                value={fromDate}
-                onChange={(e) => setFromDate(e.target.value)}
-              />
-            </div>
-          </div>
-          <div className="flex-1">
-            <label className="block text-xs text-gray-400 mb-1">To Date</label>
-            <div className="relative">
-              <CalendarIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-              <input
-                type="date"
-                className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-700 
-                  bg-gray-800 text-gray-100 
-                  focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500
-                  transition-colors duration-200"
-                value={toDate}
-                onChange={(e) => setToDate(e.target.value)}
-              />
-            </div>
-          </div>
-        </div>
-
         {/* Tag Selection Area - Adjust spacing and button sizes */}
         <div className="space-y-2">
-          <div className="flex flex-wrap items-center gap-2 text-sm text-gray-400">
-            <span className="mr-1">Filter by tags:</span>
-            <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-2 text-sm text-gray-400">
+            {/* Left: Tag selectors */}
+            <div className="flex flex-wrap gap-2 items-center">
+              <span className="mr-1">Filter by tags:</span>
               <button
                 onClick={() => setShowTechTagModal(true)}
                 className="flex-1 sm:flex-none px-3 py-1.5 rounded-lg text-sm bg-purple-900/30 text-purple-300 
@@ -381,6 +348,39 @@ export default function ProjectSearch({
                   hover:bg-gray-700/70 transition-colors duration-200 flex items-center justify-center gap-1"
               >
                 <span>+ Domain</span>
+              </button>
+            </div>
+            {/* Right: Date pickers with labels */}
+            <div className="flex items-center gap-2 ml-auto">
+              <span className="text-xs text-gray-400">From:</span>
+              <input
+                type="date"
+                className="w-[110px] px-2 py-1 rounded border border-gray-700 bg-gray-800 text-xs text-gray-100 placeholder-gray-500 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"
+                value={fromDate}
+                onChange={e => setFromDate(e.target.value)}
+                placeholder="From"
+                title="From date"
+                style={{ minWidth: 0 }}
+              />
+              <span className="text-xs text-gray-400">To:</span>
+              <input
+                type="date"
+                className="w-[110px] px-2 py-1 rounded border border-gray-700 bg-gray-800 text-xs text-gray-100 placeholder-gray-500 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"
+                value={toDate}
+                onChange={e => setToDate(e.target.value)}
+                placeholder="To"
+                title="To date"
+                style={{ minWidth: 0 }}
+              />
+              {/* Reset Dates Button */}
+              <button
+                type="button"
+                className="ml-2 px-2 py-1 text-xs rounded border border-gray-700 text-gray-400 bg-gray-800 hover:bg-gray-700 hover:text-gray-200 transition-colors duration-150"
+                onClick={() => { setFromDate(''); setToDate(''); }}
+                disabled={!fromDate && !toDate}
+                title="Reset date filters"
+              >
+                Reset
               </button>
             </div>
           </div>
