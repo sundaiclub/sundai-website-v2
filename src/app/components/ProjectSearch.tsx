@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Listbox, ListboxButton, ListboxOption, ListboxOptions, Transition } from '@headlessui/react';
-import { MagnifyingGlassIcon, FunnelIcon, ChevronUpDownIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { MagnifyingGlassIcon, FunnelIcon, ChevronUpDownIcon, XMarkIcon, CalendarIcon } from '@heroicons/react/24/outline';
 import { Project } from './Project';
 import TagSelector from './TagSelector';
 
@@ -50,6 +51,26 @@ const SORT_OPTIONS: SortOption[] = [
   }
 ];
 
+// Helper function to format date for input
+const formatDateForInput = (date: string) => {
+  if (!date) return '';
+  try {
+    return new Date(date).toISOString().split('T')[0];
+  } catch {
+    return '';
+  }
+};
+
+// Helper function to parse date from input
+const parseDateFromInput = (dateStr: string) => {
+  if (!dateStr) return null;
+  try {
+    return new Date(dateStr);
+  } catch {
+    return null;
+  }
+};
+
 // Add this helper function to count projects per tag
 const getTagCount = (tagName: string, projects: Project[]) => {
   return projects.filter(project => 
@@ -60,19 +81,80 @@ const getTagCount = (tagName: string, projects: Project[]) => {
 
 export default function ProjectSearch({ 
   projects,
-  onFilteredProjectsChange
+  onFilteredProjectsChange,
+  urlFilters = {}
 }: {
   projects: Project[];
   onFilteredProjectsChange: (projects: Project[]) => void;
+  urlFilters?: {
+    techTags?: string[];
+    domainTags?: string[];
+    search?: string;
+    fromDate?: string;
+    toDate?: string;
+    status?: string[];
+    sort?: string;
+  };
 }) {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedStatus, setSelectedStatus] = useState<string[]>([]);
-  const [selectedTechTags, setSelectedTechTags] = useState<string[]>([]);
-  const [selectedDomainTags, setSelectedDomainTags] = useState<string[]>([]);
-  const [sortBy, setSortBy] = useState<SortOption>(SORT_OPTIONS[0]);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  
+  // Initialize state from URL parameters
+  const [searchTerm, setSearchTerm] = useState(urlFilters.search || '');
+  const [selectedStatus, setSelectedStatus] = useState<string[]>(urlFilters.status || []);
+  const [selectedTechTags, setSelectedTechTags] = useState<string[]>(urlFilters.techTags || []);
+  const [selectedDomainTags, setSelectedDomainTags] = useState<string[]>(urlFilters.domainTags || []);
+  const [sortBy, setSortBy] = useState<SortOption>(
+    SORT_OPTIONS.find(option => option.value === urlFilters.sort) || SORT_OPTIONS[0]
+  );
   const [showBroken, setShowBroken] = useState(true);
   const [showTechTagModal, setShowTechTagModal] = useState(false);
   const [showDomainTagModal, setShowDomainTagModal] = useState(false);
+  
+  // Date filtering state
+  const [fromDate, setFromDate] = useState(formatDateForInput(urlFilters.fromDate || ''));
+  const [toDate, setToDate] = useState(formatDateForInput(urlFilters.toDate || ''));
+
+  // Function to update URL parameters
+  const updateURL = (newFilters: any) => {
+    const params = new URLSearchParams();
+    
+    // Add search term
+    if (newFilters.searchTerm) {
+      params.set('search', newFilters.searchTerm);
+    }
+    
+    // Add tech tags
+    newFilters.selectedTechTags?.forEach((tag: string) => {
+      params.append('tech_tag', tag);
+    });
+    
+    // Add domain tags
+    newFilters.selectedDomainTags?.forEach((tag: string) => {
+      params.append('domain_tag', tag);
+    });
+    
+    // Add status
+    newFilters.selectedStatus?.forEach((status: string) => {
+      params.append('status', status);
+    });
+    
+    // Add dates
+    if (newFilters.fromDate) {
+      params.set('from_date', newFilters.fromDate);
+    }
+    if (newFilters.toDate) {
+      params.set('to_date', newFilters.toDate);
+    }
+    
+    // Add sort
+    if (newFilters.sortBy?.value && newFilters.sortBy.value !== 'newest') {
+      params.set('sort', newFilters.sortBy.value);
+    }
+    
+    const newURL = params.toString() ? `?${params.toString()}` : '/projects';
+    router.push(newURL, { scroll: false });
+  };
 
   // Get unique tags from all projects
   const allTechTags = useMemo(() => {
@@ -141,10 +223,18 @@ export default function ProjectSearch({
             project.domainTags.some(t => t.name === tag)
           );
 
+        // Filter by date range
+        const projectDate = new Date(project.startDate);
+        const fromDateObj = parseDateFromInput(fromDate);
+        const toDateObj = parseDateFromInput(toDate);
+        
+        const dateMatch = (!fromDateObj || projectDate >= fromDateObj) &&
+                         (!toDateObj || projectDate <= toDateObj);
+
         // Filter broken projects
         const brokenMatch = showBroken || !project.is_broken;
 
-        return searchMatch && statusMatch && techTagMatch && domainTagMatch && brokenMatch;
+        return searchMatch && statusMatch && techTagMatch && domainTagMatch && dateMatch && brokenMatch;
       })
       .sort((a, b) => {
         try {
@@ -154,12 +244,29 @@ export default function ProjectSearch({
           return 0;
         }
       });
-  }, [projects, searchTerm, selectedStatus, selectedTechTags, selectedDomainTags, sortBy, showBroken]);
+  }, [projects, searchTerm, selectedStatus, selectedTechTags, selectedDomainTags, fromDate, toDate, sortBy, showBroken]);
 
   // Update parent component with filtered projects
   useEffect(() => {
     onFilteredProjectsChange(filteredProjects);
   }, [filteredProjects, onFilteredProjectsChange]);
+
+  // Update URL when filters change
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      updateURL({
+        searchTerm,
+        selectedTechTags,
+        selectedDomainTags,
+        selectedStatus,
+        fromDate,
+        toDate,
+        sortBy
+      });
+    }, 500); // Debounce URL updates
+    
+    return () => clearTimeout(timeoutId);
+  }, [searchTerm, selectedTechTags, selectedDomainTags, selectedStatus, fromDate, toDate, sortBy]);
 
   return (
     <div className="mb-6 space-y-4 sm:space-y-6">
@@ -224,9 +331,10 @@ export default function ProjectSearch({
 
         {/* Tag Selection Area - Adjust spacing and button sizes */}
         <div className="space-y-2">
-          <div className="flex flex-wrap items-center gap-2 text-sm text-gray-400">
-            <span className="mr-1">Filter by tags:</span>
-            <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-2 text-sm text-gray-400">
+            {/* Left: Tag selectors */}
+            <div className="flex flex-wrap gap-2 items-center">
+              <span className="mr-1">Filter by tags:</span>
               <button
                 onClick={() => setShowTechTagModal(true)}
                 className="flex-1 sm:flex-none px-3 py-1.5 rounded-lg text-sm bg-purple-900/30 text-purple-300 
@@ -240,6 +348,39 @@ export default function ProjectSearch({
                   hover:bg-gray-700/70 transition-colors duration-200 flex items-center justify-center gap-1"
               >
                 <span>+ Domain</span>
+              </button>
+            </div>
+            {/* Right: Date pickers with labels */}
+            <div className="flex items-center gap-2 ml-auto">
+              <span className="text-xs text-gray-400">From:</span>
+              <input
+                type="date"
+                className="w-[110px] px-2 py-1 rounded border border-gray-700 bg-gray-800 text-xs text-gray-100 placeholder-gray-500 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"
+                value={fromDate}
+                onChange={e => setFromDate(e.target.value)}
+                placeholder="From"
+                title="From date"
+                style={{ minWidth: 0 }}
+              />
+              <span className="text-xs text-gray-400">To:</span>
+              <input
+                type="date"
+                className="w-[110px] px-2 py-1 rounded border border-gray-700 bg-gray-800 text-xs text-gray-100 placeholder-gray-500 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"
+                value={toDate}
+                onChange={e => setToDate(e.target.value)}
+                placeholder="To"
+                title="To date"
+                style={{ minWidth: 0 }}
+              />
+              {/* Reset Dates Button */}
+              <button
+                type="button"
+                className="ml-2 px-2 py-1 text-xs rounded border border-gray-700 text-gray-400 bg-gray-800 hover:bg-gray-700 hover:text-gray-200 transition-colors duration-150"
+                onClick={() => { setFromDate(''); setToDate(''); }}
+                disabled={!fromDate && !toDate}
+                title="Reset date filters"
+              >
+                Reset
               </button>
             </div>
           </div>

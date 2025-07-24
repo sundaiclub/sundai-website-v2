@@ -470,7 +470,23 @@ export default function ProjectGrid({
   statusFilter = "APPROVED", 
   show_status = false, 
   show_team = true,
-  showSearch = false
+  showSearch = false,
+  urlFilters = {}
+}: {
+  showStarredOnly?: boolean;
+  statusFilter?: string;
+  show_status?: boolean;
+  show_team?: boolean;
+  showSearch?: boolean;
+  urlFilters?: {
+    techTags?: string[];
+    domainTags?: string[];
+    search?: string;
+    fromDate?: string;
+    toDate?: string;
+    status?: string[];
+    sort?: string;
+  };
 }) {
   const { user } = useUser();
   const { isAdmin, userInfo } = useUserContext();
@@ -628,7 +644,8 @@ export default function ProjectGrid({
       {showSearch && (
         <ProjectSearch 
           projects={projects} 
-          onFilteredProjectsChange={setFilteredProjects} 
+          onFilteredProjectsChange={setFilteredProjects}
+          urlFilters={urlFilters}
         />
       )}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
