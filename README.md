@@ -1,4 +1,4 @@
-# 🚀 Sundai Club
+# 🚀 Sundai Club!
 
 This is the code for sundai.club platform.
 
