@@ -234,13 +234,25 @@ export default function ProjectSearch({
             project.domainTags.some(t => t.name === tag)
           );
 
-        // Filter by date range
+        // Filter by date range - convert to local timezone first to avoid UTC offset issues
         const projectDate = new Date(project.startDate);
-        const fromDateObj = parseDateFromInput(fromDate);
-        const toDateObj = parseDateFromInput(toDate);
+        const projectDateStr = `${projectDate.getFullYear()}-${String(projectDate.getMonth() + 1).padStart(2, '0')}-${String(projectDate.getDate()).padStart(2, '0')}`;
         
-        const dateMatch = (!fromDateObj || projectDate >= fromDateObj) &&
-                         (!toDateObj || projectDate <= toDateObj);
+        // Debug logging to see what's happening
+        if (fromDate || toDate) {
+          console.log('DEBUG Filter:', {
+            projectTitle: project.title,
+            projectStartDate: project.startDate,
+            projectDateStr,
+            fromDate,
+            toDate,
+            fromMatch: !fromDate || projectDateStr >= fromDate,
+            toMatch: !toDate || projectDateStr <= toDate
+          });
+        }
+        
+        const dateMatch = (!fromDate || projectDateStr >= fromDate) &&
+                         (!toDate || projectDateStr <= toDate);
 
         // Filter broken projects
         const brokenMatch = showBroken || !project.is_broken;
