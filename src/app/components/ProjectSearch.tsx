@@ -115,6 +115,17 @@ export default function ProjectSearch({
   const [fromDate, setFromDate] = useState(formatDateForInput(urlFilters.fromDate || ''));
   const [toDate, setToDate] = useState(formatDateForInput(urlFilters.toDate || ''));
 
+  // Sync state with URL parameters when they change
+  useEffect(() => {
+    setSearchTerm(urlFilters.search || '');
+    setSelectedStatus(urlFilters.status || []);
+    setSelectedTechTags(urlFilters.techTags || []);
+    setSelectedDomainTags(urlFilters.domainTags || []);
+    setSortBy(SORT_OPTIONS.find(option => option.value === urlFilters.sort) || SORT_OPTIONS[0]);
+    setFromDate(formatDateForInput(urlFilters.fromDate || ''));
+    setToDate(formatDateForInput(urlFilters.toDate || ''));
+  }, [urlFilters]);
+
   // Function to update URL parameters
   const updateURL = (newFilters: any) => {
     const params = new URLSearchParams();
