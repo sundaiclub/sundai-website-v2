@@ -238,18 +238,18 @@ export default function ProjectSearch({
         const projectDate = new Date(project.startDate);
         const projectDateStr = `${projectDate.getFullYear()}-${String(projectDate.getMonth() + 1).padStart(2, '0')}-${String(projectDate.getDate()).padStart(2, '0')}`;
         
-        // Debug logging to see what's happening
-        if (fromDate || toDate) {
-          console.log('DEBUG Filter:', {
-            projectTitle: project.title,
-            projectStartDate: project.startDate,
-            projectDateStr,
-            fromDate,
-            toDate,
-            fromMatch: !fromDate || projectDateStr >= fromDate,
-            toMatch: !toDate || projectDateStr <= toDate
-          });
-        }
+        // Debug logging if needed
+        // if (fromDate || toDate) {
+        //   console.log('DEBUG Filter:', {
+        //     projectTitle: project.title,
+        //     projectStartDate: project.startDate,
+        //     projectDateStr,
+        //     fromDate,
+        //     toDate,
+        //     fromMatch: !fromDate || projectDateStr >= fromDate,
+        //     toMatch: !toDate || projectDateStr <= toDate
+        //   });
+        // }
         
         const dateMatch = (!fromDate || projectDateStr >= fromDate) &&
                          (!toDate || projectDateStr <= toDate);
