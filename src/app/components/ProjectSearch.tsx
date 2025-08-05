@@ -115,6 +115,17 @@ export default function ProjectSearch({
   const [fromDate, setFromDate] = useState(formatDateForInput(urlFilters.fromDate || ''));
   const [toDate, setToDate] = useState(formatDateForInput(urlFilters.toDate || ''));
 
+  // Sync state with URL parameters when they change
+  useEffect(() => {
+    setSearchTerm(urlFilters.search || '');
+    setSelectedStatus(urlFilters.status || []);
+    setSelectedTechTags(urlFilters.techTags || []);
+    setSelectedDomainTags(urlFilters.domainTags || []);
+    setSortBy(SORT_OPTIONS.find(option => option.value === urlFilters.sort) || SORT_OPTIONS[0]);
+    setFromDate(formatDateForInput(urlFilters.fromDate || ''));
+    setToDate(formatDateForInput(urlFilters.toDate || ''));
+  }, [urlFilters]);
+
   // Function to update URL parameters
   const updateURL = (newFilters: any) => {
     const params = new URLSearchParams();
@@ -223,13 +234,25 @@ export default function ProjectSearch({
             project.domainTags.some(t => t.name === tag)
           );
 
-        // Filter by date range
+        // Filter by date range - convert to local timezone first to avoid UTC offset issues
         const projectDate = new Date(project.startDate);
-        const fromDateObj = parseDateFromInput(fromDate);
-        const toDateObj = parseDateFromInput(toDate);
+        const projectDateStr = `${projectDate.getFullYear()}-${String(projectDate.getMonth() + 1).padStart(2, '0')}-${String(projectDate.getDate()).padStart(2, '0')}`;
         
-        const dateMatch = (!fromDateObj || projectDate >= fromDateObj) &&
-                         (!toDateObj || projectDate <= toDateObj);
+        // Debug logging if needed
+        // if (fromDate || toDate) {
+        //   console.log('DEBUG Filter:', {
+        //     projectTitle: project.title,
+        //     projectStartDate: project.startDate,
+        //     projectDateStr,
+        //     fromDate,
+        //     toDate,
+        //     fromMatch: !fromDate || projectDateStr >= fromDate,
+        //     toMatch: !toDate || projectDateStr <= toDate
+        //   });
+        // }
+        
+        const dateMatch = (!fromDate || projectDateStr >= fromDate) &&
+                         (!toDate || projectDateStr <= toDate);
 
         // Filter broken projects
         const brokenMatch = showBroken || !project.is_broken;

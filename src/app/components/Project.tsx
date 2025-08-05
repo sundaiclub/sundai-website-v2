@@ -495,12 +495,12 @@ export default function ProjectGrid({
   const [loading, setLoading] = useState(true);
   const { isDarkMode } = useTheme();
 
-  // Update projects when they're loaded
+  // Update projects when they're loaded (only if no search/filtering active)
   useEffect(() => {
-    if (projects.length > 0) {
+    if (projects.length > 0 && !showSearch) {
       setFilteredProjects(projects);
     }
-  }, [projects]);
+  }, [projects, showSearch]);
 
   useEffect(() => {
     async function fetchProjects() {
@@ -644,7 +644,7 @@ export default function ProjectGrid({
       {showSearch && (
         <ProjectSearch 
           projects={projects} 
-          onFilteredProjectsChange={setFilteredProjects}
+          onFilteredProjectsChange={setFilteredProjects} 
           urlFilters={urlFilters}
         />
       )}
