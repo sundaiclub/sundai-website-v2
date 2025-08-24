@@ -1,9 +1,21 @@
-import { useState, useMemo, useEffect } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { Listbox, ListboxButton, ListboxOption, ListboxOptions, Transition } from '@headlessui/react';
-import { MagnifyingGlassIcon, FunnelIcon, ChevronUpDownIcon, XMarkIcon, CalendarIcon } from '@heroicons/react/24/outline';
-import { Project } from './Project';
-import TagSelector from './TagSelector';
+import { useState, useMemo, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import {
+  Listbox,
+  ListboxButton,
+  ListboxOption,
+  ListboxOptions,
+  Transition,
+} from "@headlessui/react";
+import {
+  MagnifyingGlassIcon,
+  FunnelIcon,
+  ChevronUpDownIcon,
+  XMarkIcon,
+  CalendarIcon,
+} from "@heroicons/react/24/outline";
+import { Project } from "./Project";
+import TagSelector from "./TagSelector";
 
 type SortOption = {
   label: string;
@@ -19,7 +31,7 @@ const SORT_OPTIONS: SortOption[] = [
       const dateA = new Date(a.startDate).getTime();
       const dateB = new Date(b.startDate).getTime();
       return isNaN(dateB) || isNaN(dateA) ? 0 : dateB - dateA;
-    }
+    },
   },
   {
     label: "Oldest First",
@@ -28,12 +40,48 @@ const SORT_OPTIONS: SortOption[] = [
       const dateA = new Date(a.startDate).getTime();
       const dateB = new Date(b.startDate).getTime();
       return isNaN(dateB) || isNaN(dateA) ? 0 : dateA - dateB;
-    }
+    },
   },
   {
     label: "Most Liked",
     value: "likes",
-    sortFn: (a: Project, b: Project) => (b.likes?.length || 0) - (a.likes?.length || 0)
+    sortFn: (a: Project, b: Project) =>
+      (b.likes?.length || 0) - (a.likes?.length || 0),
+  },
+  {
+    label: "Popular",
+    value: "likesPerDay",
+    sortFn: (a: Project, b: Project) => {
+      const now = new Date();
+
+      // Calculate likes per day for project A
+      const createdAtA = new Date(a.createdAt);
+      const daysSinceCreationA = Math.max(
+        1,
+        Math.ceil(
+          (now.getTime() - createdAtA.getTime()) / (1000 * 60 * 60 * 24)
+        )
+      );
+      const likesPerDayA = (a.likes?.length || 0) / daysSinceCreationA;
+
+      // Calculate likes per day for project B
+      const createdAtB = new Date(b.createdAt);
+      const daysSinceCreationB = Math.max(
+        1,
+        Math.ceil(
+          (now.getTime() - createdAtB.getTime()) / (1000 * 60 * 60 * 24)
+        )
+      );
+      const likesPerDayB = (b.likes?.length || 0) / daysSinceCreationB;
+
+      // Primary sort: likes per day (descending)
+      if (likesPerDayA !== likesPerDayB) {
+        return likesPerDayB - likesPerDayA;
+      }
+
+      // Secondary sort: creation date (newest first)
+      return createdAtB.getTime() - createdAtA.getTime();
+    },
   },
   {
     label: "Recently Updated",
@@ -42,22 +90,22 @@ const SORT_OPTIONS: SortOption[] = [
       const dateA = new Date(a.updatedAt).getTime();
       const dateB = new Date(b.updatedAt).getTime();
       return isNaN(dateB) || isNaN(dateA) ? 0 : dateB - dateA;
-    }
+    },
   },
   {
     label: "Alphabetical",
     value: "alpha",
-    sortFn: (a: Project, b: Project) => a.title.localeCompare(b.title)
-  }
+    sortFn: (a: Project, b: Project) => a.title.localeCompare(b.title),
+  },
 ];
 
 // Helper function to format date for input
 const formatDateForInput = (date: string) => {
-  if (!date) return '';
+  if (!date) return "";
   try {
-    return new Date(date).toISOString().split('T')[0];
+    return new Date(date).toISOString().split("T")[0];
   } catch {
-    return '';
+    return "";
   }
 };
 
@@ -73,16 +121,17 @@ const parseDateFromInput = (dateStr: string) => {
 
 // Add this helper function to count projects per tag
 const getTagCount = (tagName: string, projects: Project[]) => {
-  return projects.filter(project => 
-    project.techTags.some(t => t.name === tagName) || 
-    project.domainTags.some(t => t.name === tagName)
+  return projects.filter(
+    (project) =>
+      project.techTags.some((t) => t.name === tagName) ||
+      project.domainTags.some((t) => t.name === tagName)
   ).length;
 };
 
-export default function ProjectSearch({ 
+export default function ProjectSearch({
   projects,
   onFilteredProjectsChange,
-  urlFilters = {}
+  urlFilters = {},
 }: {
   projects: Project[];
   onFilteredProjectsChange: (projects: Project[]) => void;
@@ -98,146 +147,164 @@ export default function ProjectSearch({
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  
+
   // Initialize state from URL parameters
-  const [searchTerm, setSearchTerm] = useState(urlFilters.search || '');
-  const [selectedStatus, setSelectedStatus] = useState<string[]>(urlFilters.status || []);
-  const [selectedTechTags, setSelectedTechTags] = useState<string[]>(urlFilters.techTags || []);
-  const [selectedDomainTags, setSelectedDomainTags] = useState<string[]>(urlFilters.domainTags || []);
+  const [searchTerm, setSearchTerm] = useState(urlFilters.search || "");
+  const [selectedStatus, setSelectedStatus] = useState<string[]>(
+    urlFilters.status || []
+  );
+  const [selectedTechTags, setSelectedTechTags] = useState<string[]>(
+    urlFilters.techTags || []
+  );
+  const [selectedDomainTags, setSelectedDomainTags] = useState<string[]>(
+    urlFilters.domainTags || []
+  );
   const [sortBy, setSortBy] = useState<SortOption>(
-    SORT_OPTIONS.find(option => option.value === urlFilters.sort) || SORT_OPTIONS[0]
+    SORT_OPTIONS.find((option) => option.value === urlFilters.sort) ||
+      SORT_OPTIONS[0]
   );
   const [showBroken, setShowBroken] = useState(true);
   const [showTechTagModal, setShowTechTagModal] = useState(false);
   const [showDomainTagModal, setShowDomainTagModal] = useState(false);
-  
+
   // Date filtering state
-  const [fromDate, setFromDate] = useState(formatDateForInput(urlFilters.fromDate || ''));
-  const [toDate, setToDate] = useState(formatDateForInput(urlFilters.toDate || ''));
+  const [fromDate, setFromDate] = useState(
+    formatDateForInput(urlFilters.fromDate || "")
+  );
+  const [toDate, setToDate] = useState(
+    formatDateForInput(urlFilters.toDate || "")
+  );
 
   // Sync state with URL parameters when they change
   useEffect(() => {
-    setSearchTerm(urlFilters.search || '');
+    setSearchTerm(urlFilters.search || "");
     setSelectedStatus(urlFilters.status || []);
     setSelectedTechTags(urlFilters.techTags || []);
     setSelectedDomainTags(urlFilters.domainTags || []);
-    setSortBy(SORT_OPTIONS.find(option => option.value === urlFilters.sort) || SORT_OPTIONS[0]);
-    setFromDate(formatDateForInput(urlFilters.fromDate || ''));
-    setToDate(formatDateForInput(urlFilters.toDate || ''));
+    setSortBy(
+      SORT_OPTIONS.find((option) => option.value === urlFilters.sort) ||
+        SORT_OPTIONS[0]
+    );
+    setFromDate(formatDateForInput(urlFilters.fromDate || ""));
+    setToDate(formatDateForInput(urlFilters.toDate || ""));
   }, [urlFilters]);
 
   // Function to update URL parameters
   const updateURL = (newFilters: any) => {
     const params = new URLSearchParams();
-    
+
     // Add search term
     if (newFilters.searchTerm) {
-      params.set('search', newFilters.searchTerm);
+      params.set("search", newFilters.searchTerm);
     }
-    
+
     // Add tech tags
     newFilters.selectedTechTags?.forEach((tag: string) => {
-      params.append('tech_tag', tag);
+      params.append("tech_tag", tag);
     });
-    
+
     // Add domain tags
     newFilters.selectedDomainTags?.forEach((tag: string) => {
-      params.append('domain_tag', tag);
+      params.append("domain_tag", tag);
     });
-    
+
     // Add status
     newFilters.selectedStatus?.forEach((status: string) => {
-      params.append('status', status);
+      params.append("status", status);
     });
-    
+
     // Add dates
     if (newFilters.fromDate) {
-      params.set('from_date', newFilters.fromDate);
+      params.set("from_date", newFilters.fromDate);
     }
     if (newFilters.toDate) {
-      params.set('to_date', newFilters.toDate);
+      params.set("to_date", newFilters.toDate);
     }
-    
+
     // Add sort
-    if (newFilters.sortBy?.value && newFilters.sortBy.value !== 'newest') {
-      params.set('sort', newFilters.sortBy.value);
+    if (newFilters.sortBy?.value && newFilters.sortBy.value !== "newest") {
+      params.set("sort", newFilters.sortBy.value);
     }
-    
-    const newURL = params.toString() ? `?${params.toString()}` : '/projects';
+
+    const newURL = params.toString() ? `?${params.toString()}` : "/projects";
     router.push(newURL, { scroll: false });
   };
 
   // Get unique tags from all projects
   const allTechTags = useMemo(() => {
     const tags = new Set<string>();
-    projects.forEach(project => {
-      project.techTags.forEach(tag => tags.add(tag.name));
+    projects.forEach((project) => {
+      project.techTags.forEach((tag) => tags.add(tag.name));
     });
     return Array.from(tags).sort();
   }, [projects]);
 
   const allDomainTags = useMemo(() => {
     const tags = new Set<string>();
-    projects.forEach(project => {
-      project.domainTags.forEach(tag => tags.add(tag.name));
+    projects.forEach((project) => {
+      project.domainTags.forEach((tag) => tags.add(tag.name));
     });
     return Array.from(tags).sort();
   }, [projects]);
 
   // Modify the tag arrays to include sorting by count
   const techTagsWithCount = allTechTags
-    .map(tag => ({
+    .map((tag) => ({
       id: tag,
       name: tag,
       _count: {
-        projects: projects.filter(p => 
-          p.techTags.some(t => t.name === tag)
-        ).length
-      }
+        projects: projects.filter((p) => p.techTags.some((t) => t.name === tag))
+          .length,
+      },
     }))
     .sort((a, b) => b._count.projects - a._count.projects); // Sort by count descending
 
   const domainTagsWithCount = allDomainTags
-    .map(tag => ({
+    .map((tag) => ({
       id: tag,
       name: tag,
       _count: {
-        projects: projects.filter(p => 
-          p.domainTags.some(t => t.name === tag)
-        ).length
-      }
+        projects: projects.filter((p) =>
+          p.domainTags.some((t) => t.name === tag)
+        ).length,
+      },
     }))
     .sort((a, b) => b._count.projects - a._count.projects); // Sort by count descending
 
   // Filter and sort projects
   const filteredProjects = useMemo(() => {
     return projects
-      .filter(project => {
+      .filter((project) => {
         // Filter by search term
-        const searchMatch = 
+        const searchMatch =
           project.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
           project.preview.toLowerCase().includes(searchTerm.toLowerCase());
 
         // Filter by status
-        const statusMatch = selectedStatus.length === 0 || 
+        const statusMatch =
+          selectedStatus.length === 0 ||
           selectedStatus.includes(project.status);
 
         // Filter by tech tags
-        const techTagMatch = selectedTechTags.length === 0 ||
-          selectedTechTags.every(tag => 
-            project.techTags.some(t => t.name === tag)
+        const techTagMatch =
+          selectedTechTags.length === 0 ||
+          selectedTechTags.every((tag) =>
+            project.techTags.some((t) => t.name === tag)
           );
 
         // Filter by domain tags
-        const domainTagMatch = selectedDomainTags.length === 0 ||
-          selectedDomainTags.every(tag => 
-            project.domainTags.some(t => t.name === tag)
+        const domainTagMatch =
+          selectedDomainTags.length === 0 ||
+          selectedDomainTags.every((tag) =>
+            project.domainTags.some((t) => t.name === tag)
           );
 
         // Filter by date range - convert to local timezone first to avoid UTC offset issues
         const projectDate = new Date(project.startDate);
-        const projectDateStr = `${projectDate.getFullYear()}-${String(projectDate.getMonth() + 1).padStart(2, '0')}-${String(projectDate.getDate()).padStart(2, '0')}`;
-        
+        const projectDateStr = `${projectDate.getFullYear()}-${String(
+          projectDate.getMonth() + 1
+        ).padStart(2, "0")}-${String(projectDate.getDate()).padStart(2, "0")}`;
+
         // Debug logging if needed
         // if (fromDate || toDate) {
         //   console.log('DEBUG Filter:', {
@@ -250,24 +317,42 @@ export default function ProjectSearch({
         //     toMatch: !toDate || projectDateStr <= toDate
         //   });
         // }
-        
-        const dateMatch = (!fromDate || projectDateStr >= fromDate) &&
-                         (!toDate || projectDateStr <= toDate);
+
+        const dateMatch =
+          (!fromDate || projectDateStr >= fromDate) &&
+          (!toDate || projectDateStr <= toDate);
 
         // Filter broken projects
         const brokenMatch = showBroken || !project.is_broken;
 
-        return searchMatch && statusMatch && techTagMatch && domainTagMatch && dateMatch && brokenMatch;
+        return (
+          searchMatch &&
+          statusMatch &&
+          techTagMatch &&
+          domainTagMatch &&
+          dateMatch &&
+          brokenMatch
+        );
       })
       .sort((a, b) => {
         try {
           return sortBy.sortFn(a, b);
         } catch (error) {
-          console.error('Sorting error:', error);
+          console.error("Sorting error:", error);
           return 0;
         }
       });
-  }, [projects, searchTerm, selectedStatus, selectedTechTags, selectedDomainTags, fromDate, toDate, sortBy, showBroken]);
+  }, [
+    projects,
+    searchTerm,
+    selectedStatus,
+    selectedTechTags,
+    selectedDomainTags,
+    fromDate,
+    toDate,
+    sortBy,
+    showBroken,
+  ]);
 
   // Update parent component with filtered projects
   useEffect(() => {
@@ -284,12 +369,20 @@ export default function ProjectSearch({
         selectedStatus,
         fromDate,
         toDate,
-        sortBy
+        sortBy,
       });
     }, 500); // Debounce URL updates
-    
+
     return () => clearTimeout(timeoutId);
-  }, [searchTerm, selectedTechTags, selectedDomainTags, selectedStatus, fromDate, toDate, sortBy]);
+  }, [
+    searchTerm,
+    selectedTechTags,
+    selectedDomainTags,
+    selectedStatus,
+    fromDate,
+    toDate,
+    sortBy,
+  ]);
 
   return (
     <div className="mb-6 space-y-4 sm:space-y-6">
@@ -314,9 +407,11 @@ export default function ProjectSearch({
           {/* Sort Dropdown - Full width on mobile */}
           <Listbox value={sortBy} onChange={setSortBy}>
             <div className="relative w-full sm:w-[200px]">
-              <ListboxButton className="w-full flex items-center justify-between px-4 py-2 sm:py-2.5 
+              <ListboxButton
+                className="w-full flex items-center justify-between px-4 py-2 sm:py-2.5 
                 border border-gray-700 rounded-lg bg-gray-800 text-gray-100
-                hover:bg-gray-750 transition-colors duration-200">
+                hover:bg-gray-750 transition-colors duration-200"
+              >
                 <span className="flex items-center gap-2">
                   <FunnelIcon className="h-5 w-5 text-gray-400" />
                   <span className="text-sm sm:text-base">{sortBy.label}</span>
@@ -331,15 +426,21 @@ export default function ProjectSearch({
                 leaveFrom="transform scale-100 opacity-100"
                 leaveTo="transform scale-95 opacity-0"
               >
-                <ListboxOptions className="absolute z-10 w-full mt-1 bg-gray-800 border 
+                <ListboxOptions
+                  className="absolute z-10 w-full mt-1 bg-gray-800 border 
                   border-gray-700 rounded-lg shadow-lg max-h-60 overflow-auto scrollbar-thin
-                  scrollbar-thumb-gray-600 scrollbar-track-gray-800">
+                  scrollbar-thumb-gray-600 scrollbar-track-gray-800"
+                >
                   {SORT_OPTIONS.map((option) => (
                     <ListboxOption
                       key={option.value}
                       value={option}
                       className={({ selected }) =>
-                        `${selected ? 'bg-gray-700 text-gray-100' : 'text-gray-300'}
+                        `${
+                          selected
+                            ? "bg-gray-700 text-gray-100"
+                            : "text-gray-300"
+                        }
                         cursor-pointer select-none relative py-2 px-4 hover:bg-gray-700`
                       }
                     >
@@ -380,7 +481,7 @@ export default function ProjectSearch({
                 type="date"
                 className="w-[110px] px-2 py-1 rounded border border-gray-700 bg-gray-800 text-xs text-gray-100 placeholder-gray-500 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"
                 value={fromDate}
-                onChange={e => setFromDate(e.target.value)}
+                onChange={(e) => setFromDate(e.target.value)}
                 placeholder="From"
                 title="From date"
                 style={{ minWidth: 0 }}
@@ -390,7 +491,7 @@ export default function ProjectSearch({
                 type="date"
                 className="w-[110px] px-2 py-1 rounded border border-gray-700 bg-gray-800 text-xs text-gray-100 placeholder-gray-500 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"
                 value={toDate}
-                onChange={e => setToDate(e.target.value)}
+                onChange={(e) => setToDate(e.target.value)}
                 placeholder="To"
                 title="To date"
                 style={{ minWidth: 0 }}
@@ -399,7 +500,10 @@ export default function ProjectSearch({
               <button
                 type="button"
                 className="ml-2 px-2 py-1 text-xs rounded border border-gray-700 text-gray-400 bg-gray-800 hover:bg-gray-700 hover:text-gray-200 transition-colors duration-150"
-                onClick={() => { setFromDate(''); setToDate(''); }}
+                onClick={() => {
+                  setFromDate("");
+                  setToDate("");
+                }}
                 disabled={!fromDate && !toDate}
                 title="Reset date filters"
               >
@@ -420,7 +524,11 @@ export default function ProjectSearch({
                   {tagName}
                   <XMarkIcon
                     className="h-3.5 w-3.5 sm:h-4 sm:w-4 cursor-pointer hover:text-purple-200 transition-colors duration-200"
-                    onClick={() => setSelectedTechTags(tags => tags.filter(t => t !== tagName))}
+                    onClick={() =>
+                      setSelectedTechTags((tags) =>
+                        tags.filter((t) => t !== tagName)
+                      )
+                    }
                   />
                 </span>
               ))}
@@ -433,7 +541,11 @@ export default function ProjectSearch({
                   {tagName}
                   <XMarkIcon
                     className="h-3.5 w-3.5 sm:h-4 sm:w-4 cursor-pointer hover:text-gray-200 transition-colors duration-200"
-                    onClick={() => setSelectedDomainTags(tags => tags.filter(t => t !== tagName))}
+                    onClick={() =>
+                      setSelectedDomainTags((tags) =>
+                        tags.filter((t) => t !== tagName)
+                      )
+                    }
                   />
                 </span>
               ))}
@@ -444,7 +556,9 @@ export default function ProjectSearch({
 
       {/* Results Count - Adjust text size */}
       <div className="text-xs sm:text-sm text-gray-400 flex items-center gap-2">
-        <span className="font-medium text-gray-300">{filteredProjects.length}</span> 
+        <span className="font-medium text-gray-300">
+          {filteredProjects.length}
+        </span>
         projects found
       </div>
 
@@ -453,9 +567,9 @@ export default function ProjectSearch({
         show={showTechTagModal}
         onClose={() => setShowTechTagModal(false)}
         tags={techTagsWithCount}
-        selectedTags={selectedTechTags.map(tag => ({ id: tag }))}
+        selectedTags={selectedTechTags.map((tag) => ({ id: tag }))}
         onSelect={(tagName) => {
-          setSelectedTechTags(prev => [...prev, tagName]);
+          setSelectedTechTags((prev) => [...prev, tagName]);
           setShowTechTagModal(false);
         }}
         type="tech"
@@ -465,9 +579,9 @@ export default function ProjectSearch({
         show={showDomainTagModal}
         onClose={() => setShowDomainTagModal(false)}
         tags={domainTagsWithCount}
-        selectedTags={selectedDomainTags.map(tag => ({ id: tag }))}
+        selectedTags={selectedDomainTags.map((tag) => ({ id: tag }))}
         onSelect={(tagName) => {
-          setSelectedDomainTags(prev => [...prev, tagName]);
+          setSelectedDomainTags((prev) => [...prev, tagName]);
           setShowDomainTagModal(false);
         }}
         type="domain"
@@ -478,11 +592,11 @@ export default function ProjectSearch({
 }
 
 // Helper MultiSelect Component
-function MultiSelect({ 
-  options, 
-  selected, 
-  onChange, 
-  placeholder 
+function MultiSelect({
+  options,
+  selected,
+  onChange,
+  placeholder,
 }: {
   options: string[];
   selected: string[];
@@ -492,10 +606,14 @@ function MultiSelect({
   return (
     <Listbox value={selected} onChange={onChange} multiple>
       <div className="relative min-w-[200px]">
-        <ListboxButton className="w-full flex items-center justify-between px-4 py-2 
-          border border-gray-700 rounded-lg bg-gray-800 text-gray-100">
+        <ListboxButton
+          className="w-full flex items-center justify-between px-4 py-2 
+          border border-gray-700 rounded-lg bg-gray-800 text-gray-100"
+        >
           <span className="block truncate">
-            {selected.length === 0 ? placeholder : `${selected.length} selected`}
+            {selected.length === 0
+              ? placeholder
+              : `${selected.length} selected`}
           </span>
           <ChevronUpDownIcon className="h-5 w-5 text-gray-400" />
         </ListboxButton>
@@ -507,15 +625,17 @@ function MultiSelect({
           leaveFrom="transform scale-100 opacity-100"
           leaveTo="transform scale-95 opacity-0"
         >
-          <ListboxOptions className="absolute z-10 w-full mt-1 bg-gray-800 border 
+          <ListboxOptions
+            className="absolute z-10 w-full mt-1 bg-gray-800 border 
             border-gray-700 rounded-lg shadow-lg max-h-60 overflow-auto scrollbar-thin
-            scrollbar-thumb-gray-600 scrollbar-track-gray-800">
+            scrollbar-thumb-gray-600 scrollbar-track-gray-800"
+          >
             {options.map((option) => (
               <ListboxOption
                 key={option}
                 value={option}
                 className={({ selected }) =>
-                  `${selected ? 'bg-gray-700 text-gray-100' : 'text-gray-300'}
+                  `${selected ? "bg-gray-700 text-gray-100" : "text-gray-300"}
                   cursor-pointer select-none relative py-2 px-4 hover:bg-gray-700`
                 }
               >
@@ -538,4 +658,4 @@ function MultiSelect({
       </div>
     </Listbox>
   );
-} 
+}

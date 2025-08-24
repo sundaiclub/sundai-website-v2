@@ -7,16 +7,16 @@ import { HeartIcon } from "@heroicons/react/24/outline";
 import { HeartIcon as HeartIconSolid } from "@heroicons/react/24/solid";
 import { useUserContext } from "../contexts/UserContext";
 import { useTheme } from "../contexts/ThemeContext";
-import { Listbox, Transition } from '@headlessui/react';
-import { ChevronUpDownIcon } from '@heroicons/react/24/solid';
-import { toast } from 'react-hot-toast';
+import { Listbox, Transition } from "@headlessui/react";
+import { ChevronUpDownIcon } from "@heroicons/react/24/solid";
+import { toast } from "react-hot-toast";
 import ProjectSearch from "./ProjectSearch";
 import { swapFirstLetters } from "../utils/nameUtils";
 
 export type Project = {
   id: string;
   title: string;
-  status: 'DRAFT' | 'PENDING' | 'APPROVED';
+  status: "DRAFT" | "PENDING" | "APPROVED";
   preview: string;
   description: string;
   githubUrl?: string | null;
@@ -25,12 +25,12 @@ export type Project = {
   techTags: Array<{
     id: string;
     name: string;
-    description? : string | null;
+    description?: string | null;
   }>;
   domainTags: Array<{
     id: string;
     name: string;
-    description? : string | null;
+    description?: string | null;
   }>;
   is_starred: boolean;
   is_broken: boolean;
@@ -69,12 +69,26 @@ export type Project = {
   updatedAt: string;
 };
 
-const STATUS_OPTIONS = ['DRAFT', 'PENDING', 'APPROVED'] as const;
+const STATUS_OPTIONS = ["DRAFT", "PENDING", "APPROVED"] as const;
 
-function ProjectCard({ project, userInfo, handleLike, isDarkMode, show_status, show_team = true, onStatusChange, onStarredChange, isAdmin }: {
+function ProjectCard({
+  project,
+  userInfo,
+  handleLike,
+  isDarkMode,
+  show_status,
+  show_team = true,
+  onStatusChange,
+  onStarredChange,
+  isAdmin,
+}: {
   project: Project;
   userInfo: any;
-  handleLike: (e: React.MouseEvent, projectId: string, isLiked: boolean) => void;
+  handleLike: (
+    e: React.MouseEvent,
+    projectId: string,
+    isLiked: boolean
+  ) => void;
   isDarkMode: boolean;
   show_status: boolean;
   show_team?: boolean;
@@ -111,7 +125,9 @@ function ProjectCard({ project, userInfo, handleLike, isDarkMode, show_status, s
             {isAdmin ? (
               <>
                 <button
-                  onClick={() => onStarredChange?.(project.id, !project.is_starred)}
+                  onClick={() =>
+                    onStarredChange?.(project.id, !project.is_starred)
+                  }
                   className={`px-2 py-1 rounded-full text-xs cursor-pointer ${
                     project.is_starred
                       ? "bg-yellow-300 text-yellow-800 hover:bg-yellow-400"
@@ -120,16 +136,23 @@ function ProjectCard({ project, userInfo, handleLike, isDarkMode, show_status, s
                 >
                   {project.is_starred ? "Starred" : "Not Starred"}
                 </button>
-                
-                <Listbox value={project.status} onChange={(newStatus) => onStatusChange?.(project.id, newStatus)}>
+
+                <Listbox
+                  value={project.status}
+                  onChange={(newStatus) =>
+                    onStatusChange?.(project.id, newStatus)
+                  }
+                >
                   <div className="relative">
-                    <Listbox.Button className={`px-2 py-1 rounded-full text-xs flex items-center ${
-                      project.status === "DRAFT"
-                        ? "bg-gray-300 text-gray-800"
-                        : project.status === "PENDING"
-                        ? "bg-orange-300 text-orange-800"
-                        : "bg-green-300 text-green-800"
-                    }`}>
+                    <Listbox.Button
+                      className={`px-2 py-1 rounded-full text-xs flex items-center ${
+                        project.status === "DRAFT"
+                          ? "bg-gray-300 text-gray-800"
+                          : project.status === "PENDING"
+                          ? "bg-orange-300 text-orange-800"
+                          : "bg-green-300 text-green-800"
+                      }`}
+                    >
                       <span>{project.status}</span>
                       <ChevronUpDownIcon className="h-4 w-4 ml-1" />
                     </Listbox.Button>
@@ -141,21 +164,26 @@ function ProjectCard({ project, userInfo, handleLike, isDarkMode, show_status, s
                       leaveFrom="transform scale-100 opacity-100"
                       leaveTo="transform scale-95 opacity-0"
                     >
-                      <Listbox.Options className={`absolute right-0 mt-1 w-32 rounded-md shadow-lg z-10 ${
-                        isDarkMode ? 'bg-gray-800 border border-gray-700' : 'bg-white'
-                      }`}>
+                      <Listbox.Options
+                        className={`absolute right-0 mt-1 w-32 rounded-md shadow-lg z-10 ${
+                          isDarkMode
+                            ? "bg-gray-800 border border-gray-700"
+                            : "bg-white"
+                        }`}
+                      >
                         {STATUS_OPTIONS.map((status) => (
                           <Listbox.Option
                             key={status}
                             value={status}
                             className={({ active }) =>
-                              `${active 
-                                ? isDarkMode 
-                                  ? 'bg-gray-700 text-purple-400' 
-                                  : 'bg-indigo-100 text-indigo-900'
-                                : isDarkMode
-                                  ? 'bg-gray-800 text-gray-300'
-                                  : 'bg-white text-gray-900'
+                              `${
+                                active
+                                  ? isDarkMode
+                                    ? "bg-gray-700 text-purple-400"
+                                    : "bg-indigo-100 text-indigo-900"
+                                  : isDarkMode
+                                  ? "bg-gray-800 text-gray-300"
+                                  : "bg-white text-gray-900"
                               } cursor-pointer select-none relative py-2 px-4`
                             }
                           >
@@ -226,9 +254,7 @@ function ProjectCard({ project, userInfo, handleLike, isDarkMode, show_status, s
                 handleLike(
                   e,
                   project.id,
-                  project.likes.some(
-                    (like) => like.hackerId === userInfo?.id
-                  )
+                  project.likes.some((like) => like.hackerId === userInfo?.id)
                 );
               }}
               className="p-2 -m-2 flex items-center space-x-1 text-gray-600 hover:text-indigo-600 transition-colors active:scale-95 touch-manipulation"
@@ -350,10 +376,7 @@ function ProjectCard({ project, userInfo, handleLike, isDarkMode, show_status, s
 
               {/* Other Participants - Limited to 4 (plus Launch Lead = 5 total) */}
               {project.participants.slice(0, 4).map((participant) => (
-                <div
-                  key={participant.hacker.id}
-                  className="flex items-center"
-                >
+                <div key={participant.hacker.id} className="flex items-center">
                   <div className="flex-shrink-0">
                     {participant.hacker.avatar ? (
                       <Image
@@ -396,17 +419,21 @@ function ProjectCard({ project, userInfo, handleLike, isDarkMode, show_status, s
                         isDarkMode ? "text-gray-400" : "text-gray-500"
                       }`}
                     >
-                      {participant.role === "hacker" ? "builder" : participant.role}
+                      {participant.role === "hacker"
+                        ? "builder"
+                        : participant.role}
                     </p>
                   </div>
                 </div>
               ))}
-              
+
               {/* Show count of additional members if any */}
               {project.participants.length > 4 && (
-                <div className={`text-xs ${
-                  isDarkMode ? "text-gray-400" : "text-gray-500"
-                } mt-2`}>
+                <div
+                  className={`text-xs ${
+                    isDarkMode ? "text-gray-400" : "text-gray-500"
+                  } mt-2`}
+                >
                   +{project.participants.length - 4} more team members
                 </div>
               )}
@@ -465,13 +492,13 @@ function ProjectCard({ project, userInfo, handleLike, isDarkMode, show_status, s
   );
 }
 
-export default function ProjectGrid({ 
-  showStarredOnly = false, 
-  statusFilter = "APPROVED", 
-  show_status = false, 
+export default function ProjectGrid({
+  showStarredOnly = false,
+  statusFilter = "APPROVED",
+  show_status = false,
   show_team = true,
   showSearch = false,
-  urlFilters = {}
+  urlFilters = {},
 }: {
   showStarredOnly?: boolean;
   statusFilter?: string;
@@ -505,17 +532,18 @@ export default function ProjectGrid({
   useEffect(() => {
     async function fetchProjects() {
       try {
-        const queryParam = statusFilter === "ALL" ? "" : `?status=${statusFilter}`;
+        const queryParam =
+          statusFilter === "ALL" ? "" : `?status=${statusFilter}`;
         const response = await fetch(`/api/projects${queryParam}`);
         const data = await response.json();
-        
+
         // Sort projects by startDate (newest first) before setting state
         const sortedProjects = [...data].sort((a, b) => {
           const dateA = new Date(a.startDate).getTime();
           const dateB = new Date(b.startDate).getTime();
           return isNaN(dateB) || isNaN(dateA) ? 0 : dateB - dateA;
         });
-        
+
         setProjects(sortedProjects);
       } catch (error) {
         console.error("Error fetching projects:", error);
@@ -556,7 +584,7 @@ export default function ProjectGrid({
                   : [
                       ...project.likes,
                       {
-                        hackerId: userInfo?.id || '',
+                        hackerId: userInfo?.id || "",
                         createdAt: new Date().toISOString(),
                       },
                     ],
@@ -576,24 +604,28 @@ export default function ProjectGrid({
 
     try {
       const response = await fetch(`/api/projects/${projectId}/status`, {
-        method: 'PATCH',
+        method: "PATCH",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({ status: newStatus }),
       });
 
       if (response.ok) {
-        setProjects(projects.map(p => 
-          p.id === projectId ? { ...p, status: newStatus as "DRAFT" | "PENDING" | "APPROVED" } : p
-        ));
-        toast.success('Project status updated successfully');
+        setProjects(
+          projects.map((p) =>
+            p.id === projectId
+              ? { ...p, status: newStatus as "DRAFT" | "PENDING" | "APPROVED" }
+              : p
+          )
+        );
+        toast.success("Project status updated successfully");
       } else {
-        toast.error('Failed to update project status');
+        toast.error("Failed to update project status");
       }
     } catch (error) {
-      console.error('Error updating project status:', error);
-      toast.error('Failed to update project status');
+      console.error("Error updating project status:", error);
+      toast.error("Failed to update project status");
     }
   };
 
@@ -602,24 +634,28 @@ export default function ProjectGrid({
 
     try {
       const response = await fetch(`/api/projects/${projectId}/star`, {
-        method: 'PATCH',
+        method: "PATCH",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({ is_starred: isStarred }),
       });
 
       if (response.ok) {
-        setProjects(projects.map(p => 
-          p.id === projectId ? { ...p, is_starred: isStarred } : p
-        ));
-        toast.success(`Project ${isStarred ? 'starred' : 'unstarred'} successfully`);
+        setProjects(
+          projects.map((p) =>
+            p.id === projectId ? { ...p, is_starred: isStarred } : p
+          )
+        );
+        toast.success(
+          `Project ${isStarred ? "starred" : "unstarred"} successfully`
+        );
       } else {
-        toast.error(`Failed to ${isStarred ? 'star' : 'unstar'} project`);
+        toast.error(`Failed to ${isStarred ? "star" : "unstar"} project`);
       }
     } catch (error) {
-      console.error('Error updating project starred status:', error);
-      toast.error(`Failed to ${isStarred ? 'star' : 'unstar'} project`);
+      console.error("Error updating project starred status:", error);
+      toast.error(`Failed to ${isStarred ? "star" : "unstar"} project`);
     }
   };
 
@@ -642,9 +678,9 @@ export default function ProjectGrid({
   return (
     <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 py-6 sm:py-12">
       {showSearch && (
-        <ProjectSearch 
-          projects={projects} 
-          onFilteredProjectsChange={setFilteredProjects} 
+        <ProjectSearch
+          projects={projects}
+          onFilteredProjectsChange={setFilteredProjects}
           urlFilters={urlFilters}
         />
       )}

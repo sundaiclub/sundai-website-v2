@@ -8,16 +8,49 @@ export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
     const status = searchParams.get("status");
+    const sortBy = searchParams.get("sortBy");
+    const timeFilter = searchParams.get("timeFilter");
 
     // Determine hack_type based on environment
     const isResearchSite = process.env.IS_RESEARCH_SITE === 'true';
     const hack_type = isResearchSite ? 'RESEARCH' : 'REGULAR';
 
+    // Build date filter based on timeFilter parameter
+    let dateFilter = {};
+    if (timeFilter) {
+      const now = new Date();
+      let startDate = new Date();
+      
+      switch (timeFilter) {
+        case 'week':
+          startDate.setDate(now.getDate() - 7);
+          break;
+        case 'month':
+          startDate.setDate(now.getDate() - 30);
+          break;
+        case 'year':
+          startDate.setDate(now.getDate() - 365);
+          break;
+        default:
+          // No date filter
+          break;
+      }
+      
+      if (timeFilter !== 'all') {
+        dateFilter = {
+          createdAt: {
+            gte: startDate,
+          },
+        };
+      }
+    }
+
     const projects = await prisma.project.findMany({
       where: {
         AND: [
           status ? { status: status as ProjectStatus } : {},
-          { hack_type }
+          { hack_type },
+          dateFilter
         ]
       },
       include: {
@@ -50,7 +83,11 @@ export async function GET(req: Request) {
           },
         },
       },
-      orderBy: [
+      orderBy: sortBy === 'likes' ? [
+        {
+          createdAt: "desc",
+        },
+      ] : [
         {
           status: status === "PENDING" ? "asc" : "desc",
         },
@@ -60,8 +97,32 @@ export async function GET(req: Request) {
       ],
     });
 
+    // Calculate likes per day metric and sort
+    const now = new Date();
+    const projectsWithMetric = projects.map(project => {
+      const createdAt = new Date(project.createdAt);
+      const daysSinceCreation = Math.max(1, Math.ceil((now.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24)));
+      const likeCount = project.likes.length;
+      const likesPerDay = likeCount / daysSinceCreation;
+      
+      return {
+        ...project,
+        likesPerDay,
+        daysSinceCreation
+      };
+    });
+
+    // Sort by likes per day (descending), then by creation date (descending)
+    const sortedProjects = projectsWithMetric.sort((a, b) => {
+      if (a.likesPerDay !== b.likesPerDay) {
+        return b.likesPerDay - a.likesPerDay; // Descending order
+      }
+      // If likes per day is equal, sort by creation date (newest first)
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
+
     return NextResponse.json(
-      projects.map((project) => ({
+      sortedProjects.map((project) => ({
         ...project,
         likes: project.likes.map((like) => ({
           hackerId: like.hackerId,
