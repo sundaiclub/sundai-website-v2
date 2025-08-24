@@ -242,9 +242,9 @@ function ProjectCard({ project, userInfo, handleLike, isDarkMode, show_status, s
                 ) : (
                   <HeartIcon className="h-7 w-7" />
                 )}
-                {/* <span className="absolute -bottom-4 left-1/2 -translate-x-1/2 text-sm">
+                <span className="absolute -bottom-4 left-1/2 -translate-x-1/2 text-sm">
                   {project.likes.length}
-                </span> */}
+                </span>
               </div>
             </button>
           </div>
