@@ -4,6 +4,7 @@ import { useUserContext } from "../contexts/UserContext";
 import { useTheme } from "../contexts/ThemeContext";
 import Image from "next/image";
 import Link from "next/link";
+import { HeartIcon } from "@heroicons/react/24/outline";
 
 type Week = {
   id: string;
@@ -30,6 +31,10 @@ type Week = {
       name: string;
       avatar?: { url: string } | null;
     };
+    likes?: Array<{
+      hackerId: string;
+      createdAt: string;
+    }>;
   }>;
 };
 
@@ -233,6 +238,12 @@ export default function WeeksPage() {
                             fill
                             className="object-cover"
                           />
+                          <div className="absolute top-2 left-2 flex items-center space-x-1 bg-black/50 px-2 py-1 rounded-full">
+                            <HeartIcon className="h-4 w-4 text-white" />
+                            <span className="text-white text-sm">
+                              {project.likes?.length || 0}
+                            </span>
+                          </div>
                         </div>
                         <div className="p-4">
                           <h4

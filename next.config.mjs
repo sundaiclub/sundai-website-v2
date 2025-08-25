@@ -7,12 +7,13 @@ const nextConfig = {
     ignoreDuringBuilds: true,
   },
   images: {
-    unoptimized: true,
+    // unoptimized: true,
     domains: [
       "img.clerk.com",
       "images.clerk.dev",
       "www.gravatar.com",
       "storage.googleapis.com",
+      "replicate.delivery",
     ],
   },
   experimental: {
