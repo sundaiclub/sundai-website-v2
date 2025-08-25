@@ -54,7 +54,7 @@ Domain: ${project.domainTags.map((tag: any) => tag.name).join(', ')}
 
 User Request: ${prompt}`;
 
-    // Generate 4 different variations of the prompt
+    // Generate 4 different variations of the prompt concurrently
     const generatePromptVariation = async (basePrompt: string, variation: number) => {
       const variationPrompt = `Create a different variation of this image generation prompt. Make it unique but keep the same core concept and style:
 
@@ -105,30 +105,26 @@ Generate only the new prompt text, no explanations.`;
       return generatedVariation.trim();
     };
 
-    // Generate 4 different prompts based on project context
-    const promptVariations = [];
-    
-    // Generate all 4 prompts using the project context
+    // Generate 4 different prompts concurrently
+    const promptVariationPromises = [];
     for (let i = 1; i <= 4; i++) {
-      try {
-        const variation = await generatePromptVariation(projectContext, i);
-        promptVariations.push(variation);
-      } catch (error) {
-        // Fallback to a basic prompt if variation fails
-        const fallbackPrompt = `Pixel art thumbnail, 16:9 aspect ratio, vibrant colors, professional and modern style. Depict ${project.title} with visual elements representing ${project.techTags.map((tag: any) => tag.name).join(', ')} and ${project.domainTags.map((tag: any) => tag.name).join(', ')}. Focus on visual metaphor rather than literal representation.`;
-        promptVariations.push(fallbackPrompt);
-      }
+      promptVariationPromises.push(
+        generatePromptVariation(projectContext, i).catch(() => {
+          // Fallback to a basic prompt if variation fails
+          return `Pixel art thumbnail, 16:9 aspect ratio, vibrant colors, professional and modern style. Depict ${project.title} with visual elements representing ${project.techTags.map((tag: any) => tag.name).join(', ')} and ${project.domainTags.map((tag: any) => tag.name).join(', ')}. Focus on visual metaphor rather than literal representation.`;
+        })
+      );
     }
 
-    // Generate 4 images using qwen-image, one for each unique prompt
-    const imageUrls = [];
-    for (let i = 0; i < promptVariations.length; i++) {
+    const promptVariations = await Promise.all(promptVariationPromises);
+
+    // Generate 4 images concurrently using qwen-image
+    const imageGenerationPromises = promptVariations.map(async (promptVariation, index) => {
       try {
-        const promptVariation = promptVariations[i];
         const input = {
           prompt: promptVariation,
           guidance: 4,
-          num_inference_steps: 50,
+          num_inference_steps: 30, // Reduced from 50 to speed up generation
           seed: Math.floor(Math.random() * 10000) // Random seed for additional variety
         };
 
@@ -139,11 +135,15 @@ Generate only the new prompt text, no explanations.`;
           ? (output[0] as any).url()
           : (output as any).url();
         
-        imageUrls.push(imageUrl);
+        return imageUrl;
       } catch (error) {
-        // Skip this image if generation fails
+        console.error(`Error generating image ${index + 1}:`, error);
+        return null; // Return null for failed generations
       }
-    }
+    });
+
+    const imageResults = await Promise.all(imageGenerationPromises);
+    const imageUrls = imageResults.filter(url => url !== null); // Filter out failed generations
 
     return NextResponse.json({ images: imageUrls });
   } catch (error) {

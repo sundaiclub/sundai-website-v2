@@ -1,0 +1,25 @@
+{
+  "functions": {
+    "src/app/api/projects/[projectId]/generate-images/route.ts": {
+      "maxDuration": 60
+    }
+  },
+  "regions": ["iad1"],
+  "build": {
+    "env": {
+      "REPLICATE_API_TOKEN": "@replicate-api-token",
+      "GEMINI_API_KEY": "@gemini-api-key"
+    }
+  },
+  "headers": [
+    {
+      "source": "/api/projects/(.*)/generate-images",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, no-store, must-revalidate"
+        }
+      ]
+    }
+  ]
+}
