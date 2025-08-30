@@ -36,6 +36,15 @@ const SORT_OPTIONS: SortOption[] = [
     sortFn: (a: Project, b: Project) => (b.likes?.length || 0) - (a.likes?.length || 0)
   },
   {
+    label: "Trending",
+    value: "trending",
+    sortFn: (a: Project, b: Project) => {
+      const scoreA = calculateTrendingScore(a);
+      const scoreB = calculateTrendingScore(b);
+      return scoreB - scoreA;
+    }
+  },
+  {
     label: "Recently Updated",
     value: "updated",
     sortFn: (a: Project, b: Project) => {
@@ -77,6 +86,15 @@ const getTagCount = (tagName: string, projects: Project[]) => {
     project.techTags.some(t => t.name === tagName) || 
     project.domainTags.some(t => t.name === tagName)
   ).length;
+};
+
+// Helper function to calculate trending score using log base 7
+const calculateTrendingScore = (project: Project) => {
+  const likes = project.likes?.length || 0;
+  const daysSinceCreation = Math.floor(
+    (Date.now() - new Date(project.startDate).getTime()) / (1000 * 60 * 60 * 24)
+  );
+  return likes / Math.log(daysSinceCreation + 2) / Math.log(7);
 };
 
 export default function ProjectSearch({ 
