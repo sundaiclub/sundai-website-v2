@@ -80,6 +80,15 @@ async function main() {
         email: "vlad@sundai.club",
       },
     }),
+    prisma.hacker.create({
+        data: {
+        name: "abhishek uddaraju",
+        clerkId: "user_31kJ5uvyjnwPqZAXEWmUAY88ZAa",
+        role: Role.HACKER,
+        bio: "New developer on the team",
+        email: "uabhishek2904@gmail.com",
+      },
+    }),
   ]);
 
   const [connor, sam, serge, artem, vlad] = users;
