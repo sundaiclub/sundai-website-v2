@@ -15,7 +15,7 @@ export default function AllProjectsList() {
     fromDate: searchParams.get('from_date') || '',
     toDate: searchParams.get('to_date') || '',
     status: searchParams.getAll('status'),
-    sort: searchParams.get('sort') || 'newest'
+    sort: searchParams.get('sort') || 'trending'
   };
 
   return (
