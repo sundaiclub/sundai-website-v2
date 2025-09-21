@@ -13,6 +13,15 @@ type SortOption = {
 
 const SORT_OPTIONS: SortOption[] = [
   {
+    label: "Trending",
+    value: "trending",
+    sortFn: (a: Project, b: Project) => {
+      const scoreA = calculateTrendingScore(a);
+      const scoreB = calculateTrendingScore(b);
+      return scoreB - scoreA;
+    }
+  },
+  {
     label: "Newest First",
     value: "newest",
     sortFn: (a: Project, b: Project) => {
@@ -34,15 +43,6 @@ const SORT_OPTIONS: SortOption[] = [
     label: "Most Liked",
     value: "likes",
     sortFn: (a: Project, b: Project) => (b.likes?.length || 0) - (a.likes?.length || 0)
-  },
-  {
-    label: "Trending",
-    value: "trending",
-    sortFn: (a: Project, b: Project) => {
-      const scoreA = calculateTrendingScore(a);
-      const scoreB = calculateTrendingScore(b);
-      return scoreB - scoreA;
-    }
   },
   {
     label: "Recently Updated",
@@ -88,13 +88,14 @@ const getTagCount = (tagName: string, projects: Project[]) => {
   ).length;
 };
 
-// Helper function to calculate trending score using log base 7
-const calculateTrendingScore = (project: Project) => {
-  const likes = project.likes?.length || 0;
-  const daysSinceCreation = Math.floor(
+const calculateTrendingScore = (project: Project): number => {
+  const likesCount = project.likes?.length || 0;
+  const projectAgeInDays = Math.floor(
     (Date.now() - new Date(project.startDate).getTime()) / (1000 * 60 * 60 * 24)
   );
-  return likes / Math.log(daysSinceCreation + 2) / Math.log(7);
+  const logLikes = Math.log(likesCount + 1); // +1 to avoid log(0)
+  const decayFactor = Math.exp(-projectAgeInDays / 30); // Decay approximately every 30 days
+  return logLikes * decayFactor;
 };
 
 export default function ProjectSearch({ 
@@ -177,7 +178,7 @@ export default function ProjectSearch({
     }
     
     // Add sort
-    if (newFilters.sortBy?.value && newFilters.sortBy.value !== 'newest') {
+    if (newFilters.sortBy?.value && newFilters.sortBy.value !== 'trending') {
       params.set('sort', newFilters.sortBy.value);
     }
     
