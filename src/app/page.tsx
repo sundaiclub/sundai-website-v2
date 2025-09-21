@@ -3,16 +3,85 @@ import Link from "next/link";
 import Image from "next/image";
 import { motion } from "framer-motion";
 import ProjectGrid from "./components/Project";
+import TrendingSections from "./components/TrendingSections";
 import Typewriter from "typewriter-effect";
 import { useState, useEffect } from "react";
 import { usePullToRefresh } from "./hooks/usePullToRefresh";
 import { useTheme } from "./contexts/ThemeContext";
+import { useUser } from "@clerk/nextjs";
+import { useUserContext } from "./contexts/UserContext";
+import { Project } from "./components/Project";
 
 export default function Home() {
   const [isTypingDone, setIsTypingDone] = useState(false);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [loading, setLoading] = useState(true);
   const { isDarkMode } = useTheme();
+  const { user } = useUser();
+  const { userInfo } = useUserContext();
 
   usePullToRefresh();
+
+  // Fetch projects for trending sections
+  useEffect(() => {
+    async function fetchProjects() {
+      try {
+        const response = await fetch('/api/projects?status=APPROVED');
+        const data = await response.json();
+        setProjects(data);
+      } catch (error) {
+        console.error("Error fetching projects:", error);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchProjects();
+  }, []);
+
+  const handleLike = async (
+    e: React.MouseEvent,
+    projectId: string,
+    isLiked: boolean
+  ) => {
+    e.preventDefault();
+    if (!user) {
+      alert("Please sign in to like projects");
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/projects/${projectId}/like`, {
+        method: isLiked ? "DELETE" : "POST",
+      });
+
+      if (response.ok) {
+        setProjects(
+          projects.map((project) => {
+            if (project.id === projectId) {
+              return {
+                ...project,
+                likes: isLiked
+                  ? project.likes.filter(
+                      (like) => like.hackerId !== userInfo?.id
+                    )
+                  : [
+                      ...project.likes,
+                      {
+                        hackerId: userInfo?.id || '',
+                        createdAt: new Date().toISOString(),
+                      },
+                    ],
+              };
+            }
+            return project;
+          })
+        );
+      }
+    } catch (error) {
+      console.error("Error toggling like:", error);
+    }
+  };
 
   const stompVariants = {
     hidden: { scale: 2, opacity: 0, y: -50 },
@@ -178,13 +247,28 @@ export default function Home() {
           </div>
         </div>
 
-        <motion.div
-          initial={{ opacity: 0, y: 50 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 1.3 }}
-        >
-          <ProjectGrid showStarredOnly={true} show_team={false} />
-        </motion.div>
+        {loading ? (
+          <div className="flex justify-center items-center py-20">
+            <div
+              className={`animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 ${
+                isDarkMode ? "border-purple-400" : "border-indigo-600"
+              }`}
+            ></div>
+          </div>
+        ) : (
+          <motion.div
+            initial={{ opacity: 0, y: 50 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 1.3 }}
+          >
+            <TrendingSections 
+              projects={projects}
+              userInfo={userInfo}
+              handleLike={handleLike}
+              isDarkMode={isDarkMode}
+            />
+          </motion.div>
+        )}
       </section>
       <motion.footer
         initial={{ opacity: 0 }}
