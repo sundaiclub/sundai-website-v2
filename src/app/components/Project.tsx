@@ -231,18 +231,24 @@ function ProjectCard({ project, userInfo, handleLike, isDarkMode, show_status, s
                   )
                 );
               }}
-              className="p-2 -m-2 flex items-center space-x-1 text-gray-600 hover:text-indigo-600 transition-colors active:scale-95 touch-manipulation"
+              className={`p-3 rounded-full transition-all duration-200 active:scale-95 touch-manipulation ${
+                project.likes.some((like) => like.hackerId === userInfo?.id)
+                  ? "bg-red-500 text-white shadow-lg hover:bg-red-600"
+                  : isDarkMode
+                  ? "bg-gray-700/80 text-gray-300 hover:bg-red-500 hover:text-white hover:shadow-lg"
+                  : "bg-gray-100 text-gray-600 hover:bg-red-500 hover:text-white hover:shadow-lg"
+              }`}
               aria-label={`Like project ${project.title}`}
             >
-              <div className="relative">
+              <div className="flex items-center space-x-2">
                 {project.likes.some(
                   (like) => like.hackerId === userInfo?.id
                 ) ? (
-                  <HeartIconSolid className="h-7 w-7 text-indigo-600" />
+                  <HeartIconSolid className="h-6 w-6" />
                 ) : (
-                  <HeartIcon className="h-7 w-7" />
+                  <HeartIcon className="h-6 w-6" />
                 )}
-                <span className="absolute -bottom-4 left-1/2 -translate-x-1/2 text-sm">
+                <span className="text-sm font-bold">
                   {project.likes.length}
                 </span>
               </div>
