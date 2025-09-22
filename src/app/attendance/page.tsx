@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useUserContext } from "../contexts/UserContext";
 import { useTheme } from "../contexts/ThemeContext";
 import Image from "next/image";
@@ -32,11 +32,7 @@ export default function AttendancePage() {
   const [loading, setLoading] = useState(true);
   const [checkedIn, setCheckedIn] = useState(false);
 
-  useEffect(() => {
-    fetchCurrentWeek();
-  }, []);
-
-  const fetchCurrentWeek = async () => {
+  const fetchCurrentWeek = useCallback(async () => {
     try {
       const response = await fetch("/api/weeks/current");
       if (response.ok) {
@@ -56,7 +52,11 @@ export default function AttendancePage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [userInfo]);
+
+  useEffect(() => {
+    fetchCurrentWeek();
+  }, [fetchCurrentWeek]);
 
   const handleCheckIn = async () => {
     try {
@@ -84,6 +84,7 @@ export default function AttendancePage() {
     return (
       <div className="flex justify-center items-center min-h-screen">
         <div
+          data-testid="loading-spinner"
           className={`animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 ${
             isDarkMode ? "border-purple-400" : "border-indigo-600"
           }`}

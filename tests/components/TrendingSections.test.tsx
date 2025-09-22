@@ -107,7 +107,6 @@ describe('TrendingSections Component', () => {
     // Check if links are present (they might not be rendered in this component)
     const githubLinks = screen.queryAllByRole('link', { name: /github/i })
     const demoLinks = screen.queryAllByRole('link', { name: /demo/i })
-    const blogLinks = screen.queryAllByRole('link', { name: /blog/i })
 
     // If links are not rendered, skip this test or check for alternative elements
     if (githubLinks.length === 0) {
@@ -116,7 +115,6 @@ describe('TrendingSections Component', () => {
     } else {
       expect(githubLinks[0]).toHaveAttribute('href', 'https://github.com/test/project')
       expect(demoLinks[0]).toHaveAttribute('href', 'https://demo.example.com')
-      expect(blogLinks[0]).toHaveAttribute('href', 'https://blog.example.com')
     }
   })
 

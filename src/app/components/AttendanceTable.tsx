@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
 import { format } from "date-fns";
 
@@ -29,11 +29,7 @@ export default function AttendanceTable() {
     endDate: new Date(),
   });
 
-  useEffect(() => {
-    fetchAttendance();
-  }, [dateRange]);
-
-  const fetchAttendance = async () => {
+  const fetchAttendance = useCallback(async () => {
     try {
       const response = await fetch(
         `/api/attendance?startDate=${dateRange.startDate.toISOString()}&endDate=${dateRange.endDate.toISOString()}`
@@ -45,12 +41,16 @@ export default function AttendanceTable() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [dateRange]);
+
+  useEffect(() => {
+    fetchAttendance();
+  }, [fetchAttendance]);
 
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-[200px]">
-        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-600"></div>
+        <div data-testid="loading-spinner" className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-600"></div>
       </div>
     );
   }

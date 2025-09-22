@@ -381,6 +381,7 @@ jest.mock('svix', () => ({
   })),
 }))
 
+
 // Global fetch mock
 global.fetch = jest.fn()
 

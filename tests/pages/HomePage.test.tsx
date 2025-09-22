@@ -36,10 +36,11 @@ jest.mock('@clerk/nextjs', () => ({
 
 describe('Home Page', () => {
   beforeEach(() => {
-    // Mock fetch for projects API
+    // Mock fetch for projects API - make the project starred so it shows up
+    const starredProject = { ...mockProject, is_starred: true }
     global.fetch = jest.fn().mockResolvedValue({
       ok: true,
-      json: jest.fn().mockResolvedValue([mockProject]),
+      json: jest.fn().mockResolvedValue([starredProject]),
     })
   })
 
@@ -138,11 +139,12 @@ describe('Home Page', () => {
 
   it('shows loading state initially', async () => {
     // Mock fetch to resolve after a delay to ensure loading state is visible
+    const starredProject = { ...mockProject, is_starred: true }
     global.fetch = jest.fn().mockImplementation(() => 
       new Promise(resolve => 
         setTimeout(() => resolve({
           ok: true,
-          json: jest.fn().mockResolvedValue([mockProject]),
+          json: jest.fn().mockResolvedValue([starredProject]),
         }), 100)
       )
     )
@@ -162,10 +164,11 @@ describe('Home Page', () => {
       json: jest.fn().mockResolvedValue({}),
     })
     
+    const starredProject = { ...mockProject, is_starred: true }
     global.fetch = jest.fn()
       .mockResolvedValueOnce({
         ok: true,
-        json: jest.fn().mockResolvedValue([mockProject]),
+        json: jest.fn().mockResolvedValue([starredProject]),
       })
       .mockImplementation(mockLike)
 

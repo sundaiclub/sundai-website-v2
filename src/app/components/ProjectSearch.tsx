@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Listbox, ListboxButton, ListboxOption, ListboxOptions, Transition } from '@headlessui/react';
 import { MagnifyingGlassIcon, FunnelIcon, ChevronUpDownIcon, XMarkIcon, CalendarIcon } from '@heroicons/react/24/outline';
@@ -127,7 +127,7 @@ export default function ProjectSearch({
   }, [urlFilters]);
 
   // Function to update URL parameters
-  const updateURL = (newFilters: any) => {
+  const updateURL = useCallback((newFilters: any) => {
     const params = new URLSearchParams();
     
     // Add search term
@@ -165,7 +165,7 @@ export default function ProjectSearch({
     
     const newURL = params.toString() ? `?${params.toString()}` : '/projects';
     router.push(newURL, { scroll: false });
-  };
+  }, [router]);
 
   // Get unique tags from all projects
   const allTechTags = useMemo(() => {
@@ -289,7 +289,7 @@ export default function ProjectSearch({
     }, 500); // Debounce URL updates
     
     return () => clearTimeout(timeoutId);
-  }, [searchTerm, selectedTechTags, selectedDomainTags, selectedStatus, fromDate, toDate, sortBy]);
+  }, [searchTerm, selectedTechTags, selectedDomainTags, selectedStatus, fromDate, toDate, sortBy, updateURL]);
 
   return (
     <div className="mb-6 space-y-4 sm:space-y-6">
