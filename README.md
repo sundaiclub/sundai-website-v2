@@ -17,6 +17,7 @@ Reach out to @godeva or @arteml0178 on discord with any quesions.
   - [3. Environment Setup](#3-environment-setup)
   - [4. Database Setup](#4-database-setup)
   - [5. Start Development Server](#5-start-development-server)
+- [🧪 Testing](#-testing)
 - [🏗️ Architecture Overview](#️-architecture-overview)
 - [🔧 Troubleshooting](#-troubleshooting)
 - [📖 Feature Documentation](#-feature-documentation)
@@ -146,6 +147,54 @@ npm run dev
 
 🎉 **Success!** Visit [http://localhost:3000](http://localhost:3000) to see the application!
 
+## 🧪 Testing
+
+This project includes comprehensive testing with Jest, React Testing Library, and automated pre-commit hooks.
+
+### Quick Test Commands
+
+```bash
+# Run all tests
+npm test
+
+# Run tests in watch mode
+npm run test:watch
+
+# Run tests with coverage
+npm run test:coverage
+
+# Run tests for CI
+npm run test:ci
+
+# Setup pre-commit hooks
+npm run setup-husky
+```
+
+### Test Coverage
+
+- **Components**: All React components are tested
+- **Pages**: All page components are tested  
+- **API Routes**: All API endpoints are tested
+- **Utilities**: All utility functions are tested
+
+### Pre-commit Hooks
+
+Before each commit, the following runs automatically:
+1. **ESLint** - Code linting and fixing
+2. **Jest** - Related tests only
+3. **Prettier** - Code formatting
+4. **Build** - Next.js build verification
+
+### GitHub Actions
+
+All pull requests automatically run:
+- Linting and type checking
+- Full test suite
+- Build verification
+- Security audits
+
+For detailed testing information, see [TESTING.md](./TESTING.md).
+
 ## 🏗️ Architecture Overview
 
 ```mermaid
@@ -229,6 +278,13 @@ npm run db:restore
 npm run dev          # Start development server
 npm run build        # Build for production
 npm run lint         # Run linting
+
+# Testing
+npm test             # Run all tests
+npm run test:watch   # Run tests in watch mode
+npm run test:coverage # Run tests with coverage
+npm run test:ci      # Run tests for CI
+npm run setup-husky  # Setup pre-commit hooks
 ```
 
 ## 🔑 Required External Services Setup

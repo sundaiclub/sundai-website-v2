@@ -3,13 +3,18 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
+    "dev": "node --no-deprecation node_modules/.bin/next dev",
+    "build": "node --no-deprecation node_modules/.bin/next build",
+    "start": "node --no-deprecation node_modules/.bin/next start",
     "lint": "next lint",
+    "test": "node --no-deprecation node_modules/.bin/jest",
+    "test:watch": "node --no-deprecation node_modules/.bin/jest --watch",
+    "test:coverage": "node --no-deprecation node_modules/.bin/jest --coverage",
+    "test:ci": "node --no-deprecation node_modules/.bin/jest --ci --coverage --watchAll=false",
+    "setup-husky": "./scripts/setup-husky.sh",
     "seed": "ts-node --compiler-options '{\"module\":\"CommonJS\"}' prisma/seed.ts",
     "postinstall": "prisma generate",
-    "vercel-build": "prisma generate && prisma migrate deploy && next build",
+    "vercel-build": "prisma generate && prisma migrate deploy && node --no-deprecation node_modules/.bin/next build",
     "db:backup": "./scripts/backup_db.sh",
     "db:restore": "./scripts/restore_db.sh"
   },
@@ -41,12 +46,21 @@
   },
   "devDependencies": {
     "@tailwindcss/typography": "^0.5.15",
+    "@testing-library/jest-dom": "^6.1.4",
+    "@testing-library/react": "^14.1.2",
+    "@testing-library/user-event": "^14.5.1",
+    "@types/jest": "^29.5.8",
     "@types/node": "^20.17.6",
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "eslint": "^8",
     "eslint-config-next": "14.2.7",
+    "husky": "^8.0.3",
+    "jest": "^29.7.0",
+    "jest-environment-jsdom": "^29.7.0",
+    "lint-staged": "^15.2.0",
     "postcss": "^8",
+    "prettier": "^3.1.0",
     "tailwindcss": "^3.4.1",
     "tailwindcss-scrollbar": "^0.1.0",
     "ts-node": "^10.9.2",
@@ -54,5 +68,19 @@
   },
   "prisma": {
     "seed": "ts-node prisma/seed.ts"
+  },
+  "lint-staged": {
+    "*.{js,jsx,ts,tsx}": [
+      "eslint --fix",
+      "jest --bail --findRelatedTests"
+    ],
+    "*.{js,jsx,ts,tsx,json,css,md}": [
+      "prettier --write"
+    ]
+  },
+  "husky": {
+    "hooks": {
+      "pre-commit": "lint-staged && npm run build"
+    }
   }
 }

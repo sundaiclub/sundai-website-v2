@@ -47,7 +47,7 @@ export default function Home() {
           </h2>
           <p className="text-lg md:text-xl text-gray-300 mb-6">
             Our AI scrapes forums and communities to find side effects others
-            are facing, even when they're not listed in official documentation.
+            are facing, even when they&apos;re not listed in official documentation.
           </p>
           <GifDisplay
             altText="Side Effect Discovery"
@@ -62,7 +62,7 @@ export default function Home() {
         <div className="container mx-auto px-4 text-center">
           <h2 className="text-3xl font-bold text-white mb-6">Our Mission</h2>
           <p className="text-lg text-gray-400 max-w-[60vw] mx-auto">
-            We're dedicated to empowering patients by giving them a platform to
+            We&apos;re dedicated to empowering patients by giving them a platform to
             report side effects and compare their experiences with others. By
             using AI to aggregate data from Reddit and other sources, we help
             uncover side effects that are often overlooked.
@@ -78,7 +78,7 @@ export default function Home() {
           </h2>
           <p className="text-lg text-gray-400 mb-6 max-w-[60vw] mx-auto">
             Your support helps us continue developing our AI to improve patient
-            outcomes. Whether it's sharing your experience or donating, every
+            outcomes. Whether it&apos;s sharing your experience or donating, every
             bit helps us bring hidden side effects to light.
           </p>
           <div className="flex justify-center space-x-4">

@@ -124,7 +124,7 @@ export default function AttendancePage() {
                   : "bg-green-100 text-green-800"
               } p-4 rounded-lg`}
             >
-              You're checked in for this week!
+              You&apos;re checked in for this week!
             </div>
           ) : (
             <button
