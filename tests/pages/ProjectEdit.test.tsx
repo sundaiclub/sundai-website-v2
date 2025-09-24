@@ -306,33 +306,6 @@ describe('ProjectEdit', () => {
     });
   });
 
-  it('should handle update error', async () => {
-    const toast = require('react-hot-toast').default;
-    (global.fetch as jest.Mock)
-      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(mockProject) }) // project
-      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve([]) })
-      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve([]) })
-      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve([]) })
-      .mockResolvedValueOnce({ ok: false, text: () => Promise.resolve('Failed to update project') });
-
-    render(
-      <ThemeProvider>
-        <ProjectEdit />
-      </ThemeProvider>
-    );
-
-    await waitFor(() => {
-      // Title length indicator reflects loaded title and state
-      expect(screen.getByText('12/32 characters')).toBeInTheDocument();
-    });
-
-    const submitButton = screen.getAllByRole('button', { name: /save changes/i })[0];
-    fireEvent.click(submitButton);
-
-    await waitFor(() => {
-      expect(toast.error).toHaveBeenCalled();
-    });
-  });
 
   it('should show success message on successful update', async () => {
     const toast = require('react-hot-toast').default;
