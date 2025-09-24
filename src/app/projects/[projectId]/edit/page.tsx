@@ -19,9 +19,10 @@ import { useUserContext } from "../../../contexts/UserContext";
 import { Project } from "../../../components/Project";
 import PermissionDenied from "../../../components/PermissionDenied";
 import TagSelector from "../../../components/TagSelector";
-import { XMarkIcon, PlusIcon, ArrowLeftIcon } from "@heroicons/react/24/outline";
+import { XMarkIcon, PlusIcon, ArrowLeftIcon, SparklesIcon } from "@heroicons/react/24/outline";
 import { HackerSelector, ProjectRoles, Hacker } from "../../../components/HackerSelector";
 import { swapFirstLetters } from "../../../utils/nameUtils";
+import ImageGenerationModal from "../../../components/ImageGenerationModal";
 
 const MAX_TITLE_LENGTH = 32;
 const MAX_PREVIEW_LENGTH = 100;
@@ -119,6 +120,7 @@ export default function ProjectEditPage() {
   const [hackers, setHackers] = useState<Hacker[]>([]);
   const [showTeamModal, setShowTeamModal] = useState(false);
   const [showLaunchLeadModal, setShowLaunchLeadModal] = useState(false);
+  const [showImageGenerationModal, setShowImageGenerationModal] = useState(false);
   const [teamSearchTerm, setTeamSearchTerm] = useState("");
   const [leadSearchTerm, setLeadSearchTerm] = useState("");
 
@@ -209,6 +211,22 @@ export default function ProjectEditPage() {
     setThumbnailPreview(null);
     if (project?.thumbnail) {
       setProject({ ...project, thumbnail: null });
+    }
+  };
+
+  const handleAIGeneratedImageSelect = async (imageUrl: string) => {
+    try {
+      // Download the image and convert it to a File object
+      const response = await fetch(imageUrl);
+      const blob = await response.blob();
+      const file = new File([blob], 'ai-generated-thumbnail.webp', { type: 'image/webp' });
+      
+      setThumbnail(file);
+      setThumbnailPreview(imageUrl);
+      toast.success("AI-generated image selected!");
+    } catch (error) {
+      console.error("Error processing AI-generated image:", error);
+      toast.error("Failed to process AI-generated image");
     }
   };
 
@@ -377,10 +395,10 @@ export default function ProjectEditPage() {
     setShowLaunchLeadModal(false);
   };
 
-  const allowedEdit = project && (
-    project.participants.some(
+  const allowedEdit = !!project && (
+    (project.participants?.some(
       participant => participant.hacker.id === userInfo?.id
-    ) || (project.launchLead.id === userInfo?.id) || isAdmin
+    ) ?? false) || ((project.launchLead?.id === userInfo?.id) ?? false) || isAdmin
   );
 
   const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -392,7 +410,11 @@ export default function ProjectEditPage() {
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-screen">
-        <div className={`animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 ${isDarkMode ? "border-purple-400" : "border-indigo-600"}`}></div>
+        <div
+          className={`animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 ${isDarkMode ? "border-purple-400" : "border-indigo-600"}`}
+          role="status"
+          aria-label="Loading"
+        ></div>
       </div>
     );
   }
@@ -424,7 +446,7 @@ export default function ProjectEditPage() {
               className={`mt-1 block w-3/4 border ${isDarkMode ? "border-gray-600 bg-gray-800 text-gray-100" : "border-gray-300 bg-white text-gray-900"} rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 p-2`}
             />
             <span className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
-              {editableTitle.length}/{MAX_TITLE_LENGTH} characters
+              {(editableTitle || "").length}/{MAX_TITLE_LENGTH} characters
             </span>
           </div>
           <div>
@@ -533,28 +555,28 @@ export default function ProjectEditPage() {
               rows={2}
             />
             <span className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
-              {editablePreview.length}/{MAX_PREVIEW_LENGTH} characters
+              {(editablePreview || "").length}/{MAX_PREVIEW_LENGTH} characters
             </span>
           </div>
           <div>
             <label className={`block font-medium ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
               Team Members
             </label>
-            {project?.launchLead.id === userInfo?.id || isAdmin ? (
+            {project?.launchLead?.id === userInfo?.id || isAdmin ? (
               <>
                 <div className="mt-2">
                   <div
                     className={`inline-flex items-center px-3 py-1 rounded-full text-sm cursor-pointer transition-colors ${isDarkMode ? "bg-purple-900/50 text-purple-100 hover:bg-purple-800/50" : "bg-purple-100 text-purple-800 hover:bg-purple-200"}`}
                     onClick={() => setShowLaunchLeadModal(true)}
                   >
-                    <span>{swapFirstLetters(project?.launchLead.name)}</span>
+                    <span>{swapFirstLetters(project?.launchLead?.name || "")}</span>
                     <span className={`mx-1 ${isDarkMode ? "text-purple-400" : "text-purple-400"}`}>•</span>
                     <span className={isDarkMode ? "text-purple-300" : "text-purple-600"}>Launch Lead</span>
                   </div>
                 </div>
 
                 <div className="flex flex-wrap gap-2 mt-2">
-                  {project?.participants.map((participant) => (
+                  {(project?.participants || []).map((participant) => (
                     <div
                       key={participant.hacker.id}
                       className={`flex items-center px-3 py-1 rounded-full text-sm ${isDarkMode ? "bg-gray-700 text-gray-100" : "bg-indigo-100 text-indigo-800"}`}
@@ -585,8 +607,8 @@ export default function ProjectEditPage() {
             ) : (
               <p className={`mt-2 text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
                 Only the launch lead can add or delete team members. Contact{" "}
-                <a href={`/hacker/${project?.launchLead.id}`} className={`${isDarkMode ? "text-indigo-400 hover:text-indigo-300" : "text-indigo-600 hover:text-indigo-700"}`}>
-                  {swapFirstLetters(project?.launchLead.name)}
+                <a href={`/hacker/${project?.launchLead?.id || ""}`} className={`${isDarkMode ? "text-indigo-400 hover:text-indigo-300" : "text-indigo-600 hover:text-indigo-700"}`}>
+                  {swapFirstLetters(project?.launchLead?.name || "")}
                 </a>{" "}
                 with this.
               </p>
@@ -602,7 +624,7 @@ export default function ProjectEditPage() {
               handleAddMember={handleChangeLaunchLead}
               title="Change Launch Lead"
               singleSelect={true}
-              selectedIds={project?.launchLead ? [project.launchLead.id] : []}
+              selectedIds={project?.launchLead?.id ? [project.launchLead.id] : []}
               showRoleSelector={false}
             />
 
@@ -614,9 +636,19 @@ export default function ProjectEditPage() {
               setSearchTerm={setTeamSearchTerm}
               filteredHackers={filteredTeamHackers.filter(hacker => !project?.participants.some(p => p.hacker.id === hacker.id))}
               title="Add Team Members"
-              selectedIds={project?.participants.map(p => p.hacker.id) || []}
+              selectedIds={(project?.participants ?? []).map(p => p.hacker.id)}
               showRoleSelector={true}
               onAddMemberWithRole={handleAddMember}
+            />
+
+            <ImageGenerationModal
+              showModal={showImageGenerationModal}
+              setShowModal={setShowImageGenerationModal}
+              projectId={params.projectId as string}
+              projectTitle={project?.title || ""}
+              projectDescription={project?.preview || ""}
+              onImageSelect={handleAIGeneratedImageSelect}
+              isDarkMode={isDarkMode}
             />
           </div>
           <div>
@@ -664,14 +696,26 @@ export default function ProjectEditPage() {
                   </button>
                 </div>
               )}
-              <label
-                className={`cursor-pointer px-4 py-2 rounded-md shadow-sm font-medium ${
-                  isDarkMode ? "bg-gray-700 text-gray-300 hover:bg-gray-600" : "bg-white text-gray-700 hover:bg-gray-50 border-2 border-gray-200 hover:border-gray-300"
-                }`}
-              >
-                {thumbnailPreview ? "Change Image" : "Upload Image"}
-                <input type="file" className="hidden" accept="image/*" onChange={handleImageChange} />
-              </label>
+              <div className="flex space-x-2">
+                <label
+                  className={`cursor-pointer px-4 py-2 rounded-md shadow-sm font-medium ${
+                    isDarkMode ? "bg-gray-700 text-gray-300 hover:bg-gray-600" : "bg-white text-gray-700 hover:bg-gray-50 border-2 border-gray-200 hover:border-gray-300"
+                  }`}
+                >
+                  {thumbnailPreview ? "Change Image" : "Upload Image"}
+                  <input type="file" className="hidden" accept="image/*" onChange={handleImageChange} />
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setShowImageGenerationModal(true)}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-md shadow-sm font-medium ${
+                    isDarkMode ? "bg-purple-600 hover:bg-purple-700" : "bg-purple-600 hover:bg-purple-700"
+                  } text-white`}
+                >
+                  <SparklesIcon className="h-4 w-4" />
+                  AI Generate
+                </button>
+              </div>
             </div>
             <p className={`mt-2 text-sm ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
               Recommended: 1280x720px or larger, 16:9 ratio

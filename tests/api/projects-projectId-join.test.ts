@@ -64,8 +64,8 @@ describe('/api/projects/[projectId]/join', () => {
         console.log('POST test error:', data);
       }
 
-      expect(response.status).toBe(500);
-      expect(data.error).toBe('Error joining project');
+      expect(response.status).toBe(200);
+      expect(data).toEqual(mockParticipant);
     });
 
     it('should return 401 when not authenticated', async () => {
@@ -121,8 +121,8 @@ describe('/api/projects/[projectId]/join', () => {
       const response = await POST(request, { params: { projectId: 'project-1' } });
       const data = await response.json();
 
-      expect(response.status).toBe(500);
-      expect(data.error).toBe('Error joining project');
+      expect(response.status).toBe(400);
+      expect(data.error).toBe('Already a participant');
     });
 
     it('should handle database errors', async () => {

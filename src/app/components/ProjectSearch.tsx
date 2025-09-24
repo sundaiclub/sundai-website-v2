@@ -13,6 +13,15 @@ type SortOption = {
 
 const SORT_OPTIONS: SortOption[] = [
   {
+    label: "Trending",
+    value: "trending",
+    sortFn: (a: Project, b: Project) => {
+      const scoreA = calculateTrendingScore(a);
+      const scoreB = calculateTrendingScore(b);
+      return scoreB - scoreA;
+    }
+  },
+  {
     label: "Newest First",
     value: "newest",
     sortFn: (a: Project, b: Project) => {
@@ -78,6 +87,142 @@ const getTagCount = (tagName: string, projects: Project[]) => {
     project.domainTags.some(t => t.name === tagName)
   ).length;
 };
+
+// Configurable scoring function to eliminate duplication
+export const calculateProjectScore = (
+  project: Project, 
+  options: {
+    timeDecayDays?: number; // How many days for time decay (undefined = no decay)
+    useLogScaling?: boolean; // Whether to use logarithmic scaling for likes
+    sundayWeighting?: boolean; // Whether to apply Sunday weighting
+  } = {}
+): number => {
+  const {
+    timeDecayDays,
+    useLogScaling = true,
+    sundayWeighting = false
+  } = options;
+
+  const likesCount = project.likes?.length || 0;
+  
+  // If no time decay, return pure like count
+  if (timeDecayDays === undefined) {
+    return likesCount;
+  }
+
+  const projectDate = new Date(project.startDate);
+  const now = new Date();
+  
+  // Calculate days since project launch
+  const projectAgeInDays = Math.floor(
+    (now.getTime() - projectDate.getTime()) / (1000 * 60 * 60 * 24)
+  );
+  
+  // Apply time decay
+  const decayFactor = Math.exp(-projectAgeInDays / timeDecayDays);
+  
+  // Apply Sunday weighting if requested
+  let sundayWeight = 1;
+  if (sundayWeighting) {
+    const daysSinceLastSunday = (now.getDay() + 6) % 7;
+    const weeksAgo = Math.floor(projectAgeInDays / 7);
+    
+    if (projectAgeInDays <= daysSinceLastSunday) {
+      if (projectDate.getDay() === 0) {
+        sundayWeight = 3.0; // This Sunday
+      } else {
+        sundayWeight = 1.5; // This week
+      }
+    } else if (weeksAgo === 1) {
+      sundayWeight = 1.2; // Last week
+    } else if (weeksAgo === 2) {
+      sundayWeight = 0.8; // 2 weeks ago
+    } else {
+      sundayWeight = Math.max(0.3, Math.exp(-weeksAgo / 4));
+    }
+  }
+  
+  // Apply logarithmic scaling if requested
+  const likesScore = useLogScaling ? Math.log(likesCount + 1) : likesCount;
+  
+  return likesScore * decayFactor * sundayWeight;
+};
+
+// Convenience functions using the unified scoring system
+export const calculateTrendingScore = (project: Project): number => 
+  calculateProjectScore(project, { 
+    timeDecayDays: 45, 
+    useLogScaling: true, 
+    sundayWeighting: true 
+  });
+
+export const calculateThisWeekTrendingScore = (project: Project): number => 
+  calculateProjectScore(project, { 
+    timeDecayDays: 7, 
+    useLogScaling: true, 
+    sundayWeighting: false 
+  });
+
+export const calculateThisMonthTrendingScore = (project: Project): number => {
+  // For "Recent Best", we want to balance likes with recency but not too aggressively
+  const likesCount = project.likes?.length || 0;
+  const projectDate = new Date(project.startDate);
+  const now = new Date();
+  
+  // Calculate days since project launch
+  const projectAgeInDays = Math.floor(
+    (now.getTime() - projectDate.getTime()) / (1000 * 60 * 60 * 24)
+  );
+  
+  // Very gentle time decay - projects from 2 months ago still get 60% of their score
+  const decayFactor = Math.exp(-projectAgeInDays / 120); // Decay over ~4 months
+  
+  // Use square root scaling for likes to give more weight to popular projects
+  // but not as extreme as logarithmic scaling
+  const likesScore = Math.sqrt(likesCount + 1);
+  
+  return likesScore * decayFactor;
+};
+
+export const calculateBestOfAllTimeScore = (project: Project): number => 
+  calculateProjectScore(project, { 
+    timeDecayDays: undefined, 
+    useLogScaling: false, 
+    sundayWeighting: false 
+  });
+
+// Generic function to filter projects by date range
+const getProjectsByDateRange = (projects: Project[], daysBack: number): Project[] => {
+  const now = new Date();
+  const startDate = new Date(now);
+  startDate.setDate(now.getDate() - daysBack);
+  startDate.setHours(0, 0, 0, 0);
+  
+  return projects.filter(project => {
+    const projectDate = new Date(project.startDate);
+    return projectDate >= startDate;
+  });
+};
+
+// Helper functions for categorizing projects by time periods
+export const getThisWeekProjects = (projects: Project[]): Project[] => 
+  getProjectsByDateRange(projects, 14); // Last 2 weeks
+
+export const getThisMonthProjects = (projects: Project[]): Project[] => {
+  const now = new Date();
+  const twoMonthsAgo = new Date(now);
+  twoMonthsAgo.setMonth(now.getMonth() - 2); // Last 2 months
+  twoMonthsAgo.setDate(1); // Start of that month
+  twoMonthsAgo.setHours(0, 0, 0, 0);
+  
+  return projects.filter(project => {
+    const projectDate = new Date(project.startDate);
+    return projectDate >= twoMonthsAgo;
+  });
+};
+
+export const getAllTimeProjects = (projects: Project[]): Project[] => 
+  [...projects]; // Return all projects
 
 export default function ProjectSearch({ 
   projects,
@@ -159,7 +304,7 @@ export default function ProjectSearch({
     }
     
     // Add sort
-    if (newFilters.sortBy?.value && newFilters.sortBy.value !== 'newest') {
+    if (newFilters.sortBy?.value && newFilters.sortBy.value !== 'trending') {
       params.set('sort', newFilters.sortBy.value);
     }
     

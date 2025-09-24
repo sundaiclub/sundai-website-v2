@@ -164,7 +164,7 @@ export default function NewProject() {
           Initialize New Project
         </h1>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} noValidate className="space-y-6">
           <div>
             <label className={`block text-sm font-medium mb-1 ${
               isDarkMode ? 'text-gray-300' : 'text-gray-700'

@@ -26,10 +26,10 @@ export default function ProjectDetail() {
   const [isProjectDraft, setIsProjectDraft] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
 
-  const allowedEdit = project && (
-    project.participants.some(
-      (participant) => participant.hacker.id === userInfo?.id
-    ) || project.launchLead.id === userInfo?.id || userInfo?.role === 'ADMIN'
+  const allowedEdit = !!project && (
+    (Array.isArray(project.participants) && project.participants.some(
+      (participant) => participant?.hacker?.id === userInfo?.id
+    )) || project?.launchLead?.id === userInfo?.id || userInfo?.role === 'ADMIN'
   );
 
   useEffect(() => {
@@ -40,7 +40,14 @@ export default function ProjectDetail() {
           throw new Error("Project not found");
         }
         const data = await response.json();
-        setProject(data);
+        const normalized = {
+          ...data,
+          thumbnail: (data as any).thumbnail?.url ? (data as any).thumbnail : (typeof (data as any).thumbnail === 'string' ? { url: (data as any).thumbnail } : (data as any).thumbnail),
+          techTags: Array.isArray((data as any).techTags) ? (data as any).techTags.map((t: any) => (typeof t === 'string' ? { id: t, name: t } : t)) : [],
+          domainTags: Array.isArray((data as any).domainTags) ? (data as any).domainTags.map((t: any) => (typeof t === 'string' ? { id: t, name: t } : t)) : [],
+          participants: Array.isArray((data as any).participants) ? (data as any).participants.map((p: any) => (p?.hacker ? p : { hacker: { id: p.id, name: p.name, avatar: null }, role: (p.role || 'hacker') })) : [],
+        } as any;
+        setProject(normalized);
       } catch (error) {
         console.error("Error fetching project:", error);
         router.push("/projects");
@@ -56,8 +63,9 @@ export default function ProjectDetail() {
 
   useEffect(() => {
     if (project && userInfo) {
-      setIsLiked(project.likes.some((like) => like.hackerId === userInfo.id));
-      setLikeCount(project.likes.length);
+      const likesArray = Array.isArray((project as any).likes) ? (project as any).likes : [];
+      setIsLiked(likesArray.some((like: any) => like.hackerId === userInfo.id));
+      setLikeCount(likesArray.length);
     }
   }, [project, userInfo]);
 
@@ -139,7 +147,7 @@ export default function ProjectDetail() {
         <div
           className={`animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 ${
             isDarkMode ? "border-purple-400" : "border-indigo-600"
-          }`}
+          }`} role="status" aria-live="polite"
         ></div>
       </div>
     );
@@ -181,7 +189,7 @@ export default function ProjectDetail() {
                       : 'bg-white/20 text-white hover:bg-black/30'
                     } font-medium`}
                 >
-                  Edit
+                  Edit Project
                 </button>
                 {isProjectDraft && (
                   <button
@@ -303,13 +311,13 @@ export default function ProjectDetail() {
                       } text-white text-lg`}
                     >
                       <ShareIcon className="h-5 w-5" />
-                      Share Project
+                      Share
                     </button>
                   </div>
                   
                   {/* Tags Section */}
                   <div className="flex flex-wrap gap-2 mb-4">
-                    {project.techTags.map((tag) => (
+                    {project.techTags?.map((tag) => (
                       <span
                         key={tag.id}
                         className={`px-2 py-1 rounded-full text-xs ${
@@ -323,7 +331,7 @@ export default function ProjectDetail() {
                     ))}
                   </div>
                   <div className="flex flex-wrap gap-2 mb-4">
-                    {project.domainTags.map((tag) => (
+                    {project.domainTags?.map((tag) => (
                       <span
                         key={tag.id}
                         className={`px-2 py-1 rounded-full text-xs ${
@@ -366,6 +374,7 @@ export default function ProjectDetail() {
                     </h2>
 
                     {/* Launch Lead */}
+                    {project.launchLead?.id && (
                     <div className="mb-8">
                       <h3
                         className={`text-sm font-semibold mb-3 ${
@@ -413,6 +422,7 @@ export default function ProjectDetail() {
                         </div>
                       </Link>
                     </div>
+                    )}
 
                     {/* Team Members */}
                     <div>

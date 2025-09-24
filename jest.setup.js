@@ -121,22 +121,38 @@ jest.mock('next/server', () => ({
 
     async formData() {
       if (!this._formData) {
-        this._formData = new FormData()
-        // Parse the body if it's a string
-        if (this.body && typeof this.body === 'string') {
-          // This is a simplified parser - in real tests, you'd need proper multipart parsing
-          const lines = this.body.split('\n')
-          for (const line of lines) {
-            if (line.includes('name=')) {
-              const match = line.match(/name="([^"]+)"[^]*?([^\r\n]+)/)
-              if (match) {
-                this._formData.append(match[1], match[2].trim())
+        // If the body is already a FormData object, use it directly
+        if (this.body instanceof FormData) {
+          this._formData = this.body
+        } else {
+          this._formData = new FormData()
+          // Parse the body if it's a string
+          if (this.body && typeof this.body === 'string') {
+            // This is a simplified parser - in real tests, you'd need proper multipart parsing
+            const lines = this.body.split('\n')
+            for (const line of lines) {
+              if (line.includes('name=')) {
+                const match = line.match(/name="([^"]+)"[^]*?([^\r\n]+)/)
+                if (match) {
+                  this._formData.append(match[1], match[2].trim())
+                }
               }
             }
           }
         }
       }
       return this._formData
+    }
+
+    async json() {
+      if (this.body && typeof this.body === 'string') {
+        try {
+          return JSON.parse(this.body)
+        } catch (e) {
+          throw new Error('Invalid JSON')
+        }
+      }
+      return {}
     }
   },
 }))
@@ -381,6 +397,8 @@ jest.mock('svix', () => ({
   })),
 }))
 
+// ESM stubs
+jest.mock('react-markdown', () => ({ __esModule: true, default: (props) => React.createElement('div', props, props.children) }));
 
 // Global fetch mock
 global.fetch = jest.fn()

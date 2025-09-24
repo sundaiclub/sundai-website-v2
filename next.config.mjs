@@ -13,6 +13,7 @@ const nextConfig = {
       "images.clerk.dev",
       "www.gravatar.com",
       "storage.googleapis.com",
+      "replicate.delivery",
     ],
   },
   experimental: {

@@ -155,8 +155,14 @@ describe('AttendanceTable', () => {
       expect(screen.getByText('Attendance Records')).toBeInTheDocument();
     });
 
-    const startDateInput = screen.getByDisplayValue('2025-08-23'); // 30 days ago
-    const endDateInput = screen.getByDisplayValue('2025-09-22'); // Today
+    const today = new Date();
+    const endStr = today.toISOString().split('T')[0];
+    const start = new Date(today);
+    start.setDate(today.getDate() - 30);
+    const startStr = start.toISOString().split('T')[0];
+
+    const startDateInput = screen.getByDisplayValue(startStr); // 30 days ago
+    const endDateInput = screen.getByDisplayValue(endStr); // Today
 
     fireEvent.change(startDateInput, { target: { value: '2023-01-01' } });
     fireEvent.change(endDateInput, { target: { value: '2023-01-31' } });

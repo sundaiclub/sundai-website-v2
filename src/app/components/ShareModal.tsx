@@ -23,8 +23,8 @@ export default function ShareModal({ showModal, setShowModal, project, userInfo,
   const [isGenerating, setIsGenerating] = useState(false);
   const [customContent, setCustomContent] = useState('');
 
-  const isTeamMember = project.participants.some(p => p.hacker.id === userInfo?.id) || 
-                      project.launchLead.id === userInfo?.id;
+  const isTeamMember = (Array.isArray(project.participants) && project.participants.some(p => p.hacker?.id === userInfo?.id)) || 
+                      (project.launchLead && project.launchLead.id === userInfo?.id);
 
   const generateContent = async () => {
     setIsGenerating(true);
@@ -51,9 +51,9 @@ export default function ShareModal({ showModal, setShowModal, project, userInfo,
       
       // Fallback to basic template on error
       const teamNames = [
-        project.launchLead.name, 
-        ...project.participants.map(p => p.hacker.name)
-      ].join(', ');
+        project.launchLead?.name, 
+        ...project.participants.map(p => p.hacker?.name).filter(Boolean)
+      ].filter(Boolean).join(', ');
 
       const intro = isTeamMember 
         ? `🚀 We just built ${project.title}!` 
