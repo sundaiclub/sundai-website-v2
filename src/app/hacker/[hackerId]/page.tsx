@@ -230,7 +230,8 @@ export default function HackerProfile() {
           isDarkMode ? "bg-gray-900" : "bg-[#E5E5E5]"
         }`}
       >
-        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-600"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-600" role="status" aria-live="polite"></div>
+        <span className={isDarkMode ? "text-gray-200 ml-3" : "text-gray-800 ml-3"}>Loading...</span>
       </div>
     );
   }
@@ -293,7 +294,7 @@ export default function HackerProfile() {
                 ) : (
                   <div className="w-full h-full bg-indigo-100 flex items-center justify-center">
                     <span className="text-4xl sm:text-6xl font-bold text-indigo-600">
-                      {swapFirstLetters(hacker.name)[0]}
+                      {(swapFirstLetters(hacker.name) || 'H')[0]}
                     </span>
                   </div>
                 )}

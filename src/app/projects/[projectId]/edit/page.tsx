@@ -395,10 +395,10 @@ export default function ProjectEditPage() {
     setShowLaunchLeadModal(false);
   };
 
-  const allowedEdit = project && (
-    project.participants.some(
+  const allowedEdit = !!project && (
+    (project.participants?.some(
       participant => participant.hacker.id === userInfo?.id
-    ) || (project.launchLead.id === userInfo?.id) || isAdmin
+    ) ?? false) || ((project.launchLead?.id === userInfo?.id) ?? false) || isAdmin
   );
 
   const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -410,7 +410,11 @@ export default function ProjectEditPage() {
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-screen">
-        <div className={`animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 ${isDarkMode ? "border-purple-400" : "border-indigo-600"}`}></div>
+        <div
+          className={`animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 ${isDarkMode ? "border-purple-400" : "border-indigo-600"}`}
+          role="status"
+          aria-label="Loading"
+        ></div>
       </div>
     );
   }
@@ -442,7 +446,7 @@ export default function ProjectEditPage() {
               className={`mt-1 block w-3/4 border ${isDarkMode ? "border-gray-600 bg-gray-800 text-gray-100" : "border-gray-300 bg-white text-gray-900"} rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 p-2`}
             />
             <span className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
-              {editableTitle.length}/{MAX_TITLE_LENGTH} characters
+              {(editableTitle || "").length}/{MAX_TITLE_LENGTH} characters
             </span>
           </div>
           <div>
@@ -551,28 +555,28 @@ export default function ProjectEditPage() {
               rows={2}
             />
             <span className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
-              {editablePreview.length}/{MAX_PREVIEW_LENGTH} characters
+              {(editablePreview || "").length}/{MAX_PREVIEW_LENGTH} characters
             </span>
           </div>
           <div>
             <label className={`block font-medium ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
               Team Members
             </label>
-            {project?.launchLead.id === userInfo?.id || isAdmin ? (
+            {project?.launchLead?.id === userInfo?.id || isAdmin ? (
               <>
                 <div className="mt-2">
                   <div
                     className={`inline-flex items-center px-3 py-1 rounded-full text-sm cursor-pointer transition-colors ${isDarkMode ? "bg-purple-900/50 text-purple-100 hover:bg-purple-800/50" : "bg-purple-100 text-purple-800 hover:bg-purple-200"}`}
                     onClick={() => setShowLaunchLeadModal(true)}
                   >
-                    <span>{swapFirstLetters(project?.launchLead.name)}</span>
+                    <span>{swapFirstLetters(project?.launchLead?.name || "")}</span>
                     <span className={`mx-1 ${isDarkMode ? "text-purple-400" : "text-purple-400"}`}>•</span>
                     <span className={isDarkMode ? "text-purple-300" : "text-purple-600"}>Launch Lead</span>
                   </div>
                 </div>
 
                 <div className="flex flex-wrap gap-2 mt-2">
-                  {project?.participants.map((participant) => (
+                  {(project?.participants || []).map((participant) => (
                     <div
                       key={participant.hacker.id}
                       className={`flex items-center px-3 py-1 rounded-full text-sm ${isDarkMode ? "bg-gray-700 text-gray-100" : "bg-indigo-100 text-indigo-800"}`}
@@ -603,8 +607,8 @@ export default function ProjectEditPage() {
             ) : (
               <p className={`mt-2 text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
                 Only the launch lead can add or delete team members. Contact{" "}
-                <a href={`/hacker/${project?.launchLead.id}`} className={`${isDarkMode ? "text-indigo-400 hover:text-indigo-300" : "text-indigo-600 hover:text-indigo-700"}`}>
-                  {swapFirstLetters(project?.launchLead.name)}
+                <a href={`/hacker/${project?.launchLead?.id || ""}`} className={`${isDarkMode ? "text-indigo-400 hover:text-indigo-300" : "text-indigo-600 hover:text-indigo-700"}`}>
+                  {swapFirstLetters(project?.launchLead?.name || "")}
                 </a>{" "}
                 with this.
               </p>
@@ -620,7 +624,7 @@ export default function ProjectEditPage() {
               handleAddMember={handleChangeLaunchLead}
               title="Change Launch Lead"
               singleSelect={true}
-              selectedIds={project?.launchLead ? [project.launchLead.id] : []}
+              selectedIds={project?.launchLead?.id ? [project.launchLead.id] : []}
               showRoleSelector={false}
             />
 
@@ -632,7 +636,7 @@ export default function ProjectEditPage() {
               setSearchTerm={setTeamSearchTerm}
               filteredHackers={filteredTeamHackers.filter(hacker => !project?.participants.some(p => p.hacker.id === hacker.id))}
               title="Add Team Members"
-              selectedIds={project?.participants.map(p => p.hacker.id) || []}
+              selectedIds={(project?.participants ?? []).map(p => p.hacker.id)}
               showRoleSelector={true}
               onAddMemberWithRole={handleAddMember}
             />

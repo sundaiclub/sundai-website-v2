@@ -71,7 +71,7 @@ export type Project = {
 
 const STATUS_OPTIONS = ['DRAFT', 'PENDING', 'APPROVED'] as const;
 
-function ProjectCard({ project, userInfo, handleLike, isDarkMode, show_status, show_team = true, onStatusChange, onStarredChange, isAdmin }: {
+export function ProjectCard({ project, userInfo, handleLike, isDarkMode, show_status, show_team = true, onStatusChange, onStarredChange, isAdmin }: {
   project: Project;
   userInfo: any;
   handleLike: (e: React.MouseEvent, projectId: string, isLiked: boolean) => void;

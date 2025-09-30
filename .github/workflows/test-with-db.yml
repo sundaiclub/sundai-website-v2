@@ -1,0 +1,74 @@
+name: Test Suite with Database
+
+on:
+  pull_request:
+    branches: [ main ]
+  push:
+    branches: [ main ]
+
+jobs:
+  test-with-db:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: sundai_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Use Node.js 20.x
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Set up environment variables
+      run: |
+        echo "DATABASE_URL=postgresql://postgres:postgres@localhost:5432/sundai_test" >> .env.test
+        echo "NEXTAUTH_SECRET=test-secret" >> .env.test
+        echo "NEXTAUTH_URL=http://localhost:3000" >> .env.test
+
+    - name: Generate Prisma client
+      run: npx prisma generate
+
+    - name: Run database migrations
+      run: npx prisma migrate deploy
+      env:
+        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/sundai_test
+
+    - name: Run linter
+      run: npm run lint
+
+    - name: Run type checking
+      run: npx tsc --noEmit
+
+    - name: Run tests
+      run: npm run test:ci
+      env:
+        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/sundai_test
+
+    - name: Build application
+      run: npm run build
+
+    - name: Upload coverage reports
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage/lcov.info
+        flags: unittests
+        name: codecov-umbrella
+        fail_ci_if_error: false

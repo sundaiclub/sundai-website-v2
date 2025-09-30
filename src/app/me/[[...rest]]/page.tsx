@@ -3,6 +3,7 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useUser } from "@clerk/nextjs";
 import { SignIn } from "@clerk/nextjs";
+import { getHackerByClerkId } from "@/lib/api";
 
 export default function MePage() {
   const { user, isLoaded } = useUser();
@@ -13,15 +14,14 @@ export default function MePage() {
       if (!user) return;
 
       try {
-        const response = await fetch(`/api/hackers?clerkId=${user.id}`);
-        if (response.ok) {
-          const hacker = await response.json();
+        const hacker = await getHackerByClerkId(user.id);
+        if (hacker) {
           router.push(`/hacker/${hacker.id}`);
         } else {
-          console.error("Failed to fetch hacker profile");
+          router.push('/hacker/new');
         }
       } catch (error) {
-        console.error("Error fetching hacker profile:", error);
+        router.push('/hacker/new');
       }
     };
 
@@ -33,7 +33,7 @@ export default function MePage() {
   if (!isLoaded) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-600"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-600" role="status" aria-live="polite"></div>
       </div>
     );
   }
@@ -49,7 +49,7 @@ export default function MePage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center">
-      <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-600"></div>
+      <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-600" role="status" aria-live="polite"></div>
     </div>
   );
 }

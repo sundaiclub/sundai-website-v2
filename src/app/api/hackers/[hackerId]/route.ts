@@ -87,7 +87,7 @@ export async function PATCH(
   try {
     const { userId } = auth();
     if (!userId) {
-      return new NextResponse("Unauthorized", { status: 401 });
+      return NextResponse.json("Unauthorized", { status: 401 });
     }
 
     // Get the hacker making the request
@@ -96,12 +96,12 @@ export async function PATCH(
     });
 
     if (!requestingHacker) {
-      return new NextResponse("Builder not found", { status: 404 });
+      return NextResponse.json({ error: "Builder not found" }, { status: 404 });
     }
 
     // Check if the hacker is updating their own profile
     if (requestingHacker.id !== params.hackerId) {
-      return new NextResponse("Unauthorized", { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const data = await request.json();
