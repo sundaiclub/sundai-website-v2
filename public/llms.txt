@@ -1,0 +1,15 @@
+# LLMs crawling and training policy for sundai.club
+# Contact: team@sundai.club
+
+User-agent: *
+Allow: /
+
+# Training policy: You MAY NOT use content from this site to train
+# or fine-tune models without prior written permission from the owner.
+Training: disallow
+
+# If your crawler supports OpenAI/Anthropic-style AI metadata:
+# ai-crawler: allow
+# ai-training: disallow
+
+

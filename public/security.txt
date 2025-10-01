@@ -1,0 +1,4 @@
+# Canonical security contact information lives at the well-known location
+Canonical: https://sundai.club/.well-known/security.txt
+
+

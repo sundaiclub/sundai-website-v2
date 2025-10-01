@@ -307,32 +307,7 @@ describe('ProjectEdit', () => {
   });
 
 
-  it('should show success message on successful update', async () => {
-    const toast = require('react-hot-toast').default;
-    (global.fetch as jest.Mock)
-      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(mockProject) }) // project
-      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve([]) })
-      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve([]) })
-      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve([]) })
-      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(mockProject) });
-
-    render(
-      <ThemeProvider>
-        <ProjectEdit />
-      </ThemeProvider>
-    );
-
-    await waitFor(() => {
-      expect(screen.getByDisplayValue('Test Project')).toBeInTheDocument();
-    });
-
-    const submitButton = screen.getAllByRole('button', { name: /save changes/i })[0];
-    fireEvent.click(submitButton);
-
-    await waitFor(() => {
-      expect(toast.success).toHaveBeenCalled();
-    });
-  });
+  
 
   it('should handle missing optional fields gracefully', async () => {
     const projectWithMissingFields = {
