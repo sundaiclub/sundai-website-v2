@@ -15,23 +15,41 @@ export async function GET(
     );
     }
 
-    const tags = await prisma[tagType === 'TECH' ? 'techTag' : 'domainTag'].findMany({
-        select: {
-            id: true,
-            name: true,
-            description: true,
-            _count: {
-                select: {
-                    projects: true
-                }
-            }
-        },
-        orderBy: {
-            projects: {
-                _count: 'desc'
-            }
-        }
-    });
+    const tags = tagType === 'TECH'
+      ? await prisma.techTag.findMany({
+          select: {
+              id: true,
+              name: true,
+              description: true,
+              _count: {
+                  select: {
+                      projects: true
+                  }
+              }
+          },
+          orderBy: {
+              projects: {
+                  _count: 'desc'
+              }
+          }
+        })
+      : await prisma.domainTag.findMany({
+          select: {
+              id: true,
+              name: true,
+              description: true,
+              _count: {
+                  select: {
+                      projects: true
+                  }
+              }
+          },
+          orderBy: {
+              projects: {
+                  _count: 'desc'
+              }
+          }
+        });
 
     return NextResponse.json(tags);
     } catch (error) {
@@ -66,12 +84,13 @@ export async function POST(
             );
         }
 
-        const newTag = await prisma[tagType === 'TECH' ? 'techTag' : 'domainTag'].create({
-            data: {
-                name,
-                description
-            }
-        });
+        const newTag = tagType === 'TECH'
+          ? await prisma.techTag.create({
+              data: { name, description }
+            })
+          : await prisma.domainTag.create({
+              data: { name, description }
+            });
 
         return NextResponse.json(newTag, { status: 201 });
     } catch (error) {

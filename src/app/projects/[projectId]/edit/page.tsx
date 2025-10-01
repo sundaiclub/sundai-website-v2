@@ -398,7 +398,7 @@ export default function ProjectEditPage() {
   const allowedEdit = !!project && (
     (project.participants?.some(
       participant => participant.hacker.id === userInfo?.id
-    ) ?? false) || ((project.launchLead?.id === userInfo?.id) ?? false) || isAdmin
+    ) ?? false) || (project.launchLead?.id === userInfo?.id) || isAdmin
   );
 
   const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {

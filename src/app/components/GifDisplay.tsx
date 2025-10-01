@@ -1,10 +1,16 @@
 "use client";
-import React, { useState } from "react";
+import React, { KeyboardEvent, useState } from "react";
 import Image from "next/image";
 import gifPath2 from "../../../public/assets/pip-ai_workflow.gif"; // Your first GIF
 import gifPath1 from "../../../public/assets/standard_workflow.gif"; // Your second GIF (replace with actual path)
 
-const GifDisplay = ({ altText = "GIF", width, height }) => {
+type GifDisplayProps = {
+  altText?: string;
+  width: number;
+  height: number;
+};
+
+const GifDisplay = ({ altText = "GIF", width, height }: GifDisplayProps) => {
   const [currentGif, setCurrentGif] = useState(gifPath1); // Default to the first GIF
   const [isToggled, setIsToggled] = useState(false); // Track the toggle state
 
@@ -13,7 +19,7 @@ const GifDisplay = ({ altText = "GIF", width, height }) => {
     setCurrentGif(isToggled ? gifPath1 : gifPath2);
   };
 
-  const handleKeyPress = (event) => {
+  const handleKeyPress = (event: KeyboardEvent<HTMLDivElement>) => {
     if (event.key === "Enter" || event.key === " ") {
       toggleGif();
     }
