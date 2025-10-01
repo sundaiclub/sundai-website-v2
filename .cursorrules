@@ -1,0 +1,67 @@
+On every change in this repository, keep tests and SEO assets up to date. Follow these rules strictly.
+
+### Testing rules
+- **Always update or add tests** that cover any behavior you change or add in `src/`.
+- **Locations and mapping**:
+  - For API route handlers in `src/app/api/**/route.ts` or `src/app/api/*.ts`: create or update tests in `tests/api/*.test.ts` mirroring the endpoint path and methods.
+  - For React pages and components in `src/app/**` and `src/components/**`: test user-visible behavior in `tests/pages/**` and `tests/components/**` using Testing Library with JSDOM.
+  - For hooks in `src/app/hooks/**`: add tests in `tests/hooks/**`.
+  - For contexts in `src/app/contexts/**` or `src/contexts/**`: add tests in `tests/contexts/**`.
+  - For utilities in `src/lib/**` and `src/app/utils/**`: add tests in `tests/lib/**` or `tests/utils/**`.
+  - For middleware changes in `src/middleware.ts`: update `tests/middleware*.test.ts` accordingly.
+- **What to cover**:
+  - Happy path, common error paths, authorization/permission checks, edge cases, and regression cases for any fixed bug.
+  - For API: validate status codes, response shapes, and side effects (e.g., DB writes, notifications) using existing patterns in `tests/api/*`.
+  - For UI: assert accessible labels/roles, critical flows, and conditional rendering.
+- **Keep tests deterministic**: avoid time/network flakiness; mock external services (e.g., GCP Storage, Clerk, email) as done in existing tests.
+- **Commands to run locally before committing**:
+  - Fast tests for staged files run via lint-staged. For full confidence, run:
+    - `npm test`
+    - `npm run test:coverage`
+- **Do not lower coverage** without an explicit justification in the PR description and corresponding tests for new behavior.
+
+### SEO rules
+- **Sitemap and robots**:
+  - `next-sitemap` is configured in `next-sitemap.config.js` and runs automatically after `npm run build` (via `postbuild`). Pre-commit runs `npm run build` via husky.
+  - When adding, removing, or moving routes under `src/app/**`:
+    - Update `exclude` and policies in `next-sitemap.config.js` if admin-only or private routes change (e.g., `/admin`, `/me`, `/api`).
+    - Ensure `siteUrl` remains correct (prefer `process.env.SITE_URL`).
+  - After route changes or SEO-relevant updates, regenerate and commit outputs in `public/` by running:
+    - `npm run build` (triggers `next-sitemap`), or directly `npx next-sitemap`
+  - Commit updated generated files in `public/` when they change: `sitemap.xml`, `sitemap-0.xml`, and `robots.txt`.
+  - Do not manually hand-edit generated sitemap/robots; change the config and rebuild.
+- **Per-page metadata** (Next.js 14):
+  - For new pages or significant content changes, add or update `export const metadata` or `generateMetadata` with at least: `title`, `description`, canonical URL, Open Graph (og:title, og:description, og:url, og:image), and Twitter card.
+  - Ensure pages that should not be indexed include `robots: { index: false, follow: false }` or are excluded in `next-sitemap.config.js`.
+- **Static SEO files** in `public/` to maintain:
+  - `public/security.txt` and `public/.well-known/security.txt` must match; update both when contact or policy changes.
+  - `public/manifest.json` should reflect available icons; if you add icons in `public/`, update sizes/paths accordingly.
+  - `public/llms.txt`, `public/humans.txt`, and any policy files must be kept current and consistent with site behavior.
+
+### Definition of done for any change
+- Tests exist and pass for the changed behavior (unit/integration as appropriate).
+- SEO is correct:
+  - Page metadata updated where relevant.
+  - `next-sitemap.config.js` updated if route visibility changed.
+  - Sitemaps/robots regenerated and committed when they change.
+  - Static SEO files in `public/` reviewed and updated if impacted.
+
+### Quick checklists
+- After adding or changing an API route:
+  - Create/adjust `tests/api/<route>.test.ts` for all methods (GET/POST/PUT/DELETE).
+  - Validate status codes, auth, and response schema.
+  - `npm test` then `npm run build` to refresh sitemap.
+- After adding or changing a page/component:
+  - Create/adjust tests under `tests/pages/**` or `tests/components/**` covering user flows.
+  - Add/update `metadata` or `generateMetadata`.
+  - If the route should be hidden from indexing, update `next-sitemap.config.js` excludes.
+  - `npm test` then `npm run build`.
+- After changing site-wide URLs, domains, or icon assets:
+  - Verify `process.env.SITE_URL` and `next-sitemap.config.js` `siteUrl` usage.
+  - Update `public/manifest.json` icon entries.
+  - Sync `public/security.txt` with `public/.well-known/security.txt`.
+  - Rebuild to refresh sitemap/robots and commit changes in `public/`.
+
+### Notes
+- Husky + lint-staged already runs related tests for staged files and builds on pre-commit. Prefer running full tests locally before opening a PR.
+- Prefer small, focused PRs so tests and SEO diffs remain clear.
