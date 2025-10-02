@@ -1,0 +1,12 @@
+# *
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /me
+Disallow: /api
+
+# Host
+Host: https://sundai.club
+
+# Sitemaps
+Sitemap: https://sundai.club/sitemap.xml

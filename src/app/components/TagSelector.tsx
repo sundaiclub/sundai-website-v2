@@ -65,7 +65,7 @@ export default function TagSelector({
     const filteredTags = tags
       .filter(tag => !selectedTags.some(st => st.id === tag.id))
       .filter(tag => tag.name.toLowerCase().includes(searchTerm.toLowerCase()))
-      .sort((a, b) => (b.usageCount || 0) - (a.usageCount || 0));
+      .sort((a, b) => (b._count?.projects || 0) - (a._count?.projects || 0));
 
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">

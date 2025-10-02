@@ -9,6 +9,17 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    env:
+      NODE_ENV: test
+      CI: true
+      GOOGLE_PRIVATE_KEY: eyJjbGllbnRfZW1haWwiOiJ0ZXN0QGV4YW1wbGUuY29tIn0=
+      GOOGLE_CLOUD_BUCKET: dummy-bucket
+      WEBHOOK_SECRET: dummy
+      REPLICATE_API_TOKEN: dummy
+      GEMINI_API_KEY: dummy
+      NEXT_PUBLIC_POSTHOG_KEY: dummy
+      NEXT_PUBLIC_POSTHOG_HOST: https://us.i.posthog.com
+      SITE_URL: https://example.com
 
     strategy:
       matrix:
