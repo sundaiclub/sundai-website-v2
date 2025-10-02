@@ -167,6 +167,41 @@ describe('TrendingSections Component', () => {
     expect(thumbnail).toHaveAttribute('src', 'https://example.com/thumbnail.jpg')
   })
 
+  it('wraps trending cards with link to project page', async () => {
+    await act(async () => {
+      render(
+        <TrendingSections
+          projects={[mockProject]}
+          userInfo={mockHacker}
+          handleLike={mockHandleLike}
+          isDarkMode={false}
+        />
+      )
+    })
+
+    const cardLink = screen.getAllByRole('link', { name: /view project test project/i })[0]
+    expect(cardLink).toHaveAttribute('href', '/projects/test-project-id')
+  })
+
+  it('normalizes trending card heights (no fixed height class)', async () => {
+    await act(async () => {
+      render(
+        <TrendingSections
+          projects={[mockProject]}
+          userInfo={mockHacker}
+          handleLike={mockHandleLike}
+          isDarkMode={false}
+        />
+      )
+    })
+
+    // Find the scroll item container that wraps the card and check height class
+    const projectTitle = screen.getAllByText('Test Project')[0]
+    const scrollItem = projectTitle.closest('div.scroll-item') as HTMLElement | null
+    expect(scrollItem).not.toBeNull()
+    expect(scrollItem?.className).not.toContain('h-[360px]')
+  })
+
   it('handles empty projects array gracefully', async () => {
     await act(async () => {
       render(

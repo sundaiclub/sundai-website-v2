@@ -2,6 +2,7 @@
 import React from "react";
 import { motion } from "framer-motion";
 import Image from "next/image";
+import Link from "next/link";
 import { useTheme } from "../contexts/ThemeContext";
 import { Project } from "./Project";
 import { 
@@ -36,14 +37,19 @@ const TrendingProjectCard = ({
   const isLiked = project.likes.some(like => like.hackerId === userInfo?.id);
 
   return (
-    <motion.div
-      className={`${
-        isDarkMode
-          ? "bg-gray-800 hover:shadow-purple-400/20"
-          : "bg-white hover:shadow-xl"
-      } rounded-xl shadow-lg overflow-hidden transition-all duration-300 hover:scale-105 relative group`}
-      whileHover={{ y: -4 }}
+    <Link
+      href={`/projects/${project.id}`}
+      className="block h-full focus:outline-none"
+      aria-label={`View project ${project.title}`}
     >
+      <motion.div
+        className={`${
+          isDarkMode
+            ? "bg-gray-800 hover:shadow-purple-400/20"
+            : "bg-white hover:shadow-xl"
+        } rounded-xl shadow-lg overflow-hidden transition-all duration-300 hover:scale-105 relative group h-full flex flex-col`}
+        whileHover={{ y: -4 }}
+      >
       {/* Trending Badge - Only show when showTrendingBadge is true */}
       {showTrendingBadge && (
         <div className="absolute top-3 left-3 z-10">
@@ -60,7 +66,11 @@ const TrendingProjectCard = ({
       {/* Like Button - Prominent */}
       <div className="absolute top-3 right-3 z-10">
         <button
-          onClick={(e) => handleLike(e, project.id, isLiked)}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            handleLike(e, project.id, isLiked);
+          }}
           className={`p-3 rounded-full transition-all duration-200 shadow-lg ${
             isLiked
               ? "bg-red-500 text-white hover:bg-red-600"
@@ -100,7 +110,7 @@ const TrendingProjectCard = ({
       </div>
 
       {/* Project Info */}
-      <div className="p-4">
+      <div className="p-4 flex-1 flex flex-col">
         <h3 className={`text-lg font-bold mb-2 line-clamp-2 ${
           isDarkMode ? "text-gray-100" : "text-gray-900"
         }`}>
@@ -137,13 +147,14 @@ const TrendingProjectCard = ({
         </div>
 
         {/* Launch Date */}
-        <div className={`text-xs ${
+        <div className={`mt-auto text-xs ${
           isDarkMode ? "text-gray-400" : "text-gray-500"
         }`}>
           Launched {new Date(project.startDate).toLocaleDateString()}
         </div>
       </div>
-    </motion.div>
+      </motion.div>
+    </Link>
   );
 };
 

@@ -75,6 +75,7 @@ body {
   .scroll-container {
     @apply overflow-x-auto 
       flex 
+      items-stretch
       space-x-6 
       pb-4 
       scrollbar-thin 
@@ -88,7 +89,7 @@ body {
   }
 
   .scroll-item {
-    @apply flex-shrink-0;
+    @apply flex-shrink-0 flex;
     scroll-snap-align: start;
   }
 

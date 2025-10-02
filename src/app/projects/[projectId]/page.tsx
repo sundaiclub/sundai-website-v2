@@ -62,10 +62,14 @@ export default function ProjectDetail() {
   }, [params.projectId, router]);
 
   useEffect(() => {
-    if (project && userInfo) {
+    if (project) {
       const likesArray = Array.isArray((project as any).likes) ? (project as any).likes : [];
-      setIsLiked(likesArray.some((like: any) => like.hackerId === userInfo.id));
       setLikeCount(likesArray.length);
+      if (userInfo) {
+        setIsLiked(likesArray.some((like: any) => like.hackerId === userInfo.id));
+      } else {
+        setIsLiked(false);
+      }
     }
   }, [project, userInfo]);
 
@@ -241,6 +245,7 @@ export default function ProjectDetail() {
                 <div className="mt-4 md:mt-0">
                   <button
                     onClick={handleLike}
+                    aria-label={`Likes ${likeCount}`}
                     className="flex items-center gap-2 bg-white/20 backdrop-blur-sm px-6 py-3 rounded-full hover:bg-white/30 transition-colors"
                   >
                     {isLiked ? (
