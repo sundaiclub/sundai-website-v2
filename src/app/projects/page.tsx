@@ -31,6 +31,7 @@ export default function AllProjectsList() {
         <ProjectGrid 
           showSearch={true}
           urlFilters={urlFilters}
+          variant="compact"
         />
       </div>
     </div>

@@ -284,20 +284,12 @@ export default function HackerProfile() {
           <div className="px-4 sm:px-8 pb-8">
             <div className="flex flex-col sm:flex-row items-center sm:items-end -mt-16 sm:-mt-24 mb-4 sm:mb-8">
               <div className="relative w-32 h-32 sm:w-48 sm:h-48 rounded-full border-4 border-white overflow-hidden bg-white shadow-lg">
-                {hacker.avatar ? (
-                  <Image
-                    src={hacker.avatar.url}
-                    alt={swapFirstLetters(hacker.name)}
-                    fill
-                    className="object-cover"
-                  />
-                ) : (
-                  <div className="w-full h-full bg-indigo-100 flex items-center justify-center">
-                    <span className="text-4xl sm:text-6xl font-bold text-indigo-600">
-                      {(swapFirstLetters(hacker.name) || 'H')[0]}
-                    </span>
-                  </div>
-                )}
+                <Image
+                  src={hacker.avatar?.url || "/images/default_avatar.png"}
+                  alt={swapFirstLetters(hacker.name)}
+                  fill
+                  className="object-cover"
+                />
               </div>
               <div className="mt-4 sm:mt-0 sm:ml-6 text-center sm:text-left flex-grow">
                 {isEditing ? (
@@ -775,21 +767,13 @@ export default function HackerProfile() {
                           className="object-cover"
                         />
                         <div className="absolute bottom-2 left-2 flex items-center space-x-2 bg-black/50 px-3 py-1 rounded-full">
-                          {project.launchLead.avatar ? (
-                            <Image
-                              src={project.launchLead.avatar.url}
-                              alt={project.launchLead.name}
-                              width={20}
-                              height={20}
-                              className="rounded-full"
-                            />
-                          ) : (
-                            <div className="w-5 h-5 bg-indigo-100 rounded-full flex items-center justify-center">
-                              <span className="text-indigo-600 text-xs">
-                                {project.launchLead.name[0]}
-                              </span>
-                            </div>
-                          )}
+                          <Image
+                            src={project.launchLead.avatar?.url || "/images/default_avatar.png"}
+                            alt={project.launchLead.name}
+                            width={20}
+                            height={20}
+                            className="rounded-full"
+                          />
                           <span className="text-white text-sm">
                             {project.launchLead.name}
                           </span>

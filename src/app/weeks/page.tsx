@@ -151,28 +151,12 @@ export default function WeeksPage() {
                   >
                     <div className="flex items-center">
                       <div className="relative w-10 h-10">
-                        {record.hacker.avatar ? (
-                          <Image
-                            src={record.hacker.avatar.url}
-                            alt={record.hacker.name}
-                            fill
-                            className="rounded-full object-cover"
-                          />
-                        ) : (
-                          <div
-                            className={`w-full h-full rounded-full flex items-center justify-center ${
-                              isDarkMode ? "bg-gray-600" : "bg-gray-200"
-                            }`}
-                          >
-                            <span
-                              className={
-                                isDarkMode ? "text-gray-300" : "text-gray-600"
-                              }
-                            >
-                              {record.hacker.name[0]}
-                            </span>
-                          </div>
-                        )}
+                        <Image
+                          src={record.hacker.avatar?.url || "/images/default_avatar.png"}
+                          alt={record.hacker.name}
+                          fill
+                          className="rounded-full object-cover"
+                        />
                       </div>
                       <div className="ml-4">
                         <Link href={`/hacker/${record.hacker.id}`}>

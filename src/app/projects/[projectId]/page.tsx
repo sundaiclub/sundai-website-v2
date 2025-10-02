@@ -397,20 +397,12 @@ export default function ProjectDetail() {
                           }`}
                         >
                           <div className="relative w-12 h-12">
-                            {project.launchLead.avatar ? (
-                              <Image
-                                src={project.launchLead.avatar.url}
-                                alt={project.launchLead.name}
-                                fill
-                                className="rounded-full object-cover"
-                              />
-                            ) : (
-                              <div className="w-full h-full bg-indigo-100 rounded-full flex items-center justify-center">
-                                <span className="text-indigo-600 text-lg font-semibold text-gray-900">
-                                  {project.launchLead.name[0]}
-                                </span>
-                              </div>
-                            )}
+                            <Image
+                              src={project.launchLead.avatar?.url || "/images/default_avatar.png"}
+                              alt={project.launchLead.name}
+                              fill
+                              className="rounded-full object-cover"
+                            />
                           </div>
                           <div className="ml-4">
                             <h4
@@ -452,20 +444,12 @@ export default function ProjectDetail() {
                               }`}
                             >
                               <div className="relative w-12 h-12">
-                                {participant.hacker.avatar ? (
-                                  <Image
-                                    src={participant.hacker.avatar.url}
-                                    alt={swapFirstLetters(participant.hacker.name)}
-                                    fill
-                                    className="rounded-full object-cover"
-                                  />
-                                ) : (
-                                  <div className="w-full h-full bg-gray-100 rounded-full flex items-center justify-center">
-                                    <span className="text-gray-600 text-lg font-semibold text-gray-900">
-                                      {swapFirstLetters(participant.hacker.name)[0]}
-                                    </span>
-                                  </div>
-                                )}
+                                <Image
+                                  src={participant.hacker.avatar?.url || "/images/default_avatar.png"}
+                                  alt={swapFirstLetters(participant.hacker.name)}
+                                  fill
+                                  className="rounded-full object-cover"
+                                />
                               </div>
                               <div className="ml-4">
                                 <h4

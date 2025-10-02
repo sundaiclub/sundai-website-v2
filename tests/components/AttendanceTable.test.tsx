@@ -110,11 +110,12 @@ describe('AttendanceTable', () => {
     });
   });
 
-  it('should display initials when avatar is not available', async () => {
+  it('should display default avatar when avatar is not available', async () => {
     render(<AttendanceTable />);
     
     await waitFor(() => {
-      expect(screen.getByText('J')).toBeInTheDocument(); // Jane Smith's initial
+      const img = screen.getAllByAltText('Jane Smith')[0];
+      expect(img).toHaveAttribute('src', '/images/default_avatar.png');
     });
   });
 

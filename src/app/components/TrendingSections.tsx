@@ -1,10 +1,9 @@
 "use client";
 import React from "react";
 import { motion } from "framer-motion";
-import Image from "next/image";
 import Link from "next/link";
 import { useTheme } from "../contexts/ThemeContext";
-import { Project } from "./Project";
+import ProjectGrid, { Project as ProjectType, ProjectCard } from "./Project";
 import { 
   calculateThisWeekTrendingScore, 
   calculateThisMonthTrendingScore, 
@@ -15,144 +14,33 @@ import {
 } from "./ProjectSearch";
 
 interface TrendingSectionsProps {
-  projects: Project[];
+  projects: ProjectType[];
   userInfo: any;
   handleLike: (e: React.MouseEvent, projectId: string, isLiked: boolean) => void;
   isDarkMode: boolean;
 }
 
-const TrendingProjectCard = ({ 
-  project, 
-  userInfo, 
-  handleLike, 
-  isDarkMode,
-  showTrendingBadge = false
-}: {
-  project: Project;
+const TrendingProjectCard = ({ project, userInfo, handleLike, isDarkMode, showTrendingBadge = false }: {
+  project: ProjectType;
   userInfo: any;
   handleLike: (e: React.MouseEvent, projectId: string, isLiked: boolean) => void;
   isDarkMode: boolean;
   showTrendingBadge?: boolean;
 }) => {
   const isLiked = project.likes.some(like => like.hackerId === userInfo?.id);
-
   return (
-    <Link
-      href={`/projects/${project.id}`}
-      className="block h-full focus:outline-none"
-      aria-label={`View project ${project.title}`}
-    >
-      <motion.div
-        className={`${
-          isDarkMode
-            ? "bg-gray-800 hover:shadow-purple-400/20"
-            : "bg-white hover:shadow-xl"
-        } rounded-xl shadow-lg overflow-hidden transition-all duration-300 hover:scale-105 relative group h-full flex flex-col`}
-        whileHover={{ y: -4 }}
-      >
-      {/* Trending Badge - Only show when showTrendingBadge is true */}
-      {showTrendingBadge && (
-        <div className="absolute top-3 left-3 z-10">
-          <div className={`px-2 py-1 rounded-full text-xs font-semibold ${
-            isDarkMode 
-              ? "bg-gradient-to-r from-purple-600 to-indigo-600 text-white" 
-              : "bg-gradient-to-r from-purple-500 to-indigo-500 text-white"
-          }`}>
-            🔥 Trending
-          </div>
-        </div>
-      )}
-
-      {/* Like Button - Prominent */}
-      <div className="absolute top-3 right-3 z-10">
-        <button
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            handleLike(e, project.id, isLiked);
-          }}
-          className={`p-3 rounded-full transition-all duration-200 shadow-lg ${
-            isLiked
-              ? "bg-red-500 text-white hover:bg-red-600"
-              : isDarkMode
-              ? "bg-white/90 text-gray-800 hover:bg-red-500 hover:text-white"
-              : "bg-white text-gray-800 hover:bg-red-500 hover:text-white"
-          } group/like`}
-          aria-label={`Like project ${project.title}`}
-        >
-          <div className="flex items-center space-x-2">
-            <svg 
-              className={`w-5 h-5 ${isLiked ? 'fill-current' : ''}`} 
-              viewBox="0 0 24 24"
-            >
-              <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
-            </svg>
-            <span className="text-sm font-bold">{project.likes.length}</span>
-          </div>
-        </button>
-      </div>
-
-      {/* Project Image */}
-      <div className="relative h-32 overflow-hidden">
-        <Image
-          src={
-            project.thumbnail?.url ||
-            (isDarkMode
-              ? "/images/default_project_thumbnail_dark.svg"
-              : "/images/default_project_thumbnail_light.svg")
-          }
-          alt={project.title}
-          fill
-          className="object-cover group-hover:scale-110 transition-transform duration-300"
-          unoptimized
+    <Link href={`/projects/${project.id}`} className="block h-full w-full focus:outline-none" aria-label={`View project ${project.title}`}>
+      <motion.div whileHover={{ y: -4 }}>
+        <ProjectCard
+          project={project}
+          userInfo={userInfo}
+          handleLike={handleLike}
+          isDarkMode={isDarkMode}
+          show_status={false}
+          show_team={true}
+          variant="trending"
+          showTrendingBadge={showTrendingBadge}
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
-      </div>
-
-      {/* Project Info */}
-      <div className="p-4 flex-1 flex flex-col">
-        <h3 className={`text-lg font-bold mb-2 line-clamp-2 ${
-          isDarkMode ? "text-gray-100" : "text-gray-900"
-        }`}>
-          {project.title}
-        </h3>
-        
-        <p className={`text-sm mb-3 line-clamp-2 ${
-          isDarkMode ? "text-gray-300" : "text-gray-600"
-        }`}>
-          {project.preview}
-        </p>
-
-        {/* Tech Tags */}
-        <div className="flex flex-wrap gap-1 mb-3">
-          {project.techTags.slice(0, 3).map((tag) => (
-            <span
-              key={tag.id}
-              className={`px-2 py-1 rounded-full text-xs ${
-                isDarkMode
-                  ? "bg-purple-900/50 text-purple-300"
-                  : "bg-indigo-100 text-indigo-700"
-              }`}
-            >
-              {tag.name}
-            </span>
-          ))}
-          {project.techTags.length > 3 && (
-            <span className={`px-2 py-1 rounded-full text-xs ${
-              isDarkMode ? "text-gray-400" : "text-gray-500"
-            }`}>
-              +{project.techTags.length - 3}
-            </span>
-          )}
-        </div>
-
-        {/* Launch Date */}
-        <div className={`mt-auto text-xs ${
-          isDarkMode ? "text-gray-400" : "text-gray-500"
-        }`}>
-          Launched {new Date(project.startDate).toLocaleDateString()}
-        </div>
-      </div>
       </motion.div>
     </Link>
   );
@@ -165,15 +53,15 @@ export default function TrendingSections({ projects, userInfo, handleLike, isDar
   const allTimeProjects = getAllTimeProjects(projects);
 
   // Sort by appropriate trending score for each category
-  const sortByThisWeekTrending = (a: Project, b: Project) => {
+  const sortByThisWeekTrending = (a: ProjectType, b: ProjectType) => {
     return calculateThisWeekTrendingScore(b) - calculateThisWeekTrendingScore(a);
   };
 
-  const sortByThisMonthTrending = (a: Project, b: Project) => {
+  const sortByThisMonthTrending = (a: ProjectType, b: ProjectType) => {
     return calculateThisMonthTrendingScore(b) - calculateThisMonthTrendingScore(a);
   };
 
-  const sortByBestOfAllTime = (a: Project, b: Project) => {
+  const sortByBestOfAllTime = (a: ProjectType, b: ProjectType) => {
     return calculateBestOfAllTimeScore(b) - calculateBestOfAllTimeScore(a);
   };
 
@@ -239,6 +127,11 @@ export default function TrendingSections({ projects, userInfo, handleLike, isDar
               />
             </motion.div>
           ))}
+          <motion.div variants={cardVariants} className="scroll-item w-48 flex-shrink-0 items-center">
+            <Link href="/projects" className="flex items-center justify-center w-full h-full text-center">
+              <span className={`${isDarkMode ? 'text-purple-300' : 'text-indigo-600'} font-semibold inline-block transition-transform duration-150 hover:-translate-y-0.5 hover:${isDarkMode ? 'text-purple-200' : 'text-indigo-700'}`}>See more →</span>
+            </Link>
+          </motion.div>
         </div>
       </motion.section>
 
@@ -274,6 +167,11 @@ export default function TrendingSections({ projects, userInfo, handleLike, isDar
               />
             </motion.div>
           ))}
+          <motion.div variants={cardVariants} className="scroll-item w-48 flex-shrink-0 items-center">
+            <Link href="/projects" className="flex items-center justify-center w-full h-full text-center">
+              <span className={`${isDarkMode ? 'text-purple-300' : 'text-indigo-600'} font-semibold inline-block transition-transform duration-150 hover:-translate-y-0.5 hover:${isDarkMode ? 'text-purple-200' : 'text-indigo-700'}`}>See more →</span>
+            </Link>
+          </motion.div>
         </div>
       </motion.section>
 
@@ -309,6 +207,11 @@ export default function TrendingSections({ projects, userInfo, handleLike, isDar
               />
             </motion.div>
           ))}
+          <motion.div variants={cardVariants} className="scroll-item w-48 flex-shrink-0 items-center">
+            <Link href="/projects" className="flex items-center justify-center w-full h-full text-center">
+              <span className={`${isDarkMode ? 'text-purple-300' : 'text-indigo-600'} font-semibold inline-block transition-transform duration-150 hover:-translate-y-0.5 hover:${isDarkMode ? 'text-purple-200' : 'text-indigo-700'}`}>See more →</span>
+            </Link>
+          </motion.div>
         </div>
       </motion.section>
     </div>
