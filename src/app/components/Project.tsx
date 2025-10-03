@@ -84,6 +84,23 @@ export function ProjectCard({ project, userInfo, handleLike, isDarkMode, show_st
   variant?: "default" | "compact" | "trending";
   showTrendingBadge?: boolean;
 }) {
+  const AvatarImage = ({ src, alt, size }: { src: string | null; alt: string; size: number }) => {
+    const [imgSrc, setImgSrc] = useState<string>(src || "/images/default_avatar.png");
+    return (
+      <Image
+        src={imgSrc}
+        alt={alt}
+        width={size}
+        height={size}
+        className="rounded-full object-cover"
+        onError={() => {
+          if (imgSrc !== "/images/default_avatar.png") {
+            setImgSrc("/images/default_avatar.png");
+          }
+        }}
+      />
+    );
+  };
   const teamMembersBase = [
     { id: project.launchLead.id, name: project.launchLead.name, avatarUrl: project.launchLead.avatar?.url || null },
     ...project.participants.map(p => ({ id: p.hacker.id, name: p.hacker.name, avatarUrl: p.hacker.avatar?.url || null }))
@@ -306,23 +323,7 @@ export function ProjectCard({ project, userInfo, handleLike, isDarkMode, show_st
                     onClick={(e) => e.stopPropagation()}
                     style={{ zIndex: (visibleMembers.length - idx) }}
                   >
-                    {m.avatarUrl ? (
-                      <Image
-                        src={m.avatarUrl}
-                        alt={m.name}
-                        width={24}
-                        height={24}
-                        className="rounded-full object-cover"
-                      />
-                    ) : (
-                      <Image
-                        src={"/images/default_avatar.png"}
-                        alt={m.name}
-                        width={24}
-                        height={24}
-                        className="rounded-full object-cover"
-                      />
-                    )}
+                <AvatarImage src={m.avatarUrl} alt={m.name} size={24} />
                   </Link>
                 ))}
                 {teamMembers.length > 5 && (

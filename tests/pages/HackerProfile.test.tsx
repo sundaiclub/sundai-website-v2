@@ -1,9 +1,14 @@
 import '@testing-library/jest-dom';
 import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { useUser } from '@clerk/nextjs';
 import HackerProfile from '../../src/app/hacker/[hackerId]/page';
 import { ThemeProvider } from '../../src/app/contexts/ThemeContext';
+// Mock next/image to use plain img for reliable onError handling
+jest.mock('next/image', () => ({
+  __esModule: true,
+  default: (props: any) => <img {...props} />,
+}));
 
 // Mock Clerk
 jest.mock('@clerk/nextjs', () => ({
@@ -87,6 +92,36 @@ describe('HackerProfile', () => {
     });
 
     expect(screen.getByText('Test bio')).toBeInTheDocument();
+  });
+
+  it('falls back to default avatar when main image fails', async () => {
+    // Provide an avatar URL that will "error" in our mock <img>
+    const hackerWithAvatar = {
+      ...mockHacker,
+      avatar: { url: 'https://bad.example.com/broken.jpg' },
+    };
+
+    (global.fetch as jest.Mock).mockImplementation((url: string) => {
+      if (url.includes('/api/hackers?clerkId=')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ id: 'current-user-hacker-id' }) });
+      }
+      if (url.includes('/api/hackers/test-hacker-id')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(hackerWithAvatar) });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
+    });
+
+    render(
+      <ThemeProvider>
+        <HackerProfile />
+      </ThemeProvider>
+    );
+
+    const img = await screen.findByAltText('Test Hacker');
+    fireEvent.error(img);
+    await waitFor(() => {
+      expect((img as HTMLImageElement).src).toContain('/images/default_avatar.png');
+    });
   });
 
   // Skills, interests, and social links are not rendered in current UI
