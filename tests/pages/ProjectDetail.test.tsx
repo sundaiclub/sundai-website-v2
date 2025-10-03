@@ -27,6 +27,7 @@ jest.mock('next/navigation', () => ({
   useParams: () => ({
     projectId: 'test-project-id',
   }),
+  useSearchParams: () => ({ get: () => null, entries: () => new Map().entries() }),
 }))
 
 // Silence toast imports used in page

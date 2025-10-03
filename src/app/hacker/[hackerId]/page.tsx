@@ -179,15 +179,15 @@ export default function HackerProfile() {
     }, [src]);
 
     return (
-      <NextImage
+      <img
         src={imgSrc}
         alt={alt}
         width={size}
         height={size}
         className="object-cover rounded-full"
-        unoptimized
-        onError={() => {
-          if (imgSrc !== defaultSrc) {
+        onError={(e) => {
+          if ((e.currentTarget as HTMLImageElement).src !== defaultSrc) {
+            (e.currentTarget as HTMLImageElement).src = defaultSrc;
             setImgSrc(defaultSrc);
           }
         }}

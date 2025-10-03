@@ -28,6 +28,11 @@ export async function afterAuthHandler(auth: any, req: any) {
         body = {};
       }
 
+      // Allow like/unlike without admin: DELETE /api/projects/:id/like should pass
+      if (req.method === "DELETE" && req.nextUrl.pathname.includes("/like")) {
+        return;
+      }
+
       // Only check admin status if trying to:
       // 1. Change is_starred
       // 2. Change status from PENDING to APPROVED
