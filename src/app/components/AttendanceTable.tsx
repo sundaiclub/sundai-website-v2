@@ -116,21 +116,13 @@ export default function AttendanceTable() {
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="flex items-center">
                     <div className="flex-shrink-0 h-10 w-10">
-                      {record.hacker.avatar ? (
-                        <Image
-                          src={record.hacker.avatar.url}
-                          alt={record.hacker.name}
-                          width={40}
-                          height={40}
-                          className="rounded-full"
-                        />
-                      ) : (
-                        <div className="h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center">
-                          <span className="text-indigo-600 font-medium">
-                            {record.hacker.name[0]}
-                          </span>
-                        </div>
-                      )}
+                      <Image
+                        src={record.hacker.avatar?.url || "/images/default_avatar.png"}
+                        alt={record.hacker.name}
+                        width={40}
+                        height={40}
+                        className="rounded-full"
+                      />
                     </div>
                     <div className="ml-4">
                       <div className="text-sm font-medium text-gray-900">

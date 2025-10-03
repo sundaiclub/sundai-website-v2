@@ -75,20 +75,21 @@ body {
   .scroll-container {
     @apply overflow-x-auto 
       flex 
-      space-x-6 
-      pb-4 
+      items-stretch
+      space-x-4 
+      pb-2 
       scrollbar-thin 
       scrollbar-thumb-gray-300 
       scrollbar-track-transparent 
       hover:scrollbar-thumb-gray-400 
-      -mx-4 
-      px-4;
+      -mx-2 
+      px-2;
     -webkit-overflow-scrolling: touch;
     scroll-snap-type: x mandatory;
   }
 
   .scroll-item {
-    @apply flex-shrink-0;
+    @apply flex-shrink-0 flex;
     scroll-snap-align: start;
   }
 
@@ -98,6 +99,13 @@ body {
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
+  }
+  .line-clamp-1 {
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 }
 

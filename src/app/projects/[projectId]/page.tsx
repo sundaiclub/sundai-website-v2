@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import Image from "next/image";
+import NextImage from "next/image";
 import Link from "next/link";
 import { useUserContext } from "../../contexts/UserContext";
 import { HeartIcon } from "@heroicons/react/24/outline";
@@ -25,6 +25,64 @@ export default function ProjectDetail() {
   const { isDarkMode } = useTheme();
   const [isProjectDraft, setIsProjectDraft] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
+
+  const AvatarImage = ({ src, alt, size }: { src: string | null; alt: string; size: number }) => {
+    const defaultSrc = "/images/default_avatar.png";
+    const isClerkAvatar = (u: string | null) => {
+      if (!u) return false;
+      try {
+        const host = new URL(u).host;
+        return host.includes("clerk");
+      } catch {
+        return u.includes("clerk");
+      }
+    };
+
+    const [imgSrc, setImgSrc] = useState<string>(() => {
+      if (!src) return defaultSrc;
+      return isClerkAvatar(src) ? defaultSrc : src;
+    });
+
+    useEffect(() => {
+      if (!src) {
+        setImgSrc(defaultSrc);
+        return;
+      }
+      if (isClerkAvatar(src)) {
+        try {
+          const GlobalImage = (typeof globalThis !== 'undefined' ? (globalThis as any).Image : undefined);
+          if (GlobalImage) {
+            const preloader = new GlobalImage();
+            preloader.onload = () => setImgSrc(src);
+            preloader.onerror = () => setImgSrc(defaultSrc);
+            preloader.src = src;
+          } else {
+            setImgSrc(src);
+          }
+        } catch {
+          setImgSrc(defaultSrc);
+        }
+      } else {
+        setImgSrc(src);
+      }
+    }, [src]);
+
+    return (
+      <NextImage
+        src={imgSrc}
+        alt={alt}
+        width={size}
+        height={size}
+        className="rounded-full object-cover"
+        unoptimized
+        onError={() => {
+          if (imgSrc !== defaultSrc) {
+            setImgSrc(defaultSrc);
+          }
+        }}
+      />
+    );
+  };
 
   const allowedEdit = !!project && (
     (Array.isArray(project.participants) && project.participants.some(
@@ -62,10 +120,14 @@ export default function ProjectDetail() {
   }, [params.projectId, router]);
 
   useEffect(() => {
-    if (project && userInfo) {
+    if (project) {
       const likesArray = Array.isArray((project as any).likes) ? (project as any).likes : [];
-      setIsLiked(likesArray.some((like: any) => like.hackerId === userInfo.id));
       setLikeCount(likesArray.length);
+      if (userInfo) {
+        setIsLiked(likesArray.some((like: any) => like.hackerId === userInfo.id));
+      } else {
+        setIsLiked(false);
+      }
     }
   }, [project, userInfo]);
 
@@ -167,7 +229,7 @@ export default function ProjectDetail() {
         <div className={`shadow-lg overflow-hidden`}>
           {/* Project Header - Now with larger height on desktop */}
           <div className="relative h-64 md:h-96 w-full">
-            <Image
+          <NextImage
               src={
                 project.thumbnail?.url ||
                 (isDarkMode
@@ -241,6 +303,7 @@ export default function ProjectDetail() {
                 <div className="mt-4 md:mt-0">
                   <button
                     onClick={handleLike}
+                    aria-label={`Likes ${likeCount}`}
                     className="flex items-center gap-2 bg-white/20 backdrop-blur-sm px-6 py-3 rounded-full hover:bg-white/30 transition-colors"
                   >
                     {isLiked ? (
@@ -392,20 +455,7 @@ export default function ProjectDetail() {
                           }`}
                         >
                           <div className="relative w-12 h-12">
-                            {project.launchLead.avatar ? (
-                              <Image
-                                src={project.launchLead.avatar.url}
-                                alt={project.launchLead.name}
-                                fill
-                                className="rounded-full object-cover"
-                              />
-                            ) : (
-                              <div className="w-full h-full bg-indigo-100 rounded-full flex items-center justify-center">
-                                <span className="text-indigo-600 text-lg font-semibold text-gray-900">
-                                  {project.launchLead.name[0]}
-                                </span>
-                              </div>
-                            )}
+                            <AvatarImage src={project.launchLead.avatar?.url || null} alt={project.launchLead.name} size={48} />
                           </div>
                           <div className="ml-4">
                             <h4
@@ -447,20 +497,7 @@ export default function ProjectDetail() {
                               }`}
                             >
                               <div className="relative w-12 h-12">
-                                {participant.hacker.avatar ? (
-                                  <Image
-                                    src={participant.hacker.avatar.url}
-                                    alt={swapFirstLetters(participant.hacker.name)}
-                                    fill
-                                    className="rounded-full object-cover"
-                                  />
-                                ) : (
-                                  <div className="w-full h-full bg-gray-100 rounded-full flex items-center justify-center">
-                                    <span className="text-gray-600 text-lg font-semibold text-gray-900">
-                                      {swapFirstLetters(participant.hacker.name)[0]}
-                                    </span>
-                                  </div>
-                                )}
+                                <AvatarImage src={participant.hacker.avatar?.url || null} alt={swapFirstLetters(participant.hacker.name)} size={48} />
                               </div>
                               <div className="ml-4">
                                 <h4

@@ -16,8 +16,8 @@ const SORT_OPTIONS: SortOption[] = [
     label: "Trending",
     value: "trending",
     sortFn: (a: Project, b: Project) => {
-      const scoreA = calculateTrendingScore(a);
-      const scoreB = calculateTrendingScore(b);
+      const scoreA = calculateThisWeekTrendingScore(a);
+      const scoreB = calculateThisWeekTrendingScore(b);
       return scoreB - scoreA;
     }
   },
