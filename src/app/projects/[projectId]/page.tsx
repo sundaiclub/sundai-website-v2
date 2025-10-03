@@ -7,6 +7,7 @@ import { useUserContext } from "../../contexts/UserContext";
 import { HeartIcon } from "@heroicons/react/24/outline";
 import { HeartIcon as HeartIconSolid, ShareIcon } from "@heroicons/react/24/solid";
 import { useTheme } from "../../contexts/ThemeContext";
+import { useAutoLike } from "../../hooks/useAutoLike";
 import ReactMarkdown from 'react-markdown';
 import { CheckIcon, XMarkIcon } from "@heroicons/react/24/solid";
 import toast from 'react-hot-toast';
@@ -18,6 +19,7 @@ export default function ProjectDetail() {
   const params = useParams();
   const router = useRouter();
   const { userInfo } = useUserContext();
+  const searchParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
   const [project, setProject] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
   const [isLiked, setIsLiked] = useState(false);
@@ -25,6 +27,7 @@ export default function ProjectDetail() {
   const { isDarkMode } = useTheme();
   const [isProjectDraft, setIsProjectDraft] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
+  useAutoLike(project?.id || null);
 
   const AvatarImage = ({ src, alt, size }: { src: string | null; alt: string; size: number }) => {
     const defaultSrc = "/images/default_avatar.png";
@@ -156,6 +159,26 @@ export default function ProjectDetail() {
       console.error("Error toggling like:", error);
     }
   };
+
+  useEffect(() => {
+    // Auto-like when coming from email with like=1
+    if (!loading && project && userInfo && searchParams?.get('like') === '1') {
+      const alreadyLiked = isLiked;
+      if (!alreadyLiked) {
+        (async () => {
+          try {
+            const response = await fetch(`/api/projects/${project.id}/like`, { method: 'POST' });
+            if (response.ok) {
+              setIsLiked(true);
+              setLikeCount((prev) => prev + 1);
+            }
+          } catch (e) {
+            console.error('Auto-like failed', e);
+          }
+        })();
+      }
+    }
+  }, [loading, project, userInfo, isLiked]);
 
   const handleSubmit = async () => {
     try {
