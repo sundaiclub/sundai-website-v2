@@ -22,6 +22,7 @@
   "dependencies": {
     "@clerk/nextjs": "^5.7.2",
     "@google-cloud/storage": "^7.14.0",
+    "@google/genai": "^1.25.0",
     "@headlessui/react": "^2.2.0",
     "@heroicons/react": "^2.1.5",
     "@prisma/client": "^5.21.1",
@@ -32,7 +33,7 @@
     "next": "14.2.33",
     "next-pwa": "^5.6.0",
     "next-themes": "^0.3.0",
-    "nodemailer": "^6.9.15",
+    "nodemailer": "^7.0.9",
     "posthog-js": "^1.225.0",
     "prisma": "^5.21.1",
     "react": "^18",

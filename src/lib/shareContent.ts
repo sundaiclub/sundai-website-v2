@@ -1,4 +1,5 @@
 import { Project } from "@/app/components/Project";
+import { GoogleGenAI } from "@google/genai";
 
 export interface ShareContentRequest {
   project: Project;
@@ -106,36 +107,19 @@ Requirements:
 - Make it engaging and viral-worthy
 - End with link to https://www.sundai.club/projects for more projects
 
+Avoid fluff, keep it concise, professional and to the point.
+Avoid emojis.
 Generate only the post content, no explanations.`;
 
   try {
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${process.env.GEMINI_API_KEY}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        contents: [{
-          parts: [{
-            text: prompt
-          }]
-        }],
-        generationConfig: {
-          temperature: 0.7,
-          topK: 40,
-          topP: 0.95,
-          maxOutputTokens: 1024,
-        }
-      })
+    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY });
+    const response: any = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: prompt,
     });
 
-    if (!response.ok) {
-      throw new Error(`Gemini API error: ${response.statusText}`);
-    }
+    const generatedContent: string = (response && (response.text as any)) || '';
 
-    const data = await response.json();
-    const generatedContent = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    
     if (!generatedContent) {
       throw new Error('No content generated from Gemini API');
     }
@@ -151,7 +135,6 @@ Generate only the post content, no explanations.`;
     };
   } catch (error) {
     console.error('Error generating content with Gemini:', error);
-    
     // Fallback to template-based content if API fails
     return generateFallbackContent({ project, userInfo, platform, isTeamMember });
   }

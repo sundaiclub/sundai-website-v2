@@ -139,42 +139,27 @@ export default function HackerProfile() {
 
   const AvatarImage = ({ src, alt, size }: { src: string | null; alt: string; size: number }) => {
     const defaultSrc = "/images/default_avatar.png";
-    const isClerkAvatar = (u: string | null) => {
-      if (!u) return false;
-      try {
-        const host = new URL(u).host;
-        return host.includes("clerk");
-      } catch {
-        return u.includes("clerk");
-      }
-    };
 
-    const [imgSrc, setImgSrc] = useState<string>(() => {
-      if (!src) return defaultSrc;
-      return isClerkAvatar(src) ? defaultSrc : src;
-    });
+    const [imgSrc, setImgSrc] = useState<string>(defaultSrc);
 
     useEffect(() => {
       if (!src) {
         setImgSrc(defaultSrc);
         return;
       }
-      if (isClerkAvatar(src)) {
-        try {
-          const GlobalImage = (typeof globalThis !== 'undefined' ? (globalThis as any).Image : undefined);
-          const preloader = GlobalImage ? new GlobalImage() : null;
-          if (preloader) {
-            preloader.onload = () => setImgSrc(src);
-            preloader.onerror = () => setImgSrc(defaultSrc);
-            preloader.src = src;
-          } else {
-            setImgSrc(src);
-          }
-        } catch {
-          setImgSrc(defaultSrc);
+      try {
+        const GlobalImage = (typeof globalThis !== 'undefined' ? (globalThis as any).Image : undefined);
+        const preloader = GlobalImage ? new GlobalImage() : null;
+        if (preloader) {
+          preloader.onload = () => setImgSrc(src);
+          preloader.onerror = () => setImgSrc(defaultSrc);
+          preloader.src = src;
+        } else {
+          // If Image constructor not available, optimistically use src
+          setImgSrc(src);
         }
-      } else {
-        setImgSrc(src);
+      } catch {
+        setImgSrc(defaultSrc);
       }
     }, [src]);
 
@@ -190,6 +175,9 @@ export default function HackerProfile() {
             (e.currentTarget as HTMLImageElement).src = defaultSrc;
             setImgSrc(defaultSrc);
           }
+        }}
+        onErrorCapture={() => {
+          setImgSrc((current) => (current === defaultSrc ? current : defaultSrc));
         }}
       />
     );

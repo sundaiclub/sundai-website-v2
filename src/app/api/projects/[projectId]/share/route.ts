@@ -143,6 +143,113 @@ export async function POST(
       })),
     };
 
+    const acceptHeader = req.headers.get('accept') || '';
+    const wantsStream = acceptHeader.includes('text/event-stream') || acceptHeader.includes('text/plain');
+
+    if (wantsStream) {
+      const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+      if (!apiKey) {
+        return new NextResponse("Gemini API key not configured", { status: 500 });
+      }
+
+      const teamMembers = [projectData.launchLead, ...projectData.participants.map((p: any) => p.hacker)];
+      const formatTeamNames = (members: any[], plat: string) => {
+        const mapOne = (person: any) => {
+          switch (plat) {
+            case 'twitter': {
+              if (person.twitterUrl) {
+                const m = person.twitterUrl.match(/(?:twitter\.com|x\.com)\/([^/?]+)/);
+                return m ? `@${m[1]}` : `@${String(person.name).split(' ')[0].toLowerCase()}`;
+              }
+              return `@${String(person.name).split(' ')[0].toLowerCase()}`;
+            }
+            case 'linkedin': {
+              if (person.linkedinUrl) {
+                const m = person.linkedinUrl.match(/linkedin\.com\/in\/([^/?]+)/);
+                return m ? `@${m[1]}` : `@${String(person.name).toLowerCase().replace(/\s+/g, '-')}`;
+              }
+              return `@${String(person.name).toLowerCase().replace(/\s+/g, '-')}`;
+            }
+            case 'reddit':
+              return `u/${String(person.name).split(' ')[0].toLowerCase()}`;
+            default:
+              return String(person.name);
+          }
+        };
+        return members.map(mapOne).join(', ');
+      };
+
+      const formattedTeamNames = formatTeamNames(teamMembers, platform);
+      const perspective = isTeamMember ? "first-person as a team member" : "third-person promoting Sundai";
+      const characterLimit = platform === 'twitter' ? 280 : platform === 'linkedin' ? 3000 : 40000;
+      const style = platform === 'twitter' ? "concise, engaging, with relevant emojis and hashtags" : platform === 'linkedin' ? "professional, detailed, focusing on technical achievements and team collaboration" : "informative, community-focused, with technical details that would interest developers";
+
+      const prompt = `Generate a viral social media post for ${platform} about this project:
+
+Project: ${projectData.title}
+Description: ${projectData.preview}
+Full Description: ${projectData.description}
+Team: ${teamMembers.map((p: any) => p.name).join(', ')}
+Launch Lead: ${projectData.launchLead.name}
+
+Platform-specific tagging for ${platform}:
+${platform === 'linkedin' ? '- Tag people with their actual @username from LinkedIn profiles' : ''}
+${platform === 'twitter' ? '- Tag people with their actual @username from Twitter profiles' : ''}
+${platform === 'reddit' ? '- Tag people with u/username format, avoid hashtags' : ''}
+Formatted team tags (with real social handles): ${formattedTeamNames}
+
+Links available:
+${projectData.demoUrl ? `- Demo: ${projectData.demoUrl}` : ''}
+${projectData.githubUrl ? `- GitHub: ${projectData.githubUrl}` : ''}
+${projectData.blogUrl ? `- Blog: ${projectData.blogUrl}` : ''}
+- Project Page: https://www.sundai.club/projects/${projectData.id}
+
+Write from ${perspective}. Style should be ${style}.
+
+Requirements:
+- ${isTeamMember ? 'Start with "We just built..." or similar first-person language' : 'Mention "The team at Sundai built..." to promote Sundai'}
+- Keep under ${characterLimit} characters
+- Include relevant emojis
+- Use the real social handles: ${formattedTeamNames}
+- ${platform === 'reddit' ? 'Avoid hashtags, use plain text' : 'Add appropriate hashtags'}
+- Include team member names with their actual social handles when available
+- Mention the links including the project page
+- Make it engaging and viral-worthy
+- End with link to https://www.sundai.club/projects for more projects
+
+Make there is no fluff, keep it concise, professional and to the point, avoid emojis.
+Generate only the post content, no explanations.`;
+
+      const { GoogleGenAI } = await import("@google/genai");
+      const ai = new GoogleGenAI({ apiKey });
+      const encoder = new TextEncoder();
+      const stream = new ReadableStream({
+        async start(controller) {
+          try {
+            const response: any = await ai.models.generateContentStream({
+              model: "gemini-2.5-flash",
+              contents: prompt,
+            });
+            for await (const chunk of response as any) {
+              const text = (chunk && (chunk.text as any)) || '';
+              if (text) controller.enqueue(encoder.encode(text));
+            }
+            controller.close();
+          } catch (e) {
+            console.error('[SHARE_STREAM]', e);
+            controller.close();
+          }
+        }
+      });
+
+      return new Response(stream, {
+        headers: {
+          'Content-Type': 'text/plain; charset=utf-8',
+          'Cache-Control': 'no-cache',
+        }
+      });
+    }
+
     const shareContent = await generateShareContent({
       project: projectData as any, // Type assertion to bypass strict typing
       userInfo: currentUser,
