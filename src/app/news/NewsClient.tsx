@@ -68,38 +68,40 @@ export default function NewsClient() {
         .map(m => `<a href="https://www.sundai.club/hacker/${m.id}" style="color:#111827;text-decoration:underline">${m.name}</a>`) 
         .join(', ');
       const rank = idx === 0 ? '1st' : idx === 1 ? '2nd' : idx === 2 ? '3rd' : idx === 3 ? '4th' : '5th';
-      const rankColor = idx === 0 ? '#f59e0b' : idx === 1 ? '#6b7280' : idx === 2 ? '#d97706' : '#9ca3af';
       return `
-        <div style="padding:14px 0">
+        <div style="padding:16px 0;border-top:1px solid #e5e7eb">
           <div style="display:flex;align-items:center;margin-bottom:6px">
-            <span style="display:inline-block;padding:2px 8px;background:${rankColor};color:#ffffff;border-radius:9999px;font-size:12px;margin-right:8px">${rank}</span>
+            <span style="display:inline-block;padding:2px 8px;border:1px solid #111827;color:#111827;border-radius:0;font-size:12px;margin-right:8px">${rank}</span>
             <h3 style="margin:0;font-size:16px;line-height:24px;color:#111827">${p.title}</h3>
           </div>
           <p style="margin:0 0 6px;color:#374151">${p.preview || ""}</p>
           <p style="margin:0 0 10px;color:#6b7280">Built by: ${teamLinks}</p>
-          ${p.thumbnailUrl ? `<img src="${p.thumbnailUrl}" alt="${p.title}" style="width:260px;height:auto;border-radius:10px;border:1px solid #e5e7eb;margin:8px 0" />` : ''}
+          ${p.thumbnailUrl ? `<img src="${p.thumbnailUrl}" alt="${p.title}" style="width:260px;height:auto;border-radius:0;border:1px solid #e5e7eb;margin:8px 0" />` : ''}
           <div style="margin-top:8px">
-            <a href="${p.projectUrl}" style="display:inline-block;padding:10px 14px;background:#111827;color:#ffffff;text-decoration:none;border-radius:8px">View project</a>
-            <a href="${likeUrl}" style="display:inline-block;padding:10px 14px;background:#dc2626;color:#ffffff;text-decoration:none;border-radius:8px;margin-left:8px">❤ Like on Sundai</a>
+            <a href="${p.projectUrl}" style="display:inline-block;padding:10px 14px;background:#111827;color:#ffffff;text-decoration:none;border-radius:0;border:1px solid #111827">View project</a>
+            <a href="${likeUrl}" style="display:inline-block;padding:10px 14px;background:transparent;color:#111827;text-decoration:none;border-radius:0;border:1px solid #111827;margin-left:8px">Like on Sundai</a>
           </div>
         </div>`;
     }).join("");
 
     const introOutline = `
       <section id="outline" style="padding:14px 16px;border-bottom:1px solid #e5e7eb">
-        <p style="margin:0 0 10px;color:#374151">We reworked this weekly email and added many more cool things. This is what we'll be sending each week now:</p>
-        <div style="margin:0;display:flex;flex-wrap:wrap;gap:8px">
-          <a href="#next-hack" style="display:inline-block;padding:6px 10px;background:#f3f4f6;border:1px solid #e5e7eb;border-radius:9999px;color:#111827;text-decoration:none">🚀 Next Sundai Hack(s)</a>
-          <a href="#community-news" style="display:inline-block;padding:6px 10px;background:#f3f4f6;border:1px solid #e5e7eb;border-radius:9999px;color:#111827;text-decoration:none">📣 Community News</a>
-          <a href="#ai-news" style="display:inline-block;padding:6px 10px;background:#f3f4f6;border:1px solid #e5e7eb;border-radius:9999px;color:#111827;text-decoration:none">🧠 Weekly AI News</a>
-          <a href="#best-projects" style="display:inline-block;padding:6px 10px;background:#f3f4f6;border:1px solid #e5e7eb;border-radius:9999px;color:#111827;text-decoration:none">🏆 Best Hacks from last Sundai</a>
+        <p style="margin:0 0 8px;color:#374151">This weekly brief includes:</p>
+        <div style="margin:0;display:flex;flex-wrap:wrap;gap:12px">
+          <a href="#next-hack" style="display:inline-block;padding:0;color:#111827;text-decoration:underline;border-radius:0">Next Sundai Hack(s)</a>
+          <span style="color:#9ca3af">|</span>
+          <a href="#community-news" style="display:inline-block;padding:0;color:#111827;text-decoration:underline;border-radius:0">Community News</a>
+          <span style="color:#9ca3af">|</span>
+          <a href="#ai-news" style="display:inline-block;padding:0;color:#111827;text-decoration:underline;border-radius:0">Weekly AI News</a>
+          <span style="color:#9ca3af">|</span>
+          <a href="#best-projects" style="display:inline-block;padding:0;color:#111827;text-decoration:underline;border-radius:0">Best Hacks</a>
         </div>
       </section>`;
 
     const nextHack = `
       <section id="next-hack" style="padding:20px 16px;border-bottom:1px solid #e5e7eb">
         <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">
-          <img src="https://www.sundai.club/icon.svg" alt="Sundai" width="28" height="28" style="display:inline-block;border-radius:6px;border:1px solid #e5e7eb" />
+          <img src="https://www.sundai.club/icon.svg" alt="Sundai" width="28" height="28" style="display:inline-block;border-radius:0;border:1px solid #e5e7eb" />
           <strong style="font-size:16px;color:#111827">Next Sundai Hack · Oct 5</strong>
         </div>
         <h2 style="margin:0 0 6px;font-size:18px;line-height:26px;color:#111827">Sundai Research Hack w/ MIT CSAIL's Yoon Kim</h2>
@@ -111,14 +113,14 @@ export default function NewsClient() {
           <li>Adaptive quantization in training</li>
         </ul>
         <div style="margin-top:12px">
-          <a href="https://partiful.com/e/C3mnrNSv8YGnZefXcL0D" style="display:inline-block;padding:10px 14px;background:#2563eb;color:#ffffff;text-decoration:none;border-radius:8px">RSVP on Partiful</a>
+          <a href="https://partiful.com/e/C3mnrNSv8YGnZefXcL0D" style="display:inline-block;padding:10px 14px;background:#111827;color:#ffffff;text-decoration:none;border-radius:0;border:1px solid #111827">RSVP on Partiful</a>
         </div>
       </section>`;
 
     const hackerCombinator = `
       <section id="hc-event" style="padding:20px 16px;border-bottom:1px solid #e5e7eb">
         <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">
-          <img src="https://www.sundai.club/icon.svg" alt="Sundai" width="28" height="28" style="display:inline-block;border-radius:6px;border:1px solid #e5e7eb" />
+          <img src="https://www.sundai.club/icon.svg" alt="Sundai" width="28" height="28" style="display:inline-block;border-radius:0;border:1px solid #e5e7eb" />
           <strong style="font-size:16px;color:#111827">Apply to Hacker Combinator v2 by Oct 12th </strong>
         </div>
         <p style="margin:6px 0 0;color:#374151">Oct 26 - Nov 7</p>
@@ -130,38 +132,38 @@ export default function NewsClient() {
         </ul>
         <p style="margin:10px 0 0;color:#6b7280">Sessions: Oct 26, Nov 2, 9 (10am–7pm). YC deadline: Mon Nov 10.</p>
         <div style="margin-top:10px">
-          <a href="https://partiful.com/e/3uGkKaX39S0PtOFW7DP9" style="display:inline-block;padding:10px 14px;background:#16a34a;color:#ffffff;text-decoration:none;border-radius:8px">RSVP on Partiful</a>
+          <a href="https://partiful.com/e/3uGkKaX39S0PtOFW7DP9" style="display:inline-block;padding:10px 14px;background:#111827;color:#ffffff;text-decoration:none;border-radius:0;border:1px solid #111827">RSVP on Partiful</a>
         </div>
       </section>`;
 
     const communityNews = `
       <section id="community-news" style="padding:20px 16px;border-bottom:1px solid #e5e7eb">
-        <h2 style="margin:0 0 8px;font-size:18px;line-height:26px;color:#111827;display:flex;align-items:center;gap:8px"><span style="display:inline-block;width:20px;height:20px;border-radius:6px;background:#f3f4f6;border:1px solid #e5e7eb;text-align:center;line-height:20px;font-size:12px">📣</span> Community News</h2>
+        <h2 style="margin:0 0 8px;font-size:18px;line-height:26px;color:#111827">Community News</h2>
         <p style="margin:0;color:#374151">Here we will be sharing the main updates in the Sundai community. Not much this week. Artem reworked this emails, and Serge sent it. From now on you'll get a tighter, more structured updates: next hack, community notes, last week’s AI news TL;DR, and the best projects. Hit reply with feedback — we build in public.</p>
       </section>`;
 
     const fallbackAiNews = `
         <ul style="margin:8px 0 0 18px;color:#374151;padding:0">
           <li>GLM Coding plan is 10% off if you use the Vector Lab signup code</li>
-          <li>OpenAI releases Chat with Apps, Agentkit, and a bunch of other stuff at Dev Day</li>
+          <li>OpenAI releases Chat with Apps, Agentkit, and more at Dev Day</li>
           <li>Qwen3 VL gets a small variant</li>
           <li>Can you give an LLM a gambling addiction</li>
-          <li>And more in this week's news!</li>
+          <li>And more in this week's news</li>
         </ul>
         <p style="margin:10px 0 0;color:#374151">Shoutout to Andrew for leading Sundai News.</p>
         <p style="margin:6px 0 0;color:#374151">Audio version available <a href="https://open.spotify.com/show/7LKYxvGAGSj1pso4aklh9O" style="color:#111827;text-decoration:underline">on Spotify</a>. Join the <a href="https://discord.gg/HrNXgwpVzd" style="color:#111827;text-decoration:underline">Discord</a>. Read the <a href="https://vectorlab.dev/weekly-10-6-to-10-12" style="color:#111827;text-decoration:underline">full article on the VectorLab website</a>.</p>`;
 
     const newsTLDR = `
       <section id="ai-news" style="padding:20px 16px;border-bottom:1px solid #e5e7eb">
-        <h2 style="margin:0 0 8px;font-size:18px;line-height:26px;color:#111827;display:flex;align-items:center;gap:8px"><span style="display:inline-block;width:20px;height:20px;border-radius:6px;background:#f3f4f6;border:1px solid #e5e7eb;text-align:center;line-height:20px;font-size:12px">🧠</span> Weekly AI News · TL;DR</h2>
+        <h2 style="margin:0 0 8px;font-size:18px;line-height:26px;color:#111827">Weekly AI News · TL;DR</h2>
         ${aiNewsHtml && aiNewsHtml.trim().length > 0 ? aiNewsHtml : fallbackAiNews}
       </section>`;
 
     const projectsBlock = `
       <section id="best-projects" style="padding:20px 16px;border-bottom:1px solid #e5e7eb">
-        <h2 style="margin:0 0 6px;font-size:18px;line-height:26px;color:#111827;display:flex;align-items:center;gap:8px"><span style="display:inline-block;width:20px;height:20px;border-radius:6px;background:#f3f4f6;border:1px solid #e5e7eb;text-align:center;line-height:20px;font-size:12px">🏆</span> Check out the best hacks of the last week</h2>
-        <p style="margin:0 6px 6px 0;color:#374151">Voted by your likes — show some love, and help great hacks trend.</p>
-        ${projectsItems || `<p style="margin:0;color:#6b7280">No projects this week.</p>`}
+        <h2 style="margin:0 0 6px;font-size:18px;line-height:26px;color:#111827">Best hacks of last week</h2>
+        <p style="margin:0 6px 6px 0;color:#374151">Voted by your likes — help great hacks trend.</p>
+        ${projectsItems || `<p style=\"margin:0;color:#6b7280\">No projects this week.</p>`}
       </section>`;
 
     return `<!doctype html>
@@ -171,8 +173,8 @@ export default function NewsClient() {
         <meta charSet="utf-8" />
         <title>Sundai Weekly</title>
         <style>
-          body { font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif; margin:0; background:#f9fafb; }
-          .container { max-width: 740px; margin: 0 auto; background:#ffffff; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+          body { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; margin:0; background:#ffffff; }
+          .container { max-width: 740px; margin: 0 auto; background:#ffffff; border: 1px solid #e5e7eb; }
           .header { padding: 20px 16px; border-bottom: 1px solid #e5e7eb; display:flex; align-items:center; gap:12px; }
           .footer { padding: 20px 16px; border-top: 1px solid #e5e7eb; color: #6b7280; font-size: 14px; }
         </style>
