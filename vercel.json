@@ -1,5 +1,11 @@
 {
   "functions": {
+    "src/app/api/projects/[projectId]/share/route.ts": {
+      "maxDuration": 60
+    },
+    "src/app/api/news/generate/route.ts": {
+      "maxDuration": 60
+    },
     "src/app/api/projects/[projectId]/generate-images/route.ts": {
       "maxDuration": 60
     }
