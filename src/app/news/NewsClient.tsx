@@ -1,7 +1,9 @@
 "use client";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
+import { toast } from "react-hot-toast";
 import { useTheme } from "../contexts/ThemeContext";
 import { useUserContext } from "../contexts/UserContext";
+import { markdownToHtml } from "@/lib/markdownToHtml";
 
 type WeeklyTopProject = {
   id: string;
@@ -18,9 +20,11 @@ type WeeklyTopProject = {
 export default function NewsClient() {
   const { isDarkMode } = useTheme();
   const { isAdmin } = useUserContext();
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [topProjects, setTopProjects] = useState<WeeklyTopProject[]>([]);
   const [copiedEmail, setCopiedEmail] = useState(false);
+  const [instruction, setInstruction] = useState("");
+  const [generatedHtml, setGeneratedHtml] = useState<string>("");
 
   // Compute Sundai Week number since January 14, 2024
   const weekNumber = useMemo(() => {
@@ -31,19 +35,10 @@ export default function NewsClient() {
     return weeks > 0 ? weeks : 1;
   }, []);
 
-  useEffect(() => {
-    async function load() {
-      try {
-        const resp = await fetch("/api/news/weekly");
-        const data = await resp.json();
-        setTopProjects(data.topProjects || []);
-      } catch (e) {
-        console.error("Failed to load weekly news", e);
-      } finally {
-        setLoading(false);
-      }
-    }
-    load();
+  const loadTopProjects = useCallback(async () => {
+    const resp = await fetch("/api/news/weekly");
+    const data = await resp.json();
+    return (data.topProjects || []) as WeeklyTopProject[];
   }, []);
 
   const linkedinPost = useMemo(() => {
@@ -62,8 +57,8 @@ export default function NewsClient() {
     return lines.join("\n");
   }, [topProjects]);
 
-  const emailHtml = useMemo(() => {
-    const projectsItems = topProjects.map((p, idx) => {
+  const buildEmailHtml = useCallback((projects: WeeklyTopProject[], aiNewsHtml?: string) => {
+    const projectsItems = projects.map((p, idx) => {
       const likeUrl = `${p.projectUrl}?like=1`;
       const people = [
         { id: p.launchLead.id, name: p.launchLead.name },
@@ -145,20 +140,21 @@ export default function NewsClient() {
         <p style="margin:0;color:#374151">Here we will be sharing the main updates in the Sundai community. Not much this week. Artem reworked this emails, and Serge sent it. From now on you'll get a tighter, more structured updates: next hack, community notes, last week’s AI news TL;DR, and the best projects. Hit reply with feedback — we build in public.</p>
       </section>`;
 
+    const fallbackAiNews = `
+        <ul style="margin:8px 0 0 18px;color:#374151;padding:0">
+          <li>GLM Coding plan is 10% off if you use the Vector Lab signup code</li>
+          <li>OpenAI releases Chat with Apps, Agentkit, and a bunch of other stuff at Dev Day</li>
+          <li>Qwen3 VL gets a small variant</li>
+          <li>Can you give an LLM a gambling addiction</li>
+          <li>And more in this week's news!</li>
+        </ul>
+        <p style="margin:10px 0 0;color:#374151">Shoutout to Andrew for leading Sundai News.</p>
+        <p style="margin:6px 0 0;color:#374151">Audio version available <a href="https://open.spotify.com/show/7LKYxvGAGSj1pso4aklh9O" style="color:#111827;text-decoration:underline">on Spotify</a>. Join the <a href="https://discord.gg/HrNXgwpVzd" style="color:#111827;text-decoration:underline">Discord</a>. Read the <a href="https://vectorlab.dev/weekly-10-6-to-10-12" style="color:#111827;text-decoration:underline">full article on the VectorLab website</a>.</p>`;
+
     const newsTLDR = `
       <section id="ai-news" style="padding:20px 16px;border-bottom:1px solid #e5e7eb">
         <h2 style="margin:0 0 8px;font-size:18px;line-height:26px;color:#111827;display:flex;align-items:center;gap:8px"><span style="display:inline-block;width:20px;height:20px;border-radius:6px;background:#f3f4f6;border:1px solid #e5e7eb;text-align:center;line-height:20px;font-size:12px">🧠</span> Weekly AI News · TL;DR</h2>
-        <ul style="margin:8px 0 0 18px;color:#374151;padding:0">
-          <li>Veo3 is free for YouTube Shorts creators</li>
-          <li>OpenAI updates Codex; new GPT-5-Codex for agents</li>
-          <li>Wan 2.2 Animate leads open video character animation</li>
-          <li>Tongyi DeepResearch (Qwen) fine-tune for deep research</li>
-          <li>Moondream 3 Preview, Isaac 0.1 advance vision reasoning</li>
-        </ul>
-        <p style="margin:10px 0 0;color:#374151">Shoutout to Andrew for leading Sundai News and hitting the trending board with it. Audio version available on Spotify; Discord coming soon.</p>
-        <div style="margin-top:8px">
-          <a href="https://velab.dev/news/weekly-9-15-to-9-21/" style="display:inline-block;padding:8px 12px;background:#111827;color:#ffffff;text-decoration:none;border-radius:6px">Read full update</a>
-        </div>
+        ${aiNewsHtml && aiNewsHtml.trim().length > 0 ? aiNewsHtml : fallbackAiNews}
       </section>`;
 
     const projectsBlock = `
@@ -199,7 +195,84 @@ export default function NewsClient() {
         </div>
       </body>
     </html>`;
-  }, [topProjects, weekNumber]);
+  }, [weekNumber]);
+
+  const extractBodyInnerHtml = (fullHtml: string) => {
+    const match = fullHtml.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+    return match ? match[1] : fullHtml;
+  };
+
+  const rebuildHtmlWithBody = (fullHtml: string, newBodyInner: string) => {
+    if (!fullHtml.includes('<body')) {
+      return fullHtml;
+    }
+    return fullHtml.replace(/<body[^>]*>[\s\S]*?<\/body>/i, `<body>\n${newBodyInner}\n</body>`);
+  };
+
+  const handleGenerate = useCallback(async () => {
+    setLoading(true);
+    try {
+      const freshTop = await loadTopProjects();
+      setTopProjects(freshTop);
+      // Fetch TLDR markdown from VectorLab and convert to HTML
+      let aiNewsHtml: string | undefined = undefined;
+      try {
+        const tldrResp = await fetch('https://vectorlab.dev/api/tldr', { cache: 'no-store' });
+        if (tldrResp.ok) {
+          const tldrText = await tldrResp.text();
+          aiNewsHtml = markdownToHtml(tldrText || '');
+        }
+      } catch (e) {
+        // Silent fallback to built-in TLDR
+      }
+
+      let built = buildEmailHtml(freshTop, aiNewsHtml);
+      if (instruction.trim().length > 0) {
+        const bodyInner = extractBodyInnerHtml(built);
+        const resp = await fetch('/api/news/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Accept': 'text/plain' },
+          body: JSON.stringify({ htmlBody: bodyInner, instruction }),
+        });
+        if (!resp.ok) {
+          toast.error('Generation failed. Please try again.');
+        }
+        // Try streaming first
+        const contentType = (resp as any).headers && typeof (resp as any).headers.get === 'function'
+          ? ((resp as any).headers.get('Content-Type') || '')
+          : '';
+        if ((resp as any).body && typeof (resp as any).body.getReader === 'function' && contentType.includes('text/plain')) {
+          const reader = (resp as any).body.getReader();
+          const decoder = new TextDecoder();
+          let accum = '';
+          // Set initial HTML while streaming starts
+          setGeneratedHtml(rebuildHtmlWithBody(built, accum));
+          while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            accum += decoder.decode(value, { stream: true });
+            setGeneratedHtml(rebuildHtmlWithBody(built, accum));
+          }
+          // Ensure final decode flush
+          accum += decoder.decode();
+          built = rebuildHtmlWithBody(built, accum || bodyInner);
+        } else {
+          const data = await resp.json().catch(() => ({}));
+          if (data && data.error) {
+            toast.error(String(data.error));
+          }
+          const updatedInner = (data && data.htmlBody) || bodyInner;
+          built = rebuildHtmlWithBody(built, updatedInner);
+        }
+      }
+      setGeneratedHtml(built);
+    } catch (e) {
+      console.error('Failed to generate weekly email', e);
+      toast.error('Failed to generate weekly email');
+    } finally {
+      setLoading(false);
+    }
+  }, [buildEmailHtml, instruction, loadTopProjects]);
 
   // Page is public; no admin gate
 
@@ -207,24 +280,28 @@ export default function NewsClient() {
     <div className={`${isDarkMode ? "bg-gray-900 text-gray-100" : "bg-white text-gray-900"} font-space-mono min-h-screen`}>
       <div className="max-w-5xl mx-auto px-4 py-10">
         <h1 className="text-3xl font-bold mb-6">Weekly News</h1>
-        {loading ? (
-          <div role="status" aria-live="polite">Loading weekly highlights…</div>
-        ) : (
-          <div className="grid grid-cols-1 gap-6">
-            
-            <section>
-              <h2 className="text-xl font-semibold mb-2">Email HTML</h2>
-              <textarea
-                readOnly
-                className={`w-full h-96 p-3 border rounded font-mono text-xs ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}
-                value={emailHtml}
-              />
-              <div className="mt-2">
+        <div className="grid grid-cols-1 gap-6">
+          <section>
+            <label htmlFor="instruction" className="block text-sm font-medium mb-2">Optional instruction to modify the email</label>
+            <textarea
+              id="instruction"
+              placeholder="e.g., Add a section announcing next week's speaker, adjust wording to be more concise"
+              className={`w-full h-24 p-3 border rounded text-sm ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}
+              value={instruction}
+              onChange={(e) => setInstruction(e.target.value)}
+            />
+            <div className="mt-3 flex items-center gap-3">
+              <button
+                className="px-3 py-2 rounded bg-indigo-600 text-white disabled:opacity-50"
+                onClick={handleGenerate}
+                disabled={loading}
+              >{loading ? 'Generating…' : 'Generate'}</button>
+              {generatedHtml && (
                 <button
-                  className="px-3 py-2 rounded bg-indigo-600 text-white"
+                  className="px-3 py-2 rounded bg-gray-900 text-white"
                   onClick={async () => {
                     try {
-                      await navigator.clipboard.writeText(emailHtml);
+                      await navigator.clipboard.writeText(generatedHtml);
                       setCopiedEmail(true);
                       setTimeout(() => setCopiedEmail(false), 1500);
                     } catch (e) {
@@ -233,10 +310,38 @@ export default function NewsClient() {
                   }}
                   aria-live="polite"
                 >{copiedEmail ? 'Copied!' : 'Copy Email HTML'}</button>
+              )}
+            </div>
+          </section>
+
+          {loading && (
+            <div role="status" aria-live="polite">Loading weekly highlights…</div>
+          )}
+
+          {generatedHtml && (
+            <section>
+              <h2 className="text-xl font-semibold mb-2">Email HTML</h2>
+              <textarea
+                readOnly
+                className={`w-full h-96 p-3 border rounded font-mono text-xs ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}
+                value={generatedHtml}
+              />
+            </section>
+          )}
+
+          {generatedHtml && (
+            <section>
+              <h2 className="text-xl font-semibold mb-2">Preview</h2>
+              <div className={`w-full border rounded ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+                <iframe
+                  title="Email Preview"
+                  className="w-full h-[540px] bg-white"
+                  srcDoc={generatedHtml}
+                />
               </div>
             </section>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );

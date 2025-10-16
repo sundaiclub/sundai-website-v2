@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import Replicate from "replicate";
 import prisma from "@/lib/prisma";
+import { GoogleGenAI } from "@google/genai";
 
 const replicate = new Replicate({
   auth: process.env.REPLICATE_API_TOKEN,
@@ -71,32 +72,12 @@ Requirements for variation ${variation}:
 
 Generate only the new prompt text, no explanations.`;
 
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          contents: [{
-            parts: [{
-              text: variationPrompt
-            }]
-          }],
-          generationConfig: {
-            temperature: 0.9,
-            topK: 40,
-            topP: 0.95,
-            maxOutputTokens: 512,
-          }
-        })
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY });
+      const resp: any = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: variationPrompt
       });
-
-      if (!response.ok) {
-        throw new Error(`Gemini API error: ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      const generatedVariation = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      const generatedVariation = (resp && (resp.text as any)) || '';
       
       if (!generatedVariation) {
         throw new Error('No prompt variation generated from Gemini API');

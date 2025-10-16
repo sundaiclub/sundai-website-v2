@@ -1,5 +1,6 @@
 "use client";
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
+import toast from 'react-hot-toast';
 import { XMarkIcon, ShareIcon } from "@heroicons/react/24/outline";
 import { Project } from "./Project";
 
@@ -33,6 +34,7 @@ export default function ShareModal({ showModal, setShowModal, project, userInfo,
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Accept': 'text/plain',
         },
         body: JSON.stringify({
           platform: selectedPlatform,
@@ -40,14 +42,79 @@ export default function ShareModal({ showModal, setShowModal, project, userInfo,
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to generate content: ${response.statusText}`);
+        // Explicit handling for unauthorized
+        if ((response as any).status === 401) {
+          toast.error('Please sign in to generate shareable content.');
+          return; // Do not fallback when unauthorized
+        }
+        // Log server-provided error text if available
+        let errorText = response.statusText;
+        try {
+          errorText = await response.text();
+        } catch (_) {
+          // ignore
+        }
+        throw new Error(`Failed to generate content: ${errorText || response.statusText}`);
       }
 
-      const data = await response.json();
-      setGeneratedContent(data.content);
-      setCustomContent(data.content);
+      const contentType = (response as any).headers && typeof (response as any).headers.get === 'function'
+        ? ((response as any).headers.get('Content-Type') || '')
+        : '';
+
+      // Helper: letter-by-letter animation from a queued buffer
+      const pendingRef = { current: '' } as React.MutableRefObject<string>;
+      const animatingRef = { current: false } as React.MutableRefObject<boolean>;
+      const rafRef = { current: 0 } as React.MutableRefObject<any>;
+      const appendFrame = () => {
+        if (pendingRef.current.length === 0) {
+          animatingRef.current = false;
+          return;
+        }
+        animatingRef.current = true;
+        // Append a few characters per frame for smoothness
+        const chunk = pendingRef.current.slice(0, 3);
+        pendingRef.current = pendingRef.current.slice(3);
+        setGeneratedContent(prev => (prev || '') + chunk);
+        setCustomContent(prev => (prev || '') + chunk);
+        rafRef.current = typeof requestAnimationFrame !== 'undefined'
+          ? requestAnimationFrame(appendFrame)
+          : setTimeout(appendFrame, 16);
+      };
+      const enqueueText = (text: string) => {
+        if (!text) return;
+        pendingRef.current += text;
+        if (!animatingRef.current) {
+          appendFrame();
+        }
+      };
+
+      if ((response as any).body && typeof (response as any).body.getReader === 'function' && contentType.includes('text/plain')) {
+        const reader = (response as any).body.getReader();
+        const decoder = new TextDecoder();
+        let finalAll = '';
+        setGeneratedContent('');
+        setCustomContent('');
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          const txt = decoder.decode(value, { stream: true });
+          finalAll += txt;
+          enqueueText(txt);
+        }
+        // flush any remaining decoder buffer
+        const tail = decoder.decode();
+        if (tail) {
+          finalAll += tail;
+          enqueueText(tail);
+        }
+      } else {
+        const data = await response.json();
+        setGeneratedContent(data.content);
+        setCustomContent(data.content);
+      }
     } catch (error) {
       console.error('Error generating content:', error);
+      toast.error('Failed to generate content. Showing a basic template instead.');
       
       // Fallback to basic template on error
       const teamNames = [

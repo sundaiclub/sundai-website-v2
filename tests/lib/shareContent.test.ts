@@ -1,7 +1,17 @@
-import { generateShareContent } from '../../src/lib/shareContent';
+// Mock @google/genai SDK
+const generateContentMock = jest.fn();
+jest.mock('@google/genai', () => {
+  return {
+    __esModule: true,
+    GoogleGenAI: jest.fn().mockImplementation(() => ({
+      models: {
+        generateContent: generateContentMock,
+      },
+    })),
+  };
+}, { virtual: true });
 
-// Mock fetch
-global.fetch = jest.fn();
+import { generateShareContent } from '../../src/lib/shareContent';
 
 // Mock the Project type
 const mockProject = {
@@ -37,29 +47,16 @@ describe('ShareContent', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     process.env.GEMINI_API_KEY = 'test-api-key';
+    // Reset default behavior
+    generateContentMock.mockReset();
   });
 
 
   describe('generateShareContent', () => {
     it('should generate content using Gemini API successfully', async () => {
-      const mockResponse = {
-        candidates: [
-          {
-            content: {
-              parts: [
-                {
-                  text: '🚀 We just built Amazing Project! Check out this incredible innovation #TechInnovation #Sundai'
-                }
-              ]
-            }
-          }
-        ]
-      };
-
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
-        ok: true,
-        json: jest.fn().mockResolvedValue(mockResponse),
-      });
+    generateContentMock.mockResolvedValueOnce({
+      text: '🚀 We just built Amazing Project! Check out this incredible innovation #TechInnovation #Sundai',
+    });
 
       const result = await generateShareContent({
         project: mockProject,
@@ -74,23 +71,16 @@ describe('ShareContent', () => {
         characterCount: 94,
       });
 
-      expect(global.fetch).toHaveBeenCalledWith(
-        'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=test-api-key',
-        expect.objectContaining({
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: expect.stringContaining('Amazing Project'),
-        })
-      );
+    expect(generateContentMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        model: 'gemini-2.5-flash',
+        contents: expect.stringContaining('Amazing Project'),
+      })
+    );
     });
 
     it('should fallback to template content when API fails', async () => {
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
-        ok: false,
-        statusText: 'API Error',
-      });
+    generateContentMock.mockRejectedValueOnce(new Error('API Error'));
 
       const result = await generateShareContent({
         project: mockProject,
@@ -105,24 +95,7 @@ describe('ShareContent', () => {
     });
 
     it('should fallback when API returns no content', async () => {
-      const mockResponse = {
-        candidates: [
-          {
-            content: {
-              parts: [
-                {
-                  text: ''
-                }
-              ]
-            }
-          }
-        ]
-      };
-
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
-        ok: true,
-        json: jest.fn().mockResolvedValue(mockResponse),
-      });
+    generateContentMock.mockResolvedValueOnce({ text: '' });
 
       const result = await generateShareContent({
         project: mockProject,
@@ -135,10 +108,7 @@ describe('ShareContent', () => {
     });
 
     it('should generate LinkedIn content with professional tone', async () => {
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
-        ok: false,
-        statusText: 'API Error',
-      });
+    generateContentMock.mockRejectedValueOnce(new Error('API Error'));
 
       const result = await generateShareContent({
         project: mockProject,
@@ -153,10 +123,7 @@ describe('ShareContent', () => {
     });
 
     it('should generate Reddit content without hashtags', async () => {
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
-        ok: false,
-        statusText: 'API Error',
-      });
+    generateContentMock.mockRejectedValueOnce(new Error('API Error'));
 
       const result = await generateShareContent({
         project: mockProject,
