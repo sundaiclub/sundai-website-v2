@@ -24,5 +24,3 @@ const NewsClient = dynamic(() => import("./NewsClient"), { ssr: false });
 export default function NewsPage() {
   return <NewsClient />;
 }
-
-

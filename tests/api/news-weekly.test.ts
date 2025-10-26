@@ -18,7 +18,7 @@ describe('/api/news/weekly', () => {
     process.env.IS_RESEARCH_SITE = 'false'
   })
 
-  it('returns top projects in the last 7 days sorted by likes', async () => {
+  it('returns top projects trending in the last 14 days (time-decayed likes)', async () => {
     const now = new Date()
     const makeProject = (id: string, likes: number, createdAtOffsetDays: number) => ({
       id,
@@ -47,8 +47,9 @@ describe('/api/news/weekly', () => {
     expect(res.status).toBe(200)
     // With 4 mocks available, should cap at available <= 5
     expect(data.topProjects).toHaveLength(4)
-    expect(data.topProjects.map((p: any) => p.id)).toEqual(['b', 'd', 'a', 'c'])
-    expect(data.topProjects[0]).toMatchObject({ likeCount: 10 })
+    // Time decay with 1-day half-life equivalent puts newer likes higher
+    expect(data.topProjects.map((p: any) => p.id)).toEqual(['a', 'b', 'd', 'c'])
+    expect(data.topProjects[0]).toMatchObject({ likeCount: 5 })
   })
 
   it('handles db errors', async () => {

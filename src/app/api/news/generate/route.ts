@@ -91,7 +91,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ htmlBody: sanitizeReturn(bodyOnly) });
     }
 
-    const prompt = `You are given the inner HTML of an email <body>. Modify it according to the user instruction, keeping it as valid inline-styled HTML suitable for email clients. Do not add <html>, <head>, or <body> tags. Keep existing structure where possible and improve content as requested. Return only the modified inner HTML.
+    const prompt = `You are given the inner HTML of an email <body>. Modify it according to the user instruction, keeping it as valid inline-styled HTML suitable for email clients. Do not add <html>, <head>, or <body> tags. Keep existing structure where possible and improve content as requested. Return only the modified inner HTML. Try to keep the same outline and style as the original. Please remember that our events are called Hacks, not Hackathons.
 
 Instruction: ${instruction}
 

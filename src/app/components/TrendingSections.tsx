@@ -5,13 +5,11 @@ import Link from "next/link";
 import { useTheme } from "../contexts/ThemeContext";
 import ProjectGrid, { Project as ProjectType, ProjectCard } from "./Project";
 import { 
-  calculateThisWeekTrendingScore, 
-  calculateThisMonthTrendingScore, 
-  calculateBestOfAllTimeScore,
   getThisWeekProjects, 
   getThisMonthProjects, 
   getAllTimeProjects 
 } from "./ProjectSearch";
+import { calculateProjectScore } from '@/lib/trending';
 
 interface TrendingSectionsProps {
   projects: ProjectType[];
@@ -54,15 +52,15 @@ export default function TrendingSections({ projects, userInfo, handleLike, isDar
 
   // Sort by appropriate trending score for each category
   const sortByThisWeekTrending = (a: ProjectType, b: ProjectType) => {
-    return calculateThisWeekTrendingScore(b) - calculateThisWeekTrendingScore(a);
+    return calculateProjectScore(b, { timeDecayDays: 1 }) - calculateProjectScore(a, { timeDecayDays: 1 });
   };
 
   const sortByThisMonthTrending = (a: ProjectType, b: ProjectType) => {
-    return calculateThisMonthTrendingScore(b) - calculateThisMonthTrendingScore(a);
+    return calculateProjectScore(b, { timeDecayDays: 20 }) - calculateProjectScore(a, { timeDecayDays: 20 });
   };
 
   const sortByBestOfAllTime = (a: ProjectType, b: ProjectType) => {
-    return calculateBestOfAllTimeScore(b) - calculateBestOfAllTimeScore(a);
+    return calculateProjectScore(b, { timeDecayDays: undefined }) - calculateProjectScore(a, { timeDecayDays: undefined });
   };
 
   // Always show 5 projects, but if not enough in this week, fill with recent projects
