@@ -87,12 +87,11 @@ prisma.hacker.create({
 }),
 ```
 
-if you already ran prisma beforehand plaese do the following, otherwise skip this step
+If you already ran migrations/seed beforehand, please do the following (otherwise skip this step):
 
 ```bash
 # Reset and reseed the database with your profile included
-npx prisma migrate reset --force
-npx prisma db seed
+npm run db:reset
 ```
 
 **Now your profile should work!** Visit `/me` or click on your profile to see your hacker profile page.
@@ -131,16 +130,23 @@ NEXT_PUBLIC_POSTHOG_HOST="https://us.i.posthog.com"
 
 ```bash
 # Start PostgreSQL database container
-docker-compose up -d
+npm run db:up
 
-# Verify database is running
-docker-compose ps
+# Populate database (generate client, apply migrations, seed)
+npm run db:populate
 
-# Apply all database migrations
-npx prisma migrate deploy
+# Optionally verify database container
+docker compose ps postgres
+```
 
-# Seed database with sample data
-npx prisma db seed
+Common DB tasks during development:
+
+```bash
+# Create/apply a new migration from schema changes (interactive)
+npm run db:migrate
+
+# Reset DB and reseed (drops data!)
+npm run db:reset
 ```
 
 ### 5. Start Development Server
@@ -154,6 +160,7 @@ npm run dev
 ## 🧪 Testing
 
 This project includes comprehensive testing with Jest, React Testing Library, and automated pre-commit hooks.
+Tests mock Prisma (the database) and external services, so Postgres is not required to run tests locally.
 
 ### Quick Test Commands
 
@@ -240,9 +247,9 @@ cat .env.local  # Check if file exists and has DATABASE_URL
 #### "Database connection failed"
 ```bash
 # Solution: Ensure PostgreSQL container is running
-docker-compose ps
+docker compose ps
 # If not running:
-docker-compose up -d
+npm run db:up
 ```
 
 #### "Clerk authentication errors"
@@ -264,19 +271,20 @@ CLERK_ENCRYPTION_KEY="your_encryption_key_from_clerk_dashboard"
 
 ```bash
 # Database management
-docker-compose logs -f postgres    # View database logs
-docker-compose down               # Stop database
-docker-compose down -v            # Stop and remove database data
+npm run db:up                 # Start database
+npm run db:down               # Stop database
+docker compose logs -f postgres # View database logs
 
 # Database reset (careful!)
-docker-compose down -v
-docker-compose up -d
-npx prisma migrate deploy
-npx prisma db seed
+npm run db:reset
+npm run db:populate
 
 # Database backup/restore
 npm run db:backup
-npm run db:restore
+npm run db:restore ./.data/backups/<backup>.sql.gz
+
+# Note: backups use DATABASE_URL from your .env file.
+# Ensure .env contains a valid DATABASE_URL (same as in .env.local typically).
 
 # Development
 npm run dev          # Start development server

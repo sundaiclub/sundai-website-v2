@@ -1,3 +1,40 @@
+rules:
+  - name: keep-seed-and-tests-up-to-date
+    description: |
+      When introducing schema changes under `prisma/schema.prisma` or changing behaviors in `src/`, ensure:
+      1) `prisma/seed.ts` stays valid and covers new required fields/relations.
+      2) Add/update tests per repo rules in tests/** for changed behavior.
+      3) Update scripts to support local dev DB population.
+    on:
+      - path: "prisma/schema.prisma"
+      - path: "src/**"
+      - path: "src/app/**"
+      - path: "src/lib/**"
+    actions:
+      - check:
+          - file: "prisma/seed.ts"
+            ensure_exists: true
+      - suggest:
+          - run: "npm run db:populate"
+          - run: "npm test"
+  - name: ensure-sitemap-and-robots-updated
+    description: |
+      After adding/removing/moving routes under `src/app/**`, ensure sitemap/robots are regenerated.
+    on:
+      - path: "src/app/**"
+    actions:
+      - suggest:
+          - run: "npm run build" # triggers next-sitemap via postbuild
+  - name: backup-and-restore-guidance
+    description: |
+      Provide guidance to use db scripts for local dev.
+    actions:
+      - message: |
+          Use:
+          - `npm run db:up` to start Postgres
+          - `npm run db:populate` to apply migrations and seed
+          - `npm run db:backup` and `npm run db:restore <file>` to manage snapshots
+
 On every change in this repository, keep tests and SEO assets up to date. Follow these rules strictly.
 
 ### Testing rules
