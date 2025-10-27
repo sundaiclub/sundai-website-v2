@@ -85,10 +85,26 @@ export default function PitchEventPage() {
     const my = await fetch("/api/projects?status=APPROVED");
     const all = await my.json();
     const mine = all.filter((p: Project) => p.launchLead.id === userInfo.id || p.participants.some(pt => pt.hacker.id === userInfo.id));
-    setMyProjects(mine);
-    setSelectedProjectId(mine[0]?.id || "");
+    // Sort most recent first by startDate
+    const sorted = [...mine].sort((a,b) => {
+      const da = new Date((a as any).startDate).getTime();
+      const db = new Date((b as any).startDate).getTime();
+      return isNaN(db) || isNaN(da) ? 0 : db - da;
+    });
+    setMyProjects(sorted);
+    setSelectedProjectId(sorted[0]?.id || "");
     setShowJoin(true);
   };
+
+  const filteredMyProjects = useMemo(() => {
+    const q = searchTerm.trim().toLowerCase();
+    const base = myProjects;
+    if (!q) return base;
+    return base.filter(p =>
+      p.title.toLowerCase().includes(q) ||
+      (p.preview || "").toLowerCase().includes(q)
+    );
+  }, [searchTerm, myProjects]);
 
   const confirmJoin = async () => {
     if (!selectedProjectId) return;
@@ -375,17 +391,31 @@ export default function PitchEventPage() {
           {myProjects.length === 0 ? (
             <div className="opacity-80">You have no projects to pitch.</div>
           ) : (
-            <div className="space-y-3">
-              {myProjects.map(p => (
-                <label key={p.id} className={`flex items-center gap-3 p-2 rounded-md ${isDarkMode ? 'bg-gray-800' : 'bg-gray-100'}`}>
-                  <input type="radio" name="proj" value={p.id} checked={selectedProjectId===p.id} onChange={()=>setSelectedProjectId(p.id)} />
-                  <div>
-                    <div className="font-medium">{p.title}</div>
-                    <div className="text-sm opacity-75">{p.preview}</div>
-                  </div>
-                </label>
-              ))}
-            </div>
+            <>
+              <div className="mb-3">
+                <input
+                  value={searchTerm}
+                  onChange={(e)=>setSearchTerm(e.target.value)}
+                  placeholder="Search your projects..."
+                  className={`w-full px-3 py-2 rounded-md ${isDarkMode ? 'bg-gray-800 text-gray-100' : 'bg-gray-100 text-gray-900'}`}
+                />
+              </div>
+              <div className="max-h-80 overflow-y-auto space-y-2 pr-1">
+                {filteredMyProjects.map(p => (
+                  <label key={p.id} className={`flex items-start gap-3 p-3 rounded-md border ${isDarkMode ? 'bg-gray-800 border-gray-700 hover:bg-gray-750' : 'bg-gray-50 border-gray-200 hover:bg-gray-100'}`}>
+                    <input type="radio" name="proj" value={p.id} checked={selectedProjectId===p.id} onChange={()=>setSelectedProjectId(p.id)} className="mt-1" />
+                    <div className="min-w-0">
+                      <div className="font-medium truncate" title={p.title}>{p.title}</div>
+                      <div className="text-xs opacity-70 truncate">{p.preview}</div>
+                      <div className="text-[10px] opacity-60 mt-1">Launched {new Date((p as any).startDate).toLocaleDateString()}</div>
+                    </div>
+                  </label>
+                ))}
+                {filteredMyProjects.length === 0 && (
+                  <div className="text-sm opacity-70">No results</div>
+                )}
+              </div>
+            </>
           )}
           <div className="mt-6 flex justify-end gap-3">
             <button onClick={()=>setShowJoin(false)} className={`${isDarkMode ? 'bg-gray-800 text-gray-200' : 'bg-gray-100 text-gray-800'} px-4 py-2 rounded-md`}>Cancel</button>
