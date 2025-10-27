@@ -21,6 +21,7 @@ export async function GET(req: Request) {
                 likes: { select: { hackerId: true, createdAt: true } },
               },
             },
+            // include scalar fields like addedById by default
           },
         },
       },
