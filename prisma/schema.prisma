@@ -43,6 +43,11 @@ model Hacker {
   totalMinutesAttended Int          @default(0)
   lastAttendance      DateTime?
 
+  // Event relations
+  createdEvents       Event[]
+  mcEvents            EventMC[]
+  addedEventProjects  EventProject[]
+
   @@index([clerkId])
 }
 
@@ -97,6 +102,8 @@ model Project {
 
   @@index([launchLeadId])
   attendance Attendance[]
+  // Pitch queue entries linking this project to events
+  eventEntries EventProject[]
 }
 
 model ProjectToParticipant {
@@ -253,4 +260,62 @@ enum NotificationType {
 enum HackType {
   REGULAR
   RESEARCH
+}
+
+// Events and Pitch Queue
+model Event {
+  id               String     @id @default(uuid())
+  title            String
+  description      String?
+  startTime        DateTime
+  meetingUrl       String?
+  location         String?
+  createdBy        Hacker     @relation(fields: [createdById], references: [id])
+  createdById      String
+  audienceCanReorder Boolean  @default(true)
+  projects         EventProject[]
+  mcs              EventMC[]
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+
+  @@index([startTime])
+}
+
+model EventMC {
+  id       String @id @default(uuid())
+  event    Event  @relation(fields: [eventId], references: [id])
+  eventId  String
+  hacker   Hacker @relation(fields: [hackerId], references: [id])
+  hackerId String
+  role     String?
+
+  @@unique([eventId, hackerId])
+  @@index([hackerId])
+}
+
+model EventProject {
+  id         String             @id @default(uuid())
+  event      Event              @relation(fields: [eventId], references: [id])
+  eventId    String
+  project    Project            @relation(fields: [projectId], references: [id])
+  projectId  String
+  addedBy    Hacker             @relation(fields: [addedById], references: [id])
+  addedById  String
+  position   Int                @default(0)
+  status     EventProjectStatus @default(QUEUED)
+  approved   Boolean            @default(false)
+  createdAt  DateTime           @default(now())
+  updatedAt  DateTime           @updatedAt
+
+  @@unique([eventId, projectId])
+  @@index([eventId, position])
+  @@index([status])
+}
+
+enum EventProjectStatus {
+  QUEUED
+  APPROVED
+  CURRENT
+  DONE
+  SKIPPED
 }

@@ -1,9 +1,12 @@
-const { PrismaClient, Role, ProjectStatus } = require("@prisma/client");
+const { PrismaClient, Role, ProjectStatus, EventProjectStatus } = require("@prisma/client");
 
 const prisma = new PrismaClient();
 
 async function main() {
   // Clean up existing data
+  await prisma.eventProject?.deleteMany?.({});
+  await prisma.eventMC?.deleteMany?.({});
+  await prisma.event?.deleteMany?.({});
   await prisma.attendance.deleteMany({});
   await prisma.projectToParticipant.deleteMany({});
   await prisma.projectLike.deleteMany({});
@@ -236,6 +239,43 @@ async function main() {
             name: tag,
           })),
         },
+      },
+    });
+  }
+
+  // Create a sample upcoming Event with MCs and a queue
+  const allProjects = await prisma.project.findMany({});
+  const start = new Date();
+  start.setMinutes(start.getMinutes() + 60); // starts in 60 minutes
+  const sampleEvent = await prisma.event.create({
+    data: {
+      title: "Sundai Weekly Pitch Night",
+      description: "Weekly demos and lightning pitches from the Sundai community.",
+      startTime: start,
+      meetingUrl: "https://zoom.us/j/1234567890",
+      location: "Hybrid",
+      createdById: users[0].id,
+      audienceCanReorder: true,
+      mcs: {
+        create: [
+          { hackerId: users[0].id, role: "Host" },
+          { hackerId: users[1].id, role: "Co-Host" },
+        ],
+      },
+    },
+  });
+
+  const queueProjects = allProjects.slice(0, Math.min(3, allProjects.length));
+  for (let i = 0; i < queueProjects.length; i++) {
+    const p = queueProjects[i];
+    await prisma.eventProject.create({
+      data: {
+        eventId: sampleEvent.id,
+        projectId: p.id,
+        addedById: p.launchLeadId,
+        position: i + 1,
+        status: EventProjectStatus.QUEUED,
+        approved: i === 0 ? true : false,
       },
     });
   }

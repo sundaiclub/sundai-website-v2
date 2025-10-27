@@ -71,7 +71,7 @@ export type Project = {
 
 const STATUS_OPTIONS = ['DRAFT', 'PENDING', 'APPROVED'] as const;
 
-export function ProjectCard({ project, userInfo, handleLike, isDarkMode, show_status, show_team = true, onStatusChange, onStarredChange, isAdmin, variant = "default", showTrendingBadge = false }: {
+export function ProjectCard({ project, userInfo, handleLike, isDarkMode, show_status, show_team = true, onStatusChange, onStarredChange, isAdmin, variant = "default", showTrendingBadge = false, openInNewTab = false }: {
   project: Project;
   userInfo: any;
   handleLike: (e: React.MouseEvent, projectId: string, isLiked: boolean) => void;
@@ -83,6 +83,7 @@ export function ProjectCard({ project, userInfo, handleLike, isDarkMode, show_st
   isAdmin?: boolean;
   variant?: "default" | "compact" | "trending";
   showTrendingBadge?: boolean;
+  openInNewTab?: boolean;
 }) {
   const AvatarImage = ({ src, alt, size }: { src: string | null; alt: string; size: number }) => {
     const [imgSrc, setImgSrc] = useState<string>(src || "/images/default_avatar.png");
@@ -181,7 +182,7 @@ export function ProjectCard({ project, userInfo, handleLike, isDarkMode, show_st
             </div>
           </button>
         </div>
-        <Link href={`/projects/${project.id}`}>
+        <Link href={`/projects/${project.id}`} target={openInNewTab ? "_blank" : undefined} rel={openInNewTab ? "noopener noreferrer" : undefined}>
           <Image
             src={
               project.thumbnail?.url ||
@@ -290,7 +291,7 @@ export function ProjectCard({ project, userInfo, handleLike, isDarkMode, show_st
       <div className={`${cardPaddingClass} flex-1 flex flex-col`}>
         <div className="flex justify-between items-start mb-4">
           <div>
-            <Link href={`/projects/${project.id}`}>
+            <Link href={`/projects/${project.id}`} target={openInNewTab ? "_blank" : undefined} rel={openInNewTab ? "noopener noreferrer" : undefined}>
               <h3
                 className={`${titleClass} line-clamp-1 ${
                   isDarkMode
@@ -336,7 +337,7 @@ export function ProjectCard({ project, userInfo, handleLike, isDarkMode, show_st
           </div>
         </div>
 
-        <Link href={`/projects/${project.id}`}>
+        <Link href={`/projects/${project.id}`} target={openInNewTab ? "_blank" : undefined} rel={openInNewTab ? "noopener noreferrer" : undefined}>
           <p
             className={`${previewClass} ${
               isDarkMode ? "text-gray-300" : "text-gray-600"
@@ -417,12 +418,13 @@ export function ProjectCard({ project, userInfo, handleLike, isDarkMode, show_st
             <div className="flex-1 text-right">
               <Link
                 href={`/projects/${project.id}`}
+                target={openInNewTab ? "_blank" : undefined}
+                rel={openInNewTab ? "noopener noreferrer" : undefined}
                 className={`${
                   isDarkMode
                     ? "text-gray-400 hover:text-gray-300"
                     : "text-gray-600 hover:text-gray-800"
                 } text-xs sm:text-sm font-medium`}
-                target="_blank"
               >
                 More Info →
               </Link>
