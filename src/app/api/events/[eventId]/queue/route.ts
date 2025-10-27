@@ -85,12 +85,32 @@ export async function PATCH(
     const event = await prisma.event.findUnique({ where: { id: params.eventId } });
     if (!event) return new NextResponse("Event not found", { status: 404 });
 
-    if (!(event.audienceCanReorder || hacker.role === "ADMIN")) {
-      return new NextResponse("Unauthorized", { status: 401 });
-    }
+    const isAdmin = hacker.role === "ADMIN";
+    const allowAll = event.audienceCanReorder || isAdmin;
 
     const { items } = await req.json();
     if (!Array.isArray(items)) return NextResponse.json({ message: "items array required" }, { status: 400 });
+
+    if (!allowAll) {
+      if (items.length === 0) {
+        return new NextResponse("Unauthorized", { status: 401 });
+      }
+      // Owners can only move their own items and not before the CURRENT item
+      const ids = items.map((it: { id: string }) => it.id);
+      const eps = await prisma.eventProject.findMany({
+        where: { id: { in: ids } },
+        select: { id: true, addedById: true, eventId: true },
+      });
+      if (eps.length !== ids.length) return new NextResponse("Not found", { status: 404 });
+      if (eps.some(ep => ep.eventId !== params.eventId)) return new NextResponse("Bad Request", { status: 400 });
+      if (eps.some(ep => ep.addedById !== hacker.id)) return new NextResponse("Unauthorized", { status: 401 });
+
+      const current = await prisma.eventProject.findFirst({ where: { eventId: params.eventId, status: 'CURRENT' }, select: { position: true } });
+      if (current) {
+        const invalid = items.some((it: { position: number }) => it.position <= current.position);
+        if (invalid) return new NextResponse("Cannot move before current", { status: 400 });
+      }
+    }
 
     const ops = items.map((it: { id: string; position: number }) =>
       prisma.eventProject.update({ where: { id: it.id }, data: { position: it.position } })
