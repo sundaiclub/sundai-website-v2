@@ -182,6 +182,15 @@ export default function PitchEventPage() {
     ]);
   };
 
+  const delistItem = async (eventProjectId: string) => {
+    if (!event) return;
+    const res = await fetch(`/api/events/${event.id}/queue/${eventProjectId}`, { method: 'DELETE' });
+    if (res.status === 204) {
+      const updated = await fetch(`/api/events/${event.id}`);
+      setEvent(await updated.json());
+    }
+  };
+
   // Likes
   const handleLike = async (
     e: React.MouseEvent,
@@ -351,6 +360,39 @@ export default function PitchEventPage() {
                                 className={`w-7 h-7 rounded-md text-xs ${canDown ? (isDarkMode ? 'bg-gray-700 text-gray-200 hover:bg-gray-600' : 'bg-gray-100 text-gray-800 hover:bg-gray-200') : 'bg-gray-200 text-gray-400 cursor-not-allowed'}`}
                                 aria-label="Move down"
                               >▼</button>
+                              <button
+                                onClick={() => delistItem(ep.id)}
+                                className={`w-7 h-7 rounded-md text-xs ${isDarkMode ? 'bg-red-600 text-white hover:bg-red-700' : 'bg-red-600 text-white hover:bg-red-700'}`}
+                                aria-label="Delist"
+                                title="Remove from queue"
+                              >✕</button>
+                            </div>
+                          )}
+                          {!isController && userInfo?.id === (ep as any).addedById && (
+                            <div className="flex items-center gap-1 mr-1">
+                              <button
+                                onClick={() => delistItem(ep.id)}
+                                className={`w-7 h-7 rounded-md text-xs ${isDarkMode ? 'bg-red-600 text-white hover:bg-red-700' : 'bg-red-600 text-white hover:bg-red-700'}`}
+                                aria-label="Delist"
+                                title="Remove from queue"
+                              >✕</button>
+                              {/* Owner can move own item within movable range */}
+                              {movable.has(ep.status) && (
+                                <>
+                                  <button
+                                    disabled={!canUp}
+                                    onClick={() => moveItem(ep.id, 'up')}
+                                    className={`w-7 h-7 rounded-md text-xs ${canUp ? (isDarkMode ? 'bg-gray-700 text-gray-200 hover:bg-gray-600' : 'bg-gray-100 text-gray-800 hover:bg-gray-200') : 'bg-gray-200 text-gray-400 cursor-not-allowed'}`}
+                                    aria-label="Move up"
+                                  >▲</button>
+                                  <button
+                                    disabled={!canDown}
+                                    onClick={() => moveItem(ep.id, 'down')}
+                                    className={`w-7 h-7 rounded-md text-xs ${canDown ? (isDarkMode ? 'bg-gray-700 text-gray-200 hover:bg-gray-600' : 'bg-gray-100 text-gray-800 hover:bg-gray-200') : 'bg-gray-200 text-gray-400 cursor-not-allowed'}`}
+                                    aria-label="Move down"
+                                  >▼</button>
+                                </>
+                              )}
                             </div>
                           )}
                           <button
