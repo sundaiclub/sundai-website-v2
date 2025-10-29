@@ -3,7 +3,7 @@ import React, { useCallback, useMemo, useState } from "react";
 import { toast } from "react-hot-toast";
 import { useTheme } from "../contexts/ThemeContext";
 import { useUserContext } from "../contexts/UserContext";
-import { markdownToHtml } from "@/lib/markdownToHtml";
+ 
 
 type WeeklyTopProject = {
   id: string;
@@ -90,7 +90,9 @@ export default function NewsClient() {
         <div style="margin:0;display:flex;flex-wrap:wrap;gap:12px">
           <a href="#next-hack" style="display:inline-block;padding:0;color:#111827;text-decoration:underline;border-radius:0">Next Sundai Hack(s)</a>
           <span style="color:#9ca3af">|</span>
-          <a href="#community-news" style="display:inline-block;padding:0;color:#111827;text-decoration:underline;border-radius:0">Community News</a>
+          <a href="#tools-club" style="display:inline-block;padding:0;color:#111827;text-decoration:underline;border-radius:0">AI Tools Club</a>
+          <span style="color:#9ca3af">|</span>
+          <a href="#community" style="display:inline-block;padding:0;color:#111827;text-decoration:underline;border-radius:0">Community</a>
           <span style="color:#9ca3af">|</span>
           <a href="#ai-news" style="display:inline-block;padding:0;color:#111827;text-decoration:underline;border-radius:0">Weekly AI News</a>
           <span style="color:#9ca3af">|</span>
@@ -117,29 +119,34 @@ export default function NewsClient() {
         </div>
       </section>`;
 
-    const hackerCombinator = `
-      <section id="hc-event" style="padding:20px 16px;border-bottom:1px solid #e5e7eb">
-        <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">
-          <img src="https://www.sundai.club/icon.svg" alt="Sundai" width="28" height="28" style="display:inline-block;border-radius:0;border:1px solid #e5e7eb" />
-          <strong style="font-size:16px;color:#111827">Apply to Hacker Combinator v2 by Oct 12th </strong>
-        </div>
-        <p style="margin:6px 0 0;color:#374151">Oct 26 - Nov 7</p>
-        <p style="margin:10px 0 0;color:#374151">Are you a technical founder applying to YC this Fall? Join our YC Startup Track to grow traction for 3 weeks, then apply to Y Combinator with us.</p>
-        <ul style="margin:10px 0 0 18px;color:#374151;padding:0">
-          <li>Focus on growth and traction before the YC app</li>
-          <li>Meet YC founders and mentors</li>
-          <li>Build with top hackers from Harvard & MIT; real critique</li>
+    const toolsClub = `
+      <section id="tools-club" style="padding:20px 16px;border-bottom:1px solid #e5e7eb">
+        <h2 style="margin:0 0 8px;font-size:18px;line-height:26px;color:#111827;display:flex;align-items:center;gap:8px"><span style="display:inline-block;width:20px;height:20px;border-radius:6px;background:#f3f4f6;border:1px solid #e5e7eb;text-align:center;line-height:20px;font-size:12px">🛠 </span> AI Tools Club, Tuesdays @ 5pm</h2>
+        <ul style="margin:8px 0 0 18px;color:#374151;padding:0">
+          <li>We discuss AI tools and frameworks every week</li>
+          <li>Meets virtually on <a href="https://discord.com/invite/EVbrS8aEC9">Discord</a> </li>
+          <li>Community toolbox - <a href="http://www.tiny.cc/sundai-toolbox">tiny.cc/sundai-toolbox</a></li>
+          <li>Add it to your <a href="https://calendar.google.com/calendar/event?action=TEMPLATE&tmeid=N3U0bThmcTZjM2oxcjBiajU0djYxaG85bThfMjAyNTEwMTRUMjEwMDAwWiBiOTYwOGM1MWQ4Nzg0OGQzMGFhNmFiMzZkNjQ5MzJmOTIxNmZmZmM5NzZlMzQ4NzNkZjcxNWRjN2QyNDBiNjhiQGc&tmsrc=b9608c51d87848d30aa6ab36d64932f9216fffc976e34873df715dc7d240b68b%40group.calendar.google.com&scp=ALL">calendar </a></li>
+          <li>[YouTube channel is coming]</li>
+
         </ul>
-        <p style="margin:10px 0 0;color:#6b7280">Sessions: Oct 26, Nov 2, 9 (10am–7pm). YC deadline: Mon Nov 10.</p>
-        <div style="margin-top:10px">
-          <a href="https://partiful.com/e/3uGkKaX39S0PtOFW7DP9" style="display:inline-block;padding:10px 14px;background:#111827;color:#ffffff;text-decoration:none;border-radius:0;border:1px solid #111827">RSVP on Partiful</a>
+        <div style="margin-top:8px">
+          <a href="https://partiful.com/e/xZtVjYqjTCVZQ2wlAjCg" style="display:inline-block;padding:10px 14px;background:#111827;color:#ffffff;text-decoration:none;border-radius:0;border:1px solid #111827">Join us Tuesdays @ 5pm</a>
         </div>
       </section>`;
 
     const communityNews = `
-      <section id="community-news" style="padding:20px 16px;border-bottom:1px solid #e5e7eb">
-        <h2 style="margin:0 0 8px;font-size:18px;line-height:26px;color:#111827">Community News</h2>
-        <p style="margin:0;color:#374151">Here we will be sharing the main updates in the Sundai community. Not much this week. Artem reworked this emails, and Serge sent it. From now on you'll get a tighter, more structured updates: next hack, community notes, last week’s AI news TL;DR, and the best projects. Hit reply with feedback — we build in public.</p>
+      <section id="community" style="padding:20px 16px;border-bottom:1px solid #e5e7eb">
+        <h2 style="margin:0 0 8px;font-size:18px;line-height:26px;color:#111827;display:flex;align-items:center;gap:8px"><span style="display:inline-block;width:20px;height:20px;border-radius:6px;background:#f3f4f6;border:1px solid #e5e7eb;text-align:center;line-height:20px;font-size:12px">📣</span> Community</h2>
+        <ul style="margin:8px 0 0 18px;color:#374151;padding:0">
+          Get involved in leading the club:  
+         <li>Weekly Community Meeting - Tuesdays @8:30 - <a href="https://calendar.google.com/calendar/event?action=TEMPLATE&tmeid=NjIzbDNpZjJwdmwxMmE5M251dWNlNGpqczBfMjAyNTEwMTVUMDAzMDAwWiBzdW5kYWljbHViQG0&tmsrc=sundaiclub%40gmail.com&scp=ALL">calendar invite</a></li>  
+         <li>Get promoted to <a href="https://partiful.com/e/GZfEKvYQlIrk21mzx6Qe">#hacker role</a> - attend at least 4+ sundais</li>
+        <li>Organize a <a href="https://partiful.com/e/iROjbe4j0PiKtaGop8SD">Sundai Hack as a MC</a> - get featured on our website, 50% off Sundai hoodies / tshirts </li>
+        <li>Apply for a legendary <a href="https://partiful.com/e/JOkspvZdMbEbJJjyULqX">Sundai Retreat</a></li>
+        <li>Start <a href="https://partiful.com/e/dEh518Skq6MZqcXVNa3d">a chapter your city</a>. Read our <a href="https://github.com/sergeicu/sundai-global">Constitution & Guide</a>. </li>
+
+        </ul>
       </section>`;
 
     const fallbackAiNews = `
@@ -186,7 +193,7 @@ export default function NewsClient() {
           </header>
           ${introOutline}
           ${nextHack}
-          ${hackerCombinator}
+          ${toolsClub}
           ${communityNews}
           ${newsTLDR}
           ${projectsBlock}
@@ -216,13 +223,12 @@ export default function NewsClient() {
     try {
       const freshTop = await loadTopProjects();
       setTopProjects(freshTop);
-      // Fetch TLDR markdown from VectorLab and convert to HTML
+      // Fetch TLDR HTML from VectorLab
       let aiNewsHtml: string | undefined = undefined;
       try {
         const tldrResp = await fetch('https://vectorlab.dev/api/tldr', { cache: 'no-store' });
         if (tldrResp.ok) {
-          const tldrText = await tldrResp.text();
-          aiNewsHtml = markdownToHtml(tldrText || '');
+          aiNewsHtml = await tldrResp.text();
         }
       } catch (e) {
         // Silent fallback to built-in TLDR
