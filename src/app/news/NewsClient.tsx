@@ -92,11 +92,11 @@ export default function NewsClient() {
           <span style="color:#9ca3af">|</span>
           <a href="#tools-club" style="display:inline-block;padding:0;color:#111827;text-decoration:underline;border-radius:0">AI Tools Club</a>
           <span style="color:#9ca3af">|</span>
-          <a href="#community" style="display:inline-block;padding:0;color:#111827;text-decoration:underline;border-radius:0">Community</a>
+          <a href="#community" style="display:inline-block;padding:0;color:#111827;text-decoration:underline;border-radius:0">Community News</a>
           <span style="color:#9ca3af">|</span>
           <a href="#ai-news" style="display:inline-block;padding:0;color:#111827;text-decoration:underline;border-radius:0">Weekly AI News</a>
           <span style="color:#9ca3af">|</span>
-          <a href="#best-projects" style="display:inline-block;padding:0;color:#111827;text-decoration:underline;border-radius:0">Best Hacks</a>
+          <a href="#best-projects" style="display:inline-block;padding:0;color:#111827;text-decoration:underline;border-radius:0">Best Hacks of the Last Sundai</a>
         </div>
       </section>`;
 
@@ -137,14 +137,13 @@ export default function NewsClient() {
 
     const communityNews = `
       <section id="community" style="padding:20px 16px;border-bottom:1px solid #e5e7eb">
-        <h2 style="margin:0 0 8px;font-size:18px;line-height:26px;color:#111827;display:flex;align-items:center;gap:8px"><span style="display:inline-block;width:20px;height:20px;border-radius:6px;background:#f3f4f6;border:1px solid #e5e7eb;text-align:center;line-height:20px;font-size:12px">📣</span> Community</h2>
+        <h2 style="margin:0 0 8px;font-size:18px;line-height:26px;color:#111827;display:flex;align-items:center;gap:8px"> Community News</h2>
         <ul style="margin:8px 0 0 18px;color:#374151;padding:0">
-          Get involved in leading the club:  
-         <li>Weekly Community Meeting - Tuesdays @8:30 - <a href="https://calendar.google.com/calendar/event?action=TEMPLATE&tmeid=NjIzbDNpZjJwdmwxMmE5M251dWNlNGpqczBfMjAyNTEwMTVUMDAzMDAwWiBzdW5kYWljbHViQG0&tmsrc=sundaiclub%40gmail.com&scp=ALL">calendar invite</a></li>  
-         <li>Get promoted to <a href="https://partiful.com/e/GZfEKvYQlIrk21mzx6Qe">#hacker role</a> - attend at least 4+ sundais</li>
-        <li>Organize a <a href="https://partiful.com/e/iROjbe4j0PiKtaGop8SD">Sundai Hack as a MC</a> - get featured on our website, 50% off Sundai hoodies / tshirts </li>
-        <li>Apply for a legendary <a href="https://partiful.com/e/JOkspvZdMbEbJJjyULqX">Sundai Retreat</a></li>
-        <li>Start <a href="https://partiful.com/e/dEh518Skq6MZqcXVNa3d">a chapter your city</a>. Read our <a href="https://github.com/sergeicu/sundai-global">Constitution & Guide</a>. </li>
+          <li>Subscribe to <a href="https://calendar.google.com/calendar/u/0?cid=Yjk2MDhjNTFkODc4NDhkMzBhYTZhYjM2ZDY0OTMyZjkyMTZmZmZjOTc2ZTM0ODczZGY3MTVkYzdkMjQwYjY4YkBncm91cC5jYWxlbmRhci5nb29nbGUuY29t">our calendar</a></li> to get all the events handy; </li>
+          <li>Weekly Community Meeting - Tuesdays @8:30 - <a href="https://calendar.google.com/calendar/u/0?cid=Yjk2MDhjNTFkODc4NDhkMzBhYTZhYjM2ZDY0OTMyZjkyMTZmZmZjOTc2ZTM0ODczZGY3MTVkYzdkMjQwYjY4YkBncm91cC5jYWxlbmRhci5nb29nbGUuY29t">calendar invite</a>  -- give us feedback, propose a new Sundai initiative;</li>
+          <li>Get promoted to <a href="https://partiful.com/e/GZfEKvYQlIrk21mzx6Qe">#hacker role</a> - attend at least 4+ sundais</li>
+          <li>Organize a <a href="https://partiful.com/e/iROjbe4j0PiKtaGop8SD">Sundai Hack as an MC</a> - get featured on our website</li>
+          <li>Start <a href="https://partiful.com/e/dEh518Skq6MZqcXVNa3d">a chapter in your city</a>. Read our <a href="https://github.com/sergeicu/sundai-global">Constitution & Guide</a>. </li>
 
         </ul>
       </section>`;
