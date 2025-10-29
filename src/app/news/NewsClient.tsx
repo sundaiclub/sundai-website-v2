@@ -31,7 +31,7 @@ export default function NewsClient() {
     const origin = new Date(Date.UTC(2024, 0, 14, 0, 0, 0));
     const now = new Date();
     const diffMs = now.getTime() - origin.getTime();
-    const weeks = Math.floor(diffMs / (7 * 24 * 60 * 60 * 1000)) + 1;
+    const weeks = Math.ceil(diffMs / (7 * 24 * 60 * 60 * 1000)) + 1;
     return weeks > 0 ? weeks : 1;
   }, []);
 
