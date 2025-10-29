@@ -59,6 +59,25 @@ describe('/news page', () => {
     expect(calls.some((args: any[]) => String(args[0]).includes('vectorlab.dev/api/tldr'))).toBe(true)
     const previewHeading = screen.getByText('Preview')
     expect(previewHeading).toBeInTheDocument()
+
+    // Validate updated sections exist in generated HTML and removed ones are absent
+    const textareas = screen.getAllByRole('textbox') as HTMLTextAreaElement[]
+    const htmlArea = textareas.find(t => t.readOnly) as HTMLTextAreaElement
+    expect(htmlArea).toBeTruthy()
+    const html = htmlArea.value
+    expect(html).toContain('id="tools-club"')
+    expect(html).toContain('AI Tools Club, Tuesdays @ 5pm')
+    expect(html).toContain('id="community"')
+    expect(html).not.toContain('Hacker Combinator')
+
+    // Tools Club button should be black, square (no curve)
+    const ctaHref = 'https://partiful.com/e/xZtVjYqjTCVZQ2wlAjCg'
+    const ctaIdx = html.indexOf(ctaHref)
+    expect(ctaIdx).toBeGreaterThan(-1)
+    const ctaSlice = html.slice(ctaIdx - 200, ctaIdx + 200)
+    expect(ctaSlice).toContain('background:#111827')
+    expect(ctaSlice).toContain('border-radius:0')
+    expect(ctaSlice).not.toContain('#f87171')
   })
 
   it('streams generated content progressively', async () => {
