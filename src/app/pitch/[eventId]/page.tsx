@@ -4,7 +4,6 @@ import { useParams } from "next/navigation";
 import { useTheme } from "../../contexts/ThemeContext";
 import { useUserContext } from "../../contexts/UserContext";
 import { Project, ProjectCard } from "../../components/Project";
-import { HackerSelector, type Hacker } from "../../components/HackerSelector";
 
 type EventDetail = {
   id: string;
@@ -41,7 +40,7 @@ export default function PitchEventPage() {
   const [event, setEvent] = useState<EventDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [now, setNow] = useState(Date.now());
-  const [poll, setPoll] = useState<NodeJS.Timeout | null>(null);
+  // polling handled via effect cleanup
 
   // Join modal state
   const [showJoin, setShowJoin] = useState(false);
@@ -69,14 +68,11 @@ export default function PitchEventPage() {
     // Poll for live updates
     if (eventId) {
       const handle = setInterval(load, 4000);
-      setPoll(handle as any);
       return () => clearInterval(handle);
     }
   }, [eventId]);
 
   const currentItem = useMemo(() => event?.projects.find(p => p.status === "CURRENT"), [event]);
-  const upcoming = useMemo(() => (event?.projects || []).filter(p => p.status === "QUEUED" || p.status === "APPROVED").sort((a,b)=>a.position-b.position), [event]);
-  const previous = useMemo(() => (event?.projects || []).filter(p => p.status === "DONE" || p.status === "SKIPPED"), [event]);
   const allOrdered = useMemo(() => (event?.projects || []).slice().sort((a,b)=>a.position-b.position), [event]);
   const isController = useMemo(() => (isAdmin || (event?.mcs || []).some(m=>m.hacker.id===userInfo?.id)) , [isAdmin, event?.mcs, userInfo?.id]);
 
@@ -231,7 +227,7 @@ export default function PitchEventPage() {
   if (loading) return <div className="py-24 text-center">Loading...</div>;
   if (!event) return <div className="py-24 text-center">Event not found</div>;
 
-  const notStarted = now < new Date(event.startTime).getTime();
+  // We render the same layout regardless of start state to keep UX consistent
 
   return (
     <>
@@ -251,18 +247,7 @@ export default function PitchEventPage() {
 
         <p className="opacity-80 mb-4">{event.description}</p>
 
-        {notStarted ? (
-              <div className={`${isDarkMode ? "bg-gray-900" : "bg-white"} rounded-xl p-4 shadow mb-6`}>
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="font-semibold mb-1">Countdown to start</div>
-                {/* Reuse logic from /pitch page for brevity */}
-                <div>{new Date(event.startTime).toLocaleString()}</div>
-              </div>
-                  <button onClick={openJoin} className="px-4 py-2 rounded-md bg-green-600 text-white">Join queue</button>
-            </div>
-          </div>
-        ) : (
+        {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
             <div className={`${isDarkMode ? "bg-gray-900" : "bg-white"} rounded-xl p-4 shadow lg:col-span-2`}>
               <h2 className="font-semibold mb-3">Current project</h2>
@@ -420,7 +405,7 @@ export default function PitchEventPage() {
               </div>
             </div>
           </div>
-        )}
+        }
       </div>
     </div>
     {showJoin && (
