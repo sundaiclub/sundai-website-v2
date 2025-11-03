@@ -16,26 +16,25 @@ describe('/news page', () => {
   })
 
   it('generates email on demand and shows preview', async () => {
-    const weeklyResp = {
+    const projectsResp = {
       ok: true,
-      json: () => Promise.resolve({
-        topProjects: [
-          {
-            id: 'p1',
-            title: 'Top 1',
-            preview: 'Preview 1',
-            createdAt: new Date().toISOString(),
-            likeCount: 10,
-            thumbnailUrl: null,
-            launchLead: { id: 'h1', name: 'Alice', linkedinUrl: null, twitterUrl: null },
-            team: [],
-            projectUrl: 'https://www.sundai.club/projects/p1',
-          },
-        ],
-      })
+      json: () => Promise.resolve([
+        {
+          id: 'p1',
+          title: 'Top 1',
+          preview: 'Preview 1',
+          createdAt: new Date().toISOString(),
+          thumbnail: null,
+          launchLead: { id: 'h1', name: 'Alice' },
+          participants: [],
+          likes: [{ hackerId: 'u1', createdAt: new Date().toISOString() }],
+          techTags: [],
+          domainTags: [],
+        },
+      ])
     }
     ;(global.fetch as any) = jest.fn().mockImplementation((url: string) => {
-      if (url.includes('/api/news/weekly')) return Promise.resolve(weeklyResp)
+      if (url.includes('/api/projects')) return Promise.resolve(projectsResp)
       if (url.includes('vectorlab.dev/api/tldr')) return Promise.resolve({ ok: true, text: () => Promise.resolve('- A TLDR item') })
       if (url.includes('/api/news/generate')) return Promise.resolve({ ok: true, json: () => Promise.resolve({ htmlBody: '<section id="outline">Modified</section>' }), headers: { get: () => 'application/json' } })
       return Promise.resolve({ ok: true, json: () => Promise.resolve({}) })
@@ -81,23 +80,22 @@ describe('/news page', () => {
   })
 
   it('streams generated content progressively', async () => {
-    const weeklyResp = {
+    const projectsResp = {
       ok: true,
-      json: () => Promise.resolve({
-        topProjects: [
-          {
-            id: 'p1',
-            title: 'Top 1',
-            preview: 'Preview 1',
-            createdAt: new Date().toISOString(),
-            likeCount: 10,
-            thumbnailUrl: null,
-            launchLead: { id: 'h1', name: 'Alice', linkedinUrl: null, twitterUrl: null },
-            team: [],
-            projectUrl: 'https://www.sundai.club/projects/p1',
-          },
-        ],
-      })
+      json: () => Promise.resolve([
+        {
+          id: 'p1',
+          title: 'Top 1',
+          preview: 'Preview 1',
+          createdAt: new Date().toISOString(),
+          thumbnail: null,
+          launchLead: { id: 'h1', name: 'Alice' },
+          participants: [],
+          likes: [{ hackerId: 'u1', createdAt: new Date().toISOString() }],
+          techTags: [],
+          domainTags: [],
+        },
+      ])
     }
 
     const headers = { get: (key: string) => key.toLowerCase() === 'content-type' ? 'text/plain; charset=utf-8' : null } as any
@@ -114,7 +112,7 @@ describe('/news page', () => {
     const streamLike = { getReader: () => reader } as any
 
     ;(global.fetch as any) = jest.fn().mockImplementation((url: string) => {
-      if (url.includes('/api/news/weekly')) return Promise.resolve(weeklyResp)
+      if (url.includes('/api/projects')) return Promise.resolve(projectsResp)
       if (url.includes('vectorlab.dev/api/tldr')) return Promise.resolve({ ok: true, text: () => Promise.resolve('- Streamed TLDR item') })
       if (url.includes('/api/news/generate')) return Promise.resolve({ ok: true, headers, body: streamLike })
       return Promise.resolve({ ok: true, json: () => Promise.resolve({}) })
@@ -149,7 +147,7 @@ describe('/news page', () => {
     userCtx.useUserContext.mockReturnValue({ isAdmin: false })
     const themeCtx = require('../../src/app/contexts/ThemeContext')
     themeCtx.useTheme.mockReturnValue({ isDarkMode: false })
-    global.fetch = jest.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({ topProjects: [] }) }) as any
+    global.fetch = jest.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve([]) }) as any
     const Comp = require('../../src/app/news/NewsClient').default
 
     render(<Comp />)
