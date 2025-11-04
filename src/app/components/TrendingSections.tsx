@@ -1,18 +1,13 @@
 "use client";
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { useTheme } from "../contexts/ThemeContext";
-import ProjectGrid, { Project as ProjectType, ProjectCard } from "./Project";
-import { 
-  getThisWeekProjects, 
-  getThisMonthProjects, 
-  getAllTimeProjects 
-} from "./ProjectSearch";
+import { Project as ProjectType, ProjectCard } from "./Project";
 import { calculateProjectScore } from '@/lib/trending';
 
 interface TrendingSectionsProps {
   projects: ProjectType[];
+  setProjects?: (projects: ProjectType[]) => void;
   userInfo: any;
   handleLike: (e: React.MouseEvent, projectId: string, isLiked: boolean) => void;
   isDarkMode: boolean;
@@ -44,38 +39,50 @@ const TrendingProjectCard = ({ project, userInfo, handleLike, isDarkMode, showTr
   );
 };
 
-export default function TrendingSections({ projects, userInfo, handleLike, isDarkMode }: TrendingSectionsProps) {
-  // Get projects for each category
-  const thisWeekProjects = getThisWeekProjects(projects);
-  const thisMonthProjects = getThisMonthProjects(projects);
-  const allTimeProjects = getAllTimeProjects(projects);
+export default function TrendingSections({ projects, setProjects, userInfo, handleLike, isDarkMode }: TrendingSectionsProps) {
+  const [trendingWeek, setTrendingWeek] = useState<ProjectType[]>([]);
+  const [trendingMonth, setTrendingMonth] = useState<ProjectType[]>([]);
+  const [trendingAllTime, setTrendingAllTime] = useState<ProjectType[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // Sort by appropriate trending score for each category
-  const sortByThisWeekTrending = (a: ProjectType, b: ProjectType) => {
-    return calculateProjectScore(b, { timeDecayDays: 1 }) - calculateProjectScore(a, { timeDecayDays: 1 });
-  };
+  useEffect(() => {
+    async function fetchTrending() {
+      try {
+        const [wRes, mRes, aRes] = await Promise.all([
+          fetch("/api/projects/trending?range=week&limit=5"),
+          fetch("/api/projects/trending?range=month&limit=5"),
+          fetch("/api/projects/trending?range=all&limit=5"),
+        ]);
 
-  const sortByThisMonthTrending = (a: ProjectType, b: ProjectType) => {
-    return calculateProjectScore(b, { timeDecayDays: 20 }) - calculateProjectScore(a, { timeDecayDays: 20 });
-  };
+        const [wData, mData, aData] = await Promise.all([
+          wRes.json(),
+          mRes.json(),
+          aRes.json(),
+        ]);
 
-  const sortByBestOfAllTime = (a: ProjectType, b: ProjectType) => {
-    return calculateProjectScore(b, { timeDecayDays: undefined }) - calculateProjectScore(a, { timeDecayDays: undefined });
-  };
+        const week = Array.isArray(wData) ? wData : [];
+        const month = Array.isArray(mData) ? mData : [];
+        const all = Array.isArray(aData) ? aData : [];
 
-  // Always show 5 projects, but if not enough in this week, fill with recent projects
-  const trendingThisWeek = thisWeekProjects.length >= 5 
-    ? thisWeekProjects.sort(sortByThisWeekTrending).slice(0, 5)
-    : [
-        ...thisWeekProjects.sort(sortByThisWeekTrending),
-        ...projects
-          .filter(p => !thisWeekProjects.includes(p))
-          .sort(sortByThisWeekTrending)
-          .slice(0, 5 - thisWeekProjects.length)
-      ];
+        setTrendingWeek(week);
+        setTrendingMonth(month);
+        setTrendingAllTime(all);
 
-  const trendingThisMonth = thisMonthProjects.sort(sortByThisMonthTrending).slice(0, 5);
-  const bestOfAllTime = allTimeProjects.sort(sortByBestOfAllTime).slice(0, 5);
+        // if you still want the parent to know about “some projects”, you can push them up:
+        if (setProjects) {
+          // de-dup by id (optional)
+          const merged = [...week, ...month, ...all];
+          setProjects(merged);
+        }
+      } catch (err) {
+        console.error("Error fetching trending projects:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchTrending();
+  }, [setProjects]);
 
   const sectionVariants = {
     hidden: { opacity: 0, y: 20 },
@@ -93,6 +100,16 @@ export default function TrendingSections({ projects, userInfo, handleLike, isDar
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-12">
+      {loading ? (
+          <div className="flex justify-center items-center py-20">
+            <div
+              className={`animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 ${
+                isDarkMode ? 'border-purple-400' : 'border-indigo-600'
+              }`}
+            ></div>
+          </div>
+        ) : (
+          <>
       {/* This Week's Trending */}
       <motion.section 
         className="mb-16"
@@ -109,12 +126,12 @@ export default function TrendingSections({ projects, userInfo, handleLike, isDar
           <div className={`text-sm ${
             isDarkMode ? "text-gray-400" : "text-gray-600"
           }`}>
-            {trendingThisWeek.length} projects
+            {trendingWeek.length} projects
           </div>
         </div>
-        
+
         <div className="scroll-container">
-          {trendingThisWeek.map((project) => (
+          {trendingWeek.map((project) => (
             <motion.div key={project.id} variants={cardVariants} className="scroll-item w-80 flex-shrink-0">
               <TrendingProjectCard
                 project={project}
@@ -134,7 +151,7 @@ export default function TrendingSections({ projects, userInfo, handleLike, isDar
       </motion.section>
 
       {/* This Month's Trending */}
-      <motion.section 
+      <motion.section
         className="mb-16"
         variants={sectionVariants}
         initial="hidden"
@@ -149,12 +166,12 @@ export default function TrendingSections({ projects, userInfo, handleLike, isDar
           <div className={`text-sm ${
             isDarkMode ? "text-gray-400" : "text-gray-600"
           }`}>
-            {trendingThisMonth.length} projects
+            {trendingMonth.length} projects
           </div>
         </div>
-        
+
         <div className="scroll-container">
-          {trendingThisMonth.map((project) => (
+          {trendingMonth.map((project) => (
             <motion.div key={project.id} variants={cardVariants} className="scroll-item w-80 flex-shrink-0">
               <TrendingProjectCard
                 project={project}
@@ -189,12 +206,12 @@ export default function TrendingSections({ projects, userInfo, handleLike, isDar
           <div className={`text-sm ${
             isDarkMode ? "text-gray-400" : "text-gray-600"
           }`}>
-            {bestOfAllTime.length} projects
+            {trendingAllTime.length} projects
           </div>
         </div>
-        
+
         <div className="scroll-container">
-          {bestOfAllTime.map((project) => (
+          {trendingAllTime.map((project) => (
             <motion.div key={project.id} variants={cardVariants} className="scroll-item w-80 flex-shrink-0">
               <TrendingProjectCard
                 project={project}
@@ -212,6 +229,7 @@ export default function TrendingSections({ projects, userInfo, handleLike, isDar
           </motion.div>
         </div>
       </motion.section>
+        </>)}
     </div>
   );
 }
