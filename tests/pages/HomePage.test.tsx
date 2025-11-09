@@ -36,12 +36,24 @@ jest.mock('@clerk/nextjs', () => ({
 
 describe('Home Page', () => {
   beforeEach(() => {
-    // Mock fetch for projects API - make the project starred so it shows up
+    // Mock fetch for trending endpoints (week, month, all)
     const starredProject = { ...mockProject, is_starred: true }
-    global.fetch = jest.fn().mockResolvedValue({
-      ok: true,
-      json: jest.fn().mockResolvedValue([starredProject]),
-    })
+    global.fetch = jest.fn()
+      // week
+      .mockResolvedValueOnce({
+        ok: true,
+        json: jest.fn().mockResolvedValue([starredProject]),
+      })
+      // month
+      .mockResolvedValueOnce({
+        ok: true,
+        json: jest.fn().mockResolvedValue([starredProject]),
+      })
+      // all
+      .mockResolvedValueOnce({
+        ok: true,
+        json: jest.fn().mockResolvedValue([starredProject]),
+      })
   })
 
   afterEach(() => {
@@ -133,7 +145,9 @@ describe('Home Page', () => {
     })
     
     await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith('/api/projects?status=APPROVED')
+      expect(global.fetch).toHaveBeenCalledWith('/api/projects/trending?range=week&limit=5')
+      expect(global.fetch).toHaveBeenCalledWith('/api/projects/trending?range=month&limit=5')
+      expect(global.fetch).toHaveBeenCalledWith('/api/projects/trending?range=all&limit=5')
     })
   })
 
@@ -166,6 +180,17 @@ describe('Home Page', () => {
     
     const starredProject = { ...mockProject, is_starred: true }
     global.fetch = jest.fn()
+      // week
+      .mockResolvedValueOnce({
+        ok: true,
+        json: jest.fn().mockResolvedValue([starredProject]),
+      })
+      // month
+      .mockResolvedValueOnce({
+        ok: true,
+        json: jest.fn().mockResolvedValue([starredProject]),
+      })
+      // all
       .mockResolvedValueOnce({
         ok: true,
         json: jest.fn().mockResolvedValue([starredProject]),
