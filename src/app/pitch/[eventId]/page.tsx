@@ -81,7 +81,8 @@ export default function PitchEventPage() {
     if (eventId) load();
     // Poll for live updates
     if (eventId) {
-      const handle = setInterval(load, 4000);
+      const intervalMs = process.env.NODE_ENV === "production" ? 10000 : 4000;
+      const handle = setInterval(load, intervalMs);
       const onFocus = () => load();
       const onVisibility = () => { if (!document.hidden) load(); };
       window.addEventListener('focus', onFocus);
@@ -116,7 +117,7 @@ export default function PitchEventPage() {
       alert("Event is finished. Queue is locked.");
       return;
     }
-    const my = await fetch("/api/projects?status=APPROVED");
+    const my = await fetch(`/api/projects?status=APPROVED&hacker_id=${encodeURIComponent(userInfo.id)}&limit=1000`);
     const all = await my.json();
     const items: Project[] = Array.isArray(all) ? all : (all?.items ?? []);
     const mine = items.filter((p: Project) => p.launchLead.id === userInfo.id || p.participants.some(pt => pt.hacker.id === userInfo.id));

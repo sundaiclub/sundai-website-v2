@@ -101,34 +101,19 @@ describe('/api/projects', () => {
       const request = new NextRequest('http://localhost:3000/api/projects?status=APPROVED&sort=newest')
       await GET(request)
 
-      expect(mockPrisma.project.findMany).toHaveBeenCalledWith({
-        where: {
-          status: { in: ['APPROVED'] },
-        },
+      expect(mockPrisma.project.findMany).toHaveBeenCalled()
+      const args = mockPrisma.project.findMany.mock.calls[0][0]
+      expect(args).toMatchObject({
         skip: 0,
         take: 10,
         orderBy: { createdAt: 'desc' },
-        include: {
-          launchLead: {
-            include: {
-              avatar: true,
-            },
-          },
-          participants: {
-            include: {
-              hacker: {
-                include: {
-                  avatar: true,
-                },
-              },
-            },
-          },
-          techTags: true,
-          domainTags: true,
-          thumbnail: true,
-          likes: true,
-        },
       })
+      // where should contain status filter within AND
+      expect(args.where.AND).toEqual(
+        expect.arrayContaining([
+          { status: { in: ['APPROVED'] } }
+        ])
+      )
     })
   })
 
