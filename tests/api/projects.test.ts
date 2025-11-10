@@ -62,6 +62,38 @@ describe('/api/projects', () => {
       })
     })
 
+    it('returns items with thumbnail and avatars included', async () => {
+      const projectWithMedia = {
+        ...mockProject,
+        thumbnail: { url: 'https://example.com/thumbnail.jpg' },
+        launchLead: {
+          ...mockProject.launchLead,
+          avatar: { url: 'https://example.com/avatar-lead.jpg' },
+        },
+        participants: [
+          {
+            role: 'Dev',
+            hacker: {
+              id: 'h1',
+              name: 'Hacker One',
+              avatar: { url: 'https://example.com/avatar-h1.jpg' },
+            },
+          },
+        ],
+      }
+      mockPrisma.project.count.mockResolvedValue(1)
+      mockPrisma.project.findMany.mockResolvedValue([projectWithMedia])
+
+      const request = new NextRequest('http://localhost:3000/api/projects?page=1&limit=10')
+      const response = await GET(request)
+      const data = await response.json()
+
+      expect(response.status).toBe(200)
+      expect(data.items[0].thumbnail?.url).toBe('https://example.com/thumbnail.jpg')
+      expect(data.items[0].launchLead?.avatar?.url).toBe('https://example.com/avatar-lead.jpg')
+      expect(data.items[0].participants?.[0]?.hacker?.avatar?.url).toBe('https://example.com/avatar-h1.jpg')
+    })
+
     it('applies status filter and sorting', async () => {
       mockPrisma.project.count.mockResolvedValue(1)
       mockPrisma.project.findMany.mockResolvedValue([mockProject])
@@ -77,14 +109,23 @@ describe('/api/projects', () => {
         take: 10,
         orderBy: { createdAt: 'desc' },
         include: {
-          launchLead: true,
+          launchLead: {
+            include: {
+              avatar: true,
+            },
+          },
           participants: {
             include: {
-              hacker: true,
+              hacker: {
+                include: {
+                  avatar: true,
+                },
+              },
             },
           },
           techTags: true,
           domainTags: true,
+          thumbnail: true,
           likes: true,
         },
       })

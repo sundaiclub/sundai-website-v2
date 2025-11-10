@@ -115,14 +115,23 @@ export async function GET(req: NextRequest) {
       take: limit,
       orderBy,
       include: {
-        launchLead: true,
+        launchLead: {
+          include: {
+            avatar: true,
+          },
+        },
         participants: {
           include: {
-            hacker: true,
+            hacker: {
+              include: {
+                avatar: true,
+              },
+            },
           },
         },
         techTags: true,
         domainTags: true,
+        thumbnail: true,
         likes: true,
       },
     }),
