@@ -91,7 +91,7 @@ function getImageNameFromUrl(url: string): string {
 }
 
 export default function ProjectEditPage() {
-  const params = useParams();
+  const params = (useParams() || {}) as { projectId?: string };
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const { isAdmin, userInfo } = useUserContext();

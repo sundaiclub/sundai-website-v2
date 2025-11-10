@@ -116,7 +116,7 @@ const getStatusBadgeClasses = (status: string) => {
 };
 
 export default function HackerProfile() {
-  const params = useParams();
+  const params = (useParams() || {}) as { hackerId?: string };
   const { user } = useUser();
   const [hacker, setHacker] = useState<HackerProfile | null>(null);
   const [loading, setLoading] = useState(true);
