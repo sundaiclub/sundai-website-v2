@@ -16,7 +16,7 @@ import { swapFirstLetters } from "../../utils/nameUtils";
 import ShareModal from "../../components/ShareModal";
 
 export default function ProjectDetail() {
-  const params = useParams();
+  const params = (useParams() || {}) as { projectId?: string };
   const router = useRouter();
   const { userInfo } = useUserContext();
   const searchParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;

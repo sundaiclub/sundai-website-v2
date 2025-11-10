@@ -273,6 +273,7 @@ model Event {
   createdBy        Hacker     @relation(fields: [createdById], references: [id])
   createdById      String
   audienceCanReorder Boolean  @default(true)
+  isFinished       Boolean    @default(false)
   projects         EventProject[]
   mcs              EventMC[]
   createdAt        DateTime   @default(now())

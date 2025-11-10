@@ -1,18 +1,24 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
+import Link from "next/link";
+import ReactMarkdown from "react-markdown";
+import NextImage from "next/image";
 import { useTheme } from "../../contexts/ThemeContext";
 import { useUserContext } from "../../contexts/UserContext";
 import { Project, ProjectCard } from "../../components/Project";
+import { HackerSelector, type Hacker } from "../../components/HackerSelector";
+import { HeartIcon } from "@heroicons/react/24/outline";
+import { HeartIcon as HeartIconSolid } from "@heroicons/react/24/solid";
 
 type EventDetail = {
   id: string;
   title: string;
   description?: string | null;
   startTime: string;
-  endTime?: string | null;
   meetingUrl?: string | null;
   audienceCanReorder: boolean;
+  isFinished: boolean;
   mcs: Array<{ id: string; hacker: { id: string; name: string } }>;
   projects: Array<{
     id: string;
@@ -48,6 +54,14 @@ export default function PitchEventPage() {
   const [selectedProjectId, setSelectedProjectId] = useState<string>("");
   const [confirming, setConfirming] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  // Edit Event modal state
+  const [showEdit, setShowEdit] = useState(false);
+  const [editTitle, setEditTitle] = useState("");
+  const [editMeetingUrl, setEditMeetingUrl] = useState("");
+  const [editStartTime, setEditStartTime] = useState("");
+  const [allHackers, setAllHackers] = useState<Hacker[]>([]);
+  const [selectedMCs, setSelectedMCs] = useState<string[]>([]);
+  const [showMCSelector, setShowMCSelector] = useState(false);
 
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000);
@@ -68,9 +82,29 @@ export default function PitchEventPage() {
     // Poll for live updates
     if (eventId) {
       const handle = setInterval(load, 4000);
-      return () => clearInterval(handle);
+      const onFocus = () => load();
+      const onVisibility = () => { if (!document.hidden) load(); };
+      window.addEventListener('focus', onFocus);
+      document.addEventListener('visibilitychange', onVisibility);
+      return () => {
+        clearInterval(handle);
+        window.removeEventListener('focus', onFocus);
+        document.removeEventListener('visibilitychange', onVisibility);
+      };
     }
   }, [eventId]);
+
+  useEffect(() => {
+    if (showMCSelector) {
+      (async () => {
+        try {
+          const res = await fetch('/api/hackers');
+          const hs = await res.json();
+          setAllHackers(hs);
+        } catch {}
+      })();
+    }
+  }, [showMCSelector]);
 
   const currentItem = useMemo(() => event?.projects.find(p => p.status === "CURRENT"), [event]);
   const allOrdered = useMemo(() => (event?.projects || []).slice().sort((a,b)=>a.position-b.position), [event]);
@@ -78,9 +112,14 @@ export default function PitchEventPage() {
 
   const openJoin = async () => {
     if (!userInfo) return alert("Sign in first");
+    if (event?.isFinished) {
+      alert("Event is finished. Queue is locked.");
+      return;
+    }
     const my = await fetch("/api/projects?status=APPROVED");
     const all = await my.json();
-    const mine = all.filter((p: Project) => p.launchLead.id === userInfo.id || p.participants.some(pt => pt.hacker.id === userInfo.id));
+    const items: Project[] = Array.isArray(all) ? all : (all?.items ?? []);
+    const mine = items.filter((p: Project) => p.launchLead.id === userInfo.id || p.participants.some(pt => pt.hacker.id === userInfo.id));
     // Sort most recent first by startDate
     const sorted = [...mine].sort((a,b) => {
       const da = new Date((a as any).startDate).getTime();
@@ -180,6 +219,7 @@ export default function PitchEventPage() {
 
   const delistItem = async (eventProjectId: string) => {
     if (!event) return;
+    if (event.isFinished) return;
     const res = await fetch(`/api/events/${event.id}/queue/${eventProjectId}`, { method: 'DELETE' });
     if (res.status === 204) {
       const updated = await fetch(`/api/events/${event.id}`);
@@ -237,10 +277,54 @@ export default function PitchEventPage() {
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-bold">{event.title}</h1>
             <StageBadge now={now} start={event.startTime} />
+            <span className={`text-xs px-2 py-1 rounded ${isDarkMode ? "bg-gray-800 text-gray-300" : "bg-gray-200 text-gray-700"}`}>All times ET (Boston)</span>
+            {event.isFinished && (
+              <span className={`text-xs px-2 py-1 rounded ${isDarkMode ? "bg-red-700 text-white" : "bg-red-600 text-white"}`}>Finished</span>
+            )}
           </div>
           <div className="flex items-center gap-2">
             {event.meetingUrl && (
               <a href={event.meetingUrl} target="_blank" className="px-3 py-2 rounded-md bg-indigo-600 text-white text-sm">Join meeting</a>
+            )}
+            {isController && (
+              <>
+                <button onClick={() => {
+                  // Prefill edit state
+                  setEditTitle(event.title || "");
+                  setEditMeetingUrl(event.meetingUrl || "");
+                  // Format to datetime-local
+                  const toLocal = (iso?: string | null) => {
+                    if (!iso) return "";
+                    const d = new Date(iso);
+                    const pad = (n: number) => String(n).padStart(2, "0");
+                    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+                    // Note: displayed as user's local; label indicates ET
+                  };
+                  setEditStartTime(toLocal(event.startTime));
+                  setSelectedMCs((event.mcs || []).map(m => m.hacker.id));
+                  setShowEdit(true);
+                }} className="px-3 py-2 rounded-md bg-gray-600 text-white text-sm">Edit event</button>
+                {!event.isFinished && (
+                  <button
+                    onClick={async () => {
+                      try {
+                        const res = await fetch(`/api/events/${event.id}`, {
+                          method: "PATCH",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ isFinished: true }),
+                        });
+                        if (res.ok) {
+                          const updated = await res.json();
+                          setEvent(updated);
+                        }
+                      } catch (e) {}
+                    }}
+                    className="px-3 py-2 rounded-md bg-red-600 text-white text-sm"
+                  >
+                    Mark finished
+                  </button>
+                )}
+              </>
             )}
           </div>
         </div>
@@ -249,27 +333,152 @@ export default function PitchEventPage() {
 
         {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-            <div className={`${isDarkMode ? "bg-gray-900" : "bg-white"} rounded-xl p-4 shadow lg:col-span-2`}>
+            <div className={`${isDarkMode ? "bg-gray-900" : "bg-white"} rounded-xl p-4 shadow lg:col-span-2 order-2 lg:order-1`}>
               <h2 className="font-semibold mb-3">Current project</h2>
               {currentItem ? (
                 <div className="max-w-5xl">
-                  <ProjectCard
-                    project={currentItem.project}
-                    userInfo={userInfo}
-                    handleLike={handleLike}
-                    isDarkMode={isDarkMode}
-                    show_status={false}
-                    show_team={true}
-                    isAdmin={isAdmin}
-                    variant="default"
-                    openInNewTab={true}
-                  />
+                  <div className={`${isDarkMode ? "bg-gray-800" : "bg-white"} rounded-xl border ${isDarkMode ? "border-gray-700" : "border-gray-200"} overflow-hidden`}>
+                    {/* Preview image header */}
+                    <div className="relative h-52 sm:h-64 w-full">
+                      <NextImage
+                        src={
+                          currentItem.project.thumbnail?.url ||
+                          (isDarkMode
+                            ? "/images/default_project_thumbnail_dark.svg"
+                            : "/images/default_project_thumbnail_light.svg")
+                        }
+                        alt={currentItem.project.title}
+                        fill
+                        className="object-cover"
+                        unoptimized
+                      />
+                      {/* Optional dark overlay for better title contrast if needed */}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/20 to-transparent pointer-events-none" />
+                    </div>
+                    {/* Header: title + like */}
+                    <div className="p-4 sm:p-6 border-b ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <Link href={`/projects/${currentItem.project.id}`} target="_blank" rel="noopener noreferrer" className={`${isDarkMode ? "text-gray-100 hover:text-purple-400" : "text-gray-900 hover:text-indigo-600"} text-xl sm:text-2xl font-bold transition-colors`}>
+                            {currentItem.project.title}
+                          </Link>
+                          <p className={`text-xs mt-1 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
+                            Launched on {new Date(currentItem.project.startDate as any).toLocaleDateString()}
+                          </p>
+                        </div>
+                        {(() => {
+                          const liked = currentItem.project.likes.some(l => l.hackerId === userInfo?.id);
+                          return (
+                            <button
+                              onClick={(e)=>handleLike(e, currentItem.project.id, liked)}
+                              aria-label={`Likes ${currentItem.project.likes.length}`}
+                              className="flex items-center gap-2 bg-white/20 backdrop-blur-sm px-6 py-3 rounded-full hover:bg-white/30 transition-colors"
+                              title="Like"
+                            >
+                              {liked ? (
+                                <HeartIconSolid className="h-5 w-5 text-red-500" />
+                              ) : (
+                                <HeartIcon className={`h-5 w-5 ${isDarkMode ? "text-white" : "text-gray-700"}`} />
+                              )}
+                              <span className={`${isDarkMode ? "text-white" : "text-gray-800"} text-lg`}>{currentItem.project.likes.length}</span>
+                            </button>
+                          );
+                        })()}
+                      </div>
+                    </div>
+                    {/* Links */}
+                    {(currentItem.project.demoUrl || currentItem.project.githubUrl || currentItem.project.blogUrl) && (
+                      <div className="px-4 sm:px-6 py-4 flex flex-wrap gap-3">
+                        {currentItem.project.demoUrl && (
+                          <Link href={currentItem.project.demoUrl} target="_blank" className={`${isDarkMode ? "bg-indigo-700 hover:bg-indigo-600" : "bg-indigo-600 hover:bg-indigo-700"} text-white px-3 py-2 rounded-md text-sm`}>View Demo</Link>
+                        )}
+                        {currentItem.project.githubUrl && (
+                          <Link href={currentItem.project.githubUrl} target="_blank" className={`${isDarkMode ? "bg-gray-700 hover:bg-gray-600 text-white" : "bg-gray-800 hover:bg-gray-900 text-white"} px-3 py-2 rounded-md text-sm`}>GitHub</Link>
+                        )}
+                        {currentItem.project.blogUrl && (
+                          <Link href={currentItem.project.blogUrl} target="_blank" className={`${isDarkMode ? "bg-gray-700 hover:bg-gray-600 text-white" : "bg-gray-800 hover:bg-gray-900 text-white"} px-3 py-2 rounded-md text-sm`}>Blogpost</Link>
+                        )}
+                      </div>
+                    )}
+                    {/* Tags */}
+                    <div className="px-4 sm:px-6 py-2 flex flex-wrap gap-2">
+                      {currentItem.project.techTags?.map(tag => (
+                        <span key={tag.id} className={`px-2 py-1 rounded-full text-xs ${isDarkMode ? "bg-purple-900/50 text-purple-300" : "bg-indigo-100 text-indigo-700"}`}>{tag.name}</span>
+                      ))}
+                      {currentItem.project.domainTags?.map(tag => (
+                        <span key={tag.id} className={`px-2 py-1 rounded-full text-xs ${isDarkMode ? "bg-gray-700 text-gray-300" : "bg-gray-100 text-gray-700"}`}>{tag.name}</span>
+                      ))}
+                    </div>
+                    {/* Description */}
+                    <div className="px-4 sm:px-6 py-4">
+                      <ReactMarkdown className={`${isDarkMode ? "prose prose-invert max-w-none" : "prose max-w-none"}`}>
+                        {currentItem.project.description || currentItem.project.preview}
+                      </ReactMarkdown>
+                    </div>
+                    {/* Team section */}
+                    <div className="px-4 sm:px-6 pb-6">
+                      <h3 className={`text-lg font-semibold mb-3 ${isDarkMode ? "text-gray-100" : "text-gray-900"}`}>Team</h3>
+                      {/* Launch Lead */}
+                      {currentItem.project.launchLead?.id && (
+                        <div className="mb-4">
+                          <h4 className={`text-xs font-semibold mb-2 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>Launch Lead</h4>
+                          <Link href={`/hacker/${currentItem.project.launchLead.id}`}>
+                            <div className={`flex items-center p-3 rounded-lg transition-colors ${isDarkMode ? "bg-gray-700 hover:bg-gray-600" : "bg-gray-50 hover:bg-gray-100"}`}>
+                              <div className="relative w-10 h-10">
+                                <NextImage
+                                  src={currentItem.project.launchLead.avatar?.url || "/images/default_avatar.png"}
+                                  alt={currentItem.project.launchLead.name}
+                                  width={40}
+                                  height={40}
+                                  className="rounded-full object-cover"
+                                  unoptimized
+                                />
+                              </div>
+                              <div className="ml-3">
+                                <div className={`${isDarkMode ? "text-gray-100" : "text-gray-900"} text-sm font-medium`}>{currentItem.project.launchLead.name}</div>
+                                <div className="text-xs text-indigo-500">Launch Lead</div>
+                              </div>
+                            </div>
+                          </Link>
+                        </div>
+                      )}
+                      {/* Participants */}
+                      <div>
+                        <h4 className={`text-xs font-semibold mb-2 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>Team Members</h4>
+                        <div className="flex flex-col gap-2">
+                          {currentItem.project.participants.map((participant) => (
+                            <Link key={participant.hacker.id} href={`/hacker/${participant.hacker.id}`}>
+                              <div className={`flex items-center p-2 rounded-lg transition-colors ${isDarkMode ? "bg-gray-700 hover:bg-gray-600" : "bg-gray-50 hover:bg-gray-100"}`}>
+                                <div className="relative w-10 h-10">
+                                  <NextImage
+                                    src={participant.hacker.avatar?.url || "/images/default_avatar.png"}
+                                    alt={participant.hacker.name}
+                                    width={40}
+                                    height={40}
+                                    className="rounded-full object-cover"
+                                    unoptimized
+                                  />
+                                </div>
+                                <div className="ml-3">
+                                  <div className={`${isDarkMode ? "text-gray-100" : "text-gray-900"} text-sm font-medium`}>{participant.hacker.name}</div>
+                                  <div className={`text-xs ${isDarkMode ? "text-indigo-400" : "text-gray-600"}`}>{(participant.role === "hacker" ? "builder" : participant.role) || "builder"}</div>
+                                </div>
+                              </div>
+                            </Link>
+                          ))}
+                          {currentItem.project.participants.length === 0 && (
+                            <div className={`${isDarkMode ? "text-gray-400" : "text-gray-500"} text-sm`}>No additional members</div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               ) : (
                 <div className="opacity-70">No current project</div>
               )}
             </div>
-            <div className="space-y-6">
+            <div className="space-y-6 order-1 lg:order-2">
               <div className={`${isDarkMode ? "bg-gray-900" : "bg-white"} rounded-xl p-4 shadow`}>
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="font-semibold">Presentation queue</h3>
@@ -331,7 +540,7 @@ export default function PitchEventPage() {
                           {isCurrent && (
                             <span className={`text-[10px] uppercase tracking-wide px-2 py-0.5 rounded ${isDarkMode ? 'bg-indigo-600 text-white' : 'bg-indigo-600 text-white'}`}>Current</span>
                           )}
-                          {isController && (
+                          {isController && !event.isFinished && (
                             <div className="flex items-center gap-1 mr-1">
                               <button
                                 disabled={!canUp}
@@ -353,7 +562,7 @@ export default function PitchEventPage() {
                               >✕</button>
                             </div>
                           )}
-                          {!isController && userInfo?.id === (ep as any).addedById && (
+                          {!isController && !event.isFinished && userInfo?.id === (ep as any).addedById && (
                             <div className="flex items-center gap-1 mr-1">
                               <button
                                 onClick={() => delistItem(ep.id)}
@@ -394,7 +603,7 @@ export default function PitchEventPage() {
                   })}
                 </div>
                 <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  <button onClick={openJoin} className="w-full px-3 py-2 rounded-md bg-green-600 text-white text-sm">Join queue</button>
+                  <button onClick={openJoin} disabled={event.isFinished} className={`w-full px-3 py-2 rounded-md text-white text-sm ${event.isFinished ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-600'}`}>{event.isFinished ? 'Queue locked' : 'Join queue'}</button>
                   {(isAdmin || (event?.mcs || []).some(m=>m.hacker.id===userInfo?.id)) && (
                     <div className="grid grid-cols-2 gap-2">
                       <button onClick={previousStep} className="w-full px-3 py-2 rounded-md bg-gray-600 text-white text-sm">Previous</button>
@@ -408,6 +617,86 @@ export default function PitchEventPage() {
         }
       </div>
     </div>
+    {showEdit && event && (
+      <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+        <div className={`${isDarkMode ? 'bg-gray-900' : 'bg-white'} rounded-xl w-full max-w-lg p-6 shadow-xl`}>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold">Edit Event</h2>
+            <button onClick={() => setShowEdit(false)} className="text-sm opacity-70">Close</button>
+          </div>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm mb-1">Title</label>
+              <input value={editTitle} onChange={(e)=>setEditTitle(e.target.value)} className={`w-full px-3 py-2 rounded-md ${isDarkMode ? 'bg-gray-800' : 'bg-gray-100'}`} />
+            </div>
+            <div>
+              <label className="block text-sm mb-1">Meeting link</label>
+              <input value={editMeetingUrl} onChange={(e)=>setEditMeetingUrl(e.target.value)} className={`w-full px-3 py-2 rounded-md ${isDarkMode ? 'bg-gray-800' : 'bg-gray-100'}`} placeholder="https://zoom.us/j/…" />
+            </div>
+            <div>
+              <label className="block text-sm mb-1">Start time</label>
+              <input type="datetime-local" value={editStartTime} onChange={(e)=>setEditStartTime(e.target.value)} className={`w-full px-3 py-2 rounded-md ${isDarkMode ? 'bg-gray-800' : 'bg-gray-100'}`} />
+              <p className={`text-xs mt-1 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>All times are ET (Boston)</p>
+            </div>
+            <div>
+              <label className="block text-sm mb-2">MCs</label>
+              <div className="flex flex-wrap gap-2 mb-2">
+                {(allHackers.filter(h=>selectedMCs.includes(h.id))).map(h=> (
+                  <span key={h.id} className={`${isDarkMode ? 'bg-gray-800' : 'bg-gray-100'} px-2 py-1 rounded-full text-sm`}>{h.name}</span>
+                ))}
+                {selectedMCs.length === 0 && <span className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>No MCs selected</span>}
+              </div>
+              <button onClick={()=>setShowMCSelector(true)} className="px-3 py-2 rounded-md bg-gray-200 text-gray-900 text-sm">
+                Edit MC list
+              </button>
+            </div>
+          </div>
+          <div className="mt-6 flex justify-end gap-3">
+            <button onClick={()=>setShowEdit(false)} className={`${isDarkMode ? 'bg-gray-800 text-gray-200' : 'bg-gray-100 text-gray-800'} px-4 py-2 rounded-md`}>Cancel</button>
+            <button
+              onClick={async ()=> {
+                try {
+                  const body: any = {
+                    title: editTitle,
+                    meetingUrl: editMeetingUrl || null,
+                    startTime: editStartTime ? new Date(editStartTime).toISOString() : undefined,
+                    mcIds: selectedMCs,
+                  };
+                  const res = await fetch(`/api/events/${event.id}`, {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(body),
+                  });
+                  if (!res.ok) {
+                    alert("Failed to update event");
+                    return;
+                  }
+                  const updated = await res.json();
+                  setEvent(updated);
+                  setShowEdit(false);
+                } catch {}
+              }}
+              className={`px-4 py-2 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white`}
+            >
+              Save
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+    <HackerSelector
+      showModal={showMCSelector}
+      setShowModal={setShowMCSelector}
+      isDarkMode={isDarkMode}
+      searchTerm={searchTerm}
+      setSearchTerm={setSearchTerm}
+      filteredHackers={allHackers.filter(h => h.name.toLowerCase().includes(searchTerm.toLowerCase()) || (h.email || "").toLowerCase().includes(searchTerm.toLowerCase()))}
+      title="Select MCs"
+      singleSelect={false}
+      selectedIds={selectedMCs}
+      showRoleSelector={false}
+      handleAddMember={(h)=> setSelectedMCs(prev => prev.includes(h.id) ? prev.filter(id=>id!==h.id) : [...prev, h.id])}
+    />
     {showJoin && (
       <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
         <div className={`${isDarkMode ? 'bg-gray-900' : 'bg-white'} rounded-xl w-full max-w-lg p-6 shadow-xl`}>

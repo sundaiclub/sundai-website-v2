@@ -19,6 +19,8 @@ export async function DELETE(
 
     // Permissions: MC/Admin can delist any; owner (addedBy) can delist their own item unless it's CURRENT
     const event = await prisma.event.findUnique({ where: { id: params.eventId }, include: { mcs: true } });
+    if (!event) return new NextResponse("Event not found", { status: 404 });
+    if ((event as any).isFinished) return NextResponse.json({ message: "Event finished" }, { status: 400 });
     const isMC = !!event?.mcs.find(m => m.hackerId === me.id);
     const isAdmin = me.role === 'ADMIN';
     const isOwner = ep.addedById === me.id;

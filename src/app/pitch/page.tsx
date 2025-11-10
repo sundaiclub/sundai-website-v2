@@ -11,7 +11,6 @@ type EventListItem = {
   title: string;
   description?: string | null;
   startTime: string;
-  endTime?: string | null;
   meetingUrl?: string | null;
 };
 
@@ -40,7 +39,6 @@ export default function PitchPage() {
   const [title, setTitle] = useState("");
   const [meetingUrl, setMeetingUrl] = useState("");
   const [startTime, setStartTime] = useState("");
-  const [endTime, setEndTime] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [hackers, setHackers] = useState<Hacker[]>([]);
   const [selectedMCs, setSelectedMCs] = useState<string[]>([]);
@@ -57,7 +55,6 @@ export default function PitchPage() {
           title: e.title,
           description: e.description,
           startTime: e.startTime,
-          endTime: e.endTime,
           meetingUrl: e.meetingUrl,
         }));
         setEvents(mapped);
@@ -107,7 +104,6 @@ export default function PitchPage() {
         title,
         meetingUrl: meetingUrl || null,
         startTime,
-        endTime: endTime || null,
         mcIds: selectedMCs,
       };
       const res = await fetch('/api/events', {
@@ -126,7 +122,7 @@ export default function PitchPage() {
       }
       const created = await res.json();
       setShowCreate(false);
-      setTitle(""); setMeetingUrl(""); setStartTime(""); setEndTime(""); setSelectedMCs([]);
+      setTitle(""); setMeetingUrl(""); setStartTime(""); setSelectedMCs([]);
       router.push(`/pitch/${created.id}`);
     } catch (e) {
       console.error(e);
@@ -254,17 +250,17 @@ export default function PitchPage() {
                 <label className="block text-sm mb-1">Start time</label>
                 <input type="datetime-local" value={startTime} onChange={e=>setStartTime(e.target.value)} className={`w-full px-3 py-2 rounded-md ${isDarkMode ? 'bg-gray-800' : 'bg-gray-100'}`} />
               </div>
-              <div>
-                <label className="block text-sm mb-2">MCs</label>
-                <div className="flex flex-wrap gap-2 mb-2">
-                  {hackers.filter(h=>selectedMCs.includes(h.id)).map(h=> (
-                    <span key={h.id} className={`${isDarkMode ? 'bg-gray-800' : 'bg-gray-100'} px-2 py-1 rounded-full text-sm`}>{h.name}</span>
-                  ))}
-                </div>
-                <button onClick={()=>setShowSelector(true)} className="px-3 py-2 rounded-md bg-gray-200 text-gray-900 text-sm">
-                  Add MCs
-                </button>
+            <div>
+              <label className="block text-sm mb-2">MCs</label>
+              <div className="flex flex-wrap gap-2 mb-2">
+                {hackers.filter(h=>selectedMCs.includes(h.id)).map(h=> (
+                  <span key={h.id} className={`${isDarkMode ? 'bg-gray-800' : 'bg-gray-100'} px-2 py-1 rounded-full text-sm`}>{h.name}</span>
+                ))}
               </div>
+              <button onClick={()=>setShowSelector(true)} className="px-3 py-2 rounded-md bg-gray-200 text-gray-900 text-sm">
+                Add MCs
+              </button>
+            </div>
             </div>
             <div className="mt-6 flex justify-end gap-3">
               <button onClick={()=>setShowCreate(false)} className={`${isDarkMode ? 'bg-gray-800 text-gray-200' : 'bg-gray-100 text-gray-800'} px-4 py-2 rounded-md`}>Cancel</button>

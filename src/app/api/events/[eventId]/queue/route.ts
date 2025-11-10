@@ -20,6 +20,7 @@ export async function POST(
 
     const event = await prisma.event.findUnique({ where: { id: params.eventId } });
     if (!event) return new NextResponse("Event not found", { status: 404 });
+    if ((event as any).isFinished) return NextResponse.json({ message: "Event finished" }, { status: 400 });
 
     // Verify the user owns or participates in the project
     const project = await prisma.project.findUnique({
@@ -84,6 +85,7 @@ export async function PATCH(
 
     const event = await prisma.event.findUnique({ where: { id: params.eventId } });
     if (!event) return new NextResponse("Event not found", { status: 404 });
+    if ((event as any).isFinished) return NextResponse.json({ message: "Event finished" }, { status: 400 });
 
     const isAdmin = hacker.role === "ADMIN";
     const allowAll = event.audienceCanReorder || isAdmin;
