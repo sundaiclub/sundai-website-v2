@@ -15,58 +15,89 @@ export async function GET(req: NextRequest) {
   const toDate = searchParams.get('to_date') || undefined;
   const sort = searchParams.get('sort') || undefined;
   const starred = searchParams.get('starred') === '1';
+  const hackerIdParam = searchParams.get('hacker_id') || undefined;
+  const clerkIdParam = searchParams.get('clerk_id') || undefined;
 
   const status = searchParams.getAll('status'); // can be []
   const techTags = searchParams.getAll('tech_tag'); // can be []
   const domainTags = searchParams.getAll('domain_tag'); // can be []
 
   // WHERE
-  const where: any = {};
+  let where: any = {};
+  const andFilters: any[] = [];
 
   if (search) {
-    where.OR = [
+    const searchOr = [
       { title: { contains: search, mode: 'insensitive' } },
       { preview: { contains: search, mode: 'insensitive' } },
       { description: { contains: search, mode: 'insensitive' } },
     ];
+    andFilters.push({ OR: searchOr });
   }
 
   if (status && status.length > 0) {
-    where.status = { in: status };
+    andFilters.push({ status: { in: status } });
   }
 
   if (starred) {
-    where.is_starred = true;
+    andFilters.push({ is_starred: true });
   }
 
   if (fromDate || toDate) {
-    where.startDate = {};
+    const startDate: any = {};
     if (fromDate) {
-      where.startDate.gte = new Date(fromDate);
+      startDate.gte = new Date(fromDate);
     }
     if (toDate) {
       // end of day
       const to = new Date(toDate);
       to.setHours(23, 59, 59, 999);
-      where.startDate.lte = to;
+      startDate.lte = to;
     }
+    andFilters.push({ startDate });
   }
 
   if (techTags && techTags.length > 0) {
     // assumes project.techTags is M:N
-    where.techTags = {
-      some: {
-        name: { in: techTags },
-      },
-    };
+    andFilters.push({
+      techTags: {
+        some: { name: { in: techTags } },
+      }
+    });
   }
 
   if (domainTags && domainTags.length > 0) {
-    where.domainTags = {
-      some: {
-        name: { in: domainTags },
-      },
-    };
+    andFilters.push({
+      domainTags: {
+        some: { name: { in: domainTags } },
+      }
+    });
+  }
+
+  // Ownership filter: by hacker_id (prisma id) or clerk_id
+  let resolvedHackerId = hackerIdParam;
+  if (!resolvedHackerId && clerkIdParam) {
+    const hacker = await prisma.hacker.findUnique({
+      where: { clerkId: clerkIdParam },
+      select: { id: true },
+    });
+    if (hacker?.id) {
+      resolvedHackerId = hacker.id;
+    } else {
+      // If clerk_id provided but not found, ensure no results
+      andFilters.push({ id: { equals: '__none__' } });
+    }
+  }
+  if (resolvedHackerId) {
+    const ownershipOr = [
+      { launchLeadId: resolvedHackerId },
+      { participants: { some: { hackerId: resolvedHackerId } } },
+    ];
+    andFilters.push({ OR: ownershipOr });
+  }
+
+  if (andFilters.length > 0) {
+    where = { AND: andFilters };
   }
 
   // SORT
