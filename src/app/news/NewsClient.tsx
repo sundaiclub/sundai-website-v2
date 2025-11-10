@@ -3,6 +3,7 @@ import React, { useCallback, useMemo, useState } from "react";
 import { toast } from "react-hot-toast";
 import { useTheme } from "../contexts/ThemeContext";
 import { useUserContext } from "../contexts/UserContext";
+import { calculateProjectScore } from "@/lib/trending";
  
 
 type WeeklyTopProject = {
@@ -36,9 +37,56 @@ export default function NewsClient() {
   }, []);
 
   const loadTopProjects = useCallback(async () => {
-    const resp = await fetch("/api/news/weekly");
-    const data = await resp.json();
-    return (data.topProjects || []) as WeeklyTopProject[];
+    // Fetch all approved projects fresh and compute trending weekly list client-side
+    const resp = await fetch('/api/projects?status=APPROVED', { cache: 'no-store' });
+    const projects = await resp.json();
+
+    const now = new Date();
+    const cutoffDate = new Date(now);
+    cutoffDate.setDate(now.getDate() - 7);
+    cutoffDate.setHours(0, 0, 0, 0);
+
+    const inCutoffDate = projects.filter((p: any) => {
+      const startOrCreated = new Date((p.startDate as any) || (p.createdAt as any));
+      return startOrCreated >= cutoffDate;
+    });
+
+    const byTrending = (a: any, b: any) =>
+      calculateProjectScore(b, { timeDecayDays: 1 }) - calculateProjectScore(a, { timeDecayDays: 1 });
+
+    const trendingThisWeek = inCutoffDate.length >= 5
+      ? inCutoffDate.sort(byTrending).slice(0, 5)
+      : [
+          ...inCutoffDate.sort(byTrending),
+          ...projects
+            .filter((p: any) => !inCutoffDate.includes(p))
+            .sort(byTrending)
+            .slice(0, 5 - inCutoffDate.length),
+        ];
+
+    const result: WeeklyTopProject[] = trendingThisWeek.map((p: any) => ({
+      id: p.id,
+      title: p.title,
+      preview: p.preview || p.title,
+      createdAt: (p.createdAt instanceof Date ? p.createdAt : new Date(p.createdAt as any)).toISOString(),
+      likeCount: (p.likes?.length as number) || 0,
+      thumbnailUrl: p.thumbnail?.url || null,
+      launchLead: {
+        id: p.launchLead?.id,
+        name: p.launchLead?.name,
+        linkedinUrl: (p.launchLead as any)?.linkedinUrl || null,
+        twitterUrl: (p.launchLead as any)?.twitterUrl || null,
+      },
+      team: (p.participants || []).map((pp: any) => ({
+        id: pp.hacker?.id,
+        name: pp.hacker?.name,
+        linkedinUrl: (pp.hacker as any)?.linkedinUrl || null,
+        twitterUrl: (pp.hacker as any)?.twitterUrl || null,
+      })),
+      projectUrl: `https://www.sundai.club/projects/${p.id}`,
+    }));
+
+    return result;
   }, []);
 
   const linkedinPost = useMemo(() => {

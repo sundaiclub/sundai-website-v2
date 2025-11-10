@@ -137,7 +137,7 @@ export default function PitchPage() {
     <div className={`min-h-screen ${isDarkMode ? "bg-black text-gray-100" : "bg-gray-50 text-gray-900"}`}>
       <div className="max-w-6xl mx-auto px-4 py-8">
         <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl md:text-3xl font-bold">Pitch Night</h1>
+          <h1 className="text-2xl md:text-3xl font-bold">Pitch at Sundai</h1>
           {isAdmin && (
             <button onClick={() => setShowCreate(true)} className="px-4 py-2 rounded-md bg-indigo-600 text-white hover:bg-indigo-700">
               Create Event
@@ -230,24 +230,6 @@ export default function PitchPage() {
               );
             })()}
 
-            <div>
-              <h3 className="text-lg font-semibold mb-2">All upcoming</h3>
-              <ul className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {events.map((e) => (
-                  <li key={e.id} className={`${isDarkMode ? "bg-gray-900" : "bg-white"} rounded-lg p-4 shadow`}>
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <div className="font-medium">{e.title}</div>
-                        <div className="text-sm opacity-75"><Countdown start={e.startTime} /></div>
-                      </div>
-                      <Link href={`/pitch/${e.id}`} className="px-3 py-2 rounded-md bg-indigo-600 text-white hover:bg-indigo-700 text-sm">
-                        View
-                      </Link>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </div>
           </div>
         )}
       </div>
@@ -262,7 +244,7 @@ export default function PitchPage() {
             <div className="space-y-4">
               <div>
                 <label className="block text-sm mb-1">Title</label>
-                <input value={title} onChange={e=>setTitle(e.target.value)} className={`w-full px-3 py-2 rounded-md ${isDarkMode ? 'bg-gray-800' : 'bg-gray-100'}`} placeholder="Sundai Pitch Night" />
+                <input value={title} onChange={e=>setTitle(e.target.value)} className={`w-full px-3 py-2 rounded-md ${isDarkMode ? 'bg-gray-800' : 'bg-gray-100'}`} placeholder="Sundai Pitches" />
               </div>
               <div>
                 <label className="block text-sm mb-1">Meeting link</label>
