@@ -92,6 +92,15 @@ async function main() {
         email: "uabhishek2904@gmail.com",
       },
     }),
+    prisma.hacker.create({
+        data: {
+        name: "Liliia Botueva",
+        clerkId: "user_34tZPzJUCi7Am6iYKdiSqjUsPun",
+        role: Role.HACKER,
+        bio: "New developer on the team",
+        email: "botuevaliliia@gmail.com",
+      },
+    }),
   ]);
 
   const [connor, sam, serge, artem, vlad] = users;

@@ -15,29 +15,11 @@ import { Project } from "./components/Project";
 export default function Home() {
   const [isTypingDone, setIsTypingDone] = useState(false);
   const [projects, setProjects] = useState<Project[]>([]);
-  const [loading, setLoading] = useState(true);
   const { isDarkMode } = useTheme();
   const { user } = useUser();
   const { userInfo } = useUserContext();
 
   usePullToRefresh();
-
-  // Fetch projects for trending sections
-  useEffect(() => {
-    async function fetchProjects() {
-      try {
-        const response = await fetch('/api/projects?status=APPROVED');
-        const data = await response.json();
-        setProjects(data);
-      } catch (error) {
-        console.error("Error fetching projects:", error);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    fetchProjects();
-  }, []);
 
   const handleLike = async (
     e: React.MouseEvent,
@@ -246,16 +228,6 @@ export default function Home() {
             </motion.div>
           </div>
         </div>
-
-        {loading ? (
-          <div className="flex justify-center items-center py-20">
-            <div
-              className={`animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 ${
-                isDarkMode ? "border-purple-400" : "border-indigo-600"
-              }`}
-            ></div>
-          </div>
-        ) : (
           <motion.div
             initial={{ opacity: 0, y: 50 }}
             animate={{ opacity: 1, y: 0 }}
@@ -263,12 +235,12 @@ export default function Home() {
           >
             <TrendingSections 
               projects={projects}
+              setProjects={setProjects}
               userInfo={userInfo}
               handleLike={handleLike}
               isDarkMode={isDarkMode}
             />
           </motion.div>
-        )}
       </section>
       <motion.footer
         initial={{ opacity: 0 }}

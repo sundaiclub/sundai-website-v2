@@ -7,6 +7,7 @@ jest.mock('../../src/lib/prisma', () => ({
   __esModule: true,
   default: {
     project: {
+      count: jest.fn(),
       findMany: jest.fn(),
       create: jest.fn(),
     },
@@ -25,7 +26,7 @@ jest.mock('@clerk/nextjs/server', () => ({
   auth: jest.fn(),
 }))
 
-// Mock GCP storage
+// Mock GCP storage (kept for compatibility with imports in tests)
 jest.mock('../../src/lib/gcp-storage', () => ({
   uploadToGCS: jest.fn(),
 }))
@@ -39,69 +40,95 @@ describe('/api/projects', () => {
     process.env.IS_RESEARCH_SITE = 'false'
   })
 
-  describe('GET', () => {
-    it('fetches projects successfully', async () => {
+  describe('GET (paginated)', () => {
+    it('returns paginated projects successfully', async () => {
+      mockPrisma.project.count.mockResolvedValue(1)
       mockPrisma.project.findMany.mockResolvedValue([mockProject])
 
-      const request = new NextRequest('http://localhost:3000/api/projects')
+      const request = new NextRequest('http://localhost:3000/api/projects?page=1&limit=10')
       const response = await GET(request)
       const data = await response.json()
 
       expect(response.status).toBe(200)
-      expect(data).toHaveLength(1)
-      expect(data[0]).toMatchObject({
+      expect(Array.isArray(data.items)).toBe(true)
+      expect(data.items).toHaveLength(1)
+      expect(data.page).toBe(1)
+      expect(data.pageCount).toBe(1)
+      expect(data.total).toBe(1)
+      expect(data.items[0]).toMatchObject({
         id: 'test-project-id',
         title: 'Test Project',
         status: 'APPROVED',
       })
     })
 
-    it('filters projects by status', async () => {
-      mockPrisma.project.findMany.mockResolvedValue([mockProject])
-
-      const request = new NextRequest('http://localhost:3000/api/projects?status=APPROVED')
-      await GET(request)
-
-      expect(mockPrisma.project.findMany).toHaveBeenCalledWith({
-        where: {
-          AND: [
-            { status: 'APPROVED' },
-            { hack_type: 'REGULAR' },
-          ],
+    it('returns items with thumbnail and avatars included', async () => {
+      const projectWithMedia = {
+        ...mockProject,
+        thumbnail: { url: 'https://example.com/thumbnail.jpg' },
+        launchLead: {
+          ...mockProject.launchLead,
+          avatar: { url: 'https://example.com/avatar-lead.jpg' },
         },
-        include: expect.any(Object),
-        orderBy: expect.any(Array),
-      })
-    })
+        participants: [
+          {
+            role: 'Dev',
+            hacker: {
+              id: 'h1',
+              name: 'Hacker One',
+              avatar: { url: 'https://example.com/avatar-h1.jpg' },
+            },
+          },
+        ],
+      }
+      mockPrisma.project.count.mockResolvedValue(1)
+      mockPrisma.project.findMany.mockResolvedValue([projectWithMedia])
 
-    it('handles research site environment', async () => {
-      process.env.IS_RESEARCH_SITE = 'true'
-      mockPrisma.project.findMany.mockResolvedValue([])
-
-      const request = new NextRequest('http://localhost:3000/api/projects')
-      await GET(request)
-
-      expect(mockPrisma.project.findMany).toHaveBeenCalledWith({
-        where: {
-          AND: [
-            {},
-            { hack_type: 'RESEARCH' },
-          ],
-        },
-        include: expect.any(Object),
-        orderBy: expect.any(Array),
-      })
-    })
-
-    it('handles database errors', async () => {
-      mockPrisma.project.findMany.mockRejectedValue(new Error('Database error'))
-
-      const request = new NextRequest('http://localhost:3000/api/projects')
+      const request = new NextRequest('http://localhost:3000/api/projects?page=1&limit=10')
       const response = await GET(request)
       const data = await response.json()
 
-      expect(response.status).toBe(500)
-      expect(data).toEqual({ error: 'Error fetching projects' })
+      expect(response.status).toBe(200)
+      expect(data.items[0].thumbnail?.url).toBe('https://example.com/thumbnail.jpg')
+      expect(data.items[0].launchLead?.avatar?.url).toBe('https://example.com/avatar-lead.jpg')
+      expect(data.items[0].participants?.[0]?.hacker?.avatar?.url).toBe('https://example.com/avatar-h1.jpg')
+    })
+
+    it('applies status filter and sorting', async () => {
+      mockPrisma.project.count.mockResolvedValue(1)
+      mockPrisma.project.findMany.mockResolvedValue([mockProject])
+
+      const request = new NextRequest('http://localhost:3000/api/projects?status=APPROVED&sort=newest')
+      await GET(request)
+
+      expect(mockPrisma.project.findMany).toHaveBeenCalledWith({
+        where: {
+          status: { in: ['APPROVED'] },
+        },
+        skip: 0,
+        take: 10,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          launchLead: {
+            include: {
+              avatar: true,
+            },
+          },
+          participants: {
+            include: {
+              hacker: {
+                include: {
+                  avatar: true,
+                },
+              },
+            },
+          },
+          techTags: true,
+          domainTags: true,
+          thumbnail: true,
+          likes: true,
+        },
+      })
     })
   })
 

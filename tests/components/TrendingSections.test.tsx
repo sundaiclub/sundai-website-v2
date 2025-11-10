@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, act } from '../utils/test-utils'
+import { render, screen, fireEvent, act, waitFor } from '../utils/test-utils'
 import TrendingSections from '../../src/app/components/TrendingSections'
 import { mockProject, mockHacker } from '../utils/test-utils'
 
@@ -8,6 +8,18 @@ jest.mock('../../src/app/contexts/ThemeContext', () => ({
     isDarkMode: false,
   }),
 }))
+
+// Mock fetch used by TrendingSections to load data
+const globalAny: any = global
+beforeEach(() => {
+  jest.clearAllMocks()
+  globalAny.fetch = jest.fn()
+  // default mock: three calls for week, month, all
+  ;(globalAny.fetch as jest.Mock).mockResolvedValue({
+    ok: true,
+    json: async () => [mockProject],
+  })
+})
 
 describe('TrendingSections Component', () => {
   const mockHandleLike = jest.fn()
@@ -28,9 +40,11 @@ describe('TrendingSections Component', () => {
       )
     })
 
-    expect(screen.getByText('🔥 Hot This Week')).toBeInTheDocument()
-    expect(screen.getByText('📈 Recent Best')).toBeInTheDocument()
-    expect(screen.getByText('⭐ Best of All Time')).toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.getByText('🔥 Hot This Week')).toBeInTheDocument()
+      expect(screen.getByText('📈 Recent Best')).toBeInTheDocument()
+      expect(screen.getByText('⭐ Best of All Time')).toBeInTheDocument()
+    })
   })
 
   it('renders project cards in trending sections', async () => {
@@ -45,8 +59,8 @@ describe('TrendingSections Component', () => {
       )
     })
 
-    expect(screen.getAllByText('Test Project')[0]).toBeInTheDocument()
-    expect(screen.getAllByText('A test project description')[0]).toBeInTheDocument()
+    expect(await screen.findAllByText('Test Project')).toBeTruthy()
+    expect(await screen.findAllByText('A test project description')).toBeTruthy()
   })
 
   it('handles like button clicks in trending cards', async () => {
@@ -62,7 +76,7 @@ describe('TrendingSections Component', () => {
     })
 
     // Like button is inside ProjectCard; ensure at least one like count is shown and clickable
-    const likeButtons = screen.getAllByRole('button', { name: /like project test project/i })
+    const likeButtons = await screen.findAllByRole('button', { name: /like project test project/i })
     fireEvent.click(likeButtons[0])
     expect(mockHandleLike).toHaveBeenCalled()
   })
@@ -84,7 +98,7 @@ describe('TrendingSections Component', () => {
       )
     })
 
-    const likeButtons = screen.getAllByRole('button', { name: /like project test project/i })
+    const likeButtons = await screen.findAllByRole('button', { name: /like project test project/i })
     expect(likeButtons[0]).toBeInTheDocument()
   })
 
@@ -101,13 +115,14 @@ describe('TrendingSections Component', () => {
     })
 
     // Check if links are present (they might not be rendered in this component)
-    const githubLinks = screen.queryAllByRole('link', { name: /github/i })
-    const demoLinks = screen.queryAllByRole('link', { name: /demo/i })
+    const githubLinks = await screen.queryAllByRole('link', { name: /github/i })
+    const demoLinks = await screen.queryAllByRole('link', { name: /demo/i })
 
     // If links are not rendered, skip this test or check for alternative elements
     if (githubLinks.length === 0) {
       // Check if the component renders project information instead
-      expect(screen.getAllByText('Test Project')[0]).toBeInTheDocument()
+      const titles = await screen.findAllByText('Test Project')
+      expect(titles[0]).toBeInTheDocument()
     } else {
       expect(githubLinks[0]).toHaveAttribute('href', 'https://github.com/test/project')
       expect(demoLinks[0]).toHaveAttribute('href', 'https://demo.example.com')
@@ -126,9 +141,9 @@ describe('TrendingSections Component', () => {
       )
     })
 
-    expect(screen.getAllByText('React')[0]).toBeInTheDocument()
+    expect((await screen.findAllByText('React'))[0]).toBeInTheDocument()
     // Domain tags might not be rendered in this component, check for tech tags only
-    expect(screen.getAllByText('React')[0]).toBeInTheDocument()
+    expect((await screen.findAllByText('React'))[0]).toBeInTheDocument()
   })
 
   it('renders launch lead information', async () => {
@@ -144,7 +159,8 @@ describe('TrendingSections Component', () => {
     })
 
     // Launch lead name might not be rendered in this component, check for project info instead
-    expect(screen.getAllByText('Test Project')[0]).toBeInTheDocument()
+    const titles = await screen.findAllByText('Test Project')
+    expect(titles[0]).toBeInTheDocument()
   })
 
   it('renders project thumbnail when available', async () => {
@@ -159,7 +175,7 @@ describe('TrendingSections Component', () => {
       )
     })
 
-    const thumbnail = screen.getAllByRole('img', { name: /Test Project/i })[0]
+    const thumbnail = (await screen.findAllByRole('img', { name: /Test Project/i }))[0]
     expect(thumbnail).toBeInTheDocument()
   })
 
@@ -175,7 +191,7 @@ describe('TrendingSections Component', () => {
       )
     })
 
-    const cardLink = screen.getAllByRole('link', { name: /view project test project/i })[0]
+    const cardLink = (await screen.findAllByRole('link', { name: /view project test project/i }))[0]
     expect(cardLink).toHaveAttribute('href', '/projects/test-project-id')
   })
 
@@ -192,7 +208,7 @@ describe('TrendingSections Component', () => {
     })
 
     // Find the scroll item container that wraps the card and check height class
-    const projectTitle = screen.getAllByText('Test Project')[0]
+    const projectTitle = (await screen.findAllByText('Test Project'))[0]
     const scrollItem = projectTitle.closest('div.scroll-item') as HTMLElement | null
     expect(scrollItem).not.toBeNull()
     expect(scrollItem?.className).not.toContain('h-[360px]')
@@ -210,9 +226,11 @@ describe('TrendingSections Component', () => {
       )
     })
 
-    expect(screen.getByText('🔥 Hot This Week')).toBeInTheDocument()
-    expect(screen.getByText('📈 Recent Best')).toBeInTheDocument()
-    expect(screen.getByText('⭐ Best of All Time')).toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.getByText('🔥 Hot This Week')).toBeInTheDocument()
+      expect(screen.getByText('📈 Recent Best')).toBeInTheDocument()
+      expect(screen.getByText('⭐ Best of All Time')).toBeInTheDocument()
+    })
   })
 
   it('renders in dark mode correctly', async () => {
@@ -227,7 +245,7 @@ describe('TrendingSections Component', () => {
       )
     })
 
-    const projectCard = screen.getAllByText('Test Project')[0].closest('div')
+    const projectCard = (await screen.findAllByText('Test Project'))[0].closest('div')
     // Check if the parent container has dark mode classes
     const darkModeContainer = projectCard?.closest('div[class*="bg-gray-800"]')
     expect(darkModeContainer).toBeInTheDocument()
@@ -246,7 +264,7 @@ describe('TrendingSections Component', () => {
     })
 
     // The trending badge should be present in the component
-    const trendingBadge = screen.getByText('🔥 Trending')
+    const trendingBadge = await screen.findByText('🔥 Trending')
     expect(trendingBadge).toBeInTheDocument()
   })
 
@@ -274,8 +292,10 @@ describe('TrendingSections Component', () => {
       )
     })
 
-    expect(screen.getAllByText('Test Project')[0]).toBeInTheDocument()
+    const titles = await screen.findAllByText('Test Project')
+    expect(titles[0]).toBeInTheDocument()
     // Test Hacker name might not be rendered in this component, check for project description instead
-    expect(screen.getAllByText('A test project description')[0]).toBeInTheDocument()
+    const descriptions = await screen.findAllByText('A test project description')
+    expect(descriptions[0]).toBeInTheDocument()
   })
 })
