@@ -83,6 +83,65 @@ async function handler(request: Request) {
     }
   }
 
+  if (eventType === "user.updated") {
+    const { id, email_addresses, first_name, last_name, image_url, username } = evt.data;
+    try {
+      // Find the hacker by clerkId
+      const existingHacker = await prisma.hacker.findUnique({
+        where: { clerkId: id },
+        include: { avatar: true },
+      });
+
+      if (!existingHacker) {
+        console.error("Hacker not found for clerkId:", id);
+        return new Response("Hacker not found", { status: 404 });
+      }
+
+      // Build the updated name
+      const emailUsername = email_addresses[0].email_address.split("@")[0];
+      const name =
+        first_name && last_name
+          ? `${first_name} ${last_name}`
+          : first_name
+          ? first_name
+          : emailUsername;
+
+      // Update the hacker
+      const updatedHacker = await prisma.hacker.update({
+        where: { clerkId: id },
+        data: {
+          name: name,
+          email: email_addresses[0].email_address,
+          username: username || existingHacker.username || emailUsername,
+          ...(image_url && !existingHacker.avatar && {
+            avatar: {
+              create: {
+                key: `avatars/${id}`,
+                bucket: "sundai-avatars",
+                url: image_url,
+                filename: `${id}-avatar`,
+                mimeType: "image/jpeg",
+                size: 0,
+              },
+            },
+          }),
+          ...(image_url && existingHacker.avatar && {
+            avatar: {
+              update: {
+                url: image_url,
+              },
+            },
+          }),
+        },
+      });
+
+      return new Response(JSON.stringify(updatedHacker), { status: 200 });
+    } catch (error) {
+      console.error("Error updating hacker:", error);
+      return new Response("Error updating hacker", { status: 500 });
+    }
+  }
+
   return new Response("", { status: 200 });
 }
 export const GET = handler;
