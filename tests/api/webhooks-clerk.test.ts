@@ -6,6 +6,8 @@ import prisma from '../../src/lib/prisma';
 jest.mock('../../src/lib/prisma', () => ({
   hacker: {
     create: jest.fn(),
+    findUnique: jest.fn(),
+    update: jest.fn(),
   },
 }));
 
@@ -280,11 +282,212 @@ describe('/api/webhooks/clerk', () => {
       expect(data).toBe('Error creating hacker');
     });
 
-    it('should return 200 for other event types', async () => {
+    it('should handle user.updated event successfully', async () => {
       const { Webhook } = require('svix');
       const mockWebhook = {
         verify: jest.fn().mockReturnValue({
           type: 'user.updated',
+          data: {
+            id: 'user_123',
+            email_addresses: [{ email_address: 'updated@example.com' }],
+            first_name: 'Jane',
+            last_name: 'Smith',
+            image_url: 'https://example.com/new-avatar.jpg',
+            username: 'janesmith',
+          },
+        }),
+      };
+      Webhook.mockImplementation(() => mockWebhook);
+
+      const mockExistingHacker = {
+        id: 'hacker_123',
+        name: 'John Doe',
+        clerkId: 'user_123',
+        email: 'test@example.com',
+        username: 'johndoe',
+        role: 'HACKER',
+        avatar: {
+          id: 'avatar_123',
+          url: 'https://example.com/old-avatar.jpg',
+        },
+      };
+
+      const mockUpdatedHacker = {
+        id: 'hacker_123',
+        name: 'Jane Smith',
+        clerkId: 'user_123',
+        email: 'updated@example.com',
+        username: 'janesmith',
+        role: 'HACKER',
+      };
+
+      mockPrisma.hacker.findUnique.mockResolvedValue(mockExistingHacker as any);
+      mockPrisma.hacker.update.mockResolvedValue(mockUpdatedHacker as any);
+
+      const request = createMockRequest({});
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data).toEqual(mockUpdatedHacker);
+      expect(mockPrisma.hacker.findUnique).toHaveBeenCalledWith({
+        where: { clerkId: 'user_123' },
+        include: { avatar: true },
+      });
+      expect(mockPrisma.hacker.update).toHaveBeenCalledWith({
+        where: { clerkId: 'user_123' },
+        data: {
+          name: 'Jane Smith',
+          email: 'updated@example.com',
+          username: 'janesmith',
+          avatar: {
+            update: {
+              url: 'https://example.com/new-avatar.jpg',
+            },
+          },
+        },
+      });
+    });
+
+    it('should handle user.updated event without existing avatar', async () => {
+      const { Webhook } = require('svix');
+      const mockWebhook = {
+        verify: jest.fn().mockReturnValue({
+          type: 'user.updated',
+          data: {
+            id: 'user_456',
+            email_addresses: [{ email_address: 'test@example.com' }],
+            first_name: 'Bob',
+            last_name: 'Johnson',
+            image_url: 'https://example.com/avatar.jpg',
+            username: 'bobjohnson',
+          },
+        }),
+      };
+      Webhook.mockImplementation(() => mockWebhook);
+
+      const mockExistingHacker = {
+        id: 'hacker_456',
+        name: 'Bob J',
+        clerkId: 'user_456',
+        email: 'test@example.com',
+        username: 'bobj',
+        role: 'HACKER',
+        avatar: null,
+      };
+
+      const mockUpdatedHacker = {
+        id: 'hacker_456',
+        name: 'Bob Johnson',
+        clerkId: 'user_456',
+        email: 'test@example.com',
+        username: 'bobjohnson',
+        role: 'HACKER',
+      };
+
+      mockPrisma.hacker.findUnique.mockResolvedValue(mockExistingHacker as any);
+      mockPrisma.hacker.update.mockResolvedValue(mockUpdatedHacker as any);
+
+      const request = createMockRequest({});
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data).toEqual(mockUpdatedHacker);
+      expect(mockPrisma.hacker.update).toHaveBeenCalledWith({
+        where: { clerkId: 'user_456' },
+        data: {
+          name: 'Bob Johnson',
+          email: 'test@example.com',
+          username: 'bobjohnson',
+          avatar: {
+            create: {
+              key: 'avatars/user_456',
+              bucket: 'sundai-avatars',
+              url: 'https://example.com/avatar.jpg',
+              filename: 'user_456-avatar',
+              mimeType: 'image/jpeg',
+              size: 0,
+            },
+          },
+        },
+      });
+    });
+
+    it('should return 404 if hacker not found for user.updated', async () => {
+      const { Webhook } = require('svix');
+      const mockWebhook = {
+        verify: jest.fn().mockReturnValue({
+          type: 'user.updated',
+          data: {
+            id: 'user_nonexistent',
+            email_addresses: [{ email_address: 'test@example.com' }],
+            first_name: 'Test',
+            last_name: 'User',
+            image_url: null,
+            username: 'testuser',
+          },
+        }),
+      };
+      Webhook.mockImplementation(() => mockWebhook);
+
+      mockPrisma.hacker.findUnique.mockResolvedValue(null);
+
+      const request = createMockRequest({});
+
+      const response = await POST(request);
+      const data = await response.text();
+
+      expect(response.status).toBe(404);
+      expect(data).toBe('Hacker not found');
+    });
+
+    it('should return 500 if hacker update fails', async () => {
+      const { Webhook } = require('svix');
+      const mockWebhook = {
+        verify: jest.fn().mockReturnValue({
+          type: 'user.updated',
+          data: {
+            id: 'user_123',
+            email_addresses: [{ email_address: 'test@example.com' }],
+            first_name: 'Test',
+            last_name: 'User',
+            image_url: null,
+            username: 'testuser',
+          },
+        }),
+      };
+      Webhook.mockImplementation(() => mockWebhook);
+
+      const mockExistingHacker = {
+        id: 'hacker_123',
+        name: 'Test User',
+        clerkId: 'user_123',
+        email: 'test@example.com',
+        username: 'testuser',
+        role: 'HACKER',
+        avatar: null,
+      };
+
+      mockPrisma.hacker.findUnique.mockResolvedValue(mockExistingHacker as any);
+      mockPrisma.hacker.update.mockRejectedValue(new Error('Database error'));
+
+      const request = createMockRequest({});
+
+      const response = await POST(request);
+      const data = await response.text();
+
+      expect(response.status).toBe(500);
+      expect(data).toBe('Error updating hacker');
+    });
+
+    it('should return 200 for other event types', async () => {
+      const { Webhook } = require('svix');
+      const mockWebhook = {
+        verify: jest.fn().mockReturnValue({
+          type: 'user.deleted',
           data: {},
         }),
       };
