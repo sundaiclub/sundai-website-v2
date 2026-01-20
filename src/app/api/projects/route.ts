@@ -13,12 +13,16 @@ export async function GET(req: Request) {
     const isResearchSite = process.env.IS_RESEARCH_SITE === 'true';
     const hack_type = isResearchSite ? 'RESEARCH' : 'REGULAR';
 
+    const isIap2026Site = process.env.IAP2026 === 'true';
+
     const projects = await prisma.project.findMany({
       where: {
         AND: [
           status ? { status: status as ProjectStatus } : {},
-          { hack_type }
-        ]
+          isIap2026Site
+            ? { domainTags: { some: { name: "IAP2026" } } }
+            : { hack_type },
+        ],
       },
       include: {
         thumbnail: {
@@ -157,6 +161,8 @@ export async function POST(req: Request) {
     const isResearchSite = process.env.IS_RESEARCH_SITE === 'true';
     const hack_type = isResearchSite ? 'RESEARCH' : 'REGULAR';
 
+    const isIap2026Site = process.env.IAP2026 === 'true';
+
     // Create project with participants and thumbnail
     const project = await prisma.project.create({
       data: {
@@ -177,6 +183,14 @@ export async function POST(req: Request) {
             hackerId: member.id,
             role: member.role,
           })),
+        },
+        domainTags: {
+          connectOrCreate: [
+            { where: { name: "RESEARCH" }, create: { name: "RESEARCH" } },
+            ...(isIap2026Site
+              ? [{ where: { name: "IAP2026" }, create: { name: "IAP2026" } }]
+              : []),
+          ],
         },
       },
       include: {
