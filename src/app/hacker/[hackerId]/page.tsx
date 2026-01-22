@@ -201,7 +201,7 @@ export default function HackerProfile() {
     fetchCurrentUserHackerId();
   }, [user?.id]);
 
-  const isOwnProfile = currentUserHackerId === params.hackerId;
+  const isOwnProfile = currentUserHackerId === params?.hackerId;
 
   useEffect(() => {
     if (hacker) {
@@ -222,7 +222,7 @@ export default function HackerProfile() {
   useEffect(() => {
     const fetchHacker = async () => {
       try {
-        const response = await fetch(`/api/hackers/${params.hackerId}`);
+        const response = await fetch(`/api/hackers/${params?.hackerId}`);
         if (!response.ok) {
           throw new Error("Failed to fetch hacker data");
         }
@@ -241,15 +241,15 @@ export default function HackerProfile() {
       }
     };
 
-    if (params.hackerId) {
+    if (params?.hackerId) {
       fetchHacker();
     }
-  }, [params.hackerId]);
+  }, [params?.hackerId]);
 
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const response = await fetch(`/api/hackers/${params.hackerId}`, {
+      const response = await fetch(`/api/hackers/${params?.hackerId}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -507,7 +507,7 @@ export default function HackerProfile() {
             </div>
 
             {/* Contact & Links */}
-            {/* {!isEditing && (
+            {/* !isEditing && (
               <div className="flex flex-wrap gap-4 justify-center sm:justify-start">
                 {hacker.githubUrl && (
                   <Link

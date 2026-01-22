@@ -9,13 +9,13 @@ export default function AllProjectsList() {
 
   // Extract URL parameters for filtering
   const urlFilters = {
-    techTags: searchParams.getAll('tech_tag'),
-    domainTags: searchParams.getAll('domain_tag'),
-    search: searchParams.get('search') || '',
-    fromDate: searchParams.get('from_date') || '',
-    toDate: searchParams.get('to_date') || '',
-    status: searchParams.getAll('status'),
-    sort: searchParams.get('sort') || 'trending'
+    techTags: searchParams?.getAll('tech_tag') ?? [],
+    domainTags: searchParams?.getAll('domain_tag') ?? [],
+    search: searchParams?.get('search') ?? '',
+    fromDate: searchParams?.get('from_date') ?? '',
+    toDate: searchParams?.get('to_date') ?? '',
+    status: searchParams?.getAll('status') ?? [],
+    sort: searchParams?.get('sort') ?? 'trending'
   };
 
   return (

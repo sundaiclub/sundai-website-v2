@@ -151,7 +151,7 @@ const Navbar = () => {
             <div className={`${isPWA ? "ml-2 p-1" : "ml-1"}`}>
               {isSignedIn ? (
                 <UserButton
-                  afterSignOutUrl={pathname}
+                  afterSignOutUrl={pathname as string}
                   appearance={{
                     elements: {
                       avatarBox: isPWA ? "w-10 h-10" : "w-8 h-8",
@@ -230,7 +230,7 @@ const Navbar = () => {
           <div className="px-4 py-2">
             {isSignedIn ? (
               <UserButton
-                afterSignOutUrl={pathname}
+                afterSignOutUrl={pathname as string}
                 appearance={{
                   elements: {
                     avatarBox: isPWA ? "w-10 h-10" : "w-8 h-8",
