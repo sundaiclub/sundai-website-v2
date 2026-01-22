@@ -96,7 +96,7 @@ export default function ProjectDetail() {
   useEffect(() => {
     const fetchProject = async () => {
       try {
-        const response = await fetch(`/api/projects/${params.projectId}`);
+        const response = await fetch(`/api/projects/${params?.projectId}`);
         if (!response.ok) {
           throw new Error("Project not found");
         }
@@ -117,10 +117,10 @@ export default function ProjectDetail() {
       }
     };
 
-    if (params.projectId) {
+    if (params?.projectId) {
       fetchProject();
     }
-  }, [params.projectId, router]);
+  }, [params?.projectId, router]);
 
   useEffect(() => {
     if (project) {

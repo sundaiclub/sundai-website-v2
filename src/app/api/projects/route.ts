@@ -4,6 +4,8 @@ import { auth } from "@clerk/nextjs/server";
 import { uploadToGCS } from "@/lib/gcp-storage";
 import prisma from "@/lib/prisma";
 
+const ignoredDomainTags = (process.env.IGNORE_DOMAIN_TAGS || "").split(",").map(tag => tag.trim());
+
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
@@ -17,8 +19,17 @@ export async function GET(req: Request) {
       where: {
         AND: [
           status ? { status: status as ProjectStatus } : {},
-          { hack_type }
-        ]
+          { hack_type },
+          {
+            domainTags: {
+              none: {
+                name: {
+                  in: ignoredDomainTags,
+                },
+              },
+            },
+          },
+        ],
       },
       include: {
         thumbnail: {
