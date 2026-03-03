@@ -46,15 +46,15 @@ const uploadImage = async (file: File): Promise<string> => {
   return data.url;
 };
 
-function ButtonPanel({ params, router, isDarkMode, handleSave, saving }:
-  { params: any, router: any, isDarkMode: boolean, handleSave: () => void, saving: boolean }) {
+function ButtonPanel({ params, router, isDarkMode, handleSave, handlePublish, saving, publishing, isDraft }:
+  { params: any, router: any, isDarkMode: boolean, handleSave: () => void, handlePublish: () => void, saving: boolean, publishing: boolean, isDraft: boolean }) {
   return (
     <div className="flex items-center space-x-4 mt-4">
       <button
         onClick={() => router.push(`/projects/${params.projectId}`)}
         className={`flex items-center gap-2 px-4 py-2 transition-colors ${
-          isDarkMode 
-            ? "bg-gray-700 hover:bg-gray-600 text-gray-100" 
+          isDarkMode
+            ? "bg-gray-700 hover:bg-gray-600 text-gray-100"
             : "bg-gray-200 hover:bg-gray-300 text-gray-900"
         } shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500`}
       >
@@ -62,9 +62,11 @@ function ButtonPanel({ params, router, isDarkMode, handleSave, saving }:
       </button>
       <button
         onClick={handleSave}
-        disabled={saving}
+        disabled={saving || publishing}
         className={`px-4 py-2 ${
-          isDarkMode ? "bg-purple-600 hover:bg-purple-700" : "bg-indigo-600 hover:bg-indigo-700"
+          isDraft
+            ? (isDarkMode ? "bg-gray-600 hover:bg-gray-500" : "bg-gray-500 hover:bg-gray-600")
+            : (isDarkMode ? "bg-purple-600 hover:bg-purple-700" : "bg-indigo-600 hover:bg-indigo-700")
         } text-white shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 flex items-center space-x-2`}
       >
         {saving ? (
@@ -73,9 +75,27 @@ function ButtonPanel({ params, router, isDarkMode, handleSave, saving }:
             <span>Saving...</span>
           </>
         ) : (
-          <span>Save Changes</span>
+          <span>{isDraft ? "Save Draft" : "Save Changes"}</span>
         )}
       </button>
+      {isDraft && (
+        <button
+          onClick={handlePublish}
+          disabled={saving || publishing}
+          className={`px-4 py-2 ${
+            isDarkMode ? "bg-green-600 hover:bg-green-700" : "bg-green-600 hover:bg-green-700"
+          } text-white shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 flex items-center space-x-2`}
+        >
+          {publishing ? (
+            <>
+              <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div>
+              <span>Publishing...</span>
+            </>
+          ) : (
+            <span>Publish</span>
+          )}
+        </button>
+      )}
     </div>
   );
 }
@@ -107,6 +127,7 @@ export default function ProjectEditPage() {
   const [editableBlogUrl, setEditableBlogUrl] = useState("");
 
   const [saving, setSaving] = useState(false);
+  const [publishing, setPublishing] = useState(false);
   const [availableTechTags, setAvailableTechTags] = useState<Project["techTags"]>([]);
   const [availableDomainTags, setAvailableDomainTags] = useState<Project["domainTags"]>([]);
   const [showTechTagModal, setShowTechTagModal] = useState(false);
@@ -286,6 +307,69 @@ export default function ProjectEditPage() {
     }
   };
 
+  const handlePublish = async () => {
+    if (!project) return;
+
+    // Trigger form validation
+    if (formRef.current && !formRef.current.checkValidity()) {
+      formRef.current.reportValidity();
+      return;
+    }
+
+    setPublishing(true);
+    try {
+      // First save changes
+      const formData = new FormData();
+      formData.append("title", editableTitle);
+      if (thumbnail) {
+        formData.append("thumbnail", thumbnail);
+      }
+      formData.append("description", editableDescription);
+      formData.append("preview", editablePreview);
+      formData.append("startDate", editableStartDate.toISOString());
+      project.techTags.forEach(tag => {
+        formData.append("techTags[]", tag.id);
+      });
+      project.domainTags.forEach(tag => {
+        formData.append("domainTags[]", tag.id);
+      });
+      formData.append("githubUrl", editableGithubUrl);
+      formData.append("demoUrl", editableDemoUrl);
+      formData.append("blogUrl", editableBlogUrl);
+      formData.append("participants", JSON.stringify(project.participants));
+      formData.append("launchLead", project.launchLead.id);
+      formData.append("deleteThumbnail", (!thumbnail && thumbnailPreview === null).toString());
+
+      const saveResponse = await fetch(`/api/projects/${params?.projectId}/edit`, {
+        method: "PATCH",
+        body: formData,
+      });
+
+      if (!saveResponse.ok) {
+        throw new Error("Failed to save project");
+      }
+
+      // Then publish
+      const publishResponse = await fetch(`/api/projects/${params?.projectId}/submit`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "APPROVED" }),
+      });
+
+      if (!publishResponse.ok) {
+        throw new Error("Failed to publish project");
+      }
+
+      toast.success("Project published!");
+      router.push(`/projects/${params?.projectId}`);
+    } catch (error) {
+      console.error("Error publishing project:", error);
+      toast.error("Failed to publish project");
+    } finally {
+      setPublishing(false);
+    }
+  };
+
   const handleRemoveTag = (tagId: string, type: "tech" | "domain") => {
     if (!project) return;
     const updatedProject = {
@@ -432,7 +516,10 @@ export default function ProjectEditPage() {
             router={router}
             isDarkMode={isDarkMode}
             handleSave={handleSave}
+            handlePublish={handlePublish}
             saving={saving}
+            publishing={publishing}
+            isDraft={project?.status === "DRAFT"}
           />
           <div>
             <label className={`block font-medium ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
@@ -1008,7 +1095,10 @@ export default function ProjectEditPage() {
             router={router}
             isDarkMode={isDarkMode}
             handleSave={handleSave}
+            handlePublish={handlePublish}
             saving={saving}
+            publishing={publishing}
+            isDraft={project?.status === "DRAFT"}
           />
         </div>
       </div>
