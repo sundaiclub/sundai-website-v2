@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
-import { uploadToGCS } from "@/lib/gcp-storage";
 import prisma from "@/lib/prisma";
 
 export async function PATCH(
@@ -108,6 +107,7 @@ export async function PATCH(
       };
     } else if (thumbnail && thumbnail instanceof File) {
       try {
+        const { uploadToGCS } = await import("@/lib/gcp-storage");
         const uploadResult = await uploadToGCS(thumbnail);
         
         const newImage = await prisma.image.create({
