@@ -26,8 +26,29 @@ const firaCode = Fira_Code({
 })
 
 export const metadata: Metadata = {
-  title: "Sundai",
+  title: "Sundai Club",
   description: "Building & Launching AI Prototypes Every Sunday",
+  metadataBase: new URL("https://www.sundai.club"),
+  openGraph: {
+    type: "website",
+    siteName: "Sundai Club",
+    title: "Sundai Club",
+    description: "Building & Launching AI Prototypes Every Sunday",
+    images: [
+      {
+        url: "/images/icon-512x512.png",
+        width: 512,
+        height: 512,
+        alt: "Sundai Club Logo",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary",
+    title: "Sundai Club",
+    description: "Building & Launching AI Prototypes Every Sunday",
+    images: ["/images/icon-512x512.png"],
+  },
 };
 
 export const viewport: Viewport = {

@@ -52,24 +52,22 @@ const Navbar = () => {
 
   return (
     <nav
-      className={`fixed top-0 left-0 w-full z-50 transition-all duration-300 font-space-mono ${
-        isDarkMode
+      className={`fixed top-0 left-0 w-full z-50 transition-all duration-300 font-space-mono ${isDarkMode
           ? isScrolled
             ? "bg-gray-900 shadow-md opacity-90"
             : "bg-gray-900"
           : isScrolled
             ? "bg-[#E5E5E5] shadow-md opacity-90"
             : "bg-[#E5E5E5]"
-      }`}
+        }`}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center py-4">
           <div className="text-lg font-space-mono text-indigo-800 font-semibold tracking-wider">
             <Link
               href="/"
-              className={`text-center group flex items-center ${
-                isPWA ? "p-2" : ""
-              }`}
+              className={`text-center group flex items-center ${isPWA ? "p-2" : ""
+                }`}
             >
               <Image
                 src={isDarkMode ? "/images/logos/sundai_logo_dark_horizontal.svg" : "/images/logos/sundai_logo_light_horizontal.svg"}
@@ -79,7 +77,7 @@ const Navbar = () => {
                 className="transition-transform duration-300 transform group-hover:scale-110 mr-2"
               />
             </Link>
-            
+
           </div>
           <button
             onClick={() => setIsMenuOpen(!isMenuOpen)}
@@ -92,9 +90,8 @@ const Navbar = () => {
           <div className="hidden md:flex items-center">
             <Link
               href="/join"
-              className={`${
-                isPWA ? "px-4 py-3" : "px-3 py-2"
-              } mx-2 rounded-lg active:bg-indigo-100`}
+              className={`${isPWA ? "px-4 py-3" : "px-3 py-2"
+                } mx-2 rounded-lg active:bg-indigo-100`}
             >
               <span className={`text-sm font-fira-code ${isDarkMode ? 'text-gray-200' : 'text-black'} hover:text-indigo-700 dark:hover:text-indigo-500 transition duration-300`}>
                 Get Involved
@@ -102,33 +99,30 @@ const Navbar = () => {
             </Link>
             <Link
               href="/projects"
-              className={`${
-                isPWA ? "px-4 py-3" : "px-3 py-2"
-              } mx-2 rounded-lg active:bg-indigo-100`}
+              className={`${isPWA ? "px-4 py-3" : "px-3 py-2"
+                } mx-2 rounded-lg active:bg-indigo-100`}
             >
               <span className={`text-sm font-fira-code ${isDarkMode ? 'text-gray-200' : 'text-black'} hover:text-indigo-700 dark:hover:text-indigo-500 transition duration-300`}>
                 All Projects
               </span>
             </Link>
-            
+
             <Link
               href="/events"
-              className={`${
-                isPWA ? "px-4 py-3" : "px-3 py-2"
-              } mx-2 rounded-lg active:bg-indigo-100`}
+              className={`${isPWA ? "px-4 py-3" : "px-3 py-2"
+                } mx-2 rounded-lg active:bg-indigo-100`}
             >
               <span className={`text-sm font-fira-code ${isDarkMode ? 'text-gray-200' : 'text-black'} hover:text-indigo-700 dark:hover:text-indigo-500 transition duration-300`}>
                 Events
               </span>
             </Link>
-            
+
             {isSignedIn && (
               <>
                 <Link
                   href="/projects/new"
-                  className={`${
-                    isPWA ? "px-4 py-3" : "px-3 py-2"
-                  } mx-2 rounded-lg active:bg-indigo-100`}
+                  className={`${isPWA ? "px-4 py-3" : "px-3 py-2"
+                    } mx-2 rounded-lg active:bg-indigo-100`}
                 >
                   <span className={`text-sm font-fira-code ${isDarkMode ? 'text-gray-200' : 'text-black'} hover:text-indigo-700 dark:hover:text-indigo-500 transition duration-300`}>
                     New Project
@@ -137,9 +131,8 @@ const Navbar = () => {
 
                 <Link
                   href={`/hacker/${hackerId}`}
-                  className={`${
-                    isPWA ? "px-4 py-3" : "px-3 py-2"
-                  } mx-2 rounded-lg active:bg-indigo-100`}
+                  className={`${isPWA ? "px-4 py-3" : "px-3 py-2"
+                    } mx-2 rounded-lg active:bg-indigo-100`}
                 >
                   <span className={`text-sm font-fira-code ${isDarkMode ? 'text-gray-200' : 'text-black'} hover:text-indigo-700 dark:hover:text-indigo-500 transition duration-300`}>
                     My Profile
@@ -193,7 +186,7 @@ const Navbar = () => {
               All Projects
             </span>
           </Link>
-          
+
           <Link
             href="/events"
             className="block px-4 py-2 rounded-lg"
@@ -203,7 +196,7 @@ const Navbar = () => {
               Events
             </span>
           </Link>
-          
+
           {isSignedIn && (
             <>
               <Link
@@ -226,15 +219,11 @@ const Navbar = () => {
               </Link>
             </>
           )}
-          
+
           <div className="px-4 py-2">
             {isSignedIn ? (
               <UserButton
-<<<<<<< HEAD
                 afterSignOutUrl={pathname ?? '/'}
-=======
-                afterSignOutUrl={pathname as string}
->>>>>>> 8b11f52945f42e7655dd5b20e072d85378a2a390
                 appearance={{
                   elements: {
                     avatarBox: isPWA ? "w-10 h-10" : "w-8 h-8",
