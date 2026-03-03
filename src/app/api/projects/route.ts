@@ -1,150 +1,37 @@
-// import { ProjectStatus } from "@prisma/client";
+import { ProjectStatus } from "@prisma/client";
 import { NextResponse, NextRequest } from "next/server";
 import { auth } from "@clerk/nextjs/server";
-// import { uploadToGCS } from "@/lib/gcp-storage";
 import prisma from "@/lib/prisma";
 
-export async function GET(req: NextRequest) {
-  const { searchParams } = new URL(req.url);
+const ignoredDomainTags = (process.env.IGNORE_DOMAIN_TAGS || "").split(",").map(tag => tag.trim());
 
-  const page = Number(searchParams.get('page') || '1');
-  const limit = Number(searchParams.get('limit') || '10');
+export async function GET(req: Request) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const status = searchParams.get("status");
 
-  const search = searchParams.get('search') || undefined;
-  const fromDate = searchParams.get('from_date') || undefined;
-  const toDate = searchParams.get('to_date') || undefined;
-  const sort = searchParams.get('sort') || undefined;
-  const starred = searchParams.get('starred') === '1';
-  const hackerIdParam = searchParams.get('hacker_id') || undefined;
-  const clerkIdParam = searchParams.get('clerk_id') || undefined;
+    const page = Number(searchParams.get('page') || '1');
+    const limit = Number(searchParams.get('limit') || '10');
 
-  const status = searchParams.getAll('status'); // can be []
-  const techTags = searchParams.getAll('tech_tag'); // can be []
-  const domainTags = searchParams.getAll('domain_tag'); // can be []
+    const skip = (page - 1) * limit;
 
-  // WHERE
-  let where: any = {};
-  const andFilters: any[] = [];
-
-  if (search) {
-    const searchOr = [
-      { title: { contains: search, mode: 'insensitive' } },
-      { preview: { contains: search, mode: 'insensitive' } },
-      { description: { contains: search, mode: 'insensitive' } },
-    ];
-    andFilters.push({ OR: searchOr });
-  }
-
-  if (status && status.length > 0) {
-    andFilters.push({ status: { in: status } });
-  }
-
-  if (starred) {
-    andFilters.push({ is_starred: true });
-  }
-
-  if (fromDate || toDate) {
-    const startDate: any = {};
-    if (fromDate) {
-      startDate.gte = new Date(fromDate);
-    }
-    if (toDate) {
-      // end of day
-      const to = new Date(toDate);
-      to.setHours(23, 59, 59, 999);
-      startDate.lte = to;
-    }
-    andFilters.push({ startDate });
-  }
-
-  if (techTags && techTags.length > 0) {
-    // assumes project.techTags is M:N
-    andFilters.push({
-      techTags: {
-        some: { name: { in: techTags } },
-      }
-    });
-  }
-
-  if (domainTags && domainTags.length > 0) {
-    andFilters.push({
-      domainTags: {
-        some: { name: { in: domainTags } },
-      }
-    });
-  }
-
-  // Ownership filter: by hacker_id (prisma id) or clerk_id
-  let resolvedHackerId = hackerIdParam;
-  if (!resolvedHackerId && clerkIdParam) {
-    const hacker = await prisma.hacker.findUnique({
-      where: { clerkId: clerkIdParam },
-      select: { id: true },
-    });
-    if (hacker?.id) {
-      resolvedHackerId = hacker.id;
-    } else {
-      // If clerk_id provided but not found, ensure no results
-      andFilters.push({ id: { equals: '__none__' } });
-    }
-  }
-  if (resolvedHackerId) {
-    const ownershipOr = [
-      { launchLeadId: resolvedHackerId },
-      { participants: { some: { hackerId: resolvedHackerId } } },
-    ];
-    andFilters.push({ OR: ownershipOr });
-  }
-
-  if (andFilters.length > 0) {
-    where = { AND: andFilters };
-  }
-
-  // SORT
-  // map frontend values -> prisma orderBy
-  let orderBy: any = { createdAt: 'desc' }; // default
-
-  switch (sort) {
-    case 'newest':
-      orderBy = { createdAt: 'desc' };
-      break;
-    case 'oldest':
-      orderBy = { createdAt: 'asc' };
-      break;
-    case 'updated':
-      orderBy = { updatedAt: 'desc' };
-      break;
-    case 'alpha':
-      orderBy = { title: 'asc' };
-      break;
-    case 'likes':
-      // order by count of likes desc, then createdAt desc
-      orderBy = [
-        { likes: { _count: 'desc' } },
-        { createdAt: 'desc' },
-      ];
-      break;
-    case 'trending':
-      // you can define trending however you want, for now: recently updated + likes
-      orderBy = [
-        { updatedAt: 'desc' },
-        { likes: { _count: 'desc' } },
-      ];
-      break;
-    default:
-      // if sort is not provided, leave default
-      break;
-  }
-
-  const skip = (page - 1) * limit;
-
-  const [total, items] = await Promise.all([
-    prisma.project.count({ where }),
-    prisma.project.findMany({
-      where,
+    const projects = await prisma.project.findMany({
+      where: {
+        AND: [
+          status ? { status: status as ProjectStatus } : {},
+          {
+            domainTags: {
+              none: {
+                name: {
+                  in: ignoredDomainTags,
+                },
+              },
+            },
+          },
+        ],
+      },
       skip,
       take: limit,
-      orderBy,
       include: {
         launchLead: {
           include: {
@@ -165,17 +52,37 @@ export async function GET(req: NextRequest) {
         thumbnail: true,
         likes: true,
       },
-    }),
-  ]);
+    });
 
-  const pageCount = Math.ceil(total / limit);
+    const total = await prisma.project.count({
+      where: {
+        AND: [
+          status ? { status: status as ProjectStatus } : {},
+          {
+            domainTags: {
+              none: {
+                name: {
+                  in: ignoredDomainTags,
+                },
+              },
+            },
+          },
+        ],
+      },
+    });
 
-  return NextResponse.json({
-    items,
-    page,
-    pageCount,
-    total,
-  });
+    const pageCount = Math.ceil(total / limit);
+
+    return NextResponse.json({
+      items: projects,
+      page,
+      pageCount,
+      total,
+    });
+  } catch (error) {
+    console.error("[PROJECTS_GET]", error);
+    return new NextResponse("Internal Error", { status: 500 });
+  }
 }
 
 export async function POST(req: Request) {
@@ -191,20 +98,20 @@ export async function POST(req: Request) {
     const members = JSON.parse(formData.get("members") as string);
 
     if (!title) {
-      return NextResponse.json({ 
-        message: "Title is required" 
+      return NextResponse.json({
+        message: "Title is required"
       }, { status: 400 });
     }
 
     if (!preview) {
-      return NextResponse.json({ 
-        message: "Preview is required" 
+      return NextResponse.json({
+        message: "Preview is required"
       }, { status: 400 });
     }
 
     if (preview.length > 100) {
-      return NextResponse.json({ 
-        message: "Preview must be 100 characters or less" 
+      return NextResponse.json({
+        message: "Preview must be 100 characters or less"
       }, { status: 400 });
     }
 
@@ -227,14 +134,12 @@ export async function POST(req: Request) {
     });
 
     if (!currentWeek) {
-      // Create a new week if none exists
       const startDate = new Date(now);
       startDate.setHours(0, 0, 0, 0);
       const endDate = new Date(startDate);
       endDate.setDate(endDate.getDate() + 6);
       endDate.setHours(23, 59, 59, 999);
 
-      // Get the latest week number
       const latestWeek = await prisma.week.findFirst({
         orderBy: { number: "desc" },
       });
@@ -251,11 +156,9 @@ export async function POST(req: Request) {
       });
     }
 
-    // Determine hack_type based on environment
     const isResearchSite = process.env.IS_RESEARCH_SITE === 'true';
     const hack_type = isResearchSite ? 'RESEARCH' : 'REGULAR';
 
-    // Create project with participants and thumbnail
     const project = await prisma.project.create({
       data: {
         title,

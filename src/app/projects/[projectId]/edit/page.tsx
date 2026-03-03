@@ -137,7 +137,7 @@ export default function ProjectEditPage() {
   useEffect(() => {
     const fetchProject = async () => {
       try {
-        const response = await fetch(`/api/projects/${params.projectId}`);
+        const response = await fetch(`/api/projects/${params?.projectId}`);
         if (!response.ok) {
           throw new Error("Project not found");
         }
@@ -151,10 +151,10 @@ export default function ProjectEditPage() {
       }
     };
 
-    if (params.projectId) {
+    if (params?.projectId) {
       fetchProject();
     }
-  }, [params.projectId, router]);
+  }, [params?.projectId, router]);
 
   useEffect(() => {
     if (project) {
@@ -265,7 +265,7 @@ export default function ProjectEditPage() {
 
       formData.append("deleteThumbnail", (!thumbnail && thumbnailPreview === null).toString());
 
-      const response = await fetch(`/api/projects/${params.projectId}/edit`, {
+      const response = await fetch(`/api/projects/${params?.projectId}/edit`, {
         method: "PATCH",
         body: formData,
       });
@@ -277,7 +277,7 @@ export default function ProjectEditPage() {
       const updatedProject = await response.json();
       setProject(updatedProject);
       toast.success("Changes saved successfully!");
-      router.push(`/projects/${params.projectId}`);
+      router.push(`/projects/${params?.projectId}`);
     } catch (error) {
       console.error("Error updating project:", error);
       toast.error("Failed to save changes");
@@ -644,7 +644,7 @@ export default function ProjectEditPage() {
             <ImageGenerationModal
               showModal={showImageGenerationModal}
               setShowModal={setShowImageGenerationModal}
-              projectId={params.projectId as string}
+              projectId={params?.projectId as string}
               projectTitle={project?.title || ""}
               projectDescription={project?.preview || ""}
               onImageSelect={handleAIGeneratedImageSelect}
