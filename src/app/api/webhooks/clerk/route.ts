@@ -51,11 +51,34 @@ async function handler(request: Request) {
         first_name && last_name
           ? `${first_name} ${last_name}`
           : first_name
-          ? first_name
-          : emailUsername;
+            ? first_name
+            : emailUsername;
 
-      const hacker = await prisma.hacker.create({
-        data: {
+      const hacker = await prisma.hacker.upsert({
+        where: { clerkId: id },
+        update: {
+          name: name,
+          email: email_addresses[0].email_address,
+          username: username || emailUsername,
+          ...(image_url && {
+            avatar: {
+              upsert: {
+                create: {
+                  key: `avatars/${id}`,
+                  bucket: "sundai-avatars",
+                  url: image_url,
+                  filename: `${id}-avatar`,
+                  mimeType: "image/jpeg",
+                  size: 0,
+                },
+                update: {
+                  url: image_url,
+                },
+              },
+            },
+          }),
+        },
+        create: {
           name: name,
           clerkId: id,
           email: email_addresses[0].email_address,
