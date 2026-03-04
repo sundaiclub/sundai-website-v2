@@ -323,7 +323,13 @@ export default function ProjectEditPage() {
             if (newTag) {
               setProject({
                 ...project,
-                startDate: project.startDate || new Date(),
+                title: editableTitle,
+                preview: editablePreview,
+                description: editableDescription,
+                startDate: editableStartDate,
+                githubUrl: editableGithubUrl,
+                demoUrl: editableDemoUrl,
+                blogUrl: editableBlogUrl,
                 techTags: [...project.techTags, newTag]
               });
             }
@@ -333,7 +339,13 @@ export default function ProjectEditPage() {
             if (newTag) {
               setProject({
                 ...project,
-                startDate: project.startDate || new Date(),
+                title: editableTitle,
+                preview: editablePreview,
+                description: editableDescription,
+                startDate: editableStartDate,
+                githubUrl: editableGithubUrl,
+                demoUrl: editableDemoUrl,
+                blogUrl: editableBlogUrl,
                 domainTags: [...project.domainTags, newTag]
               });
             }
@@ -348,7 +360,13 @@ export default function ProjectEditPage() {
 
     setProject({
       ...project,
-      startDate: project.startDate || new Date(),
+      title: editableTitle,
+      preview: editablePreview,
+      description: editableDescription,
+      startDate: editableStartDate,
+      githubUrl: editableGithubUrl,
+      demoUrl: editableDemoUrl,
+      blogUrl: editableBlogUrl,
       techTags: type === "tech" ? [...project.techTags, tagToAdd] : project.techTags,
       domainTags: type === "domain" ? [...project.domainTags, tagToAdd] : project.domainTags,
     });
