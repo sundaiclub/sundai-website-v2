@@ -112,7 +112,7 @@ DATABASE_URL="postgresql://postgres:postgres@localhost:5432/sundai_db"
 # Clerk Authentication - GET THESE FROM YOUR CLERK DASHBOARD
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY="pk_test_your_actual_key_here"
 CLERK_SECRET_KEY="sk_test_your_actual_secret_here"
-CLERK_WEBHOOK_SECRET="whsec_your_webhook_secret_here"
+WEBHOOK_SECRET="whsec_your_webhook_secret_here"
 
 # Google Cloud Storage (optional for local development)
 GOOGLE_CLOUD_BUCKET="your-bucket-name"
@@ -156,6 +156,31 @@ npm run dev
 ```
 
 🎉 **Success!** Visit [http://localhost:3000](http://localhost:3000) to see the application!
+
+### 6. Clerk Webhook Setup (Required for Auth)
+
+Clerk uses a webhook to sync new users to the database. When someone signs up, Clerk sends a `user.created` event to `/api/webhooks/clerk`, which creates their profile in the database. Since Clerk's servers need to reach your local machine, you need a reverse proxy to expose your local dev server to the internet.
+
+**Using ngrok:**
+
+1. Install ngrok from [ngrok.com](https://ngrok.com) and authenticate
+2. Start your dev server (`npm run dev`)
+3. In a separate terminal, expose your local server:
+   ```bash
+   ngrok http 3000
+   ```
+4. Copy the generated forwarding URL (e.g. `https://abc123.ngrok-free.app`)
+5. In your [Clerk Dashboard](https://dashboard.clerk.com), go to **Webhooks** and add a new endpoint:
+   - **URL**: `https://abc123.ngrok-free.app/api/webhooks/clerk`
+   - **Events**: Subscribe to `user.created`
+6. Copy the **Signing Secret** from the webhook endpoint and add it to your `.env.local`:
+   ```bash
+   WEBHOOK_SECRET="whsec_your_signing_secret_here"
+   ```
+
+> **Note:** The ngrok URL changes every time you restart it (on the free plan), so you'll need to update the webhook URL in the Clerk dashboard each time. Alternatively, you can use a paid ngrok plan for a stable subdomain, or another tunnel tool like [cloudflared](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/) or [localtunnel](https://theboroer.github.io/localtunnel-www/).
+
+Without this setup, new user sign-ups won't create a profile in your local database, and you'll need to manually add users via the seed file instead.
 
 ## 🧪 Testing
 
