@@ -6,6 +6,7 @@ import prisma from '../../src/lib/prisma';
 jest.mock('../../src/lib/prisma', () => ({
   hacker: {
     create: jest.fn(),
+    upsert: jest.fn(),
   },
 }));
 
@@ -22,6 +23,16 @@ jest.mock('next/headers', () => ({
 
 const mockPrisma = prisma as jest.Mocked<typeof prisma>;
 const { headers } = require('next/headers');
+
+function mockHackerWriteResolvedValue(value: any) {
+  mockPrisma.hacker.create.mockResolvedValue(value);
+  mockPrisma.hacker.upsert.mockResolvedValue(value);
+}
+
+function mockHackerWriteRejectedValue(error: Error) {
+  mockPrisma.hacker.create.mockRejectedValue(error);
+  mockPrisma.hacker.upsert.mockRejectedValue(error);
+}
 
 async function expectJsonResponse(response: Response, expectedStatus: number) {
   const rawBody = await response.text();
@@ -150,7 +161,7 @@ describe('/api/webhooks/clerk', () => {
         role: 'HACKER',
       };
 
-      mockPrisma.hacker.create.mockResolvedValue(mockCreatedHacker as any);
+      mockHackerWriteResolvedValue(mockCreatedHacker as any);
 
       const request = createMockRequest({});
 
@@ -185,7 +196,7 @@ describe('/api/webhooks/clerk', () => {
         role: 'HACKER',
       };
 
-      mockPrisma.hacker.create.mockResolvedValue(mockCreatedHacker as any);
+      mockHackerWriteResolvedValue(mockCreatedHacker as any);
 
       const request = createMockRequest({});
 
@@ -220,7 +231,7 @@ describe('/api/webhooks/clerk', () => {
         role: 'HACKER',
       };
 
-      mockPrisma.hacker.create.mockResolvedValue(mockCreatedHacker as any);
+      mockHackerWriteResolvedValue(mockCreatedHacker as any);
 
       const request = createMockRequest({});
 
@@ -246,7 +257,7 @@ describe('/api/webhooks/clerk', () => {
       };
       Webhook.mockImplementation(() => mockWebhook);
 
-      mockPrisma.hacker.create.mockRejectedValue(new Error('Database error'));
+      mockHackerWriteRejectedValue(new Error('Database error'));
 
       const request = createMockRequest({});
 
@@ -312,7 +323,7 @@ describe('/api/webhooks/clerk', () => {
         role: 'HACKER',
       };
 
-      mockPrisma.hacker.create.mockResolvedValue(mockCreatedHacker as any);
+      mockHackerWriteResolvedValue(mockCreatedHacker as any);
 
       const request = createMockRequest({});
 
@@ -349,7 +360,7 @@ describe('/api/webhooks/clerk', () => {
         role: 'HACKER',
       };
 
-      mockPrisma.hacker.create.mockResolvedValue(mockCreatedHacker as any);
+      mockHackerWriteResolvedValue(mockCreatedHacker as any);
 
       const request = createMockRequest({});
 
