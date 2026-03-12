@@ -23,6 +23,30 @@ jest.mock('next/headers', () => ({
 const mockPrisma = prisma as jest.Mocked<typeof prisma>;
 const { headers } = require('next/headers');
 
+async function expectJsonResponse(response: Response, expectedStatus: number) {
+  const rawBody = await response.text();
+
+  if (response.status !== expectedStatus) {
+    throw new Error(
+      `Expected status ${expectedStatus}, received ${response.status}. Response body: ${rawBody || '<empty>'}`
+    );
+  }
+
+  return rawBody ? JSON.parse(rawBody) : null;
+}
+
+async function expectTextResponse(response: Response, expectedStatus: number) {
+  const rawBody = await response.text();
+
+  if (response.status !== expectedStatus) {
+    throw new Error(
+      `Expected status ${expectedStatus}, received ${response.status}. Response body: ${rawBody || '<empty>'}`
+    );
+  }
+
+  return rawBody;
+}
+
 describe('/api/webhooks/clerk', () => {
   const mockWebhookSecret = 'test-webhook-secret';
   const originalEnv = process.env;
@@ -80,9 +104,7 @@ describe('/api/webhooks/clerk', () => {
       });
 
       const response = await POST(request);
-      const data = await response.text();
-
-      expect(response.status).toBe(400);
+      const data = await expectTextResponse(response, 400);
       expect(data).toBe('Error occured -- no svix headers');
     });
 
@@ -98,9 +120,7 @@ describe('/api/webhooks/clerk', () => {
       const request = createMockRequest({});
 
       const response = await POST(request);
-      const data = await response.text();
-
-      expect(response.status).toBe(400);
+      const data = await expectTextResponse(response, 400);
       expect(data).toBe('Error occured');
     });
 
@@ -135,9 +155,7 @@ describe('/api/webhooks/clerk', () => {
       const request = createMockRequest({});
 
       const response = await POST(request);
-      const data = await response.json();
-
-      expect(response.status).toBe(201);
+      const data = await expectJsonResponse(response, 201);
       expect(data).toEqual(mockCreatedHacker);
     });
 
@@ -172,9 +190,7 @@ describe('/api/webhooks/clerk', () => {
       const request = createMockRequest({});
 
       const response = await POST(request);
-      const data = await response.json();
-
-      expect(response.status).toBe(201);
+      const data = await expectJsonResponse(response, 201);
       expect(data).toEqual(mockCreatedHacker);
     });
 
@@ -209,9 +225,7 @@ describe('/api/webhooks/clerk', () => {
       const request = createMockRequest({});
 
       const response = await POST(request);
-      const data = await response.json();
-
-      expect(response.status).toBe(201);
+      const data = await expectJsonResponse(response, 201);
       expect(data).toEqual(mockCreatedHacker);
     });
 
@@ -237,10 +251,20 @@ describe('/api/webhooks/clerk', () => {
       const request = createMockRequest({});
 
       const response = await POST(request);
-      const data = await response.text();
-
-      expect(response.status).toBe(500);
-      expect(data).toBe('Error creating hacker');
+      const data = await expectJsonResponse(response, 500);
+      expect(data).toMatchObject({
+        error: 'Error creating hacker',
+        details: {
+          message: 'Database error',
+        },
+        context: {
+          eventType: 'user.created',
+          clerkId: 'user_123',
+          emailCount: 1,
+          hasImageUrl: false,
+          username: 'johndoe',
+        },
+      });
     });
 
     it('should return 200 for other event types', async () => {
@@ -256,9 +280,7 @@ describe('/api/webhooks/clerk', () => {
       const request = createMockRequest({});
 
       const response = await POST(request);
-      const data = await response.text();
-
-      expect(response.status).toBe(200);
+      const data = await expectTextResponse(response, 200);
       expect(data).toBe('');
     });
   });
@@ -295,9 +317,7 @@ describe('/api/webhooks/clerk', () => {
       const request = createMockRequest({});
 
       const response = await GET(request);
-      const data = await response.json();
-
-      expect(response.status).toBe(201);
+      const data = await expectJsonResponse(response, 201);
       expect(data).toEqual(mockCreatedHacker);
     });
   });
@@ -334,9 +354,7 @@ describe('/api/webhooks/clerk', () => {
       const request = createMockRequest({});
 
       const response = await PUT(request);
-      const data = await response.json();
-
-      expect(response.status).toBe(201);
+      const data = await expectJsonResponse(response, 201);
       expect(data).toEqual(mockCreatedHacker);
     });
   });
