@@ -124,45 +124,6 @@ describe('ProjectCard Component', () => {
     )
   })
 
-  it('handles join button click', async () => {
-    // The ProjectCard component doesn't have a join button, so we'll skip this test
-    // or test that the component renders without errors
-    await act(async () => {
-      render(
-        <ProjectCard
-          project={mockProject}
-          userInfo={mockHacker}
-          handleLike={mockHandleLike}
-          isDarkMode={false}
-          show_status={false}
-        />
-      )
-    })
-
-    // Just verify the component renders without errors
-    expect(screen.getByText('Test Project')).toBeInTheDocument()
-  })
-
-  it('handles star button click', async () => {
-    // The ProjectCard component doesn't have a star button, so we'll skip this test
-    // or test that the component renders without errors
-    await act(async () => {
-      render(
-        <ProjectCard
-          project={mockProject}
-          userInfo={mockHacker}
-          handleLike={mockHandleLike}
-          isDarkMode={false}
-          show_status={false}
-          onStarredChange={mockHandleStar}
-        />
-      )
-    })
-
-    // Just verify the component renders without errors
-    expect(screen.getByText('Test Project')).toBeInTheDocument()
-  })
-
   it('shows correct like state when project is liked', async () => {
     const likedProject = {
       ...mockProject,
@@ -205,7 +166,6 @@ describe('ProjectCard Component', () => {
       )
     })
 
-    // The ProjectCard component doesn't have a star button, so just check that it renders
     expect(screen.getByText('Test Project')).toBeInTheDocument()
   })
 

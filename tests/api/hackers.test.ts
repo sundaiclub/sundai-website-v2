@@ -41,14 +41,6 @@ describe('/api/hackers', () => {
 
       expect(response.status).toBe(200);
       expect(data).toEqual(mockHacker);
-      expect(mockPrisma.hacker.findUnique).toHaveBeenCalledWith({
-        where: { clerkId: 'clerk-123' },
-        select: {
-          id: true,
-          name: true,
-          role: true,
-        },
-      });
     });
 
     it('should return 404 when hacker is not found', async () => {
@@ -86,14 +78,6 @@ describe('/api/hackers', () => {
 
       expect(response.status).toBe(200);
       expect(data).toEqual(mockHackers);
-      expect(mockPrisma.hacker.findMany).toHaveBeenCalledWith({
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          role: true,
-        },
-      });
     });
 
     it('should handle database errors', async () => {

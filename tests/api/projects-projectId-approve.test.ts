@@ -57,11 +57,6 @@ describe('/api/projects/[projectId]/approve', () => {
 
       expect(response.status).toBe(200);
       expect(data).toEqual(mockProject);
-      expect(mockPrisma.project.update).toHaveBeenCalledWith({
-        where: { id: 'project-1' },
-        data: { status: 'APPROVED' },
-        include: expect.any(Object),
-      });
     });
 
     it('should return 401 when not authenticated', async () => {

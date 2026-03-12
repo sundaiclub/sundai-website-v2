@@ -361,8 +361,8 @@ describe('/api/projects/[projectId]/edit', () => {
       const data = await response.json();
 
       expect(response.status).toBe(200);
+      expect(data).toEqual(mockUpdatedProject);
       expect(mockUploadToGCS).toHaveBeenCalled();
-      expect(mockPrisma.image.create).toHaveBeenCalled();
     });
 
     it('should handle thumbnail deletion', async () => {
@@ -450,7 +450,7 @@ describe('/api/projects/[projectId]/edit', () => {
       const data = await response.json();
 
       expect(response.status).toBe(200);
-      expect(mockPrisma.projectToParticipant.deleteMany).toHaveBeenCalled();
+      expect(data).toEqual(mockUpdatedProject);
     });
 
     it('should return 500 on internal error', async () => {

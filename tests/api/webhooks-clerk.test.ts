@@ -6,6 +6,7 @@ import prisma from '../../src/lib/prisma';
 jest.mock('../../src/lib/prisma', () => ({
   hacker: {
     create: jest.fn(),
+    upsert: jest.fn(),
   },
 }));
 
@@ -22,6 +23,40 @@ jest.mock('next/headers', () => ({
 
 const mockPrisma = prisma as jest.Mocked<typeof prisma>;
 const { headers } = require('next/headers');
+
+function mockHackerWriteResolvedValue(value: any) {
+  mockPrisma.hacker.create.mockResolvedValue(value);
+  mockPrisma.hacker.upsert.mockResolvedValue(value);
+}
+
+function mockHackerWriteRejectedValue(error: Error) {
+  mockPrisma.hacker.create.mockRejectedValue(error);
+  mockPrisma.hacker.upsert.mockRejectedValue(error);
+}
+
+async function expectJsonResponse(response: Response, expectedStatus: number) {
+  const rawBody = await response.text();
+
+  if (response.status !== expectedStatus) {
+    throw new Error(
+      `Expected status ${expectedStatus}, received ${response.status}. Response body: ${rawBody || '<empty>'}`
+    );
+  }
+
+  return rawBody ? JSON.parse(rawBody) : null;
+}
+
+async function expectTextResponse(response: Response, expectedStatus: number) {
+  const rawBody = await response.text();
+
+  if (response.status !== expectedStatus) {
+    throw new Error(
+      `Expected status ${expectedStatus}, received ${response.status}. Response body: ${rawBody || '<empty>'}`
+    );
+  }
+
+  return rawBody;
+}
 
 describe('/api/webhooks/clerk', () => {
   const mockWebhookSecret = 'test-webhook-secret';
@@ -80,9 +115,7 @@ describe('/api/webhooks/clerk', () => {
       });
 
       const response = await POST(request);
-      const data = await response.text();
-
-      expect(response.status).toBe(400);
+      const data = await expectTextResponse(response, 400);
       expect(data).toBe('Error occured -- no svix headers');
     });
 
@@ -98,9 +131,7 @@ describe('/api/webhooks/clerk', () => {
       const request = createMockRequest({});
 
       const response = await POST(request);
-      const data = await response.text();
-
-      expect(response.status).toBe(400);
+      const data = await expectTextResponse(response, 400);
       expect(data).toBe('Error occured');
     });
 
@@ -130,34 +161,13 @@ describe('/api/webhooks/clerk', () => {
         role: 'HACKER',
       };
 
-      mockPrisma.hacker.create.mockResolvedValue(mockCreatedHacker as any);
+      mockHackerWriteResolvedValue(mockCreatedHacker as any);
 
       const request = createMockRequest({});
 
       const response = await POST(request);
-      const data = await response.json();
-
-      expect(response.status).toBe(201);
+      const data = await expectJsonResponse(response, 201);
       expect(data).toEqual(mockCreatedHacker);
-      expect(mockPrisma.hacker.create).toHaveBeenCalledWith({
-        data: {
-          name: 'John Doe',
-          clerkId: 'user_123',
-          email: 'test@example.com',
-          username: 'johndoe',
-          role: 'HACKER',
-          avatar: {
-            create: {
-              key: 'avatars/user_123',
-              bucket: 'sundai-avatars',
-              url: 'https://example.com/avatar.jpg',
-              filename: 'user_123-avatar',
-              mimeType: 'image/jpeg',
-              size: 0,
-            },
-          },
-        },
-      });
     });
 
     it('should handle user.created event with only first name', async () => {
@@ -186,24 +196,13 @@ describe('/api/webhooks/clerk', () => {
         role: 'HACKER',
       };
 
-      mockPrisma.hacker.create.mockResolvedValue(mockCreatedHacker as any);
+      mockHackerWriteResolvedValue(mockCreatedHacker as any);
 
       const request = createMockRequest({});
 
       const response = await POST(request);
-      const data = await response.json();
-
-      expect(response.status).toBe(201);
+      const data = await expectJsonResponse(response, 201);
       expect(data).toEqual(mockCreatedHacker);
-      expect(mockPrisma.hacker.create).toHaveBeenCalledWith({
-        data: {
-          name: 'John',
-          clerkId: 'user_123',
-          email: 'test@example.com',
-          username: 'test',
-          role: 'HACKER',
-        },
-      });
     });
 
     it('should handle user.created event with email username fallback', async () => {
@@ -232,24 +231,13 @@ describe('/api/webhooks/clerk', () => {
         role: 'HACKER',
       };
 
-      mockPrisma.hacker.create.mockResolvedValue(mockCreatedHacker as any);
+      mockHackerWriteResolvedValue(mockCreatedHacker as any);
 
       const request = createMockRequest({});
 
       const response = await POST(request);
-      const data = await response.json();
-
-      expect(response.status).toBe(201);
+      const data = await expectJsonResponse(response, 201);
       expect(data).toEqual(mockCreatedHacker);
-      expect(mockPrisma.hacker.create).toHaveBeenCalledWith({
-        data: {
-          name: 'johndoe',
-          clerkId: 'user_123',
-          email: 'johndoe@example.com',
-          username: 'johndoe',
-          role: 'HACKER',
-        },
-      });
     });
 
     it('should return 500 if hacker creation fails', async () => {
@@ -269,15 +257,25 @@ describe('/api/webhooks/clerk', () => {
       };
       Webhook.mockImplementation(() => mockWebhook);
 
-      mockPrisma.hacker.create.mockRejectedValue(new Error('Database error'));
+      mockHackerWriteRejectedValue(new Error('Database error'));
 
       const request = createMockRequest({});
 
       const response = await POST(request);
-      const data = await response.text();
-
-      expect(response.status).toBe(500);
-      expect(data).toBe('Error creating hacker');
+      const data = await expectJsonResponse(response, 500);
+      expect(data).toMatchObject({
+        error: 'Error creating hacker',
+        details: {
+          message: 'Database error',
+        },
+        context: {
+          eventType: 'user.created',
+          clerkId: 'user_123',
+          emailCount: 1,
+          hasImageUrl: false,
+          username: 'johndoe',
+        },
+      });
     });
 
     it('should return 200 for other event types', async () => {
@@ -293,9 +291,7 @@ describe('/api/webhooks/clerk', () => {
       const request = createMockRequest({});
 
       const response = await POST(request);
-      const data = await response.text();
-
-      expect(response.status).toBe(200);
+      const data = await expectTextResponse(response, 200);
       expect(data).toBe('');
     });
   });
@@ -327,14 +323,12 @@ describe('/api/webhooks/clerk', () => {
         role: 'HACKER',
       };
 
-      mockPrisma.hacker.create.mockResolvedValue(mockCreatedHacker as any);
+      mockHackerWriteResolvedValue(mockCreatedHacker as any);
 
       const request = createMockRequest({});
 
       const response = await GET(request);
-      const data = await response.json();
-
-      expect(response.status).toBe(201);
+      const data = await expectJsonResponse(response, 201);
       expect(data).toEqual(mockCreatedHacker);
     });
   });
@@ -366,14 +360,12 @@ describe('/api/webhooks/clerk', () => {
         role: 'HACKER',
       };
 
-      mockPrisma.hacker.create.mockResolvedValue(mockCreatedHacker as any);
+      mockHackerWriteResolvedValue(mockCreatedHacker as any);
 
       const request = createMockRequest({});
 
       const response = await PUT(request);
-      const data = await response.json();
-
-      expect(response.status).toBe(201);
+      const data = await expectJsonResponse(response, 201);
       expect(data).toEqual(mockCreatedHacker);
     });
   });

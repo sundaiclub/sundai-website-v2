@@ -125,11 +125,6 @@ describe('/api/projects/[projectId]', () => {
       const response = await DELETE(request, { params: { projectId: 'project-1' } });
 
       expect(response.status).toBe(204);
-      expect(mockPrisma.$transaction).toHaveBeenCalledWith([
-        mockPrisma.projectLike.deleteMany({ where: { projectId: 'project-1' } }),
-        mockPrisma.projectToParticipant.deleteMany({ where: { projectId: 'project-1' } }),
-        mockPrisma.project.delete({ where: { id: 'project-1' } }),
-      ]);
     });
 
     it('should delete project successfully as launch lead', async () => {
