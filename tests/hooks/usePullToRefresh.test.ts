@@ -85,23 +85,6 @@ describe('usePullToRefresh', () => {
     expect(mockRemoveEventListener).toHaveBeenCalledWith('touchend', expect.any(Function));
   });
 
-  it('should handle touchstart event', () => {
-    renderHook(() => usePullToRefresh());
-
-    const touchStartHandler = mockAddEventListener.mock.calls.find(
-      call => call[0] === 'touchstart'
-    )[1];
-
-    const mockTouchEvent = {
-      touches: [{ pageY: 100 }],
-    };
-
-    touchStartHandler(mockTouchEvent);
-
-    // Should not throw error
-    expect(true).toBe(true);
-  });
-
   it('should handle touchmove event with pull down', () => {
     renderHook(() => usePullToRefresh());
 

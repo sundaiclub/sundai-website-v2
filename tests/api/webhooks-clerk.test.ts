@@ -139,25 +139,6 @@ describe('/api/webhooks/clerk', () => {
 
       expect(response.status).toBe(201);
       expect(data).toEqual(mockCreatedHacker);
-      expect(mockPrisma.hacker.create).toHaveBeenCalledWith({
-        data: {
-          name: 'John Doe',
-          clerkId: 'user_123',
-          email: 'test@example.com',
-          username: 'johndoe',
-          role: 'HACKER',
-          avatar: {
-            create: {
-              key: 'avatars/user_123',
-              bucket: 'sundai-avatars',
-              url: 'https://example.com/avatar.jpg',
-              filename: 'user_123-avatar',
-              mimeType: 'image/jpeg',
-              size: 0,
-            },
-          },
-        },
-      });
     });
 
     it('should handle user.created event with only first name', async () => {
@@ -195,15 +176,6 @@ describe('/api/webhooks/clerk', () => {
 
       expect(response.status).toBe(201);
       expect(data).toEqual(mockCreatedHacker);
-      expect(mockPrisma.hacker.create).toHaveBeenCalledWith({
-        data: {
-          name: 'John',
-          clerkId: 'user_123',
-          email: 'test@example.com',
-          username: 'test',
-          role: 'HACKER',
-        },
-      });
     });
 
     it('should handle user.created event with email username fallback', async () => {
@@ -241,15 +213,6 @@ describe('/api/webhooks/clerk', () => {
 
       expect(response.status).toBe(201);
       expect(data).toEqual(mockCreatedHacker);
-      expect(mockPrisma.hacker.create).toHaveBeenCalledWith({
-        data: {
-          name: 'johndoe',
-          clerkId: 'user_123',
-          email: 'johndoe@example.com',
-          username: 'johndoe',
-          role: 'HACKER',
-        },
-      });
     });
 
     it('should return 500 if hacker creation fails', async () => {

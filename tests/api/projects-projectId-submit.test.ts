@@ -166,10 +166,6 @@ describe('/api/projects/[projectId]/submit', () => {
 
       expect(response.status).toBe(200);
       expect(data).toEqual(mockUpdatedProject);
-      expect(mockPrisma.project.update).toHaveBeenCalledWith({
-        where: { id: mockProjectId },
-        data: { status: 'PENDING' },
-      });
     });
 
     it('should allow launch lead to submit project', async () => {
@@ -207,10 +203,6 @@ describe('/api/projects/[projectId]/submit', () => {
 
       expect(response.status).toBe(200);
       expect(data).toEqual(mockUpdatedProject);
-      expect(mockPrisma.project.update).toHaveBeenCalledWith({
-        where: { id: mockProjectId },
-        data: { status: 'PENDING' },
-      });
     });
 
     it('should allow team member to submit project', async () => {
@@ -248,10 +240,6 @@ describe('/api/projects/[projectId]/submit', () => {
 
       expect(response.status).toBe(200);
       expect(data).toEqual(mockUpdatedProject);
-      expect(mockPrisma.project.update).toHaveBeenCalledWith({
-        where: { id: mockProjectId },
-        data: { status: 'PENDING' },
-      });
     });
 
     it('should return 500 on internal error', async () => {

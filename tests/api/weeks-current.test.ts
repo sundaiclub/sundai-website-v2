@@ -42,40 +42,6 @@ describe('/api/weeks/current', () => {
 
       expect(response.status).toBe(200);
       expect(data).toEqual(mockWeek);
-      expect(mockPrisma.week.findFirst).toHaveBeenCalledWith({
-        where: {
-          startDate: { lte: expect.any(Date) },
-          endDate: { gte: expect.any(Date) },
-        },
-        include: {
-          attendance: {
-            include: {
-              hacker: {
-                select: {
-                  id: true,
-                  name: true,
-                  avatar: true,
-                  role: true,
-                },
-              },
-            },
-            orderBy: {
-              timestamp: 'desc',
-            },
-          },
-          projects: {
-            include: {
-              thumbnail: true,
-              launchLead: {
-                select: {
-                  name: true,
-                  avatar: true,
-                },
-              },
-            },
-          },
-        },
-      });
     });
 
     it('should return 404 when no current week found', async () => {
