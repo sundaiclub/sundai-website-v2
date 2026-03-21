@@ -23,6 +23,10 @@ export async function POST(
     const isAdmin = me.role === "ADMIN";
     if (!(isMC || isAdmin)) return new NextResponse("Unauthorized", { status: 401 });
 
+    if (event.phase !== "PITCHING") {
+      return NextResponse.json({ message: "Can only advance during PITCHING phase" }, { status: 400 });
+    }
+
     // Find current and next queued/approved
     const ordered = await prisma.eventProject.findMany({
       where: { eventId: params.eventId },

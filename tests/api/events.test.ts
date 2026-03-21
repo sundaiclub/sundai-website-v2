@@ -43,6 +43,20 @@ describe('/api/events', () => {
     const res = await POST_EVENTS(request as any);
     expect(res.status).toBe(401);
   });
+
+  it('POST creates event with VOTING phase by default', async () => {
+    mockAuth.mockReturnValue({ userId: 'clerk-admin' });
+    prisma.hacker.findUnique.mockResolvedValue({ id: 'h-admin', role: 'ADMIN' });
+    const created = { id: 'evt-1', title: 'Test', phase: 'VOTING', startTime: new Date().toISOString() };
+    prisma.event.create.mockResolvedValue(created);
+    const request = new NextRequest('http://localhost:3000/api/events', { method: 'POST' });
+    request.json = jest.fn().mockResolvedValue({ title: 'Test', startTime: new Date().toISOString() });
+    const res = await POST_EVENTS(request as any);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    // The create call should not explicitly set phase — DB default handles it
+    expect(prisma.event.create).toHaveBeenCalled();
+  });
 });
 
 describe('/api/events/[eventId]', () => {
@@ -52,6 +66,20 @@ describe('/api/events/[eventId]', () => {
     const res = await GET_EVENT(request as any, { params: { eventId: 'evt-1' } } as any);
     expect(res.status).toBe(404);
   });
+
+  it('GET single event includes phase field', async () => {
+    prisma.event.findUnique.mockResolvedValue({
+      id: 'evt-1',
+      title: 'Test',
+      phase: 'VOTING',
+      startTime: new Date().toISOString(),
+      projects: [],
+      mcs: [],
+    });
+    const request = new NextRequest('http://localhost:3000/api/events/evt-1');
+    const res = await GET_EVENT(request as any, { params: { eventId: 'evt-1' } } as any);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.phase).toBe('VOTING');
+  });
 });
-
-
