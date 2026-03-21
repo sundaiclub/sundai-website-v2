@@ -738,6 +738,14 @@ export default function PitchEventPage() {
   const [event, setEvent] = useState<EventDetail | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Edit event modal state
+  const [showEdit, setShowEdit] = useState(false);
+  const [editMeetingUrl, setEditMeetingUrl] = useState("");
+  const [editMcIds, setEditMcIds] = useState<string[]>([]);
+  const [allHackers, setAllHackers] = useState<Array<{ id: string; name: string }>>([]);
+  const [mcSearch, setMcSearch] = useState("");
+  const [saving, setSaving] = useState(false);
+
   // Join modal state
   const [showJoin, setShowJoin] = useState(false);
   const [myProjects, setMyProjects] = useState<Project[]>([]);
@@ -785,6 +793,44 @@ export default function PitchEventPage() {
     setSelectedProjectId(sorted[0]?.id || "");
     setShowJoin(true);
   };
+
+  const openEdit = async () => {
+    if (!event) return;
+    setEditMeetingUrl(event.meetingUrl || "");
+    setEditMcIds(event.mcs.map(m => m.hacker.id));
+    setMcSearch("");
+    try {
+      const res = await fetch("/api/hackers");
+      setAllHackers(await res.json());
+    } catch {}
+    setShowEdit(true);
+  };
+
+  const saveEdit = async () => {
+    if (!event) return;
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/events/${event.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ meetingUrl: editMeetingUrl, mcIds: editMcIds }),
+      });
+      if (res.ok) {
+        setEvent(await res.json());
+        setShowEdit(false);
+      }
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const filteredHackers = useMemo(() => {
+    const q = mcSearch.trim().toLowerCase();
+    if (!q) return [];
+    return allHackers
+      .filter(h => !editMcIds.includes(h.id) && h.name.toLowerCase().includes(q))
+      .slice(0, 10);
+  }, [mcSearch, allHackers, editMcIds]);
 
   const filteredMyProjects = useMemo(() => {
     const q = searchTerm.trim().toLowerCase();
@@ -840,6 +886,14 @@ export default function PitchEventPage() {
                   Join meeting
                 </a>
               )}
+              {isAdmin && (
+                <button
+                  onClick={openEdit}
+                  className={`px-3 py-2 rounded-md text-sm ${isDarkMode ? "bg-gray-700 text-gray-200 hover:bg-gray-600" : "bg-gray-200 text-gray-800 hover:bg-gray-300"}`}
+                >
+                  Edit Event
+                </button>
+              )}
             </div>
           </div>
 
@@ -868,6 +922,86 @@ export default function PitchEventPage() {
           )}
         </div>
       </div>
+
+      {showEdit && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className={`${isDarkMode ? "bg-gray-900" : "bg-white"} rounded-xl w-full max-w-lg p-6 shadow-xl`}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold">Edit Event</h2>
+              <button onClick={() => setShowEdit(false)} className="text-sm opacity-70">
+                Close
+              </button>
+            </div>
+
+            <label className="block text-sm font-medium mb-1">Meeting URL</label>
+            <input
+              value={editMeetingUrl}
+              onChange={e => setEditMeetingUrl(e.target.value)}
+              placeholder="https://zoom.us/j/..."
+              className={`w-full px-3 py-2 rounded-md mb-4 ${isDarkMode ? "bg-gray-800 text-gray-100" : "bg-gray-100 text-gray-900"}`}
+            />
+
+            <label className="block text-sm font-medium mb-1">MCs</label>
+            <div className="flex flex-wrap gap-2 mb-2">
+              {editMcIds.map(id => {
+                const h = allHackers.find(h => h.id === id);
+                return (
+                  <span
+                    key={id}
+                    className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs ${isDarkMode ? "bg-indigo-800 text-indigo-100" : "bg-indigo-100 text-indigo-800"}`}
+                  >
+                    {h?.name || id}
+                    <button
+                      onClick={() => setEditMcIds(prev => prev.filter(x => x !== id))}
+                      className="ml-1 hover:opacity-70"
+                    >
+                      &times;
+                    </button>
+                  </span>
+                );
+              })}
+            </div>
+            <input
+              value={mcSearch}
+              onChange={e => setMcSearch(e.target.value)}
+              placeholder="Search hackers to add as MC..."
+              className={`w-full px-3 py-2 rounded-md ${isDarkMode ? "bg-gray-800 text-gray-100" : "bg-gray-100 text-gray-900"}`}
+            />
+            {filteredHackers.length > 0 && (
+              <div className={`mt-1 rounded-md border max-h-40 overflow-y-auto ${isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"}`}>
+                {filteredHackers.map(h => (
+                  <button
+                    key={h.id}
+                    onClick={() => {
+                      setEditMcIds(prev => [...prev, h.id]);
+                      setMcSearch("");
+                    }}
+                    className={`w-full text-left px-3 py-2 text-sm ${isDarkMode ? "hover:bg-gray-700" : "hover:bg-gray-100"}`}
+                  >
+                    {h.name}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                onClick={() => setShowEdit(false)}
+                className={`${isDarkMode ? "bg-gray-800 text-gray-200" : "bg-gray-100 text-gray-800"} px-4 py-2 rounded-md`}
+              >
+                Cancel
+              </button>
+              <button
+                disabled={saving}
+                onClick={saveEdit}
+                className={`px-4 py-2 rounded-md ${saving ? "bg-gray-400" : "bg-indigo-600 hover:bg-indigo-700"} text-white`}
+              >
+                {saving ? "Saving..." : "Save"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showJoin && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
