@@ -45,13 +45,22 @@ export async function POST(
       return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
     });
 
-    // Assign positions and update phase in a single transaction
-    const ops = sorted.map((ep, idx) =>
-      prisma.eventProject.update({
+    // Determine top group threshold (top 5 by likes, including ties)
+    const likeCounts = sorted.map(ep => ep.project.likes.length);
+    const threshold = likeCounts.length >= 5 ? likeCounts[4] : -1;
+
+    // Assign positions, allotted times, and update phase in a single transaction
+    const ops = sorted.map((ep, idx) => {
+      const isTopGroup = threshold >= 0 && ep.project.likes.length >= threshold;
+      return prisma.eventProject.update({
         where: { id: ep.id },
-        data: { position: idx + 1 },
-      })
-    );
+        data: {
+          position: idx + 1,
+          allottedPresentingSec: isTopGroup ? 120 : 60,
+          allottedQuestionsSec: isTopGroup ? 180 : 120,
+        },
+      });
+    });
 
     ops.push(
       prisma.event.update({

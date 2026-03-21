@@ -1,11 +1,28 @@
 "use client";
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { useParams } from "next/navigation";
 import { useTheme } from "../../contexts/ThemeContext";
 import { useUserContext } from "../../contexts/UserContext";
 import { Project, ProjectCard } from "../../components/Project";
 import { motion, AnimatePresence, PanInfo } from "framer-motion";
 import ReactMarkdown from "react-markdown";
+
+type PitchPhase = "WAITING" | "PRESENTING" | "QUESTIONS" | "COMPLETED";
+
+type EventProjectEntry = {
+  id: string;
+  position: number;
+  status: "QUEUED" | "APPROVED" | "CURRENT" | "DONE" | "SKIPPED";
+  approved: boolean;
+  addedById: string;
+  project: Project;
+  pitchPhase: PitchPhase;
+  presentingStartedAt: string | null;
+  questionsStartedAt: string | null;
+  completedAt: string | null;
+  allottedPresentingSec: number | null;
+  allottedQuestionsSec: number | null;
+};
 
 type EventDetail = {
   id: string;
@@ -17,14 +34,7 @@ type EventDetail = {
   audienceCanReorder: boolean;
   phase: "VOTING" | "PITCHING";
   mcs: Array<{ id: string; hacker: { id: string; name: string } }>;
-  projects: Array<{
-    id: string;
-    position: number;
-    status: "QUEUED" | "APPROVED" | "CURRENT" | "DONE" | "SKIPPED";
-    approved: boolean;
-    addedById: string;
-    project: Project;
-  }>;
+  projects: EventProjectEntry[];
 };
 
 function StageBadge({ phase }: { phase: "VOTING" | "PITCHING" }) {
@@ -317,6 +327,205 @@ function VotingPhase({
   );
 }
 
+// ── Timer helpers ────────────────────────────────────────
+function formatTime(seconds: number): string {
+  const mins = Math.floor(Math.abs(seconds) / 60);
+  const secs = Math.floor(Math.abs(seconds) % 60);
+  return `${mins}:${secs.toString().padStart(2, "0")}`;
+}
+
+function TimerDisplay({
+  startedAt,
+  allottedSec,
+  isDarkMode,
+  label,
+}: {
+  startedAt: string;
+  allottedSec: number;
+  isDarkMode: boolean;
+  label: string;
+}) {
+  const [elapsed, setElapsed] = useState(0);
+
+  useEffect(() => {
+    const start = new Date(startedAt).getTime();
+    const tick = () => setElapsed((Date.now() - start) / 1000);
+    tick();
+    const id = setInterval(tick, 100);
+    return () => clearInterval(id);
+  }, [startedAt]);
+
+  const overtime = Math.max(0, elapsed - allottedSec);
+  const isOver = overtime > 0;
+  const remaining = Math.max(0, allottedSec - elapsed);
+
+  return (
+    <div className="flex flex-col items-center gap-1">
+      <span className="text-xs uppercase tracking-wider opacity-70">{label}</span>
+      <div className={`text-4xl font-mono font-bold tabular-nums ${isOver ? "text-red-500" : isDarkMode ? "text-white" : "text-gray-900"}`}>
+        {isOver ? formatTime(elapsed) : formatTime(remaining)}
+      </div>
+      <div className="flex items-center gap-3 text-sm">
+        <span className="opacity-60">Allotted: {formatTime(allottedSec)}</span>
+        {isOver && (
+          <span className="text-red-500 font-semibold">+{formatTime(overtime)} over</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function CompletedTimerSummary({
+  ep,
+  isDarkMode,
+}: {
+  ep: EventProjectEntry;
+  isDarkMode: boolean;
+}) {
+  if (!ep.presentingStartedAt) return null;
+
+  const presStart = new Date(ep.presentingStartedAt).getTime();
+  const qStart = ep.questionsStartedAt ? new Date(ep.questionsStartedAt).getTime() : null;
+  const end = ep.completedAt ? new Date(ep.completedAt).getTime() : null;
+
+  const presDuration = qStart ? (qStart - presStart) / 1000 : null;
+  const qDuration = qStart && end ? (end - qStart) / 1000 : null;
+
+  const presAllotted = ep.allottedPresentingSec ?? 0;
+  const qAllotted = ep.allottedQuestionsSec ?? 0;
+
+  return (
+    <div className={`flex gap-4 text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
+      {presDuration != null && (
+        <span className={presDuration > presAllotted ? "text-red-400" : ""}>
+          Pitch: {formatTime(presDuration)}/{formatTime(presAllotted)}
+        </span>
+      )}
+      {qDuration != null && (
+        <span className={qDuration > qAllotted ? "text-red-400" : ""}>
+          Q&A: {formatTime(qDuration)}/{formatTime(qAllotted)}
+        </span>
+      )}
+    </div>
+  );
+}
+
+function PitchTimer({
+  currentItem,
+  eventId,
+  isController,
+  isDarkMode,
+  onUpdate,
+}: {
+  currentItem: EventProjectEntry;
+  eventId: string;
+  isController: boolean;
+  isDarkMode: boolean;
+  onUpdate: () => void;
+}) {
+  const [acting, setActing] = useState(false);
+
+  const timerAction = async (action: string) => {
+    setActing(true);
+    try {
+      const res = await fetch(`/api/events/${eventId}/pitch-timer`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, eventProjectId: currentItem.id }),
+      });
+      if (res.ok) {
+        if (action === "finish") {
+          await fetch(`/api/events/${eventId}/advance`, { method: "POST" });
+        }
+        onUpdate();
+      }
+    } finally {
+      setActing(false);
+    }
+  };
+
+  const phase = currentItem.pitchPhase;
+
+  return (
+    <div className={`rounded-xl p-5 shadow ${isDarkMode ? "bg-gray-900" : "bg-white"}`}>
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="font-semibold">Timer</h3>
+        <span className={`text-xs uppercase tracking-wider px-2 py-1 rounded-full font-semibold ${
+          phase === "WAITING" ? "bg-gray-200 text-gray-600" :
+          phase === "PRESENTING" ? "bg-blue-100 text-blue-700" :
+          phase === "QUESTIONS" ? "bg-purple-100 text-purple-700" :
+          "bg-green-100 text-green-700"
+        }`}>
+          {phase === "WAITING" ? "Ready" : phase === "PRESENTING" ? "Presenting" : phase === "QUESTIONS" ? "Q&A" : "Done"}
+        </span>
+      </div>
+
+      <div className="flex flex-col items-center gap-4">
+        {phase === "WAITING" && (
+          <>
+            <div className="text-center opacity-70 text-sm">
+              Allotted: {formatTime(currentItem.allottedPresentingSec ?? 0)} presenting, {formatTime(currentItem.allottedQuestionsSec ?? 0)} Q&A
+            </div>
+            {isController && (
+              <button
+                disabled={acting}
+                onClick={() => timerAction("start_presenting")}
+                className={`px-6 py-3 rounded-lg text-white font-semibold ${acting ? "bg-gray-400" : "bg-blue-600 hover:bg-blue-700"}`}
+              >
+                {acting ? "Starting..." : "Presentation Started"}
+              </button>
+            )}
+          </>
+        )}
+
+        {phase === "PRESENTING" && currentItem.presentingStartedAt && (
+          <>
+            <TimerDisplay
+              startedAt={currentItem.presentingStartedAt}
+              allottedSec={currentItem.allottedPresentingSec ?? 120}
+              isDarkMode={isDarkMode}
+              label="Presenting"
+            />
+            {isController && (
+              <button
+                disabled={acting}
+                onClick={() => timerAction("start_questions")}
+                className={`px-6 py-3 rounded-lg text-white font-semibold ${acting ? "bg-gray-400" : "bg-purple-600 hover:bg-purple-700"}`}
+              >
+                {acting ? "Starting..." : "Q&A Started"}
+              </button>
+            )}
+          </>
+        )}
+
+        {phase === "QUESTIONS" && currentItem.questionsStartedAt && (
+          <>
+            <TimerDisplay
+              startedAt={currentItem.questionsStartedAt}
+              allottedSec={currentItem.allottedQuestionsSec ?? 180}
+              isDarkMode={isDarkMode}
+              label="Q&A"
+            />
+            {isController && (
+              <button
+                disabled={acting}
+                onClick={() => timerAction("finish")}
+                className={`px-6 py-3 rounded-lg text-white font-semibold ${acting ? "bg-gray-400" : "bg-green-600 hover:bg-green-700"}`}
+              >
+                {acting ? "Finishing..." : "Finished"}
+              </button>
+            )}
+          </>
+        )}
+
+        {phase === "COMPLETED" && (
+          <CompletedTimerSummary ep={currentItem} isDarkMode={isDarkMode} />
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Pitching Phase (existing presentation UI) ───────────
 function PitchingPhase({
   event,
@@ -468,7 +677,17 @@ function PitchingPhase({
       <div className={`${isDarkMode ? "bg-gray-900" : "bg-white"} rounded-xl p-4 shadow lg:col-span-2`}>
         <h2 className="font-semibold mb-3">Current project</h2>
         {currentItem ? (
-          <div className="max-w-5xl">
+          <div className="max-w-5xl space-y-4">
+            <PitchTimer
+              currentItem={currentItem}
+              eventId={event.id}
+              isController={isController}
+              isDarkMode={isDarkMode}
+              onUpdate={async () => {
+                const res = await fetch(`/api/events/${event.id}`);
+                if (res.ok) setEvent(await res.json());
+              }}
+            />
             <ProjectCard
               project={currentItem.project}
               userInfo={userInfo}
@@ -575,23 +794,25 @@ function PitchingPhase({
                       >
                         {relLabel}
                       </span>
-                      <a
-                        href={`/projects/${ep.project.id}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className={`truncate mr-3 text-sm font-medium ${
-                          isCurrent
-                            ? isDarkMode
-                              ? "text-indigo-200"
-                              : "text-indigo-800"
-                            : isDarkMode
-                            ? "text-gray-100"
-                            : "text-gray-900"
-                        } ${isPast ? "opacity-70" : ""}`}
-                        title={ep.project.title}
-                      >
-                        {ep.project.title}
-                      </a>
+                      <div className="min-w-0">
+                        <a
+                          href={`/projects/${ep.project.id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={`truncate mr-3 text-sm font-medium block ${
+                            isCurrent
+                              ? isDarkMode
+                                ? "text-indigo-200"
+                                : "text-indigo-800"
+                              : isDarkMode
+                              ? "text-gray-100"
+                              : "text-gray-900"
+                          } ${isPast ? "opacity-70" : ""}`}
+                          title={ep.project.title}
+                        >
+                          {ep.project.title}
+                        </a>
+                      </div>
                     </div>
                     <div className="flex items-center gap-2">
                       {isCurrent && (

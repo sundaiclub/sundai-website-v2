@@ -42,10 +42,20 @@ export async function POST(
     }
 
     if (currentIdx !== -1) {
-      await prisma.eventProject.update({ where: { id: ordered[currentIdx].id }, data: { status: 'DONE' } });
+      // If still presenting/questions, mark as completed with timestamp
+      const current = ordered[currentIdx];
+      const completedData: any = { status: 'DONE' };
+      if (current.pitchPhase === 'PRESENTING' || current.pitchPhase === 'QUESTIONS') {
+        completedData.pitchPhase = 'COMPLETED';
+        completedData.completedAt = new Date();
+        if (current.pitchPhase === 'PRESENTING') {
+          completedData.questionsStartedAt = new Date();
+        }
+      }
+      await prisma.eventProject.update({ where: { id: current.id }, data: completedData });
     }
     if (nextIdx !== -1) {
-      await prisma.eventProject.update({ where: { id: ordered[nextIdx].id }, data: { status: 'CURRENT', approved: true } });
+      await prisma.eventProject.update({ where: { id: ordered[nextIdx].id }, data: { status: 'CURRENT', approved: true, pitchPhase: 'WAITING' } });
     }
     const updated = await prisma.event.findUnique({ where: { id: params.eventId }, include: { projects: { orderBy: { position: 'asc' } } } });
     return NextResponse.json(updated);

@@ -313,6 +313,14 @@ model EventProject {
   createdAt  DateTime           @default(now())
   updatedAt  DateTime           @updatedAt
 
+  // Timer fields
+  pitchPhase            PitchPhase @default(WAITING)
+  presentingStartedAt   DateTime?
+  questionsStartedAt    DateTime?
+  completedAt           DateTime?
+  allottedPresentingSec Int?
+  allottedQuestionsSec  Int?
+
   @@unique([eventId, projectId])
   @@index([eventId, position])
   @@index([status])
@@ -324,4 +332,11 @@ enum EventProjectStatus {
   CURRENT
   DONE
   SKIPPED
+}
+
+enum PitchPhase {
+  WAITING
+  PRESENTING
+  QUESTIONS
+  COMPLETED
 }
