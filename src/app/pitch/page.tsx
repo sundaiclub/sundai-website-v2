@@ -13,6 +13,7 @@ type EventListItem = {
   startTime: string;
   endTime?: string | null;
   meetingUrl?: string | null;
+  phase: "VOTING" | "PITCHING";
 };
 
 function Countdown({ start }: { start: string }) {
@@ -59,6 +60,7 @@ export default function PitchPage() {
           startTime: e.startTime,
           endTime: e.endTime,
           meetingUrl: e.meetingUrl,
+          phase: e.phase,
         }));
         setEvents(mapped);
       } finally {
@@ -197,7 +199,10 @@ export default function PitchPage() {
                           <li key={e.id} className={`${isDarkMode ? "bg-gray-900" : "bg-white"} rounded-lg p-4 shadow`}>
                             <div className="flex items-center justify-between gap-3">
                               <div>
-                                <div className="font-medium">{e.title}</div>
+                                <div className="flex items-center gap-2">
+                                  <span className="font-medium">{e.title}</span>
+                                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${e.phase === "VOTING" ? "bg-yellow-200 text-yellow-800" : "bg-green-200 text-green-800"}`}>{e.phase === "VOTING" ? "Voting Open" : "Pitching"}</span>
+                                </div>
                                 <div className="text-sm opacity-75"><Countdown start={e.startTime} /></div>
                               </div>
                               <Link href={`/pitch/${e.id}`} className="px-3 py-2 rounded-md bg-indigo-600 text-white hover:bg-indigo-700 text-sm">View</Link>
@@ -216,7 +221,10 @@ export default function PitchPage() {
                           <li key={e.id} className={`${isDarkMode ? "bg-gray-900" : "bg-white"} rounded-lg p-4 shadow`}>
                             <div className="flex items-center justify-between gap-3">
                               <div>
-                                <div className="font-medium">{e.title}</div>
+                                <div className="flex items-center gap-2">
+                                  <span className="font-medium">{e.title}</span>
+                                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${e.phase === "VOTING" ? "bg-yellow-200 text-yellow-800" : "bg-green-200 text-green-800"}`}>{e.phase === "VOTING" ? "Voting Open" : "Pitching"}</span>
+                                </div>
                                 <div className="text-sm opacity-75">Started {new Date(e.startTime).toLocaleString()}</div>
                               </div>
                               <Link href={`/pitch/${e.id}`} className="px-3 py-2 rounded-md bg-indigo-600 text-white hover:bg-indigo-700 text-sm">View</Link>

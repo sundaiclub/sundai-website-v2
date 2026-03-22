@@ -130,6 +130,16 @@ const Navbar = () => {
                 </Link>
 
                 <Link
+                  href="/pitch"
+                  className={`${isPWA ? "px-4 py-3" : "px-3 py-2"
+                    } mx-2 rounded-lg active:bg-indigo-100`}
+                >
+                  <span className={`text-sm font-fira-code ${isDarkMode ? 'text-gray-200' : 'text-black'} hover:text-indigo-700 dark:hover:text-indigo-500 transition duration-300`}>
+                    Pitch
+                  </span>
+                </Link>
+
+                <Link
                   href={`/hacker/${hackerId}`}
                   className={`${isPWA ? "px-4 py-3" : "px-3 py-2"
                     } mx-2 rounded-lg active:bg-indigo-100`}
@@ -206,6 +216,15 @@ const Navbar = () => {
               >
                 <span className={`text-sm font-fira-code ${isDarkMode ? 'text-gray-200' : 'text-black'} hover:text-indigo-700 dark:hover:text-indigo-500`}>
                   New Project
+                </span>
+              </Link>
+              <Link
+                href="/pitch"
+                className="block px-4 py-2 rounded-lg"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                <span className={`text-sm font-fira-code ${isDarkMode ? 'text-gray-200' : 'text-black'} hover:text-indigo-700 dark:hover:text-indigo-500`}>
+                  Pitch
                 </span>
               </Link>
               <Link
