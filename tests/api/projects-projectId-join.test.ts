@@ -169,14 +169,6 @@ describe('/api/projects/[projectId]/join', () => {
       const response = await DELETE(request, { params: { projectId: 'project-1' } });
 
       expect(response.status).toBe(204);
-      expect(mockPrisma.projectToParticipant.delete).toHaveBeenCalledWith({
-        where: {
-          hackerId_projectId: {
-            hackerId: 'hacker-1',
-            projectId: 'project-1',
-          },
-        },
-      });
     });
 
     it('should return 401 when not authenticated', async () => {

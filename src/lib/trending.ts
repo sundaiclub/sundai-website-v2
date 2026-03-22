@@ -19,16 +19,21 @@ export function calculateTrendingScore(
     return likesCount;
   }
 
+  if (timeDecayDays <= 0) {
+    return likesCount;
+  }
+
   const rawDate = (project.startDate as any) || (project.createdAt as any);
   const projectDate = new Date(rawDate);
   if (Number.isNaN(projectDate.getTime())) {
-    return likesCount;
+    return Math.log(Math.max(likesCount, Number.EPSILON));
   }
 
   const now = new Date();
   const projectAgeInDays = (now.getTime() - projectDate.getTime()) / (1000 * 60 * 60 * 24);
-  const decayFactor = Math.exp(-projectAgeInDays / timeDecayDays);
-  return likesCount * decayFactor;
+
+  // Use log-space scoring to avoid numeric underflow on older projects.
+  return Math.log(Math.max(likesCount, Number.EPSILON)) - projectAgeInDays / timeDecayDays;
 }
 
 // Alias with the same name used in client code
@@ -38,5 +43,4 @@ export function calculateProjectScore(
 ): number {
   return calculateTrendingScore(project, options);
 }
-
 

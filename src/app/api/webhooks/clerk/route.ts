@@ -3,6 +3,47 @@ import { headers } from "next/headers";
 import { WebhookEvent } from "@clerk/nextjs/server";
 import prisma from "@/lib/prisma";
 
+function serializeError(error: unknown) {
+  if (error instanceof Error) {
+    return {
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+    };
+  }
+
+  return {
+    message: typeof error === "string" ? error : JSON.stringify(error),
+  };
+}
+
+function createDebugErrorResponse(
+  status: number,
+  message: string,
+  error: unknown,
+  context: Record<string, unknown>
+) {
+  const isDebugEnv = process.env.NODE_ENV === "test" || process.env.CI === "true";
+
+  if (!isDebugEnv) {
+    return new Response(message, { status });
+  }
+
+  return new Response(
+    JSON.stringify({
+      error: message,
+      details: serializeError(error),
+      context,
+    }),
+    {
+      status,
+      headers: {
+        "Content-Type": "application/json",
+      },
+    }
+  );
+}
+
 async function handler(request: Request) {
   // Get the headers
   const headerPayload = headers();
@@ -51,11 +92,34 @@ async function handler(request: Request) {
         first_name && last_name
           ? `${first_name} ${last_name}`
           : first_name
-          ? first_name
-          : emailUsername;
+            ? first_name
+            : emailUsername;
 
-      const hacker = await prisma.hacker.create({
-        data: {
+      const hacker = await prisma.hacker.upsert({
+        where: { clerkId: id },
+        update: {
+          name: name,
+          email: email_addresses[0].email_address,
+          username: username || emailUsername,
+          ...(image_url && {
+            avatar: {
+              upsert: {
+                create: {
+                  key: `avatars/${id}`,
+                  bucket: "sundai-avatars",
+                  url: image_url,
+                  filename: `${id}-avatar`,
+                  mimeType: "image/jpeg",
+                  size: 0,
+                },
+                update: {
+                  url: image_url,
+                },
+              },
+            },
+          }),
+        },
+        create: {
           name: name,
           clerkId: id,
           email: email_addresses[0].email_address,
@@ -78,8 +142,21 @@ async function handler(request: Request) {
 
       return new Response(JSON.stringify(hacker), { status: 201 });
     } catch (error) {
-      console.error("Error creating hacker:", error);
-      return new Response("Error creating hacker", { status: 500 });
+      console.error("Error creating hacker:", {
+        eventType,
+        clerkId: id,
+        emailCount: email_addresses?.length ?? 0,
+        hasImageUrl: Boolean(image_url),
+        username,
+        error: serializeError(error),
+      });
+      return createDebugErrorResponse(500, "Error creating hacker", error, {
+        eventType,
+        clerkId: id,
+        emailCount: email_addresses?.length ?? 0,
+        hasImageUrl: Boolean(image_url),
+        username,
+      });
     }
   }
 

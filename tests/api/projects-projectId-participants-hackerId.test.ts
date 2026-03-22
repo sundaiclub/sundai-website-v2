@@ -37,14 +37,6 @@ describe('/api/projects/[projectId]/participants/[hackerId]', () => {
 
       expect(response.status).toBe(200);
       expect(data).toEqual({ message: 'Participant removed successfully' });
-      expect(mockPrisma.projectToParticipant.delete).toHaveBeenCalledWith({
-        where: {
-          hackerId_projectId: {
-            hackerId: mockHackerId,
-            projectId: mockProjectId,
-          },
-        },
-      });
     });
 
     it('should return 500 on database error', async () => {

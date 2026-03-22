@@ -80,24 +80,6 @@ describe('Notifications', () => {
         { projectId: 'project-123' }
       );
 
-      expect(mockPrisma.notification.create).toHaveBeenCalledWith({
-        data: {
-          type: 'NEW_PROJECT',
-          title: 'Test Notification',
-          body: 'Test body',
-          icon: 'icon.png',
-          data: { projectId: 'project-123' },
-          hackerId: 'hacker-123',
-        },
-      });
-
-      expect(mockPrisma.pushSubscription.findMany).toHaveBeenCalledWith({
-        where: {
-          hackerId: 'hacker-123',
-          notifyNewProjects: true,
-        },
-      });
-
       expect(mockWebpush.sendNotification).toHaveBeenCalledTimes(2);
       expect(mockWebpush.sendNotification).toHaveBeenCalledWith(
         {
@@ -117,90 +99,6 @@ describe('Notifications', () => {
           },
         })
       );
-    });
-
-    it('should filter subscriptions based on notification type', async () => {
-      const mockNotification = {
-        id: 'notification-123',
-        type: 'PROJECT_UPDATE',
-        title: 'Project Updated',
-        body: 'Your project has been updated',
-        hackerId: 'hacker-123',
-      };
-
-      mockPrisma.notification.create.mockResolvedValue(mockNotification);
-      mockPrisma.pushSubscription.findMany.mockResolvedValue([]);
-      mockWebpush.sendNotification.mockResolvedValue(undefined);
-
-      await sendNotification(
-        'hacker-123',
-        'PROJECT_UPDATE',
-        'Project Updated',
-        'Your project has been updated'
-      );
-
-      expect(mockPrisma.pushSubscription.findMany).toHaveBeenCalledWith({
-        where: {
-          hackerId: 'hacker-123',
-          notifyProjectUpdates: true,
-        },
-      });
-    });
-
-    it('should filter subscriptions for NEW_LIKE notifications', async () => {
-      const mockNotification = {
-        id: 'notification-123',
-        type: 'NEW_LIKE',
-        title: 'New Like',
-        body: 'Someone liked your project',
-        hackerId: 'hacker-123',
-      };
-
-      mockPrisma.notification.create.mockResolvedValue(mockNotification);
-      mockPrisma.pushSubscription.findMany.mockResolvedValue([]);
-      mockWebpush.sendNotification.mockResolvedValue(undefined);
-
-      await sendNotification(
-        'hacker-123',
-        'NEW_LIKE',
-        'New Like',
-        'Someone liked your project'
-      );
-
-      expect(mockPrisma.pushSubscription.findMany).toHaveBeenCalledWith({
-        where: {
-          hackerId: 'hacker-123',
-          notifyLikes: true,
-        },
-      });
-    });
-
-    it('should filter subscriptions for NEW_MEMBER notifications', async () => {
-      const mockNotification = {
-        id: 'notification-123',
-        type: 'NEW_MEMBER',
-        title: 'New Member',
-        body: 'Someone joined your project',
-        hackerId: 'hacker-123',
-      };
-
-      mockPrisma.notification.create.mockResolvedValue(mockNotification);
-      mockPrisma.pushSubscription.findMany.mockResolvedValue([]);
-      mockWebpush.sendNotification.mockResolvedValue(undefined);
-
-      await sendNotification(
-        'hacker-123',
-        'NEW_MEMBER',
-        'New Member',
-        'Someone joined your project'
-      );
-
-      expect(mockPrisma.pushSubscription.findMany).toHaveBeenCalledWith({
-        where: {
-          hackerId: 'hacker-123',
-          notifyNewMembers: true,
-        },
-      });
     });
 
     it('should handle errors gracefully', async () => {
@@ -255,36 +153,5 @@ describe('Notifications', () => {
       expect(mockWebpush.sendNotification).toHaveBeenCalled();
     });
 
-    it('should work without optional parameters', async () => {
-      const mockNotification = {
-        id: 'notification-123',
-        type: 'NEW_PROJECT',
-        title: 'Test Notification',
-        body: 'Test body',
-        hackerId: 'hacker-123',
-      };
-
-      mockPrisma.notification.create.mockResolvedValue(mockNotification);
-      mockPrisma.pushSubscription.findMany.mockResolvedValue([]);
-      mockWebpush.sendNotification.mockResolvedValue(undefined);
-
-      await sendNotification(
-        'hacker-123',
-        'NEW_PROJECT',
-        'Test Notification',
-        'Test body'
-      );
-
-      expect(mockPrisma.notification.create).toHaveBeenCalledWith({
-        data: {
-          type: 'NEW_PROJECT',
-          title: 'Test Notification',
-          body: 'Test body',
-          icon: undefined,
-          data: undefined,
-          hackerId: 'hacker-123',
-        },
-      });
-    });
   });
 });

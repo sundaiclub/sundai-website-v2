@@ -17,6 +17,7 @@
     "postinstall": "prisma generate",
     "vercel-build": "prisma generate && prisma migrate deploy && node --no-deprecation node_modules/.bin/next build && next-sitemap",
     "db:backup": "./scripts/backup_db.sh",
+    "db:export:projects": "./scripts/export_projects_csv.sh",
     "db:restore": "./scripts/restore_db.sh",
     "db:up": "docker compose up -d postgres",
     "db:down": "docker compose down",

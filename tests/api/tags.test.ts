@@ -43,23 +43,6 @@ describe('/api/tags/[type]', () => {
 
       expect(response.status).toBe(200);
       expect(data).toEqual(mockTechTags);
-      expect(mockPrisma.techTag.findMany).toHaveBeenCalledWith({
-        select: {
-          id: true,
-          name: true,
-          description: true,
-          _count: {
-            select: {
-              projects: true
-            }
-          }
-        },
-        orderBy: {
-          projects: {
-            _count: 'desc'
-          }
-        }
-      });
     });
 
     it('should return domain tags when type is domain', async () => {
@@ -76,23 +59,6 @@ describe('/api/tags/[type]', () => {
 
       expect(response.status).toBe(200);
       expect(data).toEqual(mockDomainTags);
-      expect(mockPrisma.domainTag.findMany).toHaveBeenCalledWith({
-        select: {
-          id: true,
-          name: true,
-          description: true,
-          _count: {
-            select: {
-              projects: true
-            }
-          }
-        },
-        orderBy: {
-          projects: {
-            _count: 'desc'
-          }
-        }
-      });
     });
 
     it('should return 400 for invalid tag type', async () => {

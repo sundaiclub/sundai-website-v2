@@ -4,7 +4,10 @@ import { auth } from "@clerk/nextjs/server";
 import { uploadToGCS } from "@/lib/gcp-storage";
 import prisma from "@/lib/prisma";
 
-const ignoredDomainTags = (process.env.IGNORE_DOMAIN_TAGS || "").split(",").map(tag => tag.trim());
+const ignoredDomainTags = (process.env.IGNORE_DOMAIN_TAGS || "")
+  .split(",")
+  .map((tag) => tag.trim())
+  .filter((tag) => tag.length > 0);
 
 export async function GET(req: Request) {
   try {
@@ -14,21 +17,27 @@ export async function GET(req: Request) {
     // Determine hack_type based on environment
     const isResearchSite = process.env.IS_RESEARCH_SITE === 'true';
     const hack_type = isResearchSite ? 'RESEARCH' : 'REGULAR';
+    const ignoredDomainTagsFilter =
+      ignoredDomainTags.length > 0
+        ? [
+            {
+              domainTags: {
+                none: {
+                  name: {
+                    in: ignoredDomainTags,
+                  },
+                },
+              },
+            },
+          ]
+        : [];
 
     const projects = await prisma.project.findMany({
       where: {
         AND: [
           status ? { status: status as ProjectStatus } : {},
           { hack_type },
-          {
-            domainTags: {
-              none: {
-                name: {
-                  in: ignoredDomainTags,
-                },
-              },
-            },
-          },
+          ...ignoredDomainTagsFilter,
         ],
       },
       include: {

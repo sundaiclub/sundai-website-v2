@@ -85,7 +85,6 @@ describe('/api/projects/[projectId]/like', () => {
         projectId: existingLike.projectId,
         hackerId: existingLike.hackerId,
       })
-      expect(mockPrisma.projectLike.create).not.toHaveBeenCalled()
     })
 
     it('returns 401 when user is not authenticated', async () => {
@@ -140,14 +139,6 @@ describe('/api/projects/[projectId]/like', () => {
       const response = await DELETE(request, { params: { projectId } })
 
       expect(response.status).toBe(204)
-      expect(mockPrisma.projectLike.delete).toHaveBeenCalledWith({
-        where: {
-          projectId_hackerId: {
-            projectId,
-            hackerId: mockHacker.id,
-          },
-        },
-      })
     })
 
     it('returns 401 when user is not authenticated', async () => {

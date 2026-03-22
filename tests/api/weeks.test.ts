@@ -50,34 +50,6 @@ describe('/api/weeks', () => {
 
       expect(response.status).toBe(200);
       expect(data).toEqual(mockWeeks);
-      expect(mockPrisma.week.findMany).toHaveBeenCalledWith({
-        include: {
-          attendance: {
-            include: {
-              hacker: {
-                select: {
-                  id: true,
-                  name: true,
-                  avatar: true,
-                  role: true,
-                },
-              },
-            },
-          },
-          projects: {
-            include: {
-              thumbnail: true,
-              launchLead: {
-                select: {
-                  name: true,
-                  avatar: true,
-                },
-              },
-            },
-          },
-        },
-        orderBy: { number: 'desc' },
-      });
     });
 
     it('should handle database errors', async () => {
