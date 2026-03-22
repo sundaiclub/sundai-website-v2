@@ -63,15 +63,15 @@ export default function Home() {
                 ...project,
                 likes: isLiked
                   ? project.likes.filter(
-                      (like) => like.hackerId !== userInfo?.id
-                    )
+                    (like) => like.hackerId !== userInfo?.id
+                  )
                   : [
-                      ...project.likes,
-                      {
-                        hackerId: userInfo?.id || '',
-                        createdAt: new Date().toISOString(),
-                      },
-                    ],
+                    ...project.likes,
+                    {
+                      hackerId: userInfo?.id || '',
+                      createdAt: new Date().toISOString(),
+                    },
+                  ],
               };
             }
             return project;
@@ -100,11 +100,10 @@ export default function Home() {
 
   return (
     <div
-      className={`min-h-screen ${
-        isDarkMode
-          ? "bg-gradient-to-b from-gray-900 to-black text-gray-100"
-          : "bg-gradient-to-b from-[#E5E5E5] to-[#F0F0F0] text-gray-800"
-      } font-space-mono`}
+      className={`min-h-screen ${isDarkMode
+        ? "bg-gradient-to-b from-gray-900 to-black text-gray-100"
+        : "bg-gradient-to-b from-[#E5E5E5] to-[#F0F0F0] text-gray-800"
+        } font-space-mono`}
     >
       {" "}
       <section className="relative py-16 md:py-24 lg:py-26 px-4 md:px-8 overflow-hidden">
@@ -129,26 +128,23 @@ export default function Home() {
               transition={{ duration: 0.8, delay: 0.4 }}
             >
               <h1
-                className={`font-semibold text-2xl sm:text-3xl md:text-4xl lg:text-5xl mb-6 font-space-mono tracking-tight ${
-                  isDarkMode ? "text-gray-100" : "text-gray-900"
-                }`}
+                className={`font-semibold text-2xl sm:text-3xl md:text-4xl lg:text-5xl mb-6 font-space-mono tracking-tight ${isDarkMode ? "text-gray-100" : "text-gray-900"
+                  }`}
               >
                 Sundai
               </h1>
               <p
-                className={`text-base sm:text-lg md:text-xl mb-8 max-w-xl mx-auto font-fira-code ${
-                  isDarkMode ? "text-gray-300" : "text-gray-700"
-                }`}
+                className={`text-base sm:text-lg md:text-xl mb-8 max-w-xl mx-auto font-fira-code ${isDarkMode ? "text-gray-300" : "text-gray-700"
+                  }`}
               >
                 Building & Launching AI Prototypes Every Sunday.
               </p>
 
               <div
-                className={`grid grid-cols-1 sm:grid-cols-3 gap-4 items-center max-w-lg mx-auto mb-12 ${
-                  isDarkMode
-                    ? "bg-gray-800 shadow-[inset_0_2px_4px_rgba(0,0,0,0.3)]"
-                    : "bg-gray-100 shadow-[inset_0_2px_4px_rgba(0,0,0,0.1)]"
-                } rounded-xl p-4 sm:p-6`}
+                className={`grid grid-cols-1 sm:grid-cols-3 gap-4 items-center max-w-lg mx-auto mb-12 ${isDarkMode
+                  ? "bg-gray-800 shadow-[inset_0_2px_4px_rgba(0,0,0,0.3)]"
+                  : "bg-gray-100 shadow-[inset_0_2px_4px_rgba(0,0,0,0.1)]"
+                  } rounded-xl p-4 sm:p-6`}
               >
                 <motion.div
                   className="flex justify-center items-center relative rounded-lg p-2 sm:p-4"
@@ -167,9 +163,8 @@ export default function Home() {
                   />
                 </motion.div>
                 <div
-                  className={`text-base sm:text-xl font-mono h-full mt-2 sm:mt-8 text-center px-2 sm:px-4 py-1 sm:py-2 rounded-lg ${
-                    isDarkMode ? "text-gray-200" : "text-gray-800"
-                  }`}
+                  className={`text-base sm:text-xl font-mono h-full mt-2 sm:mt-8 text-center px-2 sm:px-4 py-1 sm:py-2 rounded-lg ${isDarkMode ? "text-gray-200" : "text-gray-800"
+                    }`}
                 >
                   <Typewriter
                     onInit={(typewriter) => {
@@ -250,9 +245,8 @@ export default function Home() {
         {loading ? (
           <div className="flex justify-center items-center py-20">
             <div
-              className={`animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 ${
-                isDarkMode ? "border-purple-400" : "border-indigo-600"
-              }`}
+              className={`animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 ${isDarkMode ? "border-purple-400" : "border-indigo-600"
+                }`}
             ></div>
           </div>
         ) : (
@@ -261,7 +255,7 @@ export default function Home() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 1.3 }}
           >
-            <TrendingSections 
+            <TrendingSections
               projects={projects}
               userInfo={userInfo}
               handleLike={handleLike}
@@ -270,15 +264,57 @@ export default function Home() {
           </motion.div>
         )}
       </section>
+
+      {/* Sponsors Section */}
+      <motion.section
+        initial={{ opacity: 0, y: 30 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.8, delay: 1.5 }}
+        className={`py-12 px-4 md:px-8 ${isDarkMode ? "bg-gray-900/50" : "bg-gray-200/50"
+          }`}
+      >
+        <div className="container mx-auto">
+          <p
+            className={`text-center text-sm font-space-mono uppercase tracking-widest mb-8 ${isDarkMode ? "text-gray-500" : "text-gray-400"
+              }`}
+          >
+            Supported By
+          </p>
+          <div className="flex flex-wrap justify-center items-center gap-8 md:gap-16">
+            {[
+              { src: "/images/sponsors/redhat.png", alt: "Red Hat", width: 140, height: 48, invert: false },
+              { src: "/images/sponsors/e14.png", alt: "E14 Fund", width: 100, height: 48, invert: true },
+              { src: "/images/sponsors/gai-insights-logo.webp", alt: "GAI Insights", width: 105, height: 36, invert: false },
+              { src: "/images/sponsors/hyperskill.svg", alt: "Hyperskill", width: 105, height: 36, invert: false },
+            ].map((sponsor) => (
+              <div
+                key={sponsor.alt}
+                className={`transition duration-300 ${isDarkMode
+                  ? "opacity-70 hover:opacity-100"
+                  : "opacity-60 hover:opacity-100"
+                  }`}
+              >
+                <Image
+                  src={sponsor.src}
+                  alt={sponsor.alt}
+                  width={sponsor.width}
+                  height={sponsor.height}
+                  className={`h-10 md:h-12 w-auto object-contain ${sponsor.invert && isDarkMode ? "invert" : ""}`}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      </motion.section>
+
       <motion.footer
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.5, duration: 0.8 }}
-        className={`${
-          isDarkMode
-            ? "bg-gradient-to-r from-gray-900 to-gray-800 text-gray-200"
-            : "bg-gradient-to-r from-gray-100 to-gray-200 text-gray-700"
-        } py-6 md:py-2`}
+        className={`${isDarkMode
+          ? "bg-gradient-to-r from-gray-900 to-gray-800 text-gray-200"
+          : "bg-gradient-to-r from-gray-100 to-gray-200 text-gray-700"
+          } py-6 md:py-2`}
       >
         <div className="container mx-auto px-4">
           <div className="flex flex-col md:flex-row justify-between items-center">
@@ -289,15 +325,14 @@ export default function Home() {
 
             {/* Foundation link - Center aligned */}
             <p className="text-sm md:text-base order-1 md:order-2 mb-4 md:mb-0">
-              <a 
-                href="https://sundai.foundation" 
-                target="_blank" 
+              <a
+                href="https://sundai.foundation"
+                target="_blank"
                 rel="noopener noreferrer"
-                className={`${
-                  isDarkMode 
-                    ? "text-gray-200 hover:text-indigo-400" 
-                    : "text-gray-700 hover:text-indigo-600"
-                } transition duration-300`}
+                className={`${isDarkMode
+                  ? "text-gray-200 hover:text-indigo-400"
+                  : "text-gray-700 hover:text-indigo-600"
+                  } transition duration-300`}
               >
                 More about Sundai
               </a>
@@ -309,11 +344,10 @@ export default function Home() {
               <li>
                 <Link
                   href="https://github.com/sundai-club"
-                  className={`flex justify-center items-center w-8 h-8 ${
-                    isDarkMode
-                      ? "text-gray-200 hover:text-purple-400"
-                      : "text-gray-700 hover:text-purple-600"
-                  } rounded-full transition duration-150 ease-in-out`}
+                  className={`flex justify-center items-center w-8 h-8 ${isDarkMode
+                    ? "text-gray-200 hover:text-purple-400"
+                    : "text-gray-700 hover:text-purple-600"
+                    } rounded-full transition duration-150 ease-in-out`}
                   aria-label="Github"
                 >
                   <svg
@@ -329,11 +363,10 @@ export default function Home() {
               <li className="ml-4">
                 <Link
                   href="https://twitter.com/sundai_club"
-                  className={`flex justify-center items-center w-8 h-8 ${
-                    isDarkMode
-                      ? "text-gray-200 hover:text-purple-400"
-                      : "text-gray-700 hover:text-purple-600"
-                  } rounded-full transition duration-150 ease-in-out`}
+                  className={`flex justify-center items-center w-8 h-8 ${isDarkMode
+                    ? "text-gray-200 hover:text-purple-400"
+                    : "text-gray-700 hover:text-purple-600"
+                    } rounded-full transition duration-150 ease-in-out`}
                   aria-label="Twitter"
                 >
                   <svg
@@ -349,11 +382,10 @@ export default function Home() {
               <li className="ml-4">
                 <Link
                   href="https://www.linkedin.com/company/sundaiclub"
-                  className={`flex justify-center items-center w-8 h-8 ${
-                    isDarkMode
-                      ? "text-gray-200 hover:text-purple-400"
-                      : "text-gray-700 hover:text-purple-600"
-                  } rounded-full transition duration-150 ease-in-out`}
+                  className={`flex justify-center items-center w-8 h-8 ${isDarkMode
+                    ? "text-gray-200 hover:text-purple-400"
+                    : "text-gray-700 hover:text-purple-600"
+                    } rounded-full transition duration-150 ease-in-out`}
                   aria-label="LinkedIn"
                 >
                   <svg
@@ -369,11 +401,10 @@ export default function Home() {
               <li className="ml-4">
                 <Link
                   href="https://instagram.com/sundai_club"
-                  className={`flex justify-center items-center w-8 h-8 ${
-                    isDarkMode
-                      ? "text-gray-200 hover:text-purple-400"
-                      : "text-gray-700 hover:text-purple-600"
-                  } rounded-full transition duration-150 ease-in-out`}
+                  className={`flex justify-center items-center w-8 h-8 ${isDarkMode
+                    ? "text-gray-200 hover:text-purple-400"
+                    : "text-gray-700 hover:text-purple-600"
+                    } rounded-full transition duration-150 ease-in-out`}
                   aria-label="Instagram"
                 >
                   <svg
