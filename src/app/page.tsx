@@ -284,8 +284,8 @@ export default function Home() {
             {[
               { src: "/images/sponsors/redhat.png", alt: "Red Hat", width: 140, height: 48, invert: false },
               { src: "/images/sponsors/e14.png", alt: "E14 Fund", width: 100, height: 48, invert: true },
-              { src: "/images/sponsors/gai-insights-logo.webp", alt: "GAI Insights", width: 140, height: 48, invert: false },
-              { src: "/images/sponsors/hyperskill.svg", alt: "Hyperskill", width: 140, height: 48, invert: false },
+              { src: "/images/sponsors/gai-insights-logo.webp", alt: "GAI Insights", width: 105, height: 36, invert: false },
+              { src: "/images/sponsors/hyperskill.svg", alt: "Hyperskill", width: 105, height: 36, invert: false },
             ].map((sponsor) => (
               <div
                 key={sponsor.alt}
