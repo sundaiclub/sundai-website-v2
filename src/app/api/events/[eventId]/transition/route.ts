@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import prisma from "@/lib/prisma";
 
+const EVENT_PHASES = ["VOTING", "PITCHING", "FINISHED"] as const;
+
 export async function POST(
   req: Request,
   { params }: { params: { eventId: string } }
@@ -23,8 +25,24 @@ export async function POST(
     const isAdmin = me.role === "ADMIN";
     if (!(isMC || isAdmin)) return new NextResponse("Unauthorized", { status: 401 });
 
-    if (event.phase === "PITCHING") {
-      return NextResponse.json({ message: "Event is already in PITCHING phase" }, { status: 400 });
+    const body = await req.json().catch(() => ({}));
+    const targetPhase = body?.targetPhase;
+
+    if (!EVENT_PHASES.includes(targetPhase)) {
+      return NextResponse.json({ message: "Valid targetPhase is required" }, { status: 400 });
+    }
+
+    if (targetPhase === event.phase) {
+      return NextResponse.json({ message: `Event is already ${event.phase}` }, { status: 400 });
+    }
+
+    if (targetPhase === "FINISHED" || targetPhase === "VOTING" || event.phase === "FINISHED") {
+      const updated = await prisma.event.update({
+        where: { id: params.eventId },
+        data: { phase: targetPhase },
+      });
+
+      return NextResponse.json(updated);
     }
 
     // Fetch all event projects with their like counts
@@ -65,7 +83,7 @@ export async function POST(
     ops.push(
       prisma.event.update({
         where: { id: params.eventId },
-        data: { phase: "PITCHING" },
+        data: { phase: targetPhase },
       }) as any
     );
 

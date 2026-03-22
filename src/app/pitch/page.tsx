@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useUserContext } from "../contexts/UserContext";
@@ -13,8 +13,20 @@ type EventListItem = {
   startTime: string;
   endTime?: string | null;
   meetingUrl?: string | null;
-  phase: "VOTING" | "PITCHING";
+  phase: "VOTING" | "PITCHING" | "FINISHED";
 };
+
+function getPhaseBadgeStyles(phase: EventListItem["phase"]) {
+  if (phase === "VOTING") return "bg-indigo-100 text-indigo-700";
+  if (phase === "PITCHING") return "bg-purple-100 text-purple-700";
+  return "bg-gray-200 text-gray-700";
+}
+
+function getPhaseBadgeLabel(phase: EventListItem["phase"]) {
+  if (phase === "VOTING") return "Voting Open";
+  if (phase === "PITCHING") return "Pitching";
+  return "Finished";
+}
 
 function Countdown({ start }: { start: string }) {
   const [now, setNow] = useState<number>(Date.now());
@@ -40,7 +52,17 @@ export default function PitchPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [title, setTitle] = useState("");
   const [meetingUrl, setMeetingUrl] = useState("");
-  const [startTime, setStartTime] = useState("");
+  const [startTime, setStartTime] = useState(() => {
+    const now = new Date();
+    // Create today at 8pm EST (UTC-5) = 01:00 UTC next day, but we want local-aware
+    // datetime-local uses local time, so compute 8pm EST as a Date and format it
+    const est = new Date(now.toLocaleString("en-US", { timeZone: "America/New_York" }));
+    est.setHours(20, 0, 0, 0);
+    const yyyy = est.getFullYear();
+    const mm = String(est.getMonth() + 1).padStart(2, "0");
+    const dd = String(est.getDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}T20:00`;
+  });
   const [endTime, setEndTime] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [hackers, setHackers] = useState<Hacker[]>([]);
@@ -92,11 +114,6 @@ export default function PitchPage() {
     }
   }, [showSelector]);
 
-  const nextEvent = useMemo(() => {
-    if (!events.length) return null;
-    return events[0];
-  }, [events]);
-
   const filteredHackers = hackers.filter(h => h.name.toLowerCase().includes(searchTerm.toLowerCase()) || h.email?.toLowerCase().includes(searchTerm.toLowerCase()));
 
   async function createEvent() {
@@ -136,12 +153,12 @@ export default function PitchPage() {
   }
 
   return (
-    <div className={`min-h-screen ${isDarkMode ? "bg-black text-gray-100" : "bg-gray-50 text-gray-900"}`}>
-      <div className="max-w-6xl mx-auto px-4 py-8">
+    <div className={`min-h-screen font-space-mono ${isDarkMode ? "bg-gradient-to-b from-gray-900 to-black text-gray-100" : "bg-gradient-to-b from-[#E5E5E5] to-[#F0F0F0] text-gray-900"}`}>
+      <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 py-16">
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-2xl md:text-3xl font-bold">Pitch at Sundai</h1>
           {isAdmin && (
-            <button onClick={() => setShowCreate(true)} className="px-4 py-2 rounded-md bg-indigo-600 text-white hover:bg-indigo-700">
+            <button onClick={() => setShowCreate(true)} className="px-4 py-2 rounded-full bg-indigo-600 text-white hover:bg-indigo-700 transition duration-300">
               Create Event
             </button>
           )}
@@ -159,33 +176,33 @@ export default function PitchPage() {
               const sorted = [...events].sort((a,b)=> new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
               const ongoing = sorted.filter(e => {
                 const s = new Date(e.startTime).getTime();
-                return s <= nowTs && nowTs < s + TWO_HOURS;
+                return e.phase !== "FINISHED" && s <= nowTs && nowTs < s + TWO_HOURS;
               });
               const current = ongoing.at(-1) || null;
-              const upcoming = sorted.filter(e => new Date(e.startTime).getTime() > nowTs);
-              const past = sorted.filter(e => new Date(e.startTime).getTime() + TWO_HOURS <= nowTs);
+              const upcoming = sorted.filter(e => e.phase !== "FINISHED" && new Date(e.startTime).getTime() > nowTs);
+              const past = sorted.filter(e => e.phase === "FINISHED" || new Date(e.startTime).getTime() + TWO_HOURS <= nowTs);
 
               return (
                 <>
                   {current ? (
-                    <div className={`${isDarkMode ? "bg-gray-900" : "bg-white"} rounded-xl p-6 shadow`}>
+                    <div className={`${isDarkMode ? "bg-gray-800" : "bg-white"} rounded-xl p-6 shadow`}>
                       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                         <div>
                           <h2 className="text-xl font-semibold">Live now: {current.title}</h2>
                           <p className="text-sm opacity-80">Started {new Date(current.startTime).toLocaleString()}</p>
                         </div>
-                        <Link href={`/pitch/${current.id}`} className="px-4 py-2 rounded-md bg-purple-600 text-white hover:bg-purple-700">Open Event</Link>
+                        <Link href={`/pitch/${current.id}`} className="px-4 py-2 rounded-full bg-indigo-600 text-white hover:bg-indigo-700 transition duration-300">Open Event</Link>
                       </div>
                     </div>
                   ) : (
                     upcoming[0] && (
-                      <div className={`${isDarkMode ? "bg-gray-900" : "bg-white"} rounded-xl p-6 shadow`}>
+                      <div className={`${isDarkMode ? "bg-gray-800" : "bg-white"} rounded-xl p-6 shadow`}>
                         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                           <div>
                             <h2 className="text-xl font-semibold">Next up: {upcoming[0].title}</h2>
                             <p className="text-sm opacity-80">Starts in <Countdown start={upcoming[0].startTime} /></p>
                           </div>
-                          <Link href={`/pitch/${upcoming[0].id}`} className="px-4 py-2 rounded-md bg-purple-600 text-white hover:bg-purple-700">Open Event</Link>
+                          <Link href={`/pitch/${upcoming[0].id}`} className="px-4 py-2 rounded-full bg-indigo-600 text-white hover:bg-indigo-700 transition duration-300">Open Event</Link>
                         </div>
                       </div>
                     )
@@ -196,16 +213,16 @@ export default function PitchPage() {
                       <h3 className="text-lg font-semibold mb-2">Upcoming</h3>
                       <ul className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {upcoming.map((e) => (
-                          <li key={e.id} className={`${isDarkMode ? "bg-gray-900" : "bg-white"} rounded-lg p-4 shadow`}>
+                          <li key={e.id} className={`${isDarkMode ? "bg-gray-800" : "bg-white"} rounded-lg p-4 shadow`}>
                             <div className="flex items-center justify-between gap-3">
                               <div>
                                 <div className="flex items-center gap-2">
                                   <span className="font-medium">{e.title}</span>
-                                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${e.phase === "VOTING" ? "bg-yellow-200 text-yellow-800" : "bg-green-200 text-green-800"}`}>{e.phase === "VOTING" ? "Voting Open" : "Pitching"}</span>
+                                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${getPhaseBadgeStyles(e.phase)}`}>{getPhaseBadgeLabel(e.phase)}</span>
                                 </div>
                                 <div className="text-sm opacity-75"><Countdown start={e.startTime} /></div>
                               </div>
-                              <Link href={`/pitch/${e.id}`} className="px-3 py-2 rounded-md bg-indigo-600 text-white hover:bg-indigo-700 text-sm">View</Link>
+                              <Link href={`/pitch/${e.id}`} className="px-3 py-2 rounded-full bg-indigo-600 text-white hover:bg-indigo-700 text-sm transition duration-300">View</Link>
                             </div>
                           </li>
                         ))}
@@ -218,16 +235,16 @@ export default function PitchPage() {
                       <h3 className="text-lg font-semibold mb-2">Past events</h3>
                       <ul className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {[...past].reverse().map((e) => (
-                          <li key={e.id} className={`${isDarkMode ? "bg-gray-900" : "bg-white"} rounded-lg p-4 shadow`}>
+                          <li key={e.id} className={`${isDarkMode ? "bg-gray-800" : "bg-white"} rounded-lg p-4 shadow`}>
                             <div className="flex items-center justify-between gap-3">
                               <div>
                                 <div className="flex items-center gap-2">
                                   <span className="font-medium">{e.title}</span>
-                                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${e.phase === "VOTING" ? "bg-yellow-200 text-yellow-800" : "bg-green-200 text-green-800"}`}>{e.phase === "VOTING" ? "Voting Open" : "Pitching"}</span>
+                                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${getPhaseBadgeStyles(e.phase)}`}>{getPhaseBadgeLabel(e.phase)}</span>
                                 </div>
                                 <div className="text-sm opacity-75">Started {new Date(e.startTime).toLocaleString()}</div>
                               </div>
-                              <Link href={`/pitch/${e.id}`} className="px-3 py-2 rounded-md bg-indigo-600 text-white hover:bg-indigo-700 text-sm">View</Link>
+                              <Link href={`/pitch/${e.id}`} className="px-3 py-2 rounded-full bg-indigo-600 text-white hover:bg-indigo-700 text-sm transition duration-300">View</Link>
                             </div>
                           </li>
                         ))}
@@ -244,7 +261,7 @@ export default function PitchPage() {
 
       {showCreate && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className={`${isDarkMode ? 'bg-gray-900' : 'bg-white'} rounded-xl w-full max-w-lg p-6 shadow-xl`}>
+          <div className={`${isDarkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl w-full max-w-lg p-6 shadow-xl`}>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-semibold">Create Event</h2>
               <button onClick={() => setShowCreate(false)} className="text-sm opacity-70">Close</button>
@@ -298,5 +315,3 @@ export default function PitchPage() {
     </div>
   );
 }
-
-

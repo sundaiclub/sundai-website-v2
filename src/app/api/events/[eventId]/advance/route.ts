@@ -56,6 +56,11 @@ export async function POST(
     }
     if (nextIdx !== -1) {
       await prisma.eventProject.update({ where: { id: ordered[nextIdx].id }, data: { status: 'CURRENT', approved: true, pitchPhase: 'WAITING' } });
+    } else {
+      await prisma.event.update({
+        where: { id: params.eventId },
+        data: { phase: 'FINISHED' },
+      });
     }
     const updated = await prisma.event.findUnique({ where: { id: params.eventId }, include: { projects: { orderBy: { position: 'asc' } } } });
     return NextResponse.json(updated);
@@ -64,5 +69,4 @@ export async function POST(
     return new NextResponse("Internal Error", { status: 500 });
   }
 }
-
 

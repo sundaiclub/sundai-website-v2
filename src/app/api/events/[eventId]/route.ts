@@ -50,14 +50,22 @@ export async function PATCH(
       where: { clerkId: userId },
       select: { id: true, role: true },
     });
-    if (user?.role !== "ADMIN") return new NextResponse("Unauthorized", { status: 401 });
+    if (!user) return new NextResponse("Unauthorized", { status: 401 });
+
+    const isAdmin = user.role === "ADMIN";
+    const isMC = await prisma.eventMC.findFirst({
+      where: { eventId: params.eventId, hackerId: user.id },
+    });
+    if (!isAdmin && !isMC) return new NextResponse("Unauthorized", { status: 401 });
 
     const body = await req.json();
-    const { meetingUrl, mcIds } = body;
+    const { title, startTime, meetingUrl, mcIds } = body;
 
     await prisma.event.update({
       where: { id: params.eventId },
       data: {
+        ...(title !== undefined && { title }),
+        ...(startTime !== undefined && { startTime: new Date(startTime) }),
         ...(meetingUrl !== undefined && { meetingUrl: meetingUrl || null }),
       },
     });

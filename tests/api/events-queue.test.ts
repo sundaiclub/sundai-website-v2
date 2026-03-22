@@ -106,6 +106,20 @@ describe('queue endpoints', () => {
     }
   });
 
+  it('rejects join queue when event is FINISHED', async () => {
+    mockAuth.mockReturnValue({ userId: 'clerk-1' });
+    prisma.hacker.findUnique.mockResolvedValue({ id: 'h1', clerkId: 'clerk-1' });
+    prisma.event.findUnique.mockResolvedValue({ id: 'e1', phase: 'FINISHED' });
+
+    const request = new NextRequest('http://localhost:3000/api/events/e1/queue', { method: 'POST' });
+    request.json = jest.fn().mockResolvedValue({ projectId: 'p1' });
+    const res = await POST_JOIN(request as any, { params: { eventId: 'e1' } } as any);
+
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.message).toContain('finished event');
+  });
+
   it('PITCHING join appends to end position', async () => {
     mockAuth.mockReturnValue({ userId: 'clerk-1' });
     prisma.hacker.findUnique.mockResolvedValue({ id: 'h1', clerkId: 'clerk-1' });

@@ -1,0 +1,1 @@
+ALTER TYPE "EventPhase" ADD VALUE 'FINISHED';
