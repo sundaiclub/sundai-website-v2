@@ -262,6 +262,11 @@ enum HackType {
   RESEARCH
 }
 
+enum EventPhase {
+  VOTING
+  PITCHING
+}
+
 // Events and Pitch Queue
 model Event {
   id               String     @id @default(uuid())
@@ -273,6 +278,7 @@ model Event {
   createdBy        Hacker     @relation(fields: [createdById], references: [id])
   createdById      String
   audienceCanReorder Boolean  @default(true)
+  phase            EventPhase @default(VOTING)
   projects         EventProject[]
   mcs              EventMC[]
   createdAt        DateTime   @default(now())
@@ -307,6 +313,14 @@ model EventProject {
   createdAt  DateTime           @default(now())
   updatedAt  DateTime           @updatedAt
 
+  // Timer fields
+  pitchPhase            PitchPhase @default(WAITING)
+  presentingStartedAt   DateTime?
+  questionsStartedAt    DateTime?
+  completedAt           DateTime?
+  allottedPresentingSec Int?
+  allottedQuestionsSec  Int?
+
   @@unique([eventId, projectId])
   @@index([eventId, position])
   @@index([status])
@@ -318,4 +332,11 @@ enum EventProjectStatus {
   CURRENT
   DONE
   SKIPPED
+}
+
+enum PitchPhase {
+  WAITING
+  PRESENTING
+  QUESTIONS
+  COMPLETED
 }
