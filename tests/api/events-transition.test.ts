@@ -16,6 +16,14 @@ jest.mock('@clerk/nextjs/server', () => ({ auth: jest.fn() }));
 const prisma = require('../../src/lib/prisma').default;
 const mockAuth = require('@clerk/nextjs/server').auth as jest.Mock;
 
+function makeRequest(body: object = {}) {
+  return new NextRequest('http://localhost:3000/api/events/e1/transition', {
+    method: 'POST',
+    body: JSON.stringify(body),
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
 describe('/api/events/[eventId]/transition', () => {
   beforeEach(() => jest.clearAllMocks());
 
@@ -24,21 +32,103 @@ describe('/api/events/[eventId]/transition', () => {
     prisma.hacker.findUnique.mockResolvedValue({ id: 'h1', role: 'HACKER' });
     prisma.event.findUnique.mockResolvedValue({ id: 'e1', phase: 'VOTING', mcs: [] });
 
-    const request = new NextRequest('http://localhost:3000/api/events/e1/transition', { method: 'POST' });
-    const res = await POST_TRANSITION(request as any, { params: { eventId: 'e1' } } as any);
+    const res = await POST_TRANSITION(makeRequest({ targetPhase: 'PITCHING' }) as any, { params: { eventId: 'e1' } } as any);
     expect(res.status).toBe(401);
   });
 
-  it('rejects if already PITCHING', async () => {
+  it('requires a valid target phase', async () => {
     mockAuth.mockReturnValue({ userId: 'clerk-admin' });
     prisma.hacker.findUnique.mockResolvedValue({ id: 'h-admin', role: 'ADMIN' });
-    prisma.event.findUnique.mockResolvedValue({ id: 'e1', phase: 'PITCHING', mcs: [] });
+    prisma.event.findUnique.mockResolvedValue({ id: 'e1', phase: 'VOTING', mcs: [] });
 
-    const request = new NextRequest('http://localhost:3000/api/events/e1/transition', { method: 'POST' });
-    const res = await POST_TRANSITION(request as any, { params: { eventId: 'e1' } } as any);
+    const res = await POST_TRANSITION(makeRequest({}) as any, { params: { eventId: 'e1' } } as any);
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.message).toContain('targetPhase');
+  });
+
+  it('rejects when the event is already in the target phase', async () => {
+    mockAuth.mockReturnValue({ userId: 'clerk-admin' });
+    prisma.hacker.findUnique.mockResolvedValue({ id: 'h-admin', role: 'ADMIN' });
+    prisma.event.findUnique.mockResolvedValue({ id: 'e1', phase: 'FINISHED', mcs: [] });
+
+    const res = await POST_TRANSITION(makeRequest({ targetPhase: 'FINISHED' }) as any, { params: { eventId: 'e1' } } as any);
     expect(res.status).toBe(400);
     const body = await res.json();
     expect(body.message).toContain('already');
+  });
+
+  it('transitions from PITCHING to FINISHED', async () => {
+    mockAuth.mockReturnValue({ userId: 'clerk-admin' });
+    prisma.hacker.findUnique.mockResolvedValue({ id: 'h-admin', role: 'ADMIN' });
+    prisma.event.findUnique.mockResolvedValue({ id: 'e1', phase: 'PITCHING', mcs: [] });
+    prisma.event.update.mockResolvedValue({ id: 'e1', phase: 'FINISHED' });
+
+    const res = await POST_TRANSITION(makeRequest({ targetPhase: 'FINISHED' }) as any, { params: { eventId: 'e1' } } as any);
+    expect(res.status).toBe(200);
+    expect(prisma.event.update).toHaveBeenCalledWith({
+      where: { id: 'e1' },
+      data: { phase: 'FINISHED' },
+    });
+  });
+
+  it('transitions from PITCHING to VOTING', async () => {
+    mockAuth.mockReturnValue({ userId: 'clerk-admin' });
+    prisma.hacker.findUnique.mockResolvedValue({ id: 'h-admin', role: 'ADMIN' });
+    prisma.event.findUnique.mockResolvedValue({ id: 'e1', phase: 'PITCHING', mcs: [] });
+    prisma.event.update.mockResolvedValue({ id: 'e1', phase: 'VOTING' });
+
+    const res = await POST_TRANSITION(makeRequest({ targetPhase: 'VOTING' }) as any, { params: { eventId: 'e1' } } as any);
+    expect(res.status).toBe(200);
+    expect(prisma.event.update).toHaveBeenCalledWith({
+      where: { id: 'e1' },
+      data: { phase: 'VOTING' },
+    });
+  });
+
+  it('transitions from FINISHED back to PITCHING', async () => {
+    mockAuth.mockReturnValue({ userId: 'clerk-admin' });
+    prisma.hacker.findUnique.mockResolvedValue({ id: 'h-admin', role: 'ADMIN' });
+    prisma.event.findUnique
+      .mockResolvedValueOnce({ id: 'e1', phase: 'FINISHED', mcs: [] })
+      .mockResolvedValueOnce({ id: 'e1', phase: 'PITCHING', projects: [] });
+    prisma.eventProject.findMany.mockResolvedValue([
+      { id: 'ep1', position: 1, status: 'DONE', pitchPhase: 'COMPLETED' },
+      { id: 'ep2', position: 2, status: 'DONE', pitchPhase: 'COMPLETED' },
+    ]);
+    prisma.eventProject.update.mockResolvedValue({});
+    prisma.event.update.mockResolvedValue({});
+    prisma.$transaction.mockResolvedValue([]);
+
+    const res = await POST_TRANSITION(makeRequest({ targetPhase: 'PITCHING' }) as any, { params: { eventId: 'e1' } } as any);
+    expect(res.status).toBe(200);
+
+    expect(prisma.eventProject.findMany).toHaveBeenCalledWith({
+      where: { eventId: 'e1' },
+      orderBy: { position: 'asc' },
+    });
+    expect(prisma.eventProject.update).toHaveBeenNthCalledWith(1, {
+      where: { id: 'ep1' },
+      data: expect.objectContaining({
+        status: 'CURRENT',
+        approved: true,
+        pitchPhase: 'WAITING',
+        presentingStartedAt: null,
+        questionsStartedAt: null,
+        completedAt: null,
+      }),
+    });
+    expect(prisma.eventProject.update).toHaveBeenNthCalledWith(2, {
+      where: { id: 'ep2' },
+      data: expect.objectContaining({
+        status: 'APPROVED',
+        approved: true,
+        pitchPhase: 'WAITING',
+        presentingStartedAt: null,
+        questionsStartedAt: null,
+        completedAt: null,
+      }),
+    });
   });
 
   it('sorts projects by like count, assigns positions and allotted times', async () => {
@@ -58,8 +148,7 @@ describe('/api/events/[eventId]/transition', () => {
     prisma.event.update.mockResolvedValue({});
     prisma.$transaction.mockResolvedValue([]);
 
-    const request = new NextRequest('http://localhost:3000/api/events/e1/transition', { method: 'POST' });
-    const res = await POST_TRANSITION(request as any, { params: { eventId: 'e1' } } as any);
+    const res = await POST_TRANSITION(makeRequest({ targetPhase: 'PITCHING' }) as any, { params: { eventId: 'e1' } } as any);
     expect(res.status).toBe(200);
 
     // Verify transaction was called (positions assigned in sorted order)
@@ -70,6 +159,19 @@ describe('/api/events/[eventId]/transition', () => {
 
     // All 3 projects are under 5 total, so threshold is -1 → no top group → all get short allotment
     const updateCalls = prisma.eventProject.update.mock.calls;
+    expect(updateCalls[0][0].data).toEqual(expect.objectContaining({
+      position: 1,
+      status: 'CURRENT',
+      approved: true,
+      pitchPhase: 'WAITING',
+      allottedPresentingSec: 60,
+      allottedQuestionsSec: 120,
+      presentingStartedAt: null,
+      questionsStartedAt: null,
+      completedAt: null,
+    }));
+    expect(updateCalls[1][0].data.status).toBe('APPROVED');
+    expect(updateCalls[2][0].data.status).toBe('APPROVED');
     for (const call of updateCalls) {
       expect(call[0].data.allottedPresentingSec).toBe(60);
       expect(call[0].data.allottedQuestionsSec).toBe(120);
@@ -96,8 +198,7 @@ describe('/api/events/[eventId]/transition', () => {
     prisma.event.update.mockResolvedValue({});
     prisma.$transaction.mockResolvedValue([]);
 
-    const request = new NextRequest('http://localhost:3000/api/events/e1/transition', { method: 'POST' });
-    const res = await POST_TRANSITION(request as any, { params: { eventId: 'e1' } } as any);
+    const res = await POST_TRANSITION(makeRequest({ targetPhase: 'PITCHING' }) as any, { params: { eventId: 'e1' } } as any);
     expect(res.status).toBe(200);
 
     const updateCalls = prisma.eventProject.update.mock.calls;
@@ -128,8 +229,7 @@ describe('/api/events/[eventId]/transition', () => {
     prisma.event.update.mockResolvedValue({});
     prisma.$transaction.mockResolvedValue([]);
 
-    const request = new NextRequest('http://localhost:3000/api/events/e1/transition', { method: 'POST' });
-    const res = await POST_TRANSITION(request as any, { params: { eventId: 'e1' } } as any);
+    const res = await POST_TRANSITION(makeRequest({ targetPhase: 'PITCHING' }) as any, { params: { eventId: 'e1' } } as any);
     expect(res.status).toBe(200);
 
     // The transaction should have been called with position updates
@@ -148,8 +248,7 @@ describe('/api/events/[eventId]/transition', () => {
     prisma.eventProject.findMany.mockResolvedValue([]);
     prisma.$transaction.mockResolvedValue([]);
 
-    const request = new NextRequest('http://localhost:3000/api/events/e1/transition', { method: 'POST' });
-    const res = await POST_TRANSITION(request as any, { params: { eventId: 'e1' } } as any);
+    const res = await POST_TRANSITION(makeRequest({ targetPhase: 'PITCHING' }) as any, { params: { eventId: 'e1' } } as any);
     expect(res.status).toBe(200);
 
     // Transaction includes the phase update even with no projects
@@ -167,8 +266,7 @@ describe('/api/events/[eventId]/transition', () => {
     prisma.eventProject.findMany.mockResolvedValue([]);
     prisma.$transaction.mockResolvedValue([]);
 
-    const request = new NextRequest('http://localhost:3000/api/events/e1/transition', { method: 'POST' });
-    const res = await POST_TRANSITION(request as any, { params: { eventId: 'e1' } } as any);
+    const res = await POST_TRANSITION(makeRequest({ targetPhase: 'PITCHING' }) as any, { params: { eventId: 'e1' } } as any);
     expect(res.status).toBe(200);
   });
 });

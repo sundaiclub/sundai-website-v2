@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useState, useCallback, useRef } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { useTheme } from "../../contexts/ThemeContext";
 import { useUserContext } from "../../contexts/UserContext";
@@ -8,6 +8,7 @@ import { motion, AnimatePresence, PanInfo } from "framer-motion";
 import ReactMarkdown from "react-markdown";
 
 type PitchPhase = "WAITING" | "PRESENTING" | "QUESTIONS" | "COMPLETED";
+type EventPhase = "VOTING" | "PITCHING" | "FINISHED";
 
 type EventProjectEntry = {
   id: string;
@@ -32,15 +33,35 @@ type EventDetail = {
   endTime?: string | null;
   meetingUrl?: string | null;
   audienceCanReorder: boolean;
-  phase: "VOTING" | "PITCHING";
+  phase: EventPhase;
   mcs: Array<{ id: string; hacker: { id: string; name: string } }>;
   projects: EventProjectEntry[];
 };
 
-function StageBadge({ phase }: { phase: "VOTING" | "PITCHING" }) {
+function getStageBadgeStyles(phase: EventPhase) {
+  if (phase === "VOTING") return "bg-indigo-100 text-indigo-700";
+  if (phase === "PITCHING") return "bg-purple-100 text-purple-700";
+  return "bg-gray-200 text-gray-700";
+}
+
+function getStageBadgeLabel(phase: EventPhase) {
+  if (phase === "VOTING") return "Voting Open";
+  if (phase === "PITCHING") return "Pitching";
+  return "Finished";
+}
+
+function getPhaseActionLabel(targetPhase: EventPhase, currentPhase: EventPhase) {
+  if (targetPhase === "PITCHING" && currentPhase === "FINISHED") return "Back to Presenting";
+  if (targetPhase === "PITCHING") return "Move to Presenting";
+  if (targetPhase === "VOTING") return "Move to Voting";
+  if (currentPhase === "PITCHING") return "Finish Event";
+  return "Move to Finished";
+}
+
+function StageBadge({ phase }: { phase: EventPhase }) {
   return (
-    <span className={`px-2 py-1 rounded-full text-xs ${phase === "VOTING" ? "bg-yellow-200 text-yellow-800" : "bg-green-200 text-green-800"}`}>
-      {phase === "VOTING" ? "Voting Open" : "Pitching"}
+    <span className={`px-2 py-1 rounded-full text-xs ${getStageBadgeStyles(phase)}`}>
+      {getStageBadgeLabel(phase)}
     </span>
   );
 }
@@ -86,15 +107,15 @@ function SwipeCard({
         <div
           className={`absolute inset-0 rounded-xl z-10 pointer-events-none flex items-center justify-center text-4xl font-bold transition-opacity ${
             dragX > 0
-              ? "bg-green-500/20 text-green-500"
-              : "bg-red-500/20 text-red-500"
+              ? "bg-indigo-500/20 text-indigo-400"
+              : "bg-gray-500/20 text-gray-400"
           }`}
           style={{ opacity: Math.min(Math.abs(dragX) / SWIPE_THRESHOLD, 1) * 0.8 }}
         >
           {dragX > 0 ? "👍" : "👎"}
         </div>
       )}
-      <div className={`${isDarkMode ? "bg-gray-900" : "bg-white"} rounded-xl p-6 shadow-lg max-h-[70vh] overflow-y-auto`}>
+      <div className={`${isDarkMode ? "bg-gray-800" : "bg-white"} rounded-xl p-6 shadow-lg max-h-[70vh] overflow-y-auto`}>
         <img
           src={project.thumbnail?.url || (isDarkMode ? "/images/default_project_thumbnail_dark.svg" : "/images/default_project_thumbnail_light.svg")}
           alt={project.title}
@@ -207,7 +228,11 @@ function VotingPhase({
   const endVoting = async () => {
     setTransitioning(true);
     try {
-      const res = await fetch(`/api/events/${event.id}/transition`, { method: "POST" });
+      const res = await fetch(`/api/events/${event.id}/transition`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ targetPhase: "PITCHING" }),
+      });
       if (res.ok) {
         const updated = await fetch(`/api/events/${event.id}`);
         setEvent(await updated.json());
@@ -219,38 +244,45 @@ function VotingPhase({
 
   if (!votingStarted) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 gap-6">
-        <h2 className="text-2xl font-bold">Welcome to {event.title}</h2>
-        <p className="opacity-80 text-center max-w-md">
-          Add your project to the pitch queue, then vote on other projects by swiping!
-        </p>
-        <div className="flex gap-4">
-          <button
-            onClick={openJoin}
-            className="px-6 py-3 rounded-lg bg-green-600 text-white text-lg hover:bg-green-700"
-          >
-            Add Project
-          </button>
-          <button
-            onClick={() => setVotingStarted(true)}
-            className="px-6 py-3 rounded-lg bg-indigo-600 text-white text-lg hover:bg-indigo-700"
-          >
-            Start Voting
-          </button>
-        </div>
-        <p className="text-sm opacity-60">{event.projects.length} project{event.projects.length !== 1 ? "s" : ""} submitted</p>
-        {isController && (
-          <div className="mt-4 border-t pt-4 w-full max-w-md">
-            <div className="flex items-center justify-between">
-              <span className="text-sm opacity-70">{event.projects.length} submissions</span>
-              <button
-                onClick={endVoting}
-                disabled={transitioning}
-                className={`px-4 py-2 rounded-md text-white ${transitioning ? "bg-gray-400" : "bg-red-600 hover:bg-red-700"}`}
-              >
-                {transitioning ? "Ending..." : "End Voting"}
-              </button>
+      <div className={`grid grid-cols-1 gap-6 ${isController ? "lg:grid-cols-3" : ""}`}>
+        <div className={`${isController ? "lg:col-span-2" : "max-w-3xl mx-auto"} flex flex-col items-center justify-center py-16 gap-6 w-full`}>
+          <h2 className="text-2xl font-bold">Welcome to {event.title}</h2>
+          <p className="opacity-80 text-center max-w-md">
+            Add your project to the pitch queue, then vote on other projects by swiping!
+          </p>
+          <div className="flex gap-4">
+            <button
+              onClick={openJoin}
+              className="px-3 py-1.5 rounded bg-indigo-600 text-white text-lg hover:bg-indigo-700 transition duration-300"
+            >
+              Add Project
+            </button>
+            <button
+              onClick={() => setVotingStarted(true)}
+              className="px-3 py-1.5 rounded bg-purple-600 text-white text-lg hover:bg-purple-700 transition duration-300"
+            >
+              Start Voting
+            </button>
+          </div>
+          <p className="text-sm opacity-60">{event.projects.length} project{event.projects.length !== 1 ? "s" : ""} submitted</p>
+          {isController && (
+            <div className="mt-4 border-t pt-4 w-full max-w-md">
+              <div className="flex items-center justify-between">
+                <span className="text-sm opacity-70">{event.projects.length} submissions</span>
+                <button
+                  onClick={endVoting}
+                  disabled={transitioning}
+                  className={`px-3 py-1.5 rounded text-white transition duration-300 ${transitioning ? "bg-gray-400" : "bg-gray-600 hover:bg-gray-700"}`}
+                >
+                  {transitioning ? "Ending..." : "End Voting"}
+                </button>
+              </div>
             </div>
+          )}
+        </div>
+        {isController && (
+          <div className="space-y-6">
+            <VotingQueuePanel event={event} isDarkMode={isDarkMode} isController={isController} setEvent={setEvent} />
           </div>
         )}
       </div>
@@ -258,71 +290,246 @@ function VotingPhase({
   }
 
   return (
-    <div className="flex flex-col items-center py-8">
-      {isController && (
-        <div className="w-full max-w-3xl mb-6 flex items-center justify-between">
-          <span className="text-sm opacity-70">{event.projects.length} submissions</span>
-          <div className="flex gap-2">
-            <button
-              onClick={endVoting}
-              disabled={transitioning}
-              className={`px-3 py-2 rounded-md text-white text-sm ${transitioning ? "bg-gray-400" : "bg-red-600 hover:bg-red-700"}`}
-            >
-              {transitioning ? "Ending..." : "End Voting"}
-            </button>
-          </div>
-        </div>
-      )}
-
-      <div className="w-full max-w-3xl" style={{ minHeight: 300 }}>
-        <AnimatePresence mode="wait">
-          {currentCard ? (
-            <SwipeCard
-              key={currentCard.project.id}
-              project={currentCard.project}
-              onSwipeRight={handleSwipeRight}
-              onSwipeLeft={handleSwipeLeft}
-              isDarkMode={isDarkMode}
-            />
-          ) : (
-            <motion.div
-              key="empty"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="text-center py-16"
-            >
-              <p className="text-lg opacity-70">All caught up! Waiting for more projects...</p>
-              <p className="text-sm opacity-50 mt-2">New projects will appear automatically — no need to refresh.</p>
+    <div className={`grid grid-cols-1 gap-6 py-8 ${isController ? "lg:grid-cols-3" : ""}`}>
+      <div className={`${isController ? "lg:col-span-2" : "max-w-3xl mx-auto"} w-full`}>
+        {isController && (
+          <div className="w-full max-w-3xl mb-6 flex items-center justify-between">
+            <span className="text-sm opacity-70">{event.projects.length} submissions</span>
+            <div className="flex gap-2">
               <button
-                onClick={openJoin}
-                className="mt-4 px-4 py-2 rounded-md bg-green-600 text-white text-sm hover:bg-green-700"
+                onClick={endVoting}
+                disabled={transitioning}
+                className={`px-3 py-1.5 rounded text-white text-sm transition duration-300 ${transitioning ? "bg-gray-400" : "bg-gray-600 hover:bg-gray-700"}`}
               >
-                Add Another Project
+                {transitioning ? "Ending..." : "End Voting"}
               </button>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
+            </div>
+          </div>
+        )}
 
-      {currentCard && (
-        <div className="flex gap-6 mt-6">
-          <button
-            onClick={handleSwipeLeft}
-            className="w-14 h-14 rounded-full bg-red-100 text-red-600 text-2xl flex items-center justify-center hover:bg-red-200"
-            aria-label="Skip"
-          >
-            ✕
-          </button>
-          <button
-            onClick={handleSwipeRight}
-            className="w-14 h-14 rounded-full bg-green-100 text-green-600 text-2xl flex items-center justify-center hover:bg-green-200"
-            aria-label="Like"
-          >
-            ❤
-          </button>
+        <div className="w-full max-w-3xl mx-auto flex items-center gap-4" style={{ minHeight: 300 }}>
+          {currentCard && (
+            <button
+              onClick={handleSwipeLeft}
+              className={`shrink-0 w-14 h-14 rounded-full text-2xl flex items-center justify-center transition duration-300 ${isDarkMode ? "bg-gray-700 text-gray-300 hover:bg-gray-600" : "bg-gray-200 text-gray-600 hover:bg-gray-300"}`}
+              aria-label="Skip"
+            >
+              ✕
+            </button>
+          )}
+          <div className="flex-1 min-w-0">
+            <AnimatePresence mode="wait">
+              {currentCard ? (
+                <SwipeCard
+                  key={currentCard.project.id}
+                  project={currentCard.project}
+                  onSwipeRight={handleSwipeRight}
+                  onSwipeLeft={handleSwipeLeft}
+                  isDarkMode={isDarkMode}
+                />
+              ) : (
+                <motion.div
+                  key="empty"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="text-center py-16"
+                >
+                  <p className="text-lg opacity-70">All caught up! Waiting for more projects...</p>
+                  <p className="text-sm opacity-50 mt-2">New projects will appear automatically — no need to refresh.</p>
+                  <button
+                    onClick={openJoin}
+                    className="mt-4 px-3 py-1.5 rounded bg-indigo-600 text-white text-sm hover:bg-indigo-700 transition duration-300"
+                  >
+                    Add Another Project
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+          {currentCard && (
+            <button
+              onClick={handleSwipeRight}
+              className={`shrink-0 w-14 h-14 rounded-full text-2xl flex items-center justify-center transition duration-300 ${isDarkMode ? "bg-purple-900/50 text-purple-300 hover:bg-purple-800/50" : "bg-indigo-100 text-indigo-600 hover:bg-indigo-200"}`}
+              aria-label="Like"
+            >
+              ❤
+            </button>
+          )}
+        </div>
+      </div>
+      {isController && (
+        <div className="space-y-6">
+          <VotingQueuePanel event={event} isDarkMode={isDarkMode} isController={isController} setEvent={setEvent} />
         </div>
       )}
+    </div>
+  );
+}
 
+function VotingQueuePanel({
+  event,
+  isDarkMode,
+  isController,
+  setEvent,
+}: {
+  event: EventDetail;
+  isDarkMode: boolean;
+  isController: boolean;
+  setEvent: (e: EventDetail | null) => void;
+}) {
+  const allOrdered = useMemo(
+    () => [...event.projects].sort((a, b) => a.position - b.position),
+    [event]
+  );
+
+  const { topGroupIds } = useMemo(() => {
+    const likeCounts = allOrdered.map(ep => ep.project.likes.length).sort((a, b) => b - a);
+    const threshold = likeCounts.length >= 5 ? likeCounts[4] : -1;
+    const ids = new Set(
+      allOrdered
+        .filter(ep => threshold >= 0 && ep.project.likes.length >= threshold)
+        .map(ep => ep.id)
+    );
+    return { topGroupIds: ids };
+  }, [allOrdered]);
+
+  const firstNonTopIndex = allOrdered.findIndex(ep => !topGroupIds.has(ep.id));
+  const hasTopGroup = topGroupIds.size > 0;
+
+  const delistItem = async (eventProjectId: string) => {
+    const res = await fetch(`/api/events/${event.id}/queue/${eventProjectId}`, { method: "DELETE" });
+    if (res.status === 204) {
+      const updated = await fetch(`/api/events/${event.id}`);
+      setEvent(await updated.json());
+    }
+  };
+
+  return (
+    <div className={`w-full ${isDarkMode ? "bg-gray-800" : "bg-white"} rounded-xl p-4 shadow`}>
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="font-semibold">Presentation queue</h3>
+        <span className="text-xs opacity-60">{allOrdered.length} project{allOrdered.length !== 1 ? "s" : ""}</span>
+      </div>
+      {allOrdered.length === 0 ? (
+        <div className="text-sm opacity-70">No projects in the queue yet.</div>
+      ) : (
+        <div className="max-h-96 overflow-y-auto space-y-2 pr-1">
+          {allOrdered.map((ep, idx) => {
+            const isCurrent = ep.status === "CURRENT";
+            const isPast = ep.status === "DONE" || ep.status === "SKIPPED";
+            const isTopGroup = topGroupIds.has(ep.id);
+
+            const curIdx = allOrdered.findIndex(x => x.status === "CURRENT");
+            let relLabel = "";
+            if (curIdx === -1) {
+              const firstUpcoming = allOrdered.findIndex(x => x.status === "APPROVED" || x.status === "QUEUED");
+              if (firstUpcoming !== -1) {
+                const delta = idx - firstUpcoming + 1;
+                relLabel = delta === 0 ? "0" : delta > 0 ? `+${delta}` : `${delta}`;
+              } else {
+                relLabel = `${idx + 1}`;
+              }
+            } else {
+              const delta = idx - curIdx;
+              relLabel = delta === 0 ? "0" : delta > 0 ? `+${delta}` : `${delta}`;
+            }
+
+            const showDivider = hasTopGroup && idx === firstNonTopIndex;
+
+            return (
+              <div key={ep.id}>
+                {showDivider && (
+                  <div className="flex items-center gap-2 py-2">
+                    <div className={`flex-1 h-px ${isDarkMode ? "bg-yellow-500/40" : "bg-yellow-400"}`} />
+                    <span className="text-xs font-semibold text-yellow-600 uppercase tracking-wider">
+                      Top Projects
+                    </span>
+                    <div className={`flex-1 h-px ${isDarkMode ? "bg-yellow-500/40" : "bg-yellow-400"}`} />
+                  </div>
+                )}
+                <div
+                  className={`flex items-center justify-between rounded-lg border px-3 py-2 transition-colors ${
+                    isCurrent
+                      ? isDarkMode
+                        ? "border-indigo-500 bg-indigo-500/10"
+                        : "border-indigo-300 bg-indigo-50"
+                      : isTopGroup
+                      ? isDarkMode
+                        ? "border-yellow-600/40 bg-yellow-900/10"
+                        : "border-yellow-300 bg-yellow-50"
+                      : isDarkMode
+                      ? "border-gray-700 bg-gray-800/70"
+                      : "border-gray-200 bg-white"
+                  }`}
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span
+                      className={`text-xs px-2 py-0.5 rounded-full ${
+                        isCurrent
+                          ? isDarkMode
+                            ? "bg-indigo-700 text-indigo-100"
+                            : "bg-indigo-100 text-indigo-700"
+                          : isDarkMode
+                          ? "bg-gray-700 text-gray-300"
+                          : "bg-gray-100 text-gray-700"
+                      }`}
+                    >
+                      {relLabel}
+                    </span>
+                    <a
+                      href={`/projects/${ep.project.id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={`truncate mr-3 text-sm font-medium block ${
+                        isCurrent
+                          ? isDarkMode
+                            ? "text-indigo-200"
+                            : "text-indigo-800"
+                          : isDarkMode
+                          ? "text-gray-100"
+                          : "text-gray-900"
+                      } ${isPast ? "opacity-70" : ""}`}
+                      title={ep.project.title}
+                    >
+                      {ep.project.title}
+                    </a>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {isCurrent && (
+                      <span className="text-[10px] uppercase tracking-wide px-2 py-0.5 rounded bg-indigo-600 text-white">
+                        Current
+                      </span>
+                    )}
+                    {isTopGroup && !isCurrent && (
+                      <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-yellow-500/20 text-yellow-600">
+                        Top
+                      </span>
+                    )}
+                    {isController && !isTopGroup && (
+                      <button
+                        onClick={() => delistItem(ep.id)}
+                        className="w-7 h-7 rounded-md text-xs bg-gray-500 text-white hover:bg-gray-600"
+                        aria-label="Delist"
+                        title="Remove from queue"
+                      >
+                        ✕
+                      </button>
+                    )}
+                    <span
+                      className={`px-2 h-7 rounded-md text-xs font-semibold flex items-center gap-1 ${
+                        isDarkMode ? "bg-gray-700 text-gray-200" : "bg-gray-100 text-gray-800"
+                      }`}
+                    >
+                      <span>❤</span>
+                      <span>{ep.project.likes.length}</span>
+                    </span>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -447,14 +654,14 @@ function PitchTimer({
   const phase = currentItem.pitchPhase;
 
   return (
-    <div className={`rounded-xl p-5 shadow ${isDarkMode ? "bg-gray-900" : "bg-white"}`}>
+    <div className={`rounded-xl p-5 shadow ${isDarkMode ? "bg-gray-800" : "bg-white"}`}>
       <div className="flex items-center justify-between mb-4">
         <h3 className="font-semibold">Timer</h3>
         <span className={`text-xs uppercase tracking-wider px-2 py-1 rounded-full font-semibold ${
           phase === "WAITING" ? "bg-gray-200 text-gray-600" :
-          phase === "PRESENTING" ? "bg-blue-100 text-blue-700" :
+          phase === "PRESENTING" ? "bg-indigo-100 text-indigo-700" :
           phase === "QUESTIONS" ? "bg-purple-100 text-purple-700" :
-          "bg-green-100 text-green-700"
+          "bg-gray-200 text-gray-600"
         }`}>
           {phase === "WAITING" ? "Ready" : phase === "PRESENTING" ? "Presenting" : phase === "QUESTIONS" ? "Q&A" : "Done"}
         </span>
@@ -470,7 +677,7 @@ function PitchTimer({
               <button
                 disabled={acting}
                 onClick={() => timerAction("start_presenting")}
-                className={`px-6 py-3 rounded-lg text-white font-semibold ${acting ? "bg-gray-400" : "bg-blue-600 hover:bg-blue-700"}`}
+                className={`px-6 py-3 rounded-full text-white font-semibold transition duration-300 ${acting ? "bg-gray-400" : "bg-indigo-600 hover:bg-indigo-700"}`}
               >
                 {acting ? "Starting..." : "Presentation Started"}
               </button>
@@ -490,7 +697,7 @@ function PitchTimer({
               <button
                 disabled={acting}
                 onClick={() => timerAction("start_questions")}
-                className={`px-6 py-3 rounded-lg text-white font-semibold ${acting ? "bg-gray-400" : "bg-purple-600 hover:bg-purple-700"}`}
+                className={`px-6 py-3 rounded-full text-white font-semibold transition duration-300 ${acting ? "bg-gray-400" : "bg-indigo-600 hover:bg-indigo-700"}`}
               >
                 {acting ? "Starting..." : "Q&A Started"}
               </button>
@@ -510,7 +717,7 @@ function PitchTimer({
               <button
                 disabled={acting}
                 onClick={() => timerAction("finish")}
-                className={`px-6 py-3 rounded-lg text-white font-semibold ${acting ? "bg-gray-400" : "bg-green-600 hover:bg-green-700"}`}
+                className={`px-6 py-3 rounded-full text-white font-semibold transition duration-300 ${acting ? "bg-gray-400" : "bg-indigo-600 hover:bg-indigo-700"}`}
               >
                 {acting ? "Finishing..." : "Finished"}
               </button>
@@ -549,9 +756,15 @@ function PitchingPhase({
     () => [...event.projects].sort((a, b) => a.position - b.position),
     [event]
   );
+  const [settingCurrentId, setSettingCurrentId] = useState<string | null>(null);
+  const isFinished = event.phase === "FINISHED";
+  const hasUpcomingItems = useMemo(
+    () => allOrdered.some(p => p.status === "QUEUED" || p.status === "APPROVED"),
+    [allOrdered]
+  );
 
   // Compute top-group
-  const { topGroupIds, topGroupPositions } = useMemo(() => {
+  const { topGroupIds } = useMemo(() => {
     const likeCounts = allOrdered.map(ep => ep.project.likes.length).sort((a, b) => b - a);
     const threshold = likeCounts.length >= 5 ? likeCounts[4] : -1;
     const ids = new Set(
@@ -559,12 +772,7 @@ function PitchingPhase({
         .filter(ep => threshold >= 0 && ep.project.likes.length >= threshold)
         .map(ep => ep.id)
     );
-    const positions = new Set(
-      allOrdered
-        .filter(ep => ids.has(ep.id))
-        .map(ep => ep.position)
-    );
-    return { topGroupIds: ids, topGroupPositions: positions };
+    return { topGroupIds: ids };
   }, [allOrdered]);
 
   const handleLike = async (
@@ -610,6 +818,18 @@ function PitchingPhase({
 
   const previousStep = async () => {
     const res = await fetch(`/api/events/${event.id}/previous`, { method: "POST" });
+    if (res.ok) {
+      const updated = await fetch(`/api/events/${event.id}`);
+      setEvent(await updated.json());
+    }
+  };
+
+  const finishEvent = async () => {
+    const res = await fetch(`/api/events/${event.id}/transition`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ targetPhase: "FINISHED" }),
+    });
     if (res.ok) {
       const updated = await fetch(`/api/events/${event.id}`);
       setEvent(await updated.json());
@@ -668,13 +888,34 @@ function PitchingPhase({
     }
   };
 
+  const setCurrentProject = async (eventProjectId: string) => {
+    setSettingCurrentId(eventProjectId);
+    try {
+      const res = await fetch(`/api/events/${event.id}/current`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ eventProjectId }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        if (body?.message) alert(body.message);
+        return;
+      }
+
+      const updated = await fetch(`/api/events/${event.id}`);
+      setEvent(await updated.json());
+    } finally {
+      setSettingCurrentId(null);
+    }
+  };
+
   // Find first non-top item index for the divider
   const firstNonTopIndex = allOrdered.findIndex(ep => !topGroupIds.has(ep.id));
   const hasTopGroup = topGroupIds.size > 0;
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-      <div className={`${isDarkMode ? "bg-gray-900" : "bg-white"} rounded-xl p-4 shadow lg:col-span-2`}>
+      <div className={`${isDarkMode ? "bg-gray-800" : "bg-white"} rounded-xl p-4 shadow lg:col-span-2`}>
         <h2 className="font-semibold mb-3">Current project</h2>
         {currentItem ? (
           <div className="max-w-5xl space-y-4">
@@ -701,11 +942,13 @@ function PitchingPhase({
             />
           </div>
         ) : (
-          <div className="opacity-70">No current project</div>
+          <div className="opacity-70">
+            {isFinished ? "This event is finished. The queue is closed." : "No current project"}
+          </div>
         )}
       </div>
       <div className="space-y-6">
-        <div className={`${isDarkMode ? "bg-gray-900" : "bg-white"} rounded-xl p-4 shadow`}>
+        <div className={`${isDarkMode ? "bg-gray-800" : "bg-white"} rounded-xl p-4 shadow`}>
           <div className="flex items-center justify-between mb-3">
             <h3 className="font-semibold">Presentation queue</h3>
           </div>
@@ -825,6 +1068,22 @@ function PitchingPhase({
                           Top
                         </span>
                       )}
+                      {isController && !isFinished && !isCurrent && (
+                        <button
+                          onClick={() => setCurrentProject(ep.id)}
+                          disabled={settingCurrentId !== null}
+                          className={`px-2 h-7 rounded-md text-[11px] font-semibold transition ${
+                            settingCurrentId !== null
+                              ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                              : isDarkMode
+                              ? "bg-indigo-900/60 text-indigo-100 hover:bg-indigo-800/70"
+                              : "bg-indigo-100 text-indigo-700 hover:bg-indigo-200"
+                          }`}
+                          title="Set as current project"
+                        >
+                          {settingCurrentId === ep.id ? "Setting..." : "Set current"}
+                        </button>
+                      )}
                       {isController && !isTopGroup && (
                         <div className="flex items-center gap-1 mr-1">
                           <button
@@ -857,7 +1116,7 @@ function PitchingPhase({
                           </button>
                           <button
                             onClick={() => delistItem(ep.id)}
-                            className="w-7 h-7 rounded-md text-xs bg-red-600 text-white hover:bg-red-700"
+                            className="w-7 h-7 rounded-md text-xs bg-gray-500 text-white hover:bg-gray-600"
                             aria-label="Delist"
                             title="Remove from queue"
                           >
@@ -869,7 +1128,7 @@ function PitchingPhase({
                         <div className="flex items-center gap-1 mr-1">
                           <button
                             onClick={() => delistItem(ep.id)}
-                            className="w-7 h-7 rounded-md text-xs bg-red-600 text-white hover:bg-red-700"
+                            className="w-7 h-7 rounded-md text-xs bg-gray-500 text-white hover:bg-gray-600"
                             aria-label="Delist"
                             title="Remove from queue"
                           >
@@ -913,7 +1172,7 @@ function PitchingPhase({
                         onClick={e => handleLike(e, ep.project.id, isLiked)}
                         className={`px-2 h-7 rounded-md text-xs font-semibold flex items-center gap-1 ${
                           isLiked
-                            ? "bg-red-500 text-white"
+                            ? "bg-red-600 text-white"
                             : isDarkMode
                             ? "bg-gray-700 text-gray-200"
                             : "bg-gray-100 text-gray-800"
@@ -930,17 +1189,29 @@ function PitchingPhase({
             })}
           </div>
           <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
-            <button onClick={openJoin} className="w-full px-3 py-2 rounded-md bg-green-600 text-white text-sm">
-              Add Project
-            </button>
-            {isController && (
+            {!isFinished && (
+              <button onClick={openJoin} className="w-full px-1.5 py-1 rounded bg-indigo-600 text-white text-sm hover:bg-indigo-700 transition duration-300">
+                Add Project
+              </button>
+            )}
+            {isController && !isFinished && (currentItem || hasUpcomingItems) && (
               <div className="grid grid-cols-2 gap-2">
-                <button onClick={previousStep} className="w-full px-3 py-2 rounded-md bg-gray-600 text-white text-sm">
+                <button onClick={previousStep} className="w-full px-1.5 py-1 rounded bg-gray-600 text-white text-sm hover:bg-gray-700 transition duration-300">
                   Previous
                 </button>
-                <button onClick={advance} className="w-full px-3 py-2 rounded-md bg-purple-600 text-white text-sm">
+                <button onClick={advance} className="w-full px-1.5 py-1 rounded bg-indigo-600 text-white text-sm hover:bg-indigo-700 transition duration-300">
                   Move next
                 </button>
+              </div>
+            )}
+            {isController && !isFinished && !currentItem && !hasUpcomingItems && (
+              <button onClick={finishEvent} className="w-full px-1.5 py-1 rounded bg-gray-600 text-white text-sm hover:bg-gray-700 transition duration-300">
+                Finish Event
+              </button>
+            )}
+            {isFinished && (
+              <div className={`sm:col-span-2 rounded-md px-3 py-2 text-sm ${isDarkMode ? "bg-gray-800 text-gray-300" : "bg-gray-100 text-gray-700"}`}>
+                Event finished. New projects cannot be added to this queue.
               </div>
             )}
           </div>
@@ -961,11 +1232,14 @@ export default function PitchEventPage() {
 
   // Edit event modal state
   const [showEdit, setShowEdit] = useState(false);
+  const [editTitle, setEditTitle] = useState("");
+  const [editStartTime, setEditStartTime] = useState("");
   const [editMeetingUrl, setEditMeetingUrl] = useState("");
   const [editMcIds, setEditMcIds] = useState<string[]>([]);
   const [allHackers, setAllHackers] = useState<Array<{ id: string; name: string }>>([]);
   const [mcSearch, setMcSearch] = useState("");
   const [saving, setSaving] = useState(false);
+  const [phaseTransitioning, setPhaseTransitioning] = useState<EventPhase | null>(null);
 
   // Join modal state
   const [showJoin, setShowJoin] = useState(false);
@@ -996,7 +1270,33 @@ export default function PitchEventPage() {
     [isAdmin, event?.mcs, userInfo?.id]
   );
 
+  const transitionEvent = async (targetPhase: EventPhase) => {
+    if (!event) return;
+    setPhaseTransitioning(targetPhase);
+    try {
+      const res = await fetch(`/api/events/${event.id}/transition`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ targetPhase }),
+      });
+      if (res.ok) {
+        const updated = await fetch(`/api/events/${event.id}`);
+        setEvent(await updated.json());
+        return;
+      }
+
+      const body = await res.json().catch(() => ({}));
+      if (body?.message) alert(body.message);
+    } finally {
+      setPhaseTransitioning(null);
+    }
+  };
+
   const openJoin = async () => {
+    if (event?.phase === "FINISHED") {
+      alert("This event is finished. You can no longer add projects to the queue.");
+      return;
+    }
     if (!userInfo) return alert("Sign in first");
     const my = await fetch("/api/projects?status=APPROVED");
     const all = await my.json();
@@ -1017,6 +1317,8 @@ export default function PitchEventPage() {
 
   const openEdit = async () => {
     if (!event) return;
+    setEditTitle(event.title);
+    setEditStartTime(new Date(event.startTime).toISOString().slice(0, 16));
     setEditMeetingUrl(event.meetingUrl || "");
     setEditMcIds(event.mcs.map(m => m.hacker.id));
     setMcSearch("");
@@ -1034,7 +1336,7 @@ export default function PitchEventPage() {
       const res = await fetch(`/api/events/${event.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ meetingUrl: editMeetingUrl, mcIds: editMcIds }),
+        body: JSON.stringify({ title: editTitle, startTime: new Date(editStartTime).toISOString(), meetingUrl: editMeetingUrl, mcIds: editMcIds }),
       });
       if (res.ok) {
         setEvent(await res.json());
@@ -1075,6 +1377,12 @@ export default function PitchEventPage() {
       if (res.status === 409) {
         alert("This project is already in the queue");
       }
+      if (res.status === 400) {
+        const body = await res.json().catch(() => ({}));
+        if (body?.message) {
+          alert(body.message);
+        }
+      }
       if (res.ok) {
         const updated = await fetch(`/api/events/${eventId}`);
         setEvent(await updated.json());
@@ -1085,13 +1393,13 @@ export default function PitchEventPage() {
     }
   };
 
-  if (loading) return <div className="py-24 text-center">Loading...</div>;
-  if (!event) return <div className="py-24 text-center">Event not found</div>;
+  if (loading) return <div className={`min-h-screen font-space-mono flex items-center justify-center ${isDarkMode ? "bg-gradient-to-b from-gray-900 to-black text-gray-100" : "bg-gradient-to-b from-[#E5E5E5] to-[#F0F0F0] text-gray-900"}`}>Loading...</div>;
+  if (!event) return <div className={`min-h-screen font-space-mono flex items-center justify-center ${isDarkMode ? "bg-gradient-to-b from-gray-900 to-black text-gray-100" : "bg-gradient-to-b from-[#E5E5E5] to-[#F0F0F0] text-gray-900"}`}>Event not found</div>;
 
   return (
     <>
-      <div className={`min-h-screen ${isDarkMode ? "bg-black text-gray-100" : "bg-gray-50 text-gray-900"}`}>
-        <div className="max-w-7xl mx-auto px-4 py-6">
+      <div className={`min-h-screen font-space-mono ${isDarkMode ? "bg-gradient-to-b from-gray-900 to-black text-gray-100" : "bg-gradient-to-b from-[#E5E5E5] to-[#F0F0F0] text-gray-900"}`}>
+        <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 py-16">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
               <h1 className="text-2xl font-bold">{event.title}</h1>
@@ -1107,7 +1415,7 @@ export default function PitchEventPage() {
                   Join meeting
                 </a>
               )}
-              {isAdmin && (
+              {isController && (
                 <button
                   onClick={openEdit}
                   className={`px-3 py-2 rounded-md text-sm ${isDarkMode ? "bg-gray-700 text-gray-200 hover:bg-gray-600" : "bg-gray-200 text-gray-800 hover:bg-gray-300"}`}
@@ -1146,13 +1454,29 @@ export default function PitchEventPage() {
 
       {showEdit && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className={`${isDarkMode ? "bg-gray-900" : "bg-white"} rounded-xl w-full max-w-lg p-6 shadow-xl`}>
+          <div className={`${isDarkMode ? "bg-gray-800" : "bg-white"} rounded-xl w-full max-w-lg p-6 shadow-xl`}>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-semibold">Edit Event</h2>
               <button onClick={() => setShowEdit(false)} className="text-sm opacity-70">
                 Close
               </button>
             </div>
+
+            <label className="block text-sm font-medium mb-1">Title</label>
+            <input
+              value={editTitle}
+              onChange={e => setEditTitle(e.target.value)}
+              placeholder="Event title"
+              className={`w-full px-3 py-2 rounded-md mb-4 ${isDarkMode ? "bg-gray-800 text-gray-100" : "bg-gray-100 text-gray-900"}`}
+            />
+
+            <label className="block text-sm font-medium mb-1">Start Time</label>
+            <input
+              type="datetime-local"
+              value={editStartTime}
+              onChange={e => setEditStartTime(e.target.value)}
+              className={`w-full px-3 py-2 rounded-md mb-4 ${isDarkMode ? "bg-gray-800 text-gray-100" : "bg-gray-100 text-gray-900"}`}
+            />
 
             <label className="block text-sm font-medium mb-1">Meeting URL</label>
             <input
@@ -1205,6 +1529,36 @@ export default function PitchEventPage() {
               </div>
             )}
 
+            <div className="mt-6">
+              <label className="block text-sm font-medium mb-2">Phase</label>
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-sm opacity-70">Current:</span>
+                <StageBadge phase={event.phase} />
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                {(["VOTING", "PITCHING", "FINISHED"] as EventPhase[])
+                  .filter(phase => phase !== event.phase)
+                  .map(phase => (
+                    <button
+                      key={phase}
+                      onClick={() => transitionEvent(phase)}
+                      disabled={phaseTransitioning !== null}
+                      className={`px-3 py-2 rounded-md text-sm text-white transition duration-300 ${
+                        phaseTransitioning !== null
+                          ? "bg-gray-400"
+                          : phase === "VOTING"
+                          ? "bg-indigo-600 hover:bg-indigo-700"
+                          : phase === "PITCHING"
+                          ? "bg-indigo-600 hover:bg-indigo-700"
+                          : "bg-gray-600 hover:bg-gray-700"
+                      }`}
+                    >
+                      {phaseTransitioning === phase ? "Updating..." : getPhaseActionLabel(phase, event.phase)}
+                    </button>
+                  ))}
+              </div>
+            </div>
+
             <div className="mt-6 flex justify-end gap-3">
               <button
                 onClick={() => setShowEdit(false)}
@@ -1226,7 +1580,7 @@ export default function PitchEventPage() {
 
       {showJoin && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className={`${isDarkMode ? "bg-gray-900" : "bg-white"} rounded-xl w-full max-w-lg p-6 shadow-xl`}>
+          <div className={`${isDarkMode ? "bg-gray-800" : "bg-white"} rounded-xl w-full max-w-lg p-6 shadow-xl`}>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-semibold">Choose your project</h2>
               <button onClick={() => setShowJoin(false)} className="text-sm opacity-70">
@@ -1288,7 +1642,7 @@ export default function PitchEventPage() {
               <button
                 disabled={!selectedProjectId || confirming}
                 onClick={confirmJoin}
-                className={`px-4 py-2 rounded-md ${confirming ? "bg-gray-400" : "bg-green-600"} text-white`}
+                className={`px-4 py-2 rounded-full ${confirming ? "bg-gray-400" : "bg-indigo-600 hover:bg-indigo-700"} text-white transition duration-300`}
               >
                 {confirming ? "Adding..." : "Confirm"}
               </button>

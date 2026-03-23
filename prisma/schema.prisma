@@ -265,6 +265,7 @@ enum HackType {
 enum EventPhase {
   VOTING
   PITCHING
+  FINISHED
 }
 
 // Events and Pitch Queue

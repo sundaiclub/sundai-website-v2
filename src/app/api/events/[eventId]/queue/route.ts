@@ -20,6 +20,9 @@ export async function POST(
 
     const event = await prisma.event.findUnique({ where: { id: params.eventId } });
     if (!event) return new NextResponse("Event not found", { status: 404 });
+    if (event.phase === "FINISHED") {
+      return NextResponse.json({ message: "Cannot add projects to a finished event" }, { status: 400 });
+    }
 
     // Verify the user owns or participates in the project
     const project = await prisma.project.findUnique({
