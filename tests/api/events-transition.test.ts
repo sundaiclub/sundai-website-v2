@@ -89,14 +89,45 @@ describe('/api/events/[eventId]/transition', () => {
   it('transitions from FINISHED back to PITCHING', async () => {
     mockAuth.mockReturnValue({ userId: 'clerk-admin' });
     prisma.hacker.findUnique.mockResolvedValue({ id: 'h-admin', role: 'ADMIN' });
-    prisma.event.findUnique.mockResolvedValue({ id: 'e1', phase: 'FINISHED', mcs: [] });
-    prisma.event.update.mockResolvedValue({ id: 'e1', phase: 'PITCHING' });
+    prisma.event.findUnique
+      .mockResolvedValueOnce({ id: 'e1', phase: 'FINISHED', mcs: [] })
+      .mockResolvedValueOnce({ id: 'e1', phase: 'PITCHING', projects: [] });
+    prisma.eventProject.findMany.mockResolvedValue([
+      { id: 'ep1', position: 1, status: 'DONE', pitchPhase: 'COMPLETED' },
+      { id: 'ep2', position: 2, status: 'DONE', pitchPhase: 'COMPLETED' },
+    ]);
+    prisma.eventProject.update.mockResolvedValue({});
+    prisma.event.update.mockResolvedValue({});
+    prisma.$transaction.mockResolvedValue([]);
 
     const res = await POST_TRANSITION(makeRequest({ targetPhase: 'PITCHING' }) as any, { params: { eventId: 'e1' } } as any);
     expect(res.status).toBe(200);
-    expect(prisma.event.update).toHaveBeenCalledWith({
-      where: { id: 'e1' },
-      data: { phase: 'PITCHING' },
+
+    expect(prisma.eventProject.findMany).toHaveBeenCalledWith({
+      where: { eventId: 'e1' },
+      orderBy: { position: 'asc' },
+    });
+    expect(prisma.eventProject.update).toHaveBeenNthCalledWith(1, {
+      where: { id: 'ep1' },
+      data: expect.objectContaining({
+        status: 'CURRENT',
+        approved: true,
+        pitchPhase: 'WAITING',
+        presentingStartedAt: null,
+        questionsStartedAt: null,
+        completedAt: null,
+      }),
+    });
+    expect(prisma.eventProject.update).toHaveBeenNthCalledWith(2, {
+      where: { id: 'ep2' },
+      data: expect.objectContaining({
+        status: 'APPROVED',
+        approved: true,
+        pitchPhase: 'WAITING',
+        presentingStartedAt: null,
+        questionsStartedAt: null,
+        completedAt: null,
+      }),
     });
   });
 
@@ -128,6 +159,19 @@ describe('/api/events/[eventId]/transition', () => {
 
     // All 3 projects are under 5 total, so threshold is -1 → no top group → all get short allotment
     const updateCalls = prisma.eventProject.update.mock.calls;
+    expect(updateCalls[0][0].data).toEqual(expect.objectContaining({
+      position: 1,
+      status: 'CURRENT',
+      approved: true,
+      pitchPhase: 'WAITING',
+      allottedPresentingSec: 60,
+      allottedQuestionsSec: 120,
+      presentingStartedAt: null,
+      questionsStartedAt: null,
+      completedAt: null,
+    }));
+    expect(updateCalls[1][0].data.status).toBe('APPROVED');
+    expect(updateCalls[2][0].data.status).toBe('APPROVED');
     for (const call of updateCalls) {
       expect(call[0].data.allottedPresentingSec).toBe(60);
       expect(call[0].data.allottedQuestionsSec).toBe(120);

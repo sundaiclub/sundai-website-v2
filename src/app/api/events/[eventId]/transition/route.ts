@@ -3,6 +3,10 @@ import { auth } from "@clerk/nextjs/server";
 import prisma from "@/lib/prisma";
 
 const EVENT_PHASES = ["VOTING", "PITCHING", "FINISHED"] as const;
+const DEFAULT_PRESENTING_SEC = 60;
+const DEFAULT_QUESTIONS_SEC = 120;
+const TOP_GROUP_PRESENTING_SEC = 120;
+const TOP_GROUP_QUESTIONS_SEC = 180;
 
 export async function POST(
   req: Request,
@@ -36,7 +40,7 @@ export async function POST(
       return NextResponse.json({ message: `Event is already ${event.phase}` }, { status: 400 });
     }
 
-    if (targetPhase === "FINISHED" || targetPhase === "VOTING" || event.phase === "FINISHED") {
+    if (targetPhase === "FINISHED" || targetPhase === "VOTING") {
       const updated = await prisma.event.update({
         where: { id: params.eventId },
         data: { phase: targetPhase },
@@ -45,40 +49,70 @@ export async function POST(
       return NextResponse.json(updated);
     }
 
-    // Fetch all event projects with their like counts
-    const eventProjects = await prisma.eventProject.findMany({
-      where: { eventId: params.eventId },
-      include: {
-        project: {
-          include: { likes: { select: { id: true } } },
-        },
-      },
-      orderBy: { createdAt: "asc" },
-    });
+    let ops: Array<ReturnType<typeof prisma.eventProject.update> | ReturnType<typeof prisma.event.update>>;
 
-    // Sort by like count desc, tiebreak by createdAt asc
-    const sorted = [...eventProjects].sort((a, b) => {
-      const likeDiff = b.project.likes.length - a.project.likes.length;
-      if (likeDiff !== 0) return likeDiff;
-      return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-    });
-
-    // Determine top group threshold (top 5 by likes, including ties)
-    const likeCounts = sorted.map(ep => ep.project.likes.length);
-    const threshold = likeCounts.length >= 5 ? likeCounts[4] : -1;
-
-    // Assign positions, allotted times, and update phase in a single transaction
-    const ops = sorted.map((ep, idx) => {
-      const isTopGroup = threshold >= 0 && ep.project.likes.length >= threshold;
-      return prisma.eventProject.update({
-        where: { id: ep.id },
-        data: {
-          position: idx + 1,
-          allottedPresentingSec: isTopGroup ? 120 : 60,
-          allottedQuestionsSec: isTopGroup ? 180 : 120,
-        },
+    if (event.phase === "FINISHED") {
+      const ordered = await prisma.eventProject.findMany({
+        where: { eventId: params.eventId },
+        orderBy: { position: "asc" },
       });
-    });
+
+      ops = ordered.map((ep, idx) =>
+        prisma.eventProject.update({
+          where: { id: ep.id },
+          data: {
+            status: idx === 0 ? "CURRENT" : "APPROVED",
+            approved: true,
+            pitchPhase: "WAITING",
+            presentingStartedAt: null,
+            questionsStartedAt: null,
+            completedAt: null,
+          },
+        })
+      );
+    } else {
+      // Freshly entering pitching: rank by likes, assign positions/times, and start on the first project.
+      const eventProjects = await prisma.eventProject.findMany({
+        where: { eventId: params.eventId },
+        include: {
+          project: {
+            include: { likes: { select: { id: true } } },
+          },
+        },
+        orderBy: { createdAt: "asc" },
+      });
+
+      const sorted = [...eventProjects].sort((a, b) => {
+        const likeDiff = b.project.likes.length - a.project.likes.length;
+        if (likeDiff !== 0) return likeDiff;
+        return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+      });
+
+      const likeCounts = sorted.map(ep => ep.project.likes.length);
+      const threshold = likeCounts.length >= 5 ? likeCounts[4] : -1;
+
+      ops = sorted.map((ep, idx) => {
+        const isTopGroup = threshold >= 0 && ep.project.likes.length >= threshold;
+        return prisma.eventProject.update({
+          where: { id: ep.id },
+          data: {
+            position: idx + 1,
+            status: idx === 0 ? "CURRENT" : "APPROVED",
+            approved: true,
+            pitchPhase: "WAITING",
+            presentingStartedAt: null,
+            questionsStartedAt: null,
+            completedAt: null,
+            allottedPresentingSec: isTopGroup
+              ? TOP_GROUP_PRESENTING_SEC
+              : DEFAULT_PRESENTING_SEC,
+            allottedQuestionsSec: isTopGroup
+              ? TOP_GROUP_QUESTIONS_SEC
+              : DEFAULT_QUESTIONS_SEC,
+          },
+        });
+      });
+    }
 
     ops.push(
       prisma.event.update({

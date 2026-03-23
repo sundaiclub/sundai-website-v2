@@ -756,6 +756,7 @@ function PitchingPhase({
     () => [...event.projects].sort((a, b) => a.position - b.position),
     [event]
   );
+  const [settingCurrentId, setSettingCurrentId] = useState<string | null>(null);
   const isFinished = event.phase === "FINISHED";
   const hasUpcomingItems = useMemo(
     () => allOrdered.some(p => p.status === "QUEUED" || p.status === "APPROVED"),
@@ -884,6 +885,27 @@ function PitchingPhase({
     if (res.status === 204) {
       const updated = await fetch(`/api/events/${event.id}`);
       setEvent(await updated.json());
+    }
+  };
+
+  const setCurrentProject = async (eventProjectId: string) => {
+    setSettingCurrentId(eventProjectId);
+    try {
+      const res = await fetch(`/api/events/${event.id}/current`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ eventProjectId }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        if (body?.message) alert(body.message);
+        return;
+      }
+
+      const updated = await fetch(`/api/events/${event.id}`);
+      setEvent(await updated.json());
+    } finally {
+      setSettingCurrentId(null);
     }
   };
 
@@ -1045,6 +1067,22 @@ function PitchingPhase({
                         <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-yellow-500/20 text-yellow-600">
                           Top
                         </span>
+                      )}
+                      {isController && !isFinished && !isCurrent && (
+                        <button
+                          onClick={() => setCurrentProject(ep.id)}
+                          disabled={settingCurrentId !== null}
+                          className={`px-2 h-7 rounded-md text-[11px] font-semibold transition ${
+                            settingCurrentId !== null
+                              ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                              : isDarkMode
+                              ? "bg-indigo-900/60 text-indigo-100 hover:bg-indigo-800/70"
+                              : "bg-indigo-100 text-indigo-700 hover:bg-indigo-200"
+                          }`}
+                          title="Set as current project"
+                        >
+                          {settingCurrentId === ep.id ? "Setting..." : "Set current"}
+                        </button>
                       )}
                       {isController && !isTopGroup && (
                         <div className="flex items-center gap-1 mr-1">
