@@ -27,13 +27,22 @@ export function rankEventProjectsForPitching<T extends RankableEventProject>(
   return [...eventProjects].sort(compareEventProjectsByVotingResult);
 }
 
-export function getFrozenTopProjectIds<T extends { id: string }>(
+export function getFrozenTopProjectIds<T extends RankableEventProject>(
   sortedProjects: T[],
   topCount: number = TOP_PROJECT_COUNT
 ) {
+  if (topCount <= 0) {
+    return new Set<string>();
+  }
+
   if (sortedProjects.length < topCount) {
     return new Set<string>();
   }
 
-  return new Set(sortedProjects.slice(0, topCount).map(project => project.id));
+  const cutoffLikes = sortedProjects[topCount - 1].project.likes.length;
+  const tiedTopProjects = sortedProjects.filter(
+    (project) => project.project.likes.length >= cutoffLikes
+  );
+
+  return new Set(tiedTopProjects.map(project => project.id));
 }

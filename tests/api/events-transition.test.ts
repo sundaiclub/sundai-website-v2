@@ -16,6 +16,14 @@ jest.mock('@clerk/nextjs/server', () => ({ auth: jest.fn() }));
 const prisma = require('../../src/lib/prisma').default;
 const mockAuth = require('@clerk/nextjs/server').auth as jest.Mock;
 
+const eventTimingConfig = {
+  topProjectCount: 5,
+  topPresentingSec: 120,
+  topQuestionsSec: 180,
+  defaultPresentingSec: 60,
+  defaultQuestionsSec: 120,
+};
+
 function makeRequest(body: object = {}) {
   return new NextRequest('http://localhost:3000/api/events/e1/transition', {
     method: 'POST',
@@ -30,7 +38,7 @@ describe('/api/events/[eventId]/transition', () => {
   it('requires admin/MC', async () => {
     mockAuth.mockReturnValue({ userId: 'clerk-1' });
     prisma.hacker.findUnique.mockResolvedValue({ id: 'h1', role: 'HACKER' });
-    prisma.event.findUnique.mockResolvedValue({ id: 'e1', phase: 'VOTING', mcs: [] });
+    prisma.event.findUnique.mockResolvedValue({ id: 'e1', phase: 'VOTING', mcs: [], ...eventTimingConfig });
 
     const res = await POST_TRANSITION(makeRequest({ targetPhase: 'PITCHING' }) as any, { params: { eventId: 'e1' } } as any);
     expect(res.status).toBe(401);
@@ -39,7 +47,7 @@ describe('/api/events/[eventId]/transition', () => {
   it('requires a valid target phase', async () => {
     mockAuth.mockReturnValue({ userId: 'clerk-admin' });
     prisma.hacker.findUnique.mockResolvedValue({ id: 'h-admin', role: 'ADMIN' });
-    prisma.event.findUnique.mockResolvedValue({ id: 'e1', phase: 'VOTING', mcs: [] });
+    prisma.event.findUnique.mockResolvedValue({ id: 'e1', phase: 'VOTING', mcs: [], ...eventTimingConfig });
 
     const res = await POST_TRANSITION(makeRequest({}) as any, { params: { eventId: 'e1' } } as any);
     expect(res.status).toBe(400);
@@ -50,7 +58,7 @@ describe('/api/events/[eventId]/transition', () => {
   it('rejects when the event is already in the target phase', async () => {
     mockAuth.mockReturnValue({ userId: 'clerk-admin' });
     prisma.hacker.findUnique.mockResolvedValue({ id: 'h-admin', role: 'ADMIN' });
-    prisma.event.findUnique.mockResolvedValue({ id: 'e1', phase: 'FINISHED', mcs: [] });
+    prisma.event.findUnique.mockResolvedValue({ id: 'e1', phase: 'FINISHED', mcs: [], ...eventTimingConfig });
 
     const res = await POST_TRANSITION(makeRequest({ targetPhase: 'FINISHED' }) as any, { params: { eventId: 'e1' } } as any);
     expect(res.status).toBe(400);
@@ -61,7 +69,7 @@ describe('/api/events/[eventId]/transition', () => {
   it('transitions from PITCHING to FINISHED', async () => {
     mockAuth.mockReturnValue({ userId: 'clerk-admin' });
     prisma.hacker.findUnique.mockResolvedValue({ id: 'h-admin', role: 'ADMIN' });
-    prisma.event.findUnique.mockResolvedValue({ id: 'e1', phase: 'PITCHING', mcs: [] });
+    prisma.event.findUnique.mockResolvedValue({ id: 'e1', phase: 'PITCHING', mcs: [], ...eventTimingConfig });
     prisma.event.update.mockResolvedValue({ id: 'e1', phase: 'FINISHED' });
 
     const res = await POST_TRANSITION(makeRequest({ targetPhase: 'FINISHED' }) as any, { params: { eventId: 'e1' } } as any);
@@ -76,7 +84,7 @@ describe('/api/events/[eventId]/transition', () => {
     mockAuth.mockReturnValue({ userId: 'clerk-admin' });
     prisma.hacker.findUnique.mockResolvedValue({ id: 'h-admin', role: 'ADMIN' });
     prisma.event.findUnique
-      .mockResolvedValueOnce({ id: 'e1', phase: 'PITCHING', mcs: [] })
+      .mockResolvedValueOnce({ id: 'e1', phase: 'PITCHING', mcs: [], ...eventTimingConfig })
       .mockResolvedValueOnce({ id: 'e1', phase: 'VOTING', projects: [] });
     prisma.eventProject.updateMany.mockResolvedValue({ count: 6 });
     prisma.event.update.mockResolvedValue({ id: 'e1', phase: 'VOTING' });
@@ -103,7 +111,7 @@ describe('/api/events/[eventId]/transition', () => {
     mockAuth.mockReturnValue({ userId: 'clerk-admin' });
     prisma.hacker.findUnique.mockResolvedValue({ id: 'h-admin', role: 'ADMIN' });
     prisma.event.findUnique
-      .mockResolvedValueOnce({ id: 'e1', phase: 'FINISHED', mcs: [] })
+      .mockResolvedValueOnce({ id: 'e1', phase: 'FINISHED', mcs: [], ...eventTimingConfig })
       .mockResolvedValueOnce({ id: 'e1', phase: 'PITCHING', projects: [] });
     prisma.eventProject.findMany.mockResolvedValue([
       { id: 'ep1', position: 1, status: 'DONE', pitchPhase: 'COMPLETED' },
@@ -148,7 +156,7 @@ describe('/api/events/[eventId]/transition', () => {
     mockAuth.mockReturnValue({ userId: 'clerk-admin' });
     prisma.hacker.findUnique.mockResolvedValue({ id: 'h-admin', role: 'ADMIN' });
     prisma.event.findUnique
-      .mockResolvedValueOnce({ id: 'e1', phase: 'VOTING', mcs: [] })
+      .mockResolvedValueOnce({ id: 'e1', phase: 'VOTING', mcs: [], ...eventTimingConfig })
       .mockResolvedValueOnce({ id: 'e1', phase: 'PITCHING', projects: [] });
 
     const now = new Date();
@@ -196,7 +204,7 @@ describe('/api/events/[eventId]/transition', () => {
     mockAuth.mockReturnValue({ userId: 'clerk-admin' });
     prisma.hacker.findUnique.mockResolvedValue({ id: 'h-admin', role: 'ADMIN' });
     prisma.event.findUnique
-      .mockResolvedValueOnce({ id: 'e1', phase: 'VOTING', mcs: [] })
+      .mockResolvedValueOnce({ id: 'e1', phase: 'VOTING', mcs: [], ...eventTimingConfig })
       .mockResolvedValueOnce({ id: 'e1', phase: 'PITCHING', projects: [] });
 
     const now = new Date();
@@ -228,22 +236,23 @@ describe('/api/events/[eventId]/transition', () => {
     expect(updateCalls[5][0].data.allottedQuestionsSec).toBe(120);
   });
 
-  it('freezes exactly five top projects even when lower ranks are tied', async () => {
+  it('includes all projects tied at the top-group cutoff', async () => {
     mockAuth.mockReturnValue({ userId: 'clerk-admin' });
     prisma.hacker.findUnique.mockResolvedValue({ id: 'h-admin', role: 'ADMIN' });
     prisma.event.findUnique
-      .mockResolvedValueOnce({ id: 'e1', phase: 'VOTING', mcs: [] })
+      .mockResolvedValueOnce({ id: 'e1', phase: 'VOTING', mcs: [], ...eventTimingConfig })
       .mockResolvedValueOnce({ id: 'e1', phase: 'PITCHING', projects: [] });
 
     const early = new Date('2026-01-01');
     const later = new Date('2026-01-02');
     prisma.eventProject.findMany.mockResolvedValue([
-      { id: 'ep1', createdAt: early, project: { likes: Array(5).fill({ id: '1' }) } },
+      { id: 'ep1', createdAt: early, project: { likes: Array(4).fill({ id: '1' }) } },
       { id: 'ep2', createdAt: early, project: { likes: Array(4).fill({ id: '2' }) } },
-      { id: 'ep3', createdAt: early, project: { likes: Array(3).fill({ id: '3' }) } },
-      { id: 'ep4', createdAt: early, project: { likes: Array(2).fill({ id: '4' }) } },
-      { id: 'ep5', createdAt: early, project: { likes: Array(1).fill({ id: '5' }) } },
-      { id: 'ep6', createdAt: later, project: { likes: Array(1).fill({ id: '6' }) } },
+      { id: 'ep3', createdAt: early, project: { likes: Array(4).fill({ id: '3' }) } },
+      { id: 'ep4', createdAt: early, project: { likes: Array(3).fill({ id: '4' }) } },
+      { id: 'ep5', createdAt: early, project: { likes: Array(3).fill({ id: '5' }) } },
+      { id: 'ep6', createdAt: early, project: { likes: Array(3).fill({ id: '6' }) } },
+      { id: 'ep7', createdAt: later, project: { likes: Array(3).fill({ id: '7' }) } },
     ]);
     prisma.eventProject.update.mockResolvedValue({});
     prisma.event.update.mockResolvedValue({});
@@ -253,17 +262,19 @@ describe('/api/events/[eventId]/transition', () => {
     expect(res.status).toBe(200);
 
     const updateCalls = prisma.eventProject.update.mock.calls;
-    expect(updateCalls[4][0].data.isTopProject).toBe(true);
-    expect(updateCalls[5][0].data.isTopProject).toBe(false);
-    expect(updateCalls[5][0].data.allottedPresentingSec).toBe(60);
-    expect(updateCalls[5][0].data.allottedQuestionsSec).toBe(120);
+    expect(updateCalls).toHaveLength(7);
+    for (const call of updateCalls) {
+      expect(call[0].data.isTopProject).toBe(true);
+      expect(call[0].data.allottedPresentingSec).toBe(120);
+      expect(call[0].data.allottedQuestionsSec).toBe(180);
+    }
   });
 
   it('handles ties correctly (same like count → ordered by createdAt)', async () => {
     mockAuth.mockReturnValue({ userId: 'clerk-admin' });
     prisma.hacker.findUnique.mockResolvedValue({ id: 'h-admin', role: 'ADMIN' });
     prisma.event.findUnique
-      .mockResolvedValueOnce({ id: 'e1', phase: 'VOTING', mcs: [] })
+      .mockResolvedValueOnce({ id: 'e1', phase: 'VOTING', mcs: [], ...eventTimingConfig })
       .mockResolvedValueOnce({ id: 'e1', phase: 'PITCHING', projects: [] });
 
     const early = new Date('2026-01-01');
@@ -289,7 +300,7 @@ describe('/api/events/[eventId]/transition', () => {
     mockAuth.mockReturnValue({ userId: 'clerk-admin' });
     prisma.hacker.findUnique.mockResolvedValue({ id: 'h-admin', role: 'ADMIN' });
     prisma.event.findUnique
-      .mockResolvedValueOnce({ id: 'e1', phase: 'VOTING', mcs: [] })
+      .mockResolvedValueOnce({ id: 'e1', phase: 'VOTING', mcs: [], ...eventTimingConfig })
       .mockResolvedValueOnce({ id: 'e1', phase: 'PITCHING', projects: [] });
 
     prisma.eventProject.findMany.mockResolvedValue([]);
@@ -307,7 +318,7 @@ describe('/api/events/[eventId]/transition', () => {
     mockAuth.mockReturnValue({ userId: 'clerk-admin' });
     prisma.hacker.findUnique.mockResolvedValue({ id: 'h-admin', role: 'ADMIN' });
     prisma.event.findUnique
-      .mockResolvedValueOnce({ id: 'e1', phase: 'VOTING', mcs: [] })
+      .mockResolvedValueOnce({ id: 'e1', phase: 'VOTING', mcs: [], ...eventTimingConfig })
       .mockResolvedValueOnce({ id: 'e1', phase: 'PITCHING', projects: [] });
 
     prisma.eventProject.findMany.mockResolvedValue([]);
