@@ -6,6 +6,7 @@ import { useUser, SignInButton } from "@clerk/nextjs";
 import { useUserContext } from "../contexts/UserContext";
 import { useTheme } from "../contexts/ThemeContext";
 import { HackerSelector, type Hacker } from "../components/HackerSelector";
+import { formatDateTimeLocalValue, serializeDateTimeLocalValue } from "@/lib/datetimeLocal";
 
 type EventListItem = {
   id: string;
@@ -56,14 +57,9 @@ export default function PitchPage() {
   const [meetingUrl, setMeetingUrl] = useState("");
   const [startTime, setStartTime] = useState(() => {
     const now = new Date();
-    // Create today at 8pm EST (UTC-5) = 01:00 UTC next day, but we want local-aware
-    // datetime-local uses local time, so compute 8pm EST as a Date and format it
     const est = new Date(now.toLocaleString("en-US", { timeZone: "America/New_York" }));
     est.setHours(20, 0, 0, 0);
-    const yyyy = est.getFullYear();
-    const mm = String(est.getMonth() + 1).padStart(2, "0");
-    const dd = String(est.getDate()).padStart(2, "0");
-    return `${yyyy}-${mm}-${dd}T20:00`;
+    return formatDateTimeLocalValue(est);
   });
   const [endTime, setEndTime] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
@@ -74,8 +70,7 @@ export default function PitchPage() {
   const [votingEndTime, setVotingEndTime] = useState(() => {
     const d = new Date(startTime);
     if (isNaN(d.getTime())) return "";
-    const ve = new Date(d.getTime() + 15 * 60 * 1000);
-    return `${ve.getFullYear()}-${String(ve.getMonth() + 1).padStart(2, "0")}-${String(ve.getDate()).padStart(2, "0")}T${String(ve.getHours()).padStart(2, "0")}:${String(ve.getMinutes()).padStart(2, "0")}`;
+    return formatDateTimeLocalValue(new Date(d.getTime() + 15 * 60 * 1000));
   });
   const [topProjectCount, setTopProjectCount] = useState(5);
   const [topPresentingSec, setTopPresentingSec] = useState(120);
@@ -88,9 +83,7 @@ export default function PitchPage() {
     if (votingEndTimeManual) return;
     const d = new Date(startTime);
     if (isNaN(d.getTime())) return;
-    const ve = new Date(d.getTime() + 15 * 60 * 1000);
-    const formatted = `${ve.getFullYear()}-${String(ve.getMonth() + 1).padStart(2, "0")}-${String(ve.getDate()).padStart(2, "0")}T${String(ve.getHours()).padStart(2, "0")}:${String(ve.getMinutes()).padStart(2, "0")}`;
-    setVotingEndTime(formatted);
+    setVotingEndTime(formatDateTimeLocalValue(new Date(d.getTime() + 15 * 60 * 1000)));
   }, [startTime, votingEndTimeManual]);
 
   useEffect(() => {
@@ -149,10 +142,10 @@ export default function PitchPage() {
       const body: any = {
         title,
         meetingUrl: meetingUrl || null,
-        startTime,
+        startTime: serializeDateTimeLocalValue(startTime),
         endTime: endTime || null,
         mcIds: selectedMCs,
-        votingEndTime: votingEndTime || null,
+        votingEndTime: serializeDateTimeLocalValue(votingEndTime),
         topProjectCount,
         topPresentingSec,
         topQuestionsSec,

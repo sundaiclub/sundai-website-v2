@@ -7,6 +7,7 @@ import { useUserContext } from "../../contexts/UserContext";
 import { Project, ProjectCard } from "../../components/Project";
 import { motion, AnimatePresence, PanInfo } from "framer-motion";
 import ReactMarkdown from "react-markdown";
+import { formatDateTimeLocalValue, serializeDateTimeLocalValue } from "@/lib/datetimeLocal";
 
 type PitchPhase = "WAITING" | "PRESENTING" | "QUESTIONS" | "COMPLETED";
 type EventPhase = "VOTING" | "PITCHING" | "FINISHED";
@@ -1322,12 +1323,12 @@ export default function PitchEventPage() {
   const openEdit = async () => {
     if (!event) return;
     setEditTitle(event.title);
-    setEditStartTime(new Date(event.startTime).toISOString().slice(0, 16));
+    setEditStartTime(formatDateTimeLocalValue(event.startTime));
     setEditMeetingUrl(event.meetingUrl || "");
     setEditVotingEndTime(
       event.votingEndTime
-        ? new Date(event.votingEndTime).toISOString().slice(0, 16)
-        : new Date(new Date(event.startTime).getTime() + 15 * 60 * 1000).toISOString().slice(0, 16)
+        ? formatDateTimeLocalValue(event.votingEndTime)
+        : formatDateTimeLocalValue(new Date(new Date(event.startTime).getTime() + 15 * 60 * 1000))
     );
     setEditMcIds(event.mcs.map(m => m.hacker.id));
     setEditTopProjectCount(event.topProjectCount);
@@ -1352,9 +1353,9 @@ export default function PitchEventPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           title: editTitle,
-          startTime: new Date(editStartTime).toISOString(),
+          startTime: serializeDateTimeLocalValue(editStartTime),
           meetingUrl: editMeetingUrl,
-          votingEndTime: editVotingEndTime ? new Date(editVotingEndTime).toISOString() : null,
+          votingEndTime: serializeDateTimeLocalValue(editVotingEndTime),
           mcIds: editMcIds,
           topProjectCount: editTopProjectCount,
           topPresentingSec: editTopPresentingSec,
