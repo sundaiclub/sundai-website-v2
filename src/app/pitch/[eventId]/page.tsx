@@ -37,6 +37,11 @@ type EventDetail = {
   audienceCanReorder: boolean;
   votingEndTime?: string | null;
   phase: EventPhase;
+  topProjectCount: number;
+  topPresentingSec: number;
+  topQuestionsSec: number;
+  defaultPresentingSec: number;
+  defaultQuestionsSec: number;
   mcs: Array<{ id: string; hacker: { id: string; name: string } }>;
   projects: EventProjectEntry[];
 };
@@ -1234,6 +1239,11 @@ export default function PitchEventPage() {
   const [mcSearch, setMcSearch] = useState("");
   const [saving, setSaving] = useState(false);
   const [phaseTransitioning, setPhaseTransitioning] = useState<EventPhase | null>(null);
+  const [editTopProjectCount, setEditTopProjectCount] = useState(5);
+  const [editTopPresentingSec, setEditTopPresentingSec] = useState(120);
+  const [editTopQuestionsSec, setEditTopQuestionsSec] = useState(180);
+  const [editDefaultPresentingSec, setEditDefaultPresentingSec] = useState(60);
+  const [editDefaultQuestionsSec, setEditDefaultQuestionsSec] = useState(120);
 
   // Join modal state
   const [showJoin, setShowJoin] = useState(false);
@@ -1320,6 +1330,11 @@ export default function PitchEventPage() {
         : new Date(new Date(event.startTime).getTime() + 15 * 60 * 1000).toISOString().slice(0, 16)
     );
     setEditMcIds(event.mcs.map(m => m.hacker.id));
+    setEditTopProjectCount(event.topProjectCount);
+    setEditTopPresentingSec(event.topPresentingSec);
+    setEditTopQuestionsSec(event.topQuestionsSec);
+    setEditDefaultPresentingSec(event.defaultPresentingSec);
+    setEditDefaultQuestionsSec(event.defaultQuestionsSec);
     setMcSearch("");
     try {
       const res = await fetch("/api/hackers");
@@ -1335,7 +1350,18 @@ export default function PitchEventPage() {
       const res = await fetch(`/api/events/${event.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: editTitle, startTime: new Date(editStartTime).toISOString(), meetingUrl: editMeetingUrl, votingEndTime: editVotingEndTime ? new Date(editVotingEndTime).toISOString() : null, mcIds: editMcIds }),
+        body: JSON.stringify({
+          title: editTitle,
+          startTime: new Date(editStartTime).toISOString(),
+          meetingUrl: editMeetingUrl,
+          votingEndTime: editVotingEndTime ? new Date(editVotingEndTime).toISOString() : null,
+          mcIds: editMcIds,
+          topProjectCount: editTopProjectCount,
+          topPresentingSec: editTopPresentingSec,
+          topQuestionsSec: editTopQuestionsSec,
+          defaultPresentingSec: editDefaultPresentingSec,
+          defaultQuestionsSec: editDefaultQuestionsSec,
+        }),
       });
       if (res.ok) {
         setEvent(await res.json());
@@ -1469,7 +1495,7 @@ export default function PitchEventPage() {
 
       {showEdit && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className={`${isDarkMode ? "bg-gray-800" : "bg-white"} rounded-xl w-full max-w-lg p-6 shadow-xl`}>
+          <div className={`${isDarkMode ? "bg-gray-800" : "bg-white"} rounded-xl w-full max-w-lg p-6 shadow-xl max-h-[90vh] overflow-y-auto`}>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-semibold">Edit Event</h2>
               <button onClick={() => setShowEdit(false)} className="text-sm opacity-70">
@@ -1508,6 +1534,69 @@ export default function PitchEventPage() {
               onChange={e => setEditVotingEndTime(e.target.value)}
               className={`w-full px-3 py-2 rounded-md mb-4 ${isDarkMode ? "bg-gray-800 text-gray-100" : "bg-gray-100 text-gray-900"}`}
             />
+
+            <div className={`rounded-lg p-4 mb-4 ${isDarkMode ? "bg-gray-700/50" : "bg-gray-50"}`}>
+              <h3 className="text-sm font-semibold mb-3">Presentation Timing</h3>
+
+              <label className="block text-xs font-medium mb-1">Number of Top Projects</label>
+              <input
+                type="number"
+                min={0}
+                value={editTopProjectCount}
+                onChange={e => setEditTopProjectCount(Math.max(0, parseInt(e.target.value) || 0))}
+                className={`w-full px-3 py-2 rounded-md mb-3 ${isDarkMode ? "bg-gray-800 text-gray-100" : "bg-gray-100 text-gray-900"}`}
+              />
+
+              <div className="grid grid-cols-2 gap-3 mb-3">
+                <div>
+                  <label className="block text-xs font-medium mb-1">Top Presenting (sec)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    step={10}
+                    value={editTopPresentingSec}
+                    onChange={e => setEditTopPresentingSec(Math.max(0, parseInt(e.target.value) || 0))}
+                    className={`w-full px-3 py-2 rounded-md ${isDarkMode ? "bg-gray-800 text-gray-100" : "bg-gray-100 text-gray-900"}`}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium mb-1">Top Q&A (sec)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    step={10}
+                    value={editTopQuestionsSec}
+                    onChange={e => setEditTopQuestionsSec(Math.max(0, parseInt(e.target.value) || 0))}
+                    className={`w-full px-3 py-2 rounded-md ${isDarkMode ? "bg-gray-800 text-gray-100" : "bg-gray-100 text-gray-900"}`}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium mb-1">Regular Presenting (sec)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    step={10}
+                    value={editDefaultPresentingSec}
+                    onChange={e => setEditDefaultPresentingSec(Math.max(0, parseInt(e.target.value) || 0))}
+                    className={`w-full px-3 py-2 rounded-md ${isDarkMode ? "bg-gray-800 text-gray-100" : "bg-gray-100 text-gray-900"}`}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium mb-1">Regular Q&A (sec)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    step={10}
+                    value={editDefaultQuestionsSec}
+                    onChange={e => setEditDefaultQuestionsSec(Math.max(0, parseInt(e.target.value) || 0))}
+                    className={`w-full px-3 py-2 rounded-md ${isDarkMode ? "bg-gray-800 text-gray-100" : "bg-gray-100 text-gray-900"}`}
+                  />
+                </div>
+              </div>
+            </div>
 
             <label className="block text-sm font-medium mb-1">MCs</label>
             <div className="flex flex-wrap gap-2 mb-2">

@@ -27,10 +27,13 @@ export function rankEventProjectsForPitching<T extends RankableEventProject>(
   return [...eventProjects].sort(compareEventProjectsByVotingResult);
 }
 
-export function getFrozenTopProjectIds<T extends { id: string }>(sortedProjects: T[]) {
-  if (sortedProjects.length < TOP_PROJECT_COUNT) {
+export function getFrozenTopProjectIds<T extends { id: string }>(
+  sortedProjects: T[],
+  topCount: number = TOP_PROJECT_COUNT
+) {
+  if (sortedProjects.length < topCount) {
     return new Set<string>();
   }
 
-  return new Set(sortedProjects.slice(0, TOP_PROJECT_COUNT).map(project => project.id));
+  return new Set(sortedProjects.slice(0, topCount).map(project => project.id));
 }

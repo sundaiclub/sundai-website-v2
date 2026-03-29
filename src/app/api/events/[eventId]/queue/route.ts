@@ -1,10 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import prisma from "@/lib/prisma";
-import {
-  DEFAULT_PRESENTING_SEC,
-  DEFAULT_QUESTIONS_SEC,
-} from "@/lib/eventTopProjects";
 
 // Join queue by adding one of user's projects
 export async function POST(
@@ -69,8 +65,8 @@ export async function POST(
         position: nextPos,
         isTopProject: false,
         ...(event.phase === "PITCHING" && {
-          allottedPresentingSec: DEFAULT_PRESENTING_SEC,
-          allottedQuestionsSec: DEFAULT_QUESTIONS_SEC,
+          allottedPresentingSec: event.defaultPresentingSec,
+          allottedQuestionsSec: event.defaultQuestionsSec,
         }),
       },
     });

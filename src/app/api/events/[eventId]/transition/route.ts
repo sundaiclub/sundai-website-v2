@@ -2,10 +2,6 @@ import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import prisma from "@/lib/prisma";
 import {
-  DEFAULT_PRESENTING_SEC,
-  DEFAULT_QUESTIONS_SEC,
-  TOP_GROUP_PRESENTING_SEC,
-  TOP_GROUP_QUESTIONS_SEC,
   getFrozenTopProjectIds,
   rankEventProjectsForPitching,
 } from "@/lib/eventTopProjects";
@@ -109,7 +105,7 @@ export async function POST(
       });
 
       const sorted = rankEventProjectsForPitching(eventProjects);
-      const topProjectIds = getFrozenTopProjectIds(sorted);
+      const topProjectIds = getFrozenTopProjectIds(sorted, event.topProjectCount);
 
       ops = sorted.map((ep, idx) => {
         const isTopProject = topProjectIds.has(ep.id);
@@ -125,11 +121,11 @@ export async function POST(
             questionsStartedAt: null,
             completedAt: null,
             allottedPresentingSec: isTopProject
-              ? TOP_GROUP_PRESENTING_SEC
-              : DEFAULT_PRESENTING_SEC,
+              ? event.topPresentingSec
+              : event.defaultPresentingSec,
             allottedQuestionsSec: isTopProject
-              ? TOP_GROUP_QUESTIONS_SEC
-              : DEFAULT_QUESTIONS_SEC,
+              ? event.topQuestionsSec
+              : event.defaultQuestionsSec,
           },
         });
       });
