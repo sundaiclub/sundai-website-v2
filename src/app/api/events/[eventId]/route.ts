@@ -58,10 +58,32 @@ export async function PATCH(
     });
     if (!isAdmin && !isMC) return new NextResponse("Unauthorized", { status: 401 });
 
+    const existingEvent = await prisma.event.findUnique({
+      where: { id: params.eventId },
+      select: {
+        phase: true,
+        topPresentingSec: true,
+        topQuestionsSec: true,
+        defaultPresentingSec: true,
+        defaultQuestionsSec: true,
+      },
+    });
+    if (!existingEvent) return new NextResponse("Not Found", { status: 404 });
+
     const body = await req.json();
     const { title, startTime, meetingUrl, mcIds, votingEndTime, topProjectCount, topPresentingSec, topQuestionsSec, defaultPresentingSec, defaultQuestionsSec } = body;
 
-    await prisma.event.update({
+    const nextTopPresentingSec = topPresentingSec ?? existingEvent.topPresentingSec;
+    const nextTopQuestionsSec = topQuestionsSec ?? existingEvent.topQuestionsSec;
+    const nextDefaultPresentingSec = defaultPresentingSec ?? existingEvent.defaultPresentingSec;
+    const nextDefaultQuestionsSec = defaultQuestionsSec ?? existingEvent.defaultQuestionsSec;
+    const timingConfigChanged =
+      topPresentingSec !== undefined ||
+      topQuestionsSec !== undefined ||
+      defaultPresentingSec !== undefined ||
+      defaultQuestionsSec !== undefined;
+
+    const eventUpdate = prisma.event.update({
       where: { id: params.eventId },
       data: {
         ...(title !== undefined && { title }),
@@ -75,6 +97,36 @@ export async function PATCH(
         ...(defaultQuestionsSec !== undefined && { defaultQuestionsSec }),
       },
     });
+
+    if (timingConfigChanged && existingEvent.phase === "PITCHING") {
+      await prisma.$transaction([
+        eventUpdate,
+        prisma.eventProject.updateMany({
+          where: {
+            eventId: params.eventId,
+            isTopProject: true,
+            status: { in: ["CURRENT", "APPROVED"] },
+          },
+          data: {
+            allottedPresentingSec: nextTopPresentingSec,
+            allottedQuestionsSec: nextTopQuestionsSec,
+          },
+        }),
+        prisma.eventProject.updateMany({
+          where: {
+            eventId: params.eventId,
+            isTopProject: false,
+            status: { in: ["CURRENT", "APPROVED"] },
+          },
+          data: {
+            allottedPresentingSec: nextDefaultPresentingSec,
+            allottedQuestionsSec: nextDefaultQuestionsSec,
+          },
+        }),
+      ]);
+    } else {
+      await eventUpdate;
+    }
 
     if (mcIds !== undefined) {
       await prisma.eventMC.deleteMany({ where: { eventId: params.eventId } });

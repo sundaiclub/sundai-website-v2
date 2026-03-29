@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { GET as GET_EVENTS, POST as POST_EVENTS } from '../../src/app/api/events/route';
-import { GET as GET_EVENT } from '../../src/app/api/events/[eventId]/route';
+import { GET as GET_EVENT, PATCH as PATCH_EVENT } from '../../src/app/api/events/[eventId]/route';
 
 jest.mock('../../src/lib/prisma', () => ({
   __esModule: true,
@@ -9,10 +9,20 @@ jest.mock('../../src/lib/prisma', () => ({
       findMany: jest.fn(),
       create: jest.fn(),
       findUnique: jest.fn(),
+      update: jest.fn(),
     },
     hacker: {
       findUnique: jest.fn(),
     },
+    eventMC: {
+      findFirst: jest.fn(),
+      deleteMany: jest.fn(),
+      createMany: jest.fn(),
+    },
+    eventProject: {
+      updateMany: jest.fn(),
+    },
+    $transaction: jest.fn(),
   },
 }));
 
@@ -60,6 +70,10 @@ describe('/api/events', () => {
 });
 
 describe('/api/events/[eventId]', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
   it('GET returns 404 when missing', async () => {
     prisma.event.findUnique.mockResolvedValue(null);
     const request = new NextRequest('http://localhost:3000/api/events/evt-1');
@@ -81,5 +95,74 @@ describe('/api/events/[eventId]', () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.phase).toBe('VOTING');
+  });
+
+  it('PATCH updates active pitching allotments when timing changes', async () => {
+    mockAuth.mockReturnValue({ userId: 'clerk-admin' });
+    prisma.hacker.findUnique.mockResolvedValue({ id: 'h-admin', role: 'ADMIN' });
+    prisma.eventMC.findFirst.mockResolvedValue(null);
+    prisma.event.findUnique
+      .mockResolvedValueOnce({
+        phase: 'PITCHING',
+        topPresentingSec: 120,
+        topQuestionsSec: 180,
+        defaultPresentingSec: 60,
+        defaultQuestionsSec: 120,
+      })
+      .mockResolvedValueOnce({
+        id: 'evt-1',
+        title: 'Updated Event',
+        phase: 'PITCHING',
+        topPresentingSec: 150,
+        topQuestionsSec: 180,
+        defaultPresentingSec: 75,
+        defaultQuestionsSec: 120,
+        projects: [
+          { id: 'ep-top', isTopProject: true, allottedPresentingSec: 150, allottedQuestionsSec: 180 },
+          { id: 'ep-regular', isTopProject: false, allottedPresentingSec: 75, allottedQuestionsSec: 120 },
+        ],
+        mcs: [],
+      });
+    prisma.event.update.mockResolvedValue({ id: 'evt-1' });
+    prisma.eventProject.updateMany.mockResolvedValue({ count: 1 });
+    prisma.$transaction.mockImplementation(async (ops: Array<Promise<unknown>>) => Promise.all(ops));
+
+    const request = new NextRequest('http://localhost:3000/api/events/evt-1', { method: 'PATCH' });
+    request.json = jest.fn().mockResolvedValue({
+      title: 'Updated Event',
+      topPresentingSec: 150,
+      defaultPresentingSec: 75,
+    });
+
+    const res = await PATCH_EVENT(request as any, { params: { eventId: 'evt-1' } } as any);
+
+    expect(res.status).toBe(200);
+    expect(prisma.$transaction).toHaveBeenCalled();
+    expect(prisma.eventProject.updateMany).toHaveBeenNthCalledWith(1, {
+      where: {
+        eventId: 'evt-1',
+        isTopProject: true,
+        status: { in: ['CURRENT', 'APPROVED'] },
+      },
+      data: {
+        allottedPresentingSec: 150,
+        allottedQuestionsSec: 180,
+      },
+    });
+    expect(prisma.eventProject.updateMany).toHaveBeenNthCalledWith(2, {
+      where: {
+        eventId: 'evt-1',
+        isTopProject: false,
+        status: { in: ['CURRENT', 'APPROVED'] },
+      },
+      data: {
+        allottedPresentingSec: 75,
+        allottedQuestionsSec: 120,
+      },
+    });
+
+    const body = await res.json();
+    expect(body.projects[0].allottedPresentingSec).toBe(150);
+    expect(body.projects[1].allottedPresentingSec).toBe(75);
   });
 });
