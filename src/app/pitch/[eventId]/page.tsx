@@ -71,11 +71,13 @@ function SwipeCard({
   project,
   onSwipeRight,
   onSwipeLeft,
+  exitDirection,
   isDarkMode,
 }: {
   project: Project;
   onSwipeRight: () => void;
   onSwipeLeft: () => void;
+  exitDirection: "left" | "right";
   isDarkMode: boolean;
 }) {
   const [dragX, setDragX] = useState(0);
@@ -98,7 +100,7 @@ function SwipeCard({
       onDragEnd={handleDragEnd}
       initial={{ scale: 0.95, opacity: 0 }}
       animate={{ scale: 1, opacity: 1 }}
-      exit={{ x: dragX > 0 ? 300 : -300, opacity: 0, scale: 0.9 }}
+      exit={{ x: dragX !== 0 ? (dragX > 0 ? 300 : -300) : (exitDirection === "right" ? 300 : -300), opacity: 0, scale: 0.9 }}
       transition={{ type: "spring", stiffness: 300, damping: 25 }}
       className="relative cursor-grab active:cursor-grabbing select-none"
     >
@@ -186,6 +188,7 @@ function VotingPhase({
   const [votingStarted, setVotingStarted] = useState(false);
   const [seenIds, setSeenIds] = useState<Set<string>>(new Set());
   const [transitioning, setTransitioning] = useState(false);
+  const [exitDirection, setExitDirection] = useState<"left" | "right">("left");
 
   // Projects to vote on: exclude user's own (auto-liked on backend) and already seen
   const deck = useMemo(() => {
@@ -201,6 +204,7 @@ function VotingPhase({
 
   const handleSwipeRight = useCallback(async () => {
     if (!currentCard) return;
+    setExitDirection("right");
     setSeenIds(prev => new Set(prev).add(currentCard.project.id));
     try {
       await fetch(`/api/projects/${currentCard.project.id}/like`, { method: "POST" });
@@ -211,6 +215,7 @@ function VotingPhase({
 
   const handleSwipeLeft = useCallback(() => {
     if (!currentCard) return;
+    setExitDirection("left");
     setSeenIds(prev => new Set(prev).add(currentCard.project.id));
   }, [currentCard]);
 
@@ -325,6 +330,7 @@ function VotingPhase({
                   project={currentCard.project}
                   onSwipeRight={handleSwipeRight}
                   onSwipeLeft={handleSwipeLeft}
+                  exitDirection={exitDirection}
                   isDarkMode={isDarkMode}
                 />
               ) : (
