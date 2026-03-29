@@ -46,7 +46,7 @@ export async function POST(req: Request) {
     if (user?.role !== "ADMIN") return new NextResponse("Unauthorized", { status: 401 });
 
     const body = await req.json();
-    const { title, description, startTime, meetingUrl, location, mcIds = [], audienceCanReorder = true } = body || {};
+    const { title, description, startTime, meetingUrl, location, mcIds = [], audienceCanReorder = true, votingEndTime, topProjectCount, topPresentingSec, topQuestionsSec, defaultPresentingSec, defaultQuestionsSec } = body || {};
     if (!title || !startTime) {
       return NextResponse.json({ message: "title and startTime are required" }, { status: 400 });
     }
@@ -60,6 +60,12 @@ export async function POST(req: Request) {
         location: location || null,
         createdById: user.id,
         audienceCanReorder,
+        votingEndTime: votingEndTime ? new Date(votingEndTime) : new Date(new Date(startTime).getTime() + 15 * 60 * 1000),
+        ...(topProjectCount !== undefined && { topProjectCount }),
+        ...(topPresentingSec !== undefined && { topPresentingSec }),
+        ...(topQuestionsSec !== undefined && { topQuestionsSec }),
+        ...(defaultPresentingSec !== undefined && { defaultPresentingSec }),
+        ...(defaultQuestionsSec !== undefined && { defaultQuestionsSec }),
         mcs: {
           create: mcIds.map((hackerId: string) => ({ hackerId })),
         },
