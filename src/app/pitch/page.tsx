@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useUser, SignInButton } from "@clerk/nextjs";
@@ -70,12 +70,28 @@ export default function PitchPage() {
   const [hackers, setHackers] = useState<Hacker[]>([]);
   const [selectedMCs, setSelectedMCs] = useState<string[]>([]);
   const [showSelector, setShowSelector] = useState(false);
-  const [votingEndTime, setVotingEndTime] = useState("");
+  const [votingEndTimeManual, setVotingEndTimeManual] = useState(false);
+  const [votingEndTime, setVotingEndTime] = useState(() => {
+    const d = new Date(startTime);
+    if (isNaN(d.getTime())) return "";
+    const ve = new Date(d.getTime() + 15 * 60 * 1000);
+    return `${ve.getFullYear()}-${String(ve.getMonth() + 1).padStart(2, "0")}-${String(ve.getDate()).padStart(2, "0")}T${String(ve.getHours()).padStart(2, "0")}:${String(ve.getMinutes()).padStart(2, "0")}`;
+  });
   const [topProjectCount, setTopProjectCount] = useState(5);
   const [topPresentingSec, setTopPresentingSec] = useState(120);
   const [topQuestionsSec, setTopQuestionsSec] = useState(180);
   const [defaultPresentingSec, setDefaultPresentingSec] = useState(60);
   const [defaultQuestionsSec, setDefaultQuestionsSec] = useState(120);
+
+  // Auto-update voting end time when start time changes (unless manually edited)
+  useEffect(() => {
+    if (votingEndTimeManual) return;
+    const d = new Date(startTime);
+    if (isNaN(d.getTime())) return;
+    const ve = new Date(d.getTime() + 15 * 60 * 1000);
+    const formatted = `${ve.getFullYear()}-${String(ve.getMonth() + 1).padStart(2, "0")}-${String(ve.getDate()).padStart(2, "0")}T${String(ve.getHours()).padStart(2, "0")}:${String(ve.getMinutes()).padStart(2, "0")}`;
+    setVotingEndTime(formatted);
+  }, [startTime, votingEndTimeManual]);
 
   useEffect(() => {
     let interval: any;
@@ -159,7 +175,7 @@ export default function PitchPage() {
       }
       const created = await res.json();
       setShowCreate(false);
-      setTitle(""); setMeetingUrl(""); setStartTime(""); setEndTime(""); setSelectedMCs([]); setVotingEndTime(""); setTopProjectCount(5); setTopPresentingSec(120); setTopQuestionsSec(180); setDefaultPresentingSec(60); setDefaultQuestionsSec(120);
+      setTitle(""); setMeetingUrl(""); setStartTime(""); setEndTime(""); setSelectedMCs([]); setVotingEndTime(""); setVotingEndTimeManual(false); setTopProjectCount(5); setTopPresentingSec(120); setTopQuestionsSec(180); setDefaultPresentingSec(60); setDefaultQuestionsSec(120);
       router.push(`/pitch/${created.id}`);
     } catch (e) {
       console.error(e);
@@ -306,26 +322,26 @@ export default function PitchPage() {
             <div className="space-y-4">
               <div>
                 <label className="block text-sm mb-1">Title</label>
-                <input value={title} onChange={e=>setTitle(e.target.value)} className={`w-full px-3 py-2 rounded-md ${isDarkMode ? 'bg-gray-800' : 'bg-gray-100'}`} placeholder="Sundai Pitches" />
+                <input value={title} onChange={e=>setTitle(e.target.value)} className={`w-full px-3 py-2 rounded-md ${isDarkMode ? 'bg-gray-900 text-gray-100' : 'bg-gray-100 text-gray-900'}`} placeholder="Sundai Pitches" />
               </div>
               <div>
                 <label className="block text-sm mb-1">Meeting link</label>
-                <input value={meetingUrl} onChange={e=>setMeetingUrl(e.target.value)} className={`w-full px-3 py-2 rounded-md ${isDarkMode ? 'bg-gray-800' : 'bg-gray-100'}`} placeholder="https://zoom.us/j/…" />
+                <input value={meetingUrl} onChange={e=>setMeetingUrl(e.target.value)} className={`w-full px-3 py-2 rounded-md ${isDarkMode ? 'bg-gray-900 text-gray-100' : 'bg-gray-100 text-gray-900'}`} placeholder="https://zoom.us/j/…" />
               </div>
               <div>
                 <label className="block text-sm mb-1">Start time</label>
-                <input type="datetime-local" value={startTime} onChange={e=>setStartTime(e.target.value)} className={`w-full px-3 py-2 rounded-md ${isDarkMode ? 'bg-gray-800' : 'bg-gray-100'}`} />
+                <input type="datetime-local" value={startTime} onChange={e=>setStartTime(e.target.value)} className={`w-full px-3 py-2 rounded-md ${isDarkMode ? 'bg-gray-900 text-gray-100' : 'bg-gray-100 text-gray-900'}`} />
               </div>
               <div>
                 <label className="block text-sm mb-1">Voting End Time</label>
-                <input type="datetime-local" value={votingEndTime} onChange={e=>setVotingEndTime(e.target.value)} className={`w-full px-3 py-2 rounded-md ${isDarkMode ? 'bg-gray-800' : 'bg-gray-100'}`} placeholder="Default: 15 min after start" />
-                <p className={`text-xs mt-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Leave empty for 15 min after start</p>
+                <input type="datetime-local" value={votingEndTime} onChange={e=>{setVotingEndTime(e.target.value); setVotingEndTimeManual(true);}} className={`w-full px-3 py-2 rounded-md ${isDarkMode ? 'bg-gray-900 text-gray-100' : 'bg-gray-100 text-gray-900'}`} placeholder="Default: 15 min after start" />
+                <p className={`text-xs mt-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Default: 15 min after start</p>
               </div>
               <div>
                 <label className="block text-sm mb-2">MCs</label>
                 <div className="flex flex-wrap gap-2 mb-2">
                   {hackers.filter(h=>selectedMCs.includes(h.id)).map(h=> (
-                    <span key={h.id} className={`${isDarkMode ? 'bg-gray-800' : 'bg-gray-100'} px-2 py-1 rounded-full text-sm`}>{h.name}</span>
+                    <span key={h.id} className={`${isDarkMode ? 'bg-gray-900' : 'bg-gray-100'} px-2 py-1 rounded-full text-sm`}>{h.name}</span>
                   ))}
                 </div>
                 <button onClick={()=>setShowSelector(true)} className="px-3 py-2 rounded-md bg-gray-200 text-gray-900 text-sm">
@@ -336,26 +352,26 @@ export default function PitchPage() {
                 <h3 className="text-sm font-semibold mb-3">Presentation Timing</h3>
                 <div>
                   <label className="block text-xs font-medium mb-1">Number of Top Projects</label>
-                  <input type="number" min={0} value={topProjectCount} onChange={e=>setTopProjectCount(Math.max(0, parseInt(e.target.value) || 0))} className={`w-full px-3 py-2 rounded-md mb-3 ${isDarkMode ? 'bg-gray-800' : 'bg-gray-100'}`} />
+                  <input type="number" min={0} value={topProjectCount} onChange={e=>setTopProjectCount(Math.max(0, parseInt(e.target.value) || 0))} className={`w-full px-3 py-2 rounded-md mb-3 ${isDarkMode ? 'bg-gray-900 text-gray-100' : 'bg-gray-100 text-gray-900'}`} />
                 </div>
                 <div className="grid grid-cols-2 gap-3 mb-3">
                   <div>
                     <label className="block text-xs font-medium mb-1">Top Presenting (sec)</label>
-                    <input type="number" min={0} step={10} value={topPresentingSec} onChange={e=>setTopPresentingSec(Math.max(0, parseInt(e.target.value) || 0))} className={`w-full px-3 py-2 rounded-md ${isDarkMode ? 'bg-gray-800' : 'bg-gray-100'}`} />
+                    <input type="number" min={0} step={10} value={topPresentingSec} onChange={e=>setTopPresentingSec(Math.max(0, parseInt(e.target.value) || 0))} className={`w-full px-3 py-2 rounded-md ${isDarkMode ? 'bg-gray-900 text-gray-100' : 'bg-gray-100 text-gray-900'}`} />
                   </div>
                   <div>
                     <label className="block text-xs font-medium mb-1">Top Q&A (sec)</label>
-                    <input type="number" min={0} step={10} value={topQuestionsSec} onChange={e=>setTopQuestionsSec(Math.max(0, parseInt(e.target.value) || 0))} className={`w-full px-3 py-2 rounded-md ${isDarkMode ? 'bg-gray-800' : 'bg-gray-100'}`} />
+                    <input type="number" min={0} step={10} value={topQuestionsSec} onChange={e=>setTopQuestionsSec(Math.max(0, parseInt(e.target.value) || 0))} className={`w-full px-3 py-2 rounded-md ${isDarkMode ? 'bg-gray-900 text-gray-100' : 'bg-gray-100 text-gray-900'}`} />
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-medium mb-1">Regular Presenting (sec)</label>
-                    <input type="number" min={0} step={10} value={defaultPresentingSec} onChange={e=>setDefaultPresentingSec(Math.max(0, parseInt(e.target.value) || 0))} className={`w-full px-3 py-2 rounded-md ${isDarkMode ? 'bg-gray-800' : 'bg-gray-100'}`} />
+                    <input type="number" min={0} step={10} value={defaultPresentingSec} onChange={e=>setDefaultPresentingSec(Math.max(0, parseInt(e.target.value) || 0))} className={`w-full px-3 py-2 rounded-md ${isDarkMode ? 'bg-gray-900 text-gray-100' : 'bg-gray-100 text-gray-900'}`} />
                   </div>
                   <div>
                     <label className="block text-xs font-medium mb-1">Regular Q&A (sec)</label>
-                    <input type="number" min={0} step={10} value={defaultQuestionsSec} onChange={e=>setDefaultQuestionsSec(Math.max(0, parseInt(e.target.value) || 0))} className={`w-full px-3 py-2 rounded-md ${isDarkMode ? 'bg-gray-800' : 'bg-gray-100'}`} />
+                    <input type="number" min={0} step={10} value={defaultQuestionsSec} onChange={e=>setDefaultQuestionsSec(Math.max(0, parseInt(e.target.value) || 0))} className={`w-full px-3 py-2 rounded-md ${isDarkMode ? 'bg-gray-900 text-gray-100' : 'bg-gray-100 text-gray-900'}`} />
                   </div>
                 </div>
               </div>

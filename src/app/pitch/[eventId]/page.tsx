@@ -1508,7 +1508,7 @@ export default function PitchEventPage() {
               value={editTitle}
               onChange={e => setEditTitle(e.target.value)}
               placeholder="Event title"
-              className={`w-full px-3 py-2 rounded-md mb-4 ${isDarkMode ? "bg-gray-800 text-gray-100" : "bg-gray-100 text-gray-900"}`}
+              className={`w-full px-3 py-2 rounded-md mb-4 ${isDarkMode ? "bg-gray-900 text-gray-100" : "bg-gray-100 text-gray-900"}`}
             />
 
             <label className="block text-sm font-medium mb-1">Start Time</label>
@@ -1516,7 +1516,7 @@ export default function PitchEventPage() {
               type="datetime-local"
               value={editStartTime}
               onChange={e => setEditStartTime(e.target.value)}
-              className={`w-full px-3 py-2 rounded-md mb-4 ${isDarkMode ? "bg-gray-800 text-gray-100" : "bg-gray-100 text-gray-900"}`}
+              className={`w-full px-3 py-2 rounded-md mb-4 ${isDarkMode ? "bg-gray-900 text-gray-100" : "bg-gray-100 text-gray-900"}`}
             />
 
             <label className="block text-sm font-medium mb-1">Meeting URL</label>
@@ -1524,7 +1524,7 @@ export default function PitchEventPage() {
               value={editMeetingUrl}
               onChange={e => setEditMeetingUrl(e.target.value)}
               placeholder="https://zoom.us/j/..."
-              className={`w-full px-3 py-2 rounded-md mb-4 ${isDarkMode ? "bg-gray-800 text-gray-100" : "bg-gray-100 text-gray-900"}`}
+              className={`w-full px-3 py-2 rounded-md mb-4 ${isDarkMode ? "bg-gray-900 text-gray-100" : "bg-gray-100 text-gray-900"}`}
             />
 
             <label className="block text-sm font-medium mb-1">Voting End Time</label>
@@ -1532,7 +1532,7 @@ export default function PitchEventPage() {
               type="datetime-local"
               value={editVotingEndTime}
               onChange={e => setEditVotingEndTime(e.target.value)}
-              className={`w-full px-3 py-2 rounded-md mb-4 ${isDarkMode ? "bg-gray-800 text-gray-100" : "bg-gray-100 text-gray-900"}`}
+              className={`w-full px-3 py-2 rounded-md mb-4 ${isDarkMode ? "bg-gray-900 text-gray-100" : "bg-gray-100 text-gray-900"}`}
             />
 
             <div className={`rounded-lg p-4 mb-4 ${isDarkMode ? "bg-gray-700/50" : "bg-gray-50"}`}>
@@ -1544,7 +1544,7 @@ export default function PitchEventPage() {
                 min={0}
                 value={editTopProjectCount}
                 onChange={e => setEditTopProjectCount(Math.max(0, parseInt(e.target.value) || 0))}
-                className={`w-full px-3 py-2 rounded-md mb-3 ${isDarkMode ? "bg-gray-800 text-gray-100" : "bg-gray-100 text-gray-900"}`}
+                className={`w-full px-3 py-2 rounded-md mb-3 ${isDarkMode ? "bg-gray-900 text-gray-100" : "bg-gray-100 text-gray-900"}`}
               />
 
               <div className="grid grid-cols-2 gap-3 mb-3">
@@ -1556,7 +1556,7 @@ export default function PitchEventPage() {
                     step={10}
                     value={editTopPresentingSec}
                     onChange={e => setEditTopPresentingSec(Math.max(0, parseInt(e.target.value) || 0))}
-                    className={`w-full px-3 py-2 rounded-md ${isDarkMode ? "bg-gray-800 text-gray-100" : "bg-gray-100 text-gray-900"}`}
+                    className={`w-full px-3 py-2 rounded-md ${isDarkMode ? "bg-gray-900 text-gray-100" : "bg-gray-100 text-gray-900"}`}
                   />
                 </div>
                 <div>
@@ -1567,7 +1567,7 @@ export default function PitchEventPage() {
                     step={10}
                     value={editTopQuestionsSec}
                     onChange={e => setEditTopQuestionsSec(Math.max(0, parseInt(e.target.value) || 0))}
-                    className={`w-full px-3 py-2 rounded-md ${isDarkMode ? "bg-gray-800 text-gray-100" : "bg-gray-100 text-gray-900"}`}
+                    className={`w-full px-3 py-2 rounded-md ${isDarkMode ? "bg-gray-900 text-gray-100" : "bg-gray-100 text-gray-900"}`}
                   />
                 </div>
               </div>
@@ -1581,7 +1581,7 @@ export default function PitchEventPage() {
                     step={10}
                     value={editDefaultPresentingSec}
                     onChange={e => setEditDefaultPresentingSec(Math.max(0, parseInt(e.target.value) || 0))}
-                    className={`w-full px-3 py-2 rounded-md ${isDarkMode ? "bg-gray-800 text-gray-100" : "bg-gray-100 text-gray-900"}`}
+                    className={`w-full px-3 py-2 rounded-md ${isDarkMode ? "bg-gray-900 text-gray-100" : "bg-gray-100 text-gray-900"}`}
                   />
                 </div>
                 <div>
@@ -1592,7 +1592,7 @@ export default function PitchEventPage() {
                     step={10}
                     value={editDefaultQuestionsSec}
                     onChange={e => setEditDefaultQuestionsSec(Math.max(0, parseInt(e.target.value) || 0))}
-                    className={`w-full px-3 py-2 rounded-md ${isDarkMode ? "bg-gray-800 text-gray-100" : "bg-gray-100 text-gray-900"}`}
+                    className={`w-full px-3 py-2 rounded-md ${isDarkMode ? "bg-gray-900 text-gray-100" : "bg-gray-100 text-gray-900"}`}
                   />
                 </div>
               </div>
@@ -1622,7 +1622,7 @@ export default function PitchEventPage() {
               value={mcSearch}
               onChange={e => setMcSearch(e.target.value)}
               placeholder="Search hackers to add as MC..."
-              className={`w-full px-3 py-2 rounded-md ${isDarkMode ? "bg-gray-800 text-gray-100" : "bg-gray-100 text-gray-900"}`}
+              className={`w-full px-3 py-2 rounded-md ${isDarkMode ? "bg-gray-900 text-gray-100" : "bg-gray-100 text-gray-900"}`}
             />
             {filteredHackers.length > 0 && (
               <div className={`mt-1 rounded-md border max-h-40 overflow-y-auto ${isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"}`}>
@@ -1708,7 +1708,7 @@ export default function PitchEventPage() {
                     value={searchTerm}
                     onChange={e => setSearchTerm(e.target.value)}
                     placeholder="Search your projects..."
-                    className={`w-full px-3 py-2 rounded-md ${isDarkMode ? "bg-gray-800 text-gray-100" : "bg-gray-100 text-gray-900"}`}
+                    className={`w-full px-3 py-2 rounded-md ${isDarkMode ? "bg-gray-900 text-gray-100" : "bg-gray-100 text-gray-900"}`}
                   />
                 </div>
                 <div className="max-h-80 overflow-y-auto space-y-2 pr-1">
