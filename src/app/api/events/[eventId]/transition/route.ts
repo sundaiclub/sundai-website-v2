@@ -44,10 +44,32 @@ export async function POST(
       return NextResponse.json({ message: `Event is already ${event.phase}` }, { status: 400 });
     }
 
-    if (targetPhase === "FINISHED" || targetPhase === "VOTING") {
+    if (targetPhase === "FINISHED") {
       const updated = await prisma.event.update({
         where: { id: params.eventId },
         data: { phase: targetPhase },
+      });
+
+      return NextResponse.json(updated);
+    }
+
+    if (targetPhase === "VOTING") {
+      await prisma.$transaction([
+        prisma.eventProject.updateMany({
+          where: { eventId: params.eventId },
+          data: { isTopProject: false },
+        }),
+        prisma.event.update({
+          where: { id: params.eventId },
+          data: { phase: targetPhase },
+        }),
+      ]);
+
+      const updated = await prisma.event.findUnique({
+        where: { id: params.eventId },
+        include: {
+          projects: { orderBy: { position: "asc" } },
+        },
       });
 
       return NextResponse.json(updated);

@@ -6,7 +6,7 @@ jest.mock('../../src/lib/prisma', () => ({
   default: {
     hacker: { findUnique: jest.fn() },
     event: { findUnique: jest.fn(), update: jest.fn() },
-    eventProject: { findMany: jest.fn(), update: jest.fn() },
+    eventProject: { findMany: jest.fn(), update: jest.fn(), updateMany: jest.fn() },
     $transaction: jest.fn(),
   },
 }));
@@ -75,11 +75,24 @@ describe('/api/events/[eventId]/transition', () => {
   it('transitions from PITCHING to VOTING', async () => {
     mockAuth.mockReturnValue({ userId: 'clerk-admin' });
     prisma.hacker.findUnique.mockResolvedValue({ id: 'h-admin', role: 'ADMIN' });
-    prisma.event.findUnique.mockResolvedValue({ id: 'e1', phase: 'PITCHING', mcs: [] });
+    prisma.event.findUnique
+      .mockResolvedValueOnce({ id: 'e1', phase: 'PITCHING', mcs: [] })
+      .mockResolvedValueOnce({ id: 'e1', phase: 'VOTING', projects: [] });
+    prisma.eventProject.updateMany.mockResolvedValue({ count: 6 });
     prisma.event.update.mockResolvedValue({ id: 'e1', phase: 'VOTING' });
+    prisma.$transaction.mockResolvedValue([]);
 
     const res = await POST_TRANSITION(makeRequest({ targetPhase: 'VOTING' }) as any, { params: { eventId: 'e1' } } as any);
     expect(res.status).toBe(200);
+
+    expect(prisma.eventProject.updateMany).toHaveBeenCalledWith({
+      where: { eventId: 'e1' },
+      data: { isTopProject: false },
+    });
+    expect(prisma.$transaction).toHaveBeenCalledWith([
+      expect.anything(),
+      expect.anything(),
+    ]);
     expect(prisma.event.update).toHaveBeenCalledWith({
       where: { id: 'e1' },
       data: { phase: 'VOTING' },
