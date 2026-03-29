@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useUser, SignInButton } from "@clerk/nextjs";
 import { useUserContext } from "../contexts/UserContext";
 import { useTheme } from "../contexts/ThemeContext";
 import { HackerSelector, type Hacker } from "../components/HackerSelector";
@@ -43,6 +44,7 @@ function Countdown({ start }: { start: string }) {
 
 export default function PitchPage() {
   const { isDarkMode } = useTheme();
+  const { isSignedIn, isLoaded } = useUser();
   const { isAdmin } = useUserContext();
   const router = useRouter();
   const [events, setEvents] = useState<EventListItem[]>([]);
@@ -150,6 +152,29 @@ export default function PitchPage() {
     } catch (e) {
       console.error(e);
     }
+  }
+
+  if (!isLoaded) {
+    return (
+      <div className={`min-h-screen font-space-mono flex items-center justify-center ${isDarkMode ? "bg-gradient-to-b from-gray-900 to-black text-gray-100" : "bg-gradient-to-b from-[#E5E5E5] to-[#F0F0F0] text-gray-900"}`}>
+        <div className="text-center">Loading...</div>
+      </div>
+    );
+  }
+
+  if (!isSignedIn) {
+    return (
+      <div className={`min-h-screen font-space-mono flex items-center justify-center ${isDarkMode ? "bg-gradient-to-b from-gray-900 to-black text-gray-100" : "bg-gradient-to-b from-[#E5E5E5] to-[#F0F0F0] text-gray-900"}`}>
+        <div className="text-center">
+          <h1 className="text-2xl font-bold mb-4">You need to be logged in to view this page</h1>
+          <SignInButton mode="modal">
+            <button className="px-6 py-3 rounded-full bg-indigo-600 text-white hover:bg-indigo-700 transition duration-300 text-lg">
+              Log In / Sign Up
+            </button>
+          </SignInButton>
+        </div>
+      </div>
+    );
   }
 
   return (

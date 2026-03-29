@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
+import { useUser, SignInButton } from "@clerk/nextjs";
 import { useTheme } from "../../contexts/ThemeContext";
 import { useUserContext } from "../../contexts/UserContext";
 import { Project, ProjectCard } from "../../components/Project";
@@ -15,6 +16,7 @@ type EventProjectEntry = {
   position: number;
   status: "QUEUED" | "APPROVED" | "CURRENT" | "DONE" | "SKIPPED";
   approved: boolean;
+  isTopProject: boolean;
   addedById: string;
   project: Project;
   pitchPhase: PitchPhase;
@@ -71,13 +73,11 @@ function SwipeCard({
   project,
   onSwipeRight,
   onSwipeLeft,
-  exitDirection,
   isDarkMode,
 }: {
   project: Project;
   onSwipeRight: () => void;
   onSwipeLeft: () => void;
-  exitDirection: "left" | "right";
   isDarkMode: boolean;
 }) {
   const [dragX, setDragX] = useState(0);
@@ -88,8 +88,9 @@ function SwipeCard({
       onSwipeRight();
     } else if (info.offset.x < -SWIPE_THRESHOLD) {
       onSwipeLeft();
+    } else {
+      setDragX(0);
     }
-    setDragX(0);
   };
 
   return (
@@ -98,9 +99,19 @@ function SwipeCard({
       dragConstraints={{ left: 0, right: 0 }}
       onDrag={(_, info) => setDragX(info.offset.x)}
       onDragEnd={handleDragEnd}
-      initial={{ scale: 0.95, opacity: 0 }}
-      animate={{ scale: 1, opacity: 1 }}
-      exit={{ x: dragX !== 0 ? (dragX > 0 ? 300 : -300) : (exitDirection === "right" ? 300 : -300), opacity: 0, scale: 0.9 }}
+      variants={{
+        initial: { scale: 0.95, opacity: 0 },
+        animate: { scale: 1, opacity: 1 },
+        exit: (dir: "left" | "right") => ({
+          x: dir === "right" ? 300 : -300,
+          opacity: 0,
+          scale: 0.9,
+        }),
+      }}
+      initial="initial"
+      animate="animate"
+      exit="exit"
+      custom={undefined}
       transition={{ type: "spring", stiffness: 300, damping: 25 }}
       className="relative cursor-grab active:cursor-grabbing select-none"
     >
@@ -323,14 +334,13 @@ function VotingPhase({
             </button>
           )}
           <div className="flex-1 min-w-0">
-            <AnimatePresence mode="wait">
+            <AnimatePresence custom={exitDirection} mode="wait">
               {currentCard ? (
                 <SwipeCard
                   key={currentCard.project.id}
                   project={currentCard.project}
                   onSwipeRight={handleSwipeRight}
                   onSwipeLeft={handleSwipeLeft}
-                  exitDirection={exitDirection}
                   isDarkMode={isDarkMode}
                 />
               ) : (
@@ -389,11 +399,9 @@ function VotingQueuePanel({
   );
 
   const { topGroupIds } = useMemo(() => {
-    const likeCounts = allOrdered.map(ep => ep.project.likes.length).sort((a, b) => b - a);
-    const threshold = likeCounts.length >= 5 ? likeCounts[4] : -1;
     const ids = new Set(
       allOrdered
-        .filter(ep => threshold >= 0 && ep.project.likes.length >= threshold)
+        .filter(ep => ep.isTopProject)
         .map(ep => ep.id)
     );
     return { topGroupIds: ids };
@@ -771,11 +779,9 @@ function PitchingPhase({
 
   // Compute top-group
   const { topGroupIds } = useMemo(() => {
-    const likeCounts = allOrdered.map(ep => ep.project.likes.length).sort((a, b) => b - a);
-    const threshold = likeCounts.length >= 5 ? likeCounts[4] : -1;
     const ids = new Set(
       allOrdered
-        .filter(ep => threshold >= 0 && ep.project.likes.length >= threshold)
+        .filter(ep => ep.isTopProject)
         .map(ep => ep.id)
     );
     return { topGroupIds: ids };
@@ -1230,6 +1236,7 @@ function PitchingPhase({
 // ── Main Page ───────────────────────────────────────────
 export default function PitchEventPage() {
   const { isDarkMode } = useTheme();
+  const { isSignedIn, isLoaded } = useUser();
   const { isAdmin, userInfo } = useUserContext();
   const params = useParams();
   const eventId = params?.eventId as string;
@@ -1399,7 +1406,23 @@ export default function PitchEventPage() {
     }
   };
 
-  if (loading) return <div className={`min-h-screen font-space-mono flex items-center justify-center ${isDarkMode ? "bg-gradient-to-b from-gray-900 to-black text-gray-100" : "bg-gradient-to-b from-[#E5E5E5] to-[#F0F0F0] text-gray-900"}`}>Loading...</div>;
+  if (!isLoaded || loading) return <div className={`min-h-screen font-space-mono flex items-center justify-center ${isDarkMode ? "bg-gradient-to-b from-gray-900 to-black text-gray-100" : "bg-gradient-to-b from-[#E5E5E5] to-[#F0F0F0] text-gray-900"}`}>Loading...</div>;
+
+  if (!isSignedIn) {
+    return (
+      <div className={`min-h-screen font-space-mono flex items-center justify-center ${isDarkMode ? "bg-gradient-to-b from-gray-900 to-black text-gray-100" : "bg-gradient-to-b from-[#E5E5E5] to-[#F0F0F0] text-gray-900"}`}>
+        <div className="text-center">
+          <h1 className="text-2xl font-bold mb-4">You need to be logged in to view this page</h1>
+          <SignInButton mode="modal">
+            <button className="px-6 py-3 rounded-full bg-indigo-600 text-white hover:bg-indigo-700 transition duration-300 text-lg">
+              Log In / Sign Up
+            </button>
+          </SignInButton>
+        </div>
+      </div>
+    );
+  }
+
   if (!event) return <div className={`min-h-screen font-space-mono flex items-center justify-center ${isDarkMode ? "bg-gradient-to-b from-gray-900 to-black text-gray-100" : "bg-gradient-to-b from-[#E5E5E5] to-[#F0F0F0] text-gray-900"}`}>Event not found</div>;
 
   return (
