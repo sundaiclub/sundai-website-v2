@@ -279,6 +279,7 @@ model Event {
   createdBy        Hacker     @relation(fields: [createdById], references: [id])
   createdById      String
   audienceCanReorder Boolean  @default(true)
+  votingEndTime    DateTime?
   phase            EventPhase @default(VOTING)
   projects         EventProject[]
   mcs              EventMC[]

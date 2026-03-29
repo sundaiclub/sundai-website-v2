@@ -35,6 +35,7 @@ type EventDetail = {
   endTime?: string | null;
   meetingUrl?: string | null;
   audienceCanReorder: boolean;
+  votingEndTime?: string | null;
   phase: EventPhase;
   mcs: Array<{ id: string; hacker: { id: string; name: string } }>;
   projects: EventProjectEntry[];
@@ -262,9 +263,11 @@ function VotingPhase({
     return (
       <div className={`grid grid-cols-1 gap-6 ${isController ? "lg:grid-cols-3" : ""}`}>
         <div className={`${isController ? "lg:col-span-2" : "max-w-3xl mx-auto"} flex flex-col items-center justify-center py-16 gap-6 w-full`}>
-          <h2 className="text-2xl font-bold">Welcome to {event.title}</h2>
           <p className="opacity-80 text-center max-w-md">
-            Add your project to the pitch queue, then vote on other projects by swiping!
+            {event.votingEndTime
+              ? `You have until ${new Date(event.votingEndTime).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })} to vote on projects. `
+              : "Vote on projects to decide who presents first. "}
+            Top projects get to present first and get more time per presentation. Make sure your card is something people will vote on!
           </p>
           <div className="flex gap-4">
             <button
@@ -351,6 +354,11 @@ function VotingPhase({
                   className="text-center py-16"
                 >
                   <p className="text-lg opacity-70">All caught up! Waiting for more projects...</p>
+                  {event.votingEndTime && (
+                    <p className="text-sm opacity-70 mt-2">
+                      Voting ends at {new Date(event.votingEndTime).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
+                    </p>
+                  )}
                   <p className="text-sm opacity-50 mt-2">New projects will appear automatically — no need to refresh.</p>
                   <button
                     onClick={openJoin}
@@ -1220,6 +1228,7 @@ export default function PitchEventPage() {
   const [editTitle, setEditTitle] = useState("");
   const [editStartTime, setEditStartTime] = useState("");
   const [editMeetingUrl, setEditMeetingUrl] = useState("");
+  const [editVotingEndTime, setEditVotingEndTime] = useState("");
   const [editMcIds, setEditMcIds] = useState<string[]>([]);
   const [allHackers, setAllHackers] = useState<Array<{ id: string; name: string }>>([]);
   const [mcSearch, setMcSearch] = useState("");
@@ -1305,6 +1314,11 @@ export default function PitchEventPage() {
     setEditTitle(event.title);
     setEditStartTime(new Date(event.startTime).toISOString().slice(0, 16));
     setEditMeetingUrl(event.meetingUrl || "");
+    setEditVotingEndTime(
+      event.votingEndTime
+        ? new Date(event.votingEndTime).toISOString().slice(0, 16)
+        : new Date(new Date(event.startTime).getTime() + 15 * 60 * 1000).toISOString().slice(0, 16)
+    );
     setEditMcIds(event.mcs.map(m => m.hacker.id));
     setMcSearch("");
     try {
@@ -1321,7 +1335,7 @@ export default function PitchEventPage() {
       const res = await fetch(`/api/events/${event.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: editTitle, startTime: new Date(editStartTime).toISOString(), meetingUrl: editMeetingUrl, mcIds: editMcIds }),
+        body: JSON.stringify({ title: editTitle, startTime: new Date(editStartTime).toISOString(), meetingUrl: editMeetingUrl, votingEndTime: editVotingEndTime ? new Date(editVotingEndTime).toISOString() : null, mcIds: editMcIds }),
       });
       if (res.ok) {
         setEvent(await res.json());
@@ -1484,6 +1498,14 @@ export default function PitchEventPage() {
               value={editMeetingUrl}
               onChange={e => setEditMeetingUrl(e.target.value)}
               placeholder="https://zoom.us/j/..."
+              className={`w-full px-3 py-2 rounded-md mb-4 ${isDarkMode ? "bg-gray-800 text-gray-100" : "bg-gray-100 text-gray-900"}`}
+            />
+
+            <label className="block text-sm font-medium mb-1">Voting End Time</label>
+            <input
+              type="datetime-local"
+              value={editVotingEndTime}
+              onChange={e => setEditVotingEndTime(e.target.value)}
               className={`w-full px-3 py-2 rounded-md mb-4 ${isDarkMode ? "bg-gray-800 text-gray-100" : "bg-gray-100 text-gray-900"}`}
             />
 
