@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
+import { useUser, SignInButton } from "@clerk/nextjs";
 import { useTheme } from "../../contexts/ThemeContext";
 import { useUserContext } from "../../contexts/UserContext";
 import { Project, ProjectCard } from "../../components/Project";
@@ -15,6 +16,7 @@ type EventProjectEntry = {
   position: number;
   status: "QUEUED" | "APPROVED" | "CURRENT" | "DONE" | "SKIPPED";
   approved: boolean;
+  isTopProject: boolean;
   addedById: string;
   project: Project;
   pitchPhase: PitchPhase;
@@ -33,6 +35,7 @@ type EventDetail = {
   endTime?: string | null;
   meetingUrl?: string | null;
   audienceCanReorder: boolean;
+  votingEndTime?: string | null;
   phase: EventPhase;
   mcs: Array<{ id: string; hacker: { id: string; name: string } }>;
   projects: EventProjectEntry[];
@@ -86,8 +89,9 @@ function SwipeCard({
       onSwipeRight();
     } else if (info.offset.x < -SWIPE_THRESHOLD) {
       onSwipeLeft();
+    } else {
+      setDragX(0);
     }
-    setDragX(0);
   };
 
   return (
@@ -96,9 +100,19 @@ function SwipeCard({
       dragConstraints={{ left: 0, right: 0 }}
       onDrag={(_, info) => setDragX(info.offset.x)}
       onDragEnd={handleDragEnd}
-      initial={{ scale: 0.95, opacity: 0 }}
-      animate={{ scale: 1, opacity: 1 }}
-      exit={{ x: dragX > 0 ? 300 : -300, opacity: 0, scale: 0.9 }}
+      variants={{
+        initial: { scale: 0.95, opacity: 0 },
+        animate: { scale: 1, opacity: 1 },
+        exit: (dir: "left" | "right") => ({
+          x: dir === "right" ? 300 : -300,
+          opacity: 0,
+          scale: 0.9,
+        }),
+      }}
+      initial="initial"
+      animate="animate"
+      exit="exit"
+      custom={undefined}
       transition={{ type: "spring", stiffness: 300, damping: 25 }}
       className="relative cursor-grab active:cursor-grabbing select-none"
     >
@@ -186,6 +200,7 @@ function VotingPhase({
   const [votingStarted, setVotingStarted] = useState(false);
   const [seenIds, setSeenIds] = useState<Set<string>>(new Set());
   const [transitioning, setTransitioning] = useState(false);
+  const [exitDirection, setExitDirection] = useState<"left" | "right">("left");
 
   // Projects to vote on: exclude user's own (auto-liked on backend) and already seen
   const deck = useMemo(() => {
@@ -201,6 +216,7 @@ function VotingPhase({
 
   const handleSwipeRight = useCallback(async () => {
     if (!currentCard) return;
+    setExitDirection("right");
     setSeenIds(prev => new Set(prev).add(currentCard.project.id));
     try {
       await fetch(`/api/projects/${currentCard.project.id}/like`, { method: "POST" });
@@ -211,6 +227,7 @@ function VotingPhase({
 
   const handleSwipeLeft = useCallback(() => {
     if (!currentCard) return;
+    setExitDirection("left");
     setSeenIds(prev => new Set(prev).add(currentCard.project.id));
   }, [currentCard]);
 
@@ -246,9 +263,11 @@ function VotingPhase({
     return (
       <div className={`grid grid-cols-1 gap-6 ${isController ? "lg:grid-cols-3" : ""}`}>
         <div className={`${isController ? "lg:col-span-2" : "max-w-3xl mx-auto"} flex flex-col items-center justify-center py-16 gap-6 w-full`}>
-          <h2 className="text-2xl font-bold">Welcome to {event.title}</h2>
           <p className="opacity-80 text-center max-w-md">
-            Add your project to the pitch queue, then vote on other projects by swiping!
+            {event.votingEndTime
+              ? `You have until ${new Date(event.votingEndTime).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })} to vote on projects. `
+              : "Vote on projects to decide who presents first. "}
+            Top projects get to present first and get more time per presentation. Make sure your card is something people will vote on!
           </p>
           <div className="flex gap-4">
             <button
@@ -318,7 +337,7 @@ function VotingPhase({
             </button>
           )}
           <div className="flex-1 min-w-0">
-            <AnimatePresence mode="wait">
+            <AnimatePresence custom={exitDirection} mode="wait">
               {currentCard ? (
                 <SwipeCard
                   key={currentCard.project.id}
@@ -335,6 +354,11 @@ function VotingPhase({
                   className="text-center py-16"
                 >
                   <p className="text-lg opacity-70">All caught up! Waiting for more projects...</p>
+                  {event.votingEndTime && (
+                    <p className="text-sm opacity-70 mt-2">
+                      Voting ends at {new Date(event.votingEndTime).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
+                    </p>
+                  )}
                   <p className="text-sm opacity-50 mt-2">New projects will appear automatically — no need to refresh.</p>
                   <button
                     onClick={openJoin}
@@ -383,11 +407,9 @@ function VotingQueuePanel({
   );
 
   const { topGroupIds } = useMemo(() => {
-    const likeCounts = allOrdered.map(ep => ep.project.likes.length).sort((a, b) => b - a);
-    const threshold = likeCounts.length >= 5 ? likeCounts[4] : -1;
     const ids = new Set(
       allOrdered
-        .filter(ep => threshold >= 0 && ep.project.likes.length >= threshold)
+        .filter(ep => ep.isTopProject)
         .map(ep => ep.id)
     );
     return { topGroupIds: ids };
@@ -667,17 +689,17 @@ function PitchTimer({
         </span>
       </div>
 
-      <div className="flex flex-col items-center gap-4">
+      <div className={isController ? "flex items-center justify-between gap-4" : "flex flex-col items-center gap-4"}>
         {phase === "WAITING" && (
           <>
-            <div className="text-center opacity-70 text-sm">
+            <div className={isController ? "text-base" : "text-center opacity-70 text-sm"}>
               Allotted: {formatTime(currentItem.allottedPresentingSec ?? 0)} presenting, {formatTime(currentItem.allottedQuestionsSec ?? 0)} Q&A
             </div>
             {isController && (
               <button
                 disabled={acting}
                 onClick={() => timerAction("start_presenting")}
-                className={`px-6 py-3 rounded-full text-white font-semibold transition duration-300 ${acting ? "bg-gray-400" : "bg-indigo-600 hover:bg-indigo-700"}`}
+                className={`px-4 py-2 rounded text-white text-sm font-semibold transition duration-300 shrink-0 ${acting ? "bg-gray-400" : "bg-indigo-600 hover:bg-indigo-700"}`}
               >
                 {acting ? "Starting..." : "Presentation Started"}
               </button>
@@ -697,7 +719,7 @@ function PitchTimer({
               <button
                 disabled={acting}
                 onClick={() => timerAction("start_questions")}
-                className={`px-6 py-3 rounded-full text-white font-semibold transition duration-300 ${acting ? "bg-gray-400" : "bg-indigo-600 hover:bg-indigo-700"}`}
+                className={`px-4 py-2 rounded text-white text-sm font-semibold transition duration-300 shrink-0 ${acting ? "bg-gray-400" : "bg-indigo-600 hover:bg-indigo-700"}`}
               >
                 {acting ? "Starting..." : "Q&A Started"}
               </button>
@@ -717,7 +739,7 @@ function PitchTimer({
               <button
                 disabled={acting}
                 onClick={() => timerAction("finish")}
-                className={`px-6 py-3 rounded-full text-white font-semibold transition duration-300 ${acting ? "bg-gray-400" : "bg-indigo-600 hover:bg-indigo-700"}`}
+                className={`px-4 py-2 rounded text-white text-sm font-semibold transition duration-300 shrink-0 ${acting ? "bg-gray-400" : "bg-indigo-600 hover:bg-indigo-700"}`}
               >
                 {acting ? "Finishing..." : "Finished"}
               </button>
@@ -756,7 +778,6 @@ function PitchingPhase({
     () => [...event.projects].sort((a, b) => a.position - b.position),
     [event]
   );
-  const [settingCurrentId, setSettingCurrentId] = useState<string | null>(null);
   const isFinished = event.phase === "FINISHED";
   const hasUpcomingItems = useMemo(
     () => allOrdered.some(p => p.status === "QUEUED" || p.status === "APPROVED"),
@@ -765,11 +786,9 @@ function PitchingPhase({
 
   // Compute top-group
   const { topGroupIds } = useMemo(() => {
-    const likeCounts = allOrdered.map(ep => ep.project.likes.length).sort((a, b) => b - a);
-    const threshold = likeCounts.length >= 5 ? likeCounts[4] : -1;
     const ids = new Set(
       allOrdered
-        .filter(ep => threshold >= 0 && ep.project.likes.length >= threshold)
+        .filter(ep => ep.isTopProject)
         .map(ep => ep.id)
     );
     return { topGroupIds: ids };
@@ -885,27 +904,6 @@ function PitchingPhase({
     if (res.status === 204) {
       const updated = await fetch(`/api/events/${event.id}`);
       setEvent(await updated.json());
-    }
-  };
-
-  const setCurrentProject = async (eventProjectId: string) => {
-    setSettingCurrentId(eventProjectId);
-    try {
-      const res = await fetch(`/api/events/${event.id}/current`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ eventProjectId }),
-      });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        if (body?.message) alert(body.message);
-        return;
-      }
-
-      const updated = await fetch(`/api/events/${event.id}`);
-      setEvent(await updated.json());
-    } finally {
-      setSettingCurrentId(null);
     }
   };
 
@@ -1068,20 +1066,14 @@ function PitchingPhase({
                           Top
                         </span>
                       )}
-                      {isController && !isFinished && !isCurrent && (
+                      {isController && isTopGroup && !isCurrent && (
                         <button
-                          onClick={() => setCurrentProject(ep.id)}
-                          disabled={settingCurrentId !== null}
-                          className={`px-2 h-7 rounded-md text-[11px] font-semibold transition ${
-                            settingCurrentId !== null
-                              ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                              : isDarkMode
-                              ? "bg-indigo-900/60 text-indigo-100 hover:bg-indigo-800/70"
-                              : "bg-indigo-100 text-indigo-700 hover:bg-indigo-200"
-                          }`}
-                          title="Set as current project"
+                          onClick={() => delistItem(ep.id)}
+                          className="w-7 h-7 rounded-md text-xs bg-gray-500 text-white hover:bg-gray-600"
+                          aria-label="Delist"
+                          title="Remove from queue"
                         >
-                          {settingCurrentId === ep.id ? "Setting..." : "Set current"}
+                          ✕
                         </button>
                       )}
                       {isController && !isTopGroup && (
@@ -1224,6 +1216,7 @@ function PitchingPhase({
 // ── Main Page ───────────────────────────────────────────
 export default function PitchEventPage() {
   const { isDarkMode } = useTheme();
+  const { isSignedIn, isLoaded } = useUser();
   const { isAdmin, userInfo } = useUserContext();
   const params = useParams();
   const eventId = params?.eventId as string;
@@ -1235,6 +1228,7 @@ export default function PitchEventPage() {
   const [editTitle, setEditTitle] = useState("");
   const [editStartTime, setEditStartTime] = useState("");
   const [editMeetingUrl, setEditMeetingUrl] = useState("");
+  const [editVotingEndTime, setEditVotingEndTime] = useState("");
   const [editMcIds, setEditMcIds] = useState<string[]>([]);
   const [allHackers, setAllHackers] = useState<Array<{ id: string; name: string }>>([]);
   const [mcSearch, setMcSearch] = useState("");
@@ -1320,6 +1314,11 @@ export default function PitchEventPage() {
     setEditTitle(event.title);
     setEditStartTime(new Date(event.startTime).toISOString().slice(0, 16));
     setEditMeetingUrl(event.meetingUrl || "");
+    setEditVotingEndTime(
+      event.votingEndTime
+        ? new Date(event.votingEndTime).toISOString().slice(0, 16)
+        : new Date(new Date(event.startTime).getTime() + 15 * 60 * 1000).toISOString().slice(0, 16)
+    );
     setEditMcIds(event.mcs.map(m => m.hacker.id));
     setMcSearch("");
     try {
@@ -1336,7 +1335,7 @@ export default function PitchEventPage() {
       const res = await fetch(`/api/events/${event.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: editTitle, startTime: new Date(editStartTime).toISOString(), meetingUrl: editMeetingUrl, mcIds: editMcIds }),
+        body: JSON.stringify({ title: editTitle, startTime: new Date(editStartTime).toISOString(), meetingUrl: editMeetingUrl, votingEndTime: editVotingEndTime ? new Date(editVotingEndTime).toISOString() : null, mcIds: editMcIds }),
       });
       if (res.ok) {
         setEvent(await res.json());
@@ -1393,7 +1392,23 @@ export default function PitchEventPage() {
     }
   };
 
-  if (loading) return <div className={`min-h-screen font-space-mono flex items-center justify-center ${isDarkMode ? "bg-gradient-to-b from-gray-900 to-black text-gray-100" : "bg-gradient-to-b from-[#E5E5E5] to-[#F0F0F0] text-gray-900"}`}>Loading...</div>;
+  if (!isLoaded || loading) return <div className={`min-h-screen font-space-mono flex items-center justify-center ${isDarkMode ? "bg-gradient-to-b from-gray-900 to-black text-gray-100" : "bg-gradient-to-b from-[#E5E5E5] to-[#F0F0F0] text-gray-900"}`}>Loading...</div>;
+
+  if (!isSignedIn) {
+    return (
+      <div className={`min-h-screen font-space-mono flex items-center justify-center ${isDarkMode ? "bg-gradient-to-b from-gray-900 to-black text-gray-100" : "bg-gradient-to-b from-[#E5E5E5] to-[#F0F0F0] text-gray-900"}`}>
+        <div className="text-center">
+          <h1 className="text-2xl font-bold mb-4">You need to be logged in to view this page</h1>
+          <SignInButton mode="modal">
+            <button className="px-6 py-3 rounded-full bg-indigo-600 text-white hover:bg-indigo-700 transition duration-300 text-lg">
+              Log In / Sign Up
+            </button>
+          </SignInButton>
+        </div>
+      </div>
+    );
+  }
+
   if (!event) return <div className={`min-h-screen font-space-mono flex items-center justify-center ${isDarkMode ? "bg-gradient-to-b from-gray-900 to-black text-gray-100" : "bg-gradient-to-b from-[#E5E5E5] to-[#F0F0F0] text-gray-900"}`}>Event not found</div>;
 
   return (
@@ -1483,6 +1498,14 @@ export default function PitchEventPage() {
               value={editMeetingUrl}
               onChange={e => setEditMeetingUrl(e.target.value)}
               placeholder="https://zoom.us/j/..."
+              className={`w-full px-3 py-2 rounded-md mb-4 ${isDarkMode ? "bg-gray-800 text-gray-100" : "bg-gray-100 text-gray-900"}`}
+            />
+
+            <label className="block text-sm font-medium mb-1">Voting End Time</label>
+            <input
+              type="datetime-local"
+              value={editVotingEndTime}
+              onChange={e => setEditVotingEndTime(e.target.value)}
               className={`w-full px-3 py-2 rounded-md mb-4 ${isDarkMode ? "bg-gray-800 text-gray-100" : "bg-gray-100 text-gray-900"}`}
             />
 

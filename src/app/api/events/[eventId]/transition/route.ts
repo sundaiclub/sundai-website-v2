@@ -1,12 +1,16 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import prisma from "@/lib/prisma";
+import {
+  DEFAULT_PRESENTING_SEC,
+  DEFAULT_QUESTIONS_SEC,
+  TOP_GROUP_PRESENTING_SEC,
+  TOP_GROUP_QUESTIONS_SEC,
+  getFrozenTopProjectIds,
+  rankEventProjectsForPitching,
+} from "@/lib/eventTopProjects";
 
 const EVENT_PHASES = ["VOTING", "PITCHING", "FINISHED"] as const;
-const DEFAULT_PRESENTING_SEC = 60;
-const DEFAULT_QUESTIONS_SEC = 120;
-const TOP_GROUP_PRESENTING_SEC = 120;
-const TOP_GROUP_QUESTIONS_SEC = 180;
 
 export async function POST(
   req: Request,
@@ -40,10 +44,32 @@ export async function POST(
       return NextResponse.json({ message: `Event is already ${event.phase}` }, { status: 400 });
     }
 
-    if (targetPhase === "FINISHED" || targetPhase === "VOTING") {
+    if (targetPhase === "FINISHED") {
       const updated = await prisma.event.update({
         where: { id: params.eventId },
         data: { phase: targetPhase },
+      });
+
+      return NextResponse.json(updated);
+    }
+
+    if (targetPhase === "VOTING") {
+      await prisma.$transaction([
+        prisma.eventProject.updateMany({
+          where: { eventId: params.eventId },
+          data: { isTopProject: false },
+        }),
+        prisma.event.update({
+          where: { id: params.eventId },
+          data: { phase: targetPhase },
+        }),
+      ]);
+
+      const updated = await prisma.event.findUnique({
+        where: { id: params.eventId },
+        include: {
+          projects: { orderBy: { position: "asc" } },
+        },
       });
 
       return NextResponse.json(updated);
@@ -82,31 +108,26 @@ export async function POST(
         orderBy: { createdAt: "asc" },
       });
 
-      const sorted = [...eventProjects].sort((a, b) => {
-        const likeDiff = b.project.likes.length - a.project.likes.length;
-        if (likeDiff !== 0) return likeDiff;
-        return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-      });
-
-      const likeCounts = sorted.map(ep => ep.project.likes.length);
-      const threshold = likeCounts.length >= 5 ? likeCounts[4] : -1;
+      const sorted = rankEventProjectsForPitching(eventProjects);
+      const topProjectIds = getFrozenTopProjectIds(sorted);
 
       ops = sorted.map((ep, idx) => {
-        const isTopGroup = threshold >= 0 && ep.project.likes.length >= threshold;
+        const isTopProject = topProjectIds.has(ep.id);
         return prisma.eventProject.update({
           where: { id: ep.id },
           data: {
             position: idx + 1,
             status: idx === 0 ? "CURRENT" : "APPROVED",
             approved: true,
+            isTopProject,
             pitchPhase: "WAITING",
             presentingStartedAt: null,
             questionsStartedAt: null,
             completedAt: null,
-            allottedPresentingSec: isTopGroup
+            allottedPresentingSec: isTopProject
               ? TOP_GROUP_PRESENTING_SEC
               : DEFAULT_PRESENTING_SEC,
-            allottedQuestionsSec: isTopGroup
+            allottedQuestionsSec: isTopProject
               ? TOP_GROUP_QUESTIONS_SEC
               : DEFAULT_QUESTIONS_SEC,
           },

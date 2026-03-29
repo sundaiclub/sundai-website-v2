@@ -81,6 +81,29 @@ describe('/api/events/[eventId]/pitch-timer', () => {
     expect(updateCall.data.presentingStartedAt).toBeDefined();
   });
 
+  it('backfills allotted time from the frozen top-project flag', async () => {
+    mockAuth.mockReturnValue({ userId: 'clerk-admin' });
+    prisma.hacker.findUnique.mockResolvedValue({ id: 'h-admin', role: 'ADMIN' });
+    prisma.event.findUnique.mockResolvedValue({ id: 'e1', phase: 'PITCHING', mcs: [] });
+    prisma.eventProject.findUnique.mockResolvedValue({
+      id: 'ep1',
+      eventId: 'e1',
+      status: 'CURRENT',
+      pitchPhase: 'WAITING',
+      isTopProject: true,
+      allottedPresentingSec: null,
+      allottedQuestionsSec: null,
+    });
+    prisma.eventProject.update.mockResolvedValue({});
+
+    const res = await POST(makeRequest({ action: 'start_presenting', eventProjectId: 'ep1' }) as any, params);
+    expect(res.status).toBe(200);
+
+    const updateCall = prisma.eventProject.update.mock.calls[0][0];
+    expect(updateCall.data.allottedPresentingSec).toBe(120);
+    expect(updateCall.data.allottedQuestionsSec).toBe(180);
+  });
+
   it('rejects start_presenting if not in WAITING phase', async () => {
     mockAuth.mockReturnValue({ userId: 'clerk-admin' });
     prisma.hacker.findUnique.mockResolvedValue({ id: 'h-admin', role: 'ADMIN' });

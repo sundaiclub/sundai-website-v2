@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import prisma from "@/lib/prisma";
+import {
+  DEFAULT_PRESENTING_SEC,
+  DEFAULT_QUESTIONS_SEC,
+  TOP_GROUP_PRESENTING_SEC,
+  TOP_GROUP_QUESTIONS_SEC,
+} from "@/lib/eventTopProjects";
 
 export async function POST(
   req: Request,
@@ -47,18 +53,10 @@ export async function POST(
         // Backfill allotted times if missing (events transitioned before migration)
         let allottedData: { allottedPresentingSec?: number; allottedQuestionsSec?: number } = {};
         if (ep.allottedPresentingSec == null || ep.allottedQuestionsSec == null) {
-          const allProjects = await prisma.eventProject.findMany({
-            where: { eventId: params.eventId },
-            include: { project: { include: { likes: { select: { id: true } } } } },
-            orderBy: { position: "asc" },
-          });
-          const likeCounts = allProjects.map(p => p.project.likes.length).sort((a: number, b: number) => b - a);
-          const threshold = likeCounts.length >= 5 ? likeCounts[4] : -1;
-          const thisLikes = allProjects.find(p => p.id === eventProjectId)?.project.likes.length ?? 0;
-          const isTopGroup = threshold >= 0 && thisLikes >= threshold;
+          const isTopProject = ep.isTopProject;
           allottedData = {
-            allottedPresentingSec: isTopGroup ? 120 : 60,
-            allottedQuestionsSec: isTopGroup ? 180 : 120,
+            allottedPresentingSec: isTopProject ? TOP_GROUP_PRESENTING_SEC : DEFAULT_PRESENTING_SEC,
+            allottedQuestionsSec: isTopProject ? TOP_GROUP_QUESTIONS_SEC : DEFAULT_QUESTIONS_SEC,
           };
         }
         await prisma.eventProject.update({

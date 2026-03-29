@@ -6,7 +6,7 @@ jest.mock('../../src/lib/prisma', () => ({
   default: {
     hacker: { findUnique: jest.fn() },
     event: { findUnique: jest.fn(), update: jest.fn() },
-    eventProject: { findMany: jest.fn(), update: jest.fn() },
+    eventProject: { findMany: jest.fn(), update: jest.fn(), updateMany: jest.fn() },
     $transaction: jest.fn(),
   },
 }));
@@ -75,11 +75,24 @@ describe('/api/events/[eventId]/transition', () => {
   it('transitions from PITCHING to VOTING', async () => {
     mockAuth.mockReturnValue({ userId: 'clerk-admin' });
     prisma.hacker.findUnique.mockResolvedValue({ id: 'h-admin', role: 'ADMIN' });
-    prisma.event.findUnique.mockResolvedValue({ id: 'e1', phase: 'PITCHING', mcs: [] });
+    prisma.event.findUnique
+      .mockResolvedValueOnce({ id: 'e1', phase: 'PITCHING', mcs: [] })
+      .mockResolvedValueOnce({ id: 'e1', phase: 'VOTING', projects: [] });
+    prisma.eventProject.updateMany.mockResolvedValue({ count: 6 });
     prisma.event.update.mockResolvedValue({ id: 'e1', phase: 'VOTING' });
+    prisma.$transaction.mockResolvedValue([]);
 
     const res = await POST_TRANSITION(makeRequest({ targetPhase: 'VOTING' }) as any, { params: { eventId: 'e1' } } as any);
     expect(res.status).toBe(200);
+
+    expect(prisma.eventProject.updateMany).toHaveBeenCalledWith({
+      where: { eventId: 'e1' },
+      data: { isTopProject: false },
+    });
+    expect(prisma.$transaction).toHaveBeenCalledWith([
+      expect.anything(),
+      expect.anything(),
+    ]);
     expect(prisma.event.update).toHaveBeenCalledWith({
       where: { id: 'e1' },
       data: { phase: 'VOTING' },
@@ -163,6 +176,7 @@ describe('/api/events/[eventId]/transition', () => {
       position: 1,
       status: 'CURRENT',
       approved: true,
+      isTopProject: false,
       pitchPhase: 'WAITING',
       allottedPresentingSec: 60,
       allottedQuestionsSec: 120,
@@ -202,12 +216,45 @@ describe('/api/events/[eventId]/transition', () => {
     expect(res.status).toBe(200);
 
     const updateCalls = prisma.eventProject.update.mock.calls;
-    // Top 5 projects (likes >= threshold of 1) get 120/180
+    // Exactly the first 5 ranked projects are frozen as top projects.
     for (let i = 0; i < 5; i++) {
+      expect(updateCalls[i][0].data.isTopProject).toBe(true);
       expect(updateCalls[i][0].data.allottedPresentingSec).toBe(120);
       expect(updateCalls[i][0].data.allottedQuestionsSec).toBe(180);
     }
-    // 6th project (0 likes) gets 60/120
+    // 6th project gets the default times and is not promoted later.
+    expect(updateCalls[5][0].data.isTopProject).toBe(false);
+    expect(updateCalls[5][0].data.allottedPresentingSec).toBe(60);
+    expect(updateCalls[5][0].data.allottedQuestionsSec).toBe(120);
+  });
+
+  it('freezes exactly five top projects even when lower ranks are tied', async () => {
+    mockAuth.mockReturnValue({ userId: 'clerk-admin' });
+    prisma.hacker.findUnique.mockResolvedValue({ id: 'h-admin', role: 'ADMIN' });
+    prisma.event.findUnique
+      .mockResolvedValueOnce({ id: 'e1', phase: 'VOTING', mcs: [] })
+      .mockResolvedValueOnce({ id: 'e1', phase: 'PITCHING', projects: [] });
+
+    const early = new Date('2026-01-01');
+    const later = new Date('2026-01-02');
+    prisma.eventProject.findMany.mockResolvedValue([
+      { id: 'ep1', createdAt: early, project: { likes: Array(5).fill({ id: '1' }) } },
+      { id: 'ep2', createdAt: early, project: { likes: Array(4).fill({ id: '2' }) } },
+      { id: 'ep3', createdAt: early, project: { likes: Array(3).fill({ id: '3' }) } },
+      { id: 'ep4', createdAt: early, project: { likes: Array(2).fill({ id: '4' }) } },
+      { id: 'ep5', createdAt: early, project: { likes: Array(1).fill({ id: '5' }) } },
+      { id: 'ep6', createdAt: later, project: { likes: Array(1).fill({ id: '6' }) } },
+    ]);
+    prisma.eventProject.update.mockResolvedValue({});
+    prisma.event.update.mockResolvedValue({});
+    prisma.$transaction.mockResolvedValue([]);
+
+    const res = await POST_TRANSITION(makeRequest({ targetPhase: 'PITCHING' }) as any, { params: { eventId: 'e1' } } as any);
+    expect(res.status).toBe(200);
+
+    const updateCalls = prisma.eventProject.update.mock.calls;
+    expect(updateCalls[4][0].data.isTopProject).toBe(true);
+    expect(updateCalls[5][0].data.isTopProject).toBe(false);
     expect(updateCalls[5][0].data.allottedPresentingSec).toBe(60);
     expect(updateCalls[5][0].data.allottedQuestionsSec).toBe(120);
   });
