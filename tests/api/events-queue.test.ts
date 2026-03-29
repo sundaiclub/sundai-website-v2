@@ -109,7 +109,12 @@ describe('queue endpoints', () => {
   it('PITCHING join is always created as a non-top project with default times', async () => {
     mockAuth.mockReturnValue({ userId: 'clerk-1' });
     prisma.hacker.findUnique.mockResolvedValue({ id: 'h1', clerkId: 'clerk-1' });
-    prisma.event.findUnique.mockResolvedValue({ id: 'e1', phase: 'PITCHING' });
+    prisma.event.findUnique.mockResolvedValue({
+      id: 'e1',
+      phase: 'PITCHING',
+      defaultPresentingSec: 60,
+      defaultQuestionsSec: 120,
+    });
     prisma.project.findUnique.mockResolvedValue({
       id: 'p1',
       launchLeadId: 'h1',
@@ -152,7 +157,12 @@ describe('queue endpoints', () => {
   it('PITCHING join appends to end position', async () => {
     mockAuth.mockReturnValue({ userId: 'clerk-1' });
     prisma.hacker.findUnique.mockResolvedValue({ id: 'h1', clerkId: 'clerk-1' });
-    prisma.event.findUnique.mockResolvedValue({ id: 'e1', phase: 'PITCHING' });
+    prisma.event.findUnique.mockResolvedValue({
+      id: 'e1',
+      phase: 'PITCHING',
+      defaultPresentingSec: 60,
+      defaultQuestionsSec: 120,
+    });
     prisma.project.findUnique.mockResolvedValue({
       id: 'p1',
       launchLeadId: 'h1',

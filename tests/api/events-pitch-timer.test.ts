@@ -84,7 +84,15 @@ describe('/api/events/[eventId]/pitch-timer', () => {
   it('backfills allotted time from the frozen top-project flag', async () => {
     mockAuth.mockReturnValue({ userId: 'clerk-admin' });
     prisma.hacker.findUnique.mockResolvedValue({ id: 'h-admin', role: 'ADMIN' });
-    prisma.event.findUnique.mockResolvedValue({ id: 'e1', phase: 'PITCHING', mcs: [] });
+    prisma.event.findUnique.mockResolvedValue({
+      id: 'e1',
+      phase: 'PITCHING',
+      mcs: [],
+      topPresentingSec: 120,
+      topQuestionsSec: 180,
+      defaultPresentingSec: 60,
+      defaultQuestionsSec: 120,
+    });
     prisma.eventProject.findUnique.mockResolvedValue({
       id: 'ep1',
       eventId: 'e1',
