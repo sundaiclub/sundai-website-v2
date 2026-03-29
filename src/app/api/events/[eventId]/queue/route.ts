@@ -63,6 +63,11 @@ export async function POST(
         projectId,
         addedById: user.id,
         position: nextPos,
+        isTopProject: false,
+        ...(event.phase === "PITCHING" && {
+          allottedPresentingSec: event.defaultPresentingSec,
+          allottedQuestionsSec: event.defaultQuestionsSec,
+        }),
       },
     });
 
@@ -105,21 +110,17 @@ export async function PATCH(
     if (event.phase === "PITCHING") {
       const allProjects = await prisma.eventProject.findMany({
         where: { eventId: params.eventId },
-        include: { project: { include: { likes: { select: { id: true } } } } },
         orderBy: { position: "asc" },
       });
 
-      // Compute top-group threshold: like count at rank 5 (including ties)
-      const likeCounts = allProjects.map(ep => ep.project.likes.length).sort((a, b) => b - a);
-      const threshold = likeCounts.length >= 5 ? likeCounts[4] : -1; // -1 means no top group if fewer than 5 projects
       const topGroupIds = new Set(
         allProjects
-          .filter(ep => threshold >= 0 && ep.project.likes.length >= threshold)
+          .filter(ep => ep.isTopProject)
           .map(ep => ep.id)
       );
       const topGroupPositions = new Set(
         allProjects
-          .filter(ep => topGroupIds.has(ep.id))
+          .filter(ep => ep.isTopProject)
           .map(ep => ep.position)
       );
 

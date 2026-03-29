@@ -106,6 +106,35 @@ describe('queue endpoints', () => {
     }
   });
 
+  it('PITCHING join is always created as a non-top project with default times', async () => {
+    mockAuth.mockReturnValue({ userId: 'clerk-1' });
+    prisma.hacker.findUnique.mockResolvedValue({ id: 'h1', clerkId: 'clerk-1' });
+    prisma.event.findUnique.mockResolvedValue({ id: 'e1', phase: 'PITCHING' });
+    prisma.project.findUnique.mockResolvedValue({
+      id: 'p1',
+      launchLeadId: 'h1',
+      participants: [],
+    });
+    prisma.eventProject.findUnique.mockResolvedValue(null);
+    prisma.eventProject.findFirst.mockResolvedValue({ position: 5 });
+    prisma.eventProject.create.mockResolvedValue({ id: 'ep1', eventId: 'e1', projectId: 'p1', position: 6 });
+    prisma.projectLike.upsert.mockResolvedValue({ id: 'like1' });
+
+    const request = new NextRequest('http://localhost:3000/api/events/e1/queue', { method: 'POST' });
+    request.json = jest.fn().mockResolvedValue({ projectId: 'p1' });
+    const res = await POST_JOIN(request as any, { params: { eventId: 'e1' } } as any);
+
+    expect(res.status).toBe(200);
+    expect(prisma.eventProject.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        position: 6,
+        isTopProject: false,
+        allottedPresentingSec: 60,
+        allottedQuestionsSec: 120,
+      }),
+    });
+  });
+
   it('rejects join queue when event is FINISHED', async () => {
     mockAuth.mockReturnValue({ userId: 'clerk-1' });
     prisma.hacker.findUnique.mockResolvedValue({ id: 'h1', clerkId: 'clerk-1' });
@@ -149,14 +178,13 @@ describe('queue endpoints', () => {
     prisma.hacker.findUnique.mockResolvedValue({ id: 'h1', role: 'ADMIN' });
     prisma.event.findUnique.mockResolvedValue({ id: 'e1', audienceCanReorder: true, phase: 'PITCHING' });
 
-    // 6 projects, top 5 by likes threshold = 2 likes at rank 5
     prisma.eventProject.findMany.mockResolvedValue([
-      { id: 'ep1', position: 1, project: { likes: [{ id: '1' }, { id: '2' }, { id: '3' }, { id: '4' }, { id: '5' }] } },
-      { id: 'ep2', position: 2, project: { likes: [{ id: '6' }, { id: '7' }, { id: '8' }, { id: '9' }] } },
-      { id: 'ep3', position: 3, project: { likes: [{ id: '10' }, { id: '11' }, { id: '12' }] } },
-      { id: 'ep4', position: 4, project: { likes: [{ id: '13' }, { id: '14' }] } },
-      { id: 'ep5', position: 5, project: { likes: [{ id: '15' }, { id: '16' }] } },
-      { id: 'ep6', position: 6, project: { likes: [{ id: '17' }] } },
+      { id: 'ep1', position: 1, isTopProject: true },
+      { id: 'ep2', position: 2, isTopProject: true },
+      { id: 'ep3', position: 3, isTopProject: true },
+      { id: 'ep4', position: 4, isTopProject: true },
+      { id: 'ep5', position: 5, isTopProject: true },
+      { id: 'ep6', position: 6, isTopProject: false },
     ]);
 
     // Try to move ep1 (top-group) — should be rejected
@@ -174,12 +202,12 @@ describe('queue endpoints', () => {
     prisma.event.findUnique.mockResolvedValue({ id: 'e1', audienceCanReorder: true, phase: 'PITCHING' });
 
     prisma.eventProject.findMany.mockResolvedValue([
-      { id: 'ep1', position: 1, project: { likes: [{ id: '1' }, { id: '2' }, { id: '3' }, { id: '4' }, { id: '5' }] } },
-      { id: 'ep2', position: 2, project: { likes: [{ id: '6' }, { id: '7' }, { id: '8' }, { id: '9' }] } },
-      { id: 'ep3', position: 3, project: { likes: [{ id: '10' }, { id: '11' }, { id: '12' }] } },
-      { id: 'ep4', position: 4, project: { likes: [{ id: '13' }, { id: '14' }] } },
-      { id: 'ep5', position: 5, project: { likes: [{ id: '15' }, { id: '16' }] } },
-      { id: 'ep6', position: 6, project: { likes: [{ id: '17' }] } },
+      { id: 'ep1', position: 1, isTopProject: true },
+      { id: 'ep2', position: 2, isTopProject: true },
+      { id: 'ep3', position: 3, isTopProject: true },
+      { id: 'ep4', position: 4, isTopProject: true },
+      { id: 'ep5', position: 5, isTopProject: true },
+      { id: 'ep6', position: 6, isTopProject: false },
     ]);
 
     // Try to move ep6 into position 1 (top-group position) — should be rejected
@@ -197,13 +225,13 @@ describe('queue endpoints', () => {
     prisma.event.findUnique.mockResolvedValue({ id: 'e1', audienceCanReorder: true, phase: 'PITCHING' });
 
     prisma.eventProject.findMany.mockResolvedValue([
-      { id: 'ep1', position: 1, project: { likes: [{ id: '1' }, { id: '2' }, { id: '3' }, { id: '4' }, { id: '5' }] } },
-      { id: 'ep2', position: 2, project: { likes: [{ id: '6' }, { id: '7' }, { id: '8' }, { id: '9' }] } },
-      { id: 'ep3', position: 3, project: { likes: [{ id: '10' }, { id: '11' }, { id: '12' }] } },
-      { id: 'ep4', position: 4, project: { likes: [{ id: '13' }, { id: '14' }] } },
-      { id: 'ep5', position: 5, project: { likes: [{ id: '15' }, { id: '16' }] } },
-      { id: 'ep6', position: 6, project: { likes: [{ id: '17' }] } },
-      { id: 'ep7', position: 7, project: { likes: [] } },
+      { id: 'ep1', position: 1, isTopProject: true },
+      { id: 'ep2', position: 2, isTopProject: true },
+      { id: 'ep3', position: 3, isTopProject: true },
+      { id: 'ep4', position: 4, isTopProject: true },
+      { id: 'ep5', position: 5, isTopProject: true },
+      { id: 'ep6', position: 6, isTopProject: false },
+      { id: 'ep7', position: 7, isTopProject: false },
     ]);
 
     prisma.eventProject.update.mockResolvedValue({});

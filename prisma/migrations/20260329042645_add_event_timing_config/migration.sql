@@ -1,0 +1,6 @@
+-- AlterTable
+ALTER TABLE "Event" ADD COLUMN     "defaultPresentingSec" INTEGER NOT NULL DEFAULT 60,
+ADD COLUMN     "defaultQuestionsSec" INTEGER NOT NULL DEFAULT 120,
+ADD COLUMN     "topPresentingSec" INTEGER NOT NULL DEFAULT 120,
+ADD COLUMN     "topProjectCount" INTEGER NOT NULL DEFAULT 5,
+ADD COLUMN     "topQuestionsSec" INTEGER NOT NULL DEFAULT 180;
