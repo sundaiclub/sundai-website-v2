@@ -59,7 +59,7 @@ export async function PATCH(
     if (!isAdmin && !isMC) return new NextResponse("Unauthorized", { status: 401 });
 
     const body = await req.json();
-    const { title, startTime, meetingUrl, mcIds, votingEndTime } = body;
+    const { title, startTime, meetingUrl, mcIds, votingEndTime, topProjectCount, topPresentingSec, topQuestionsSec, defaultPresentingSec, defaultQuestionsSec } = body;
 
     await prisma.event.update({
       where: { id: params.eventId },
@@ -68,6 +68,11 @@ export async function PATCH(
         ...(startTime !== undefined && { startTime: new Date(startTime) }),
         ...(meetingUrl !== undefined && { meetingUrl: meetingUrl || null }),
         ...(votingEndTime !== undefined && { votingEndTime: votingEndTime ? new Date(votingEndTime) : null }),
+        ...(topProjectCount !== undefined && { topProjectCount }),
+        ...(topPresentingSec !== undefined && { topPresentingSec }),
+        ...(topQuestionsSec !== undefined && { topQuestionsSec }),
+        ...(defaultPresentingSec !== undefined && { defaultPresentingSec }),
+        ...(defaultQuestionsSec !== undefined && { defaultQuestionsSec }),
       },
     });
 

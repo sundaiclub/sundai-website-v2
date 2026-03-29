@@ -1,12 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import prisma from "@/lib/prisma";
-import {
-  DEFAULT_PRESENTING_SEC,
-  DEFAULT_QUESTIONS_SEC,
-  TOP_GROUP_PRESENTING_SEC,
-  TOP_GROUP_QUESTIONS_SEC,
-} from "@/lib/eventTopProjects";
 
 export async function POST(
   req: Request,
@@ -55,8 +49,8 @@ export async function POST(
         if (ep.allottedPresentingSec == null || ep.allottedQuestionsSec == null) {
           const isTopProject = ep.isTopProject;
           allottedData = {
-            allottedPresentingSec: isTopProject ? TOP_GROUP_PRESENTING_SEC : DEFAULT_PRESENTING_SEC,
-            allottedQuestionsSec: isTopProject ? TOP_GROUP_QUESTIONS_SEC : DEFAULT_QUESTIONS_SEC,
+            allottedPresentingSec: isTopProject ? event.topPresentingSec : event.defaultPresentingSec,
+            allottedQuestionsSec: isTopProject ? event.topQuestionsSec : event.defaultQuestionsSec,
           };
         }
         await prisma.eventProject.update({
