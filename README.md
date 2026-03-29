@@ -108,6 +108,7 @@ npm run db:reset
 ```bash
 # Database (for local development)
 DATABASE_URL="postgresql://postgres:postgres@localhost:5432/sundai_db"
+DIRECT_URL="postgresql://postgres:postgres@localhost:5432/sundai_db"
 
 # Clerk Authentication - GET THESE FROM YOUR CLERK DASHBOARD
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY="pk_test_your_actual_key_here"
@@ -125,6 +126,8 @@ REPLICATE_API_TOKEN="your_replicate_api_token_here"
 NEXT_PUBLIC_POSTHOG_KEY="your_posthog_key"
 NEXT_PUBLIC_POSTHOG_HOST="https://us.i.posthog.com"
 ```
+
+For local Docker development, `DATABASE_URL` and `DIRECT_URL` can be the same value.
 
 ### 4. Database Setup
 
@@ -148,6 +151,26 @@ npm run db:migrate
 # Reset DB and reseed (drops data!)
 npm run db:reset
 ```
+
+### Vercel + Cloud SQL managed connection pooling
+
+If you enable Google Cloud SQL Managed Connection Pooling, point runtime traffic at the pooler and keep Prisma CLI commands on a direct connection:
+
+```bash
+# Runtime queries from Vercel / Prisma Client
+DATABASE_URL="postgresql://USER:PASSWORD@DB_HOST:6432/DB_NAME?sslmode=require"
+
+# Migrations / Prisma CLI
+DIRECT_URL="postgresql://USER:PASSWORD@DB_HOST:5432/DB_NAME?sslmode=require"
+```
+
+Notes:
+
+- `DATABASE_URL` should use port `6432`, which is Cloud SQL's managed pooler port.
+- `DIRECT_URL` should use port `5432`, which is the direct Postgres port.
+- This project keeps app runtime traffic on `DATABASE_URL`, and `npm run vercel-build` now prefers `DIRECT_URL` for `prisma migrate deploy` when it is set.
+- In Cloud SQL Managed Connection Pooling, keep `pool_mode=transaction` unless you have a specific reason not to, and set `max_prepared_statements` above `0` so Prisma prepared statements are supported.
+- If your Cloud SQL instance is private-only, Vercel won't be able to reach it directly. In that case you need a public path or network bridge rather than only changing env vars.
 
 ### 5. Start Development Server
 
