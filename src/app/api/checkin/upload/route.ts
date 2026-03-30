@@ -10,21 +10,68 @@ function normalizeEventDate(dateStr: string): Date {
   return date;
 }
 
+function parseCSVRow(line: string): string[] {
+  const cells: string[] = [];
+  let current = "";
+  let inQuotes = false;
+
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+    if (char === '"') {
+      if (inQuotes && line[i + 1] === '"') {
+        current += '"';
+        i++;
+      } else {
+        inQuotes = !inQuotes;
+      }
+    } else if (char === "," && !inQuotes) {
+      cells.push(current.trim());
+      current = "";
+    } else {
+      current += char;
+    }
+  }
+  cells.push(current.trim());
+  return cells;
+}
+
 function parseEmails(csvText: string): string[] {
   const lines = csvText.split(/\r?\n/).filter((line) => line.trim());
-  const emails: string[] = [];
+  if (lines.length === 0) return [];
 
-  for (const line of lines) {
-    // Split by comma to handle multi-column CSVs
-    const cells = line.split(",");
-    for (const cell of cells) {
-      const trimmed = cell.trim().toLowerCase().replace(/^["']|["']$/g, "");
+  const headers = parseCSVRow(lines[0]);
+
+  // Find the column whose header contains "email" (case-insensitive)
+  const emailColIndex = headers.findIndex((h) =>
+    h.toLowerCase().includes("email")
+  );
+
+  if (emailColIndex === -1) {
+    // No email header found — fall back to scanning all cells for emails
+    const emails: string[] = [];
+    for (const line of lines) {
+      for (const cell of parseCSVRow(line)) {
+        const trimmed = cell.toLowerCase().replace(/^["']|["']$/g, "");
+        if (EMAIL_REGEX.test(trimmed)) {
+          emails.push(trimmed);
+        }
+      }
+    }
+    return [...new Set(emails)];
+  }
+
+  // Read emails from the identified column (skip header row)
+  const emails: string[] = [];
+  for (let i = 1; i < lines.length; i++) {
+    const cells = parseCSVRow(lines[i]);
+    const cell = cells[emailColIndex];
+    if (cell) {
+      const trimmed = cell.toLowerCase().replace(/^["']|["']$/g, "");
       if (EMAIL_REGEX.test(trimmed)) {
         emails.push(trimmed);
       }
     }
   }
-
   return [...new Set(emails)];
 }
 

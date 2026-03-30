@@ -26,13 +26,59 @@ export default function CSVUploadForm({
     total: number;
   } | null>(null);
 
+  function parseCSVRow(line: string): string[] {
+    const cells: string[] = [];
+    let current = "";
+    let inQuotes = false;
+
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i];
+      if (char === '"') {
+        if (inQuotes && line[i + 1] === '"') {
+          current += '"';
+          i++;
+        } else {
+          inQuotes = !inQuotes;
+        }
+      } else if (char === "," && !inQuotes) {
+        cells.push(current.trim());
+        current = "";
+      } else {
+        current += char;
+      }
+    }
+    cells.push(current.trim());
+    return cells;
+  }
+
   function parseCSV(text: string): string[] {
     const lines = text.split(/\r?\n/).filter((line) => line.trim());
+    if (lines.length === 0) return [];
+
+    const headers = parseCSVRow(lines[0]);
+    const emailColIndex = headers.findIndex((h) =>
+      h.toLowerCase().includes("email")
+    );
+
+    if (emailColIndex === -1) {
+      const emails: string[] = [];
+      for (const line of lines) {
+        for (const cell of parseCSVRow(line)) {
+          const trimmed = cell.toLowerCase().replace(/^["']|["']$/g, "");
+          if (EMAIL_REGEX.test(trimmed)) {
+            emails.push(trimmed);
+          }
+        }
+      }
+      return [...new Set(emails)];
+    }
+
     const emails: string[] = [];
-    for (const line of lines) {
-      const cells = line.split(",");
-      for (const cell of cells) {
-        const trimmed = cell.trim().toLowerCase().replace(/^["']|["']$/g, "");
+    for (let i = 1; i < lines.length; i++) {
+      const cells = parseCSVRow(lines[i]);
+      const cell = cells[emailColIndex];
+      if (cell) {
+        const trimmed = cell.toLowerCase().replace(/^["']|["']$/g, "");
         if (EMAIL_REGEX.test(trimmed)) {
           emails.push(trimmed);
         }
