@@ -348,3 +348,21 @@ enum PitchPhase {
   QUESTIONS
   COMPLETED
 }
+
+model EventCheckIn {
+  id           String    @id @default(uuid())
+  email        String
+  eventDate    DateTime
+  eventLabel   String?
+  checkedIn    Boolean   @default(false)
+  checkedInAt  DateTime?
+  checkedInBy  String?
+  emailSentAt  DateTime?
+  metadata     Json?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@unique([email, eventDate])
+  @@index([eventDate])
+  @@index([email])
+}
