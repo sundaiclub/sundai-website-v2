@@ -7,6 +7,7 @@ import { usePathname } from "next/navigation";
 import Image from "next/image";
 
 import { useTheme } from '../contexts/ThemeContext';
+import { useUserContext } from '../contexts/UserContext';
 
 const Navbar = () => {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -14,6 +15,7 @@ const Navbar = () => {
   const [hackerId, setHackerId] = useState<string | null>(null);
   const pathname = usePathname();
   const { isDarkMode } = useTheme();
+  const { isAdmin } = useUserContext();
   const isPWA =
     typeof window !== "undefined" &&
     window.matchMedia("(display-mode: standalone)").matches;
@@ -148,6 +150,18 @@ const Navbar = () => {
                     My Profile
                   </span>
                 </Link>
+
+                {isAdmin && (
+                  <Link
+                    href="/admin/checkin"
+                    className={`${isPWA ? "px-4 py-3" : "px-3 py-2"
+                      } mx-2 rounded-lg active:bg-indigo-100`}
+                  >
+                    <span className={`text-sm font-fira-code ${isDarkMode ? 'text-gray-200' : 'text-black'} hover:text-indigo-700 dark:hover:text-indigo-500 transition duration-300`}>
+                      Check-In
+                    </span>
+                  </Link>
+                )}
               </>
             )}
 
@@ -236,6 +250,18 @@ const Navbar = () => {
                   My Profile
                 </span>
               </Link>
+
+              {isAdmin && (
+                <Link
+                  href="/admin/checkin"
+                  className="block px-4 py-2 rounded-lg"
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  <span className={`text-sm font-fira-code ${isDarkMode ? 'text-gray-200' : 'text-black'} hover:text-indigo-700 dark:hover:text-indigo-500`}>
+                    Check-In
+                  </span>
+                </Link>
+              )}
             </>
           )}
 
