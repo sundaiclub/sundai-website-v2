@@ -155,7 +155,7 @@ const Navbar = () => {
                   <Link
                     href="/admin/checkin"
                     className={`${isPWA ? "px-4 py-3" : "px-3 py-2"
-                      } mx-2 rounded-lg active:bg-indigo-100`}
+                      } mx-2 rounded-lg active:bg-indigo-100 relative z-10`}
                   >
                     <span className={`text-sm font-fira-code ${isDarkMode ? 'text-gray-200' : 'text-black'} hover:text-indigo-700 dark:hover:text-indigo-500 transition duration-300`}>
                       Check-In
