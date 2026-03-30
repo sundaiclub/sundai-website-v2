@@ -358,6 +358,7 @@ model EventCheckIn {
   checkedInAt  DateTime?
   checkedInBy  String?
   emailSentAt  DateTime?
+  metadata     Json?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 

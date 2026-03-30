@@ -35,7 +35,12 @@ function parseCSVRow(line: string): string[] {
   return cells;
 }
 
-function parseEmails(csvText: string): string[] {
+interface ParsedRecord {
+  email: string;
+  metadata: Record<string, string>;
+}
+
+function parseCSV(csvText: string): ParsedRecord[] {
   const lines = csvText.split(/\r?\n/).filter((line) => line.trim());
   if (lines.length === 0) return [];
 
@@ -47,32 +52,42 @@ function parseEmails(csvText: string): string[] {
   );
 
   if (emailColIndex === -1) {
-    // No email header found — fall back to scanning all cells for emails
-    const emails: string[] = [];
+    // No email header — fall back to scanning all cells for emails
+    const seen = new Set<string>();
+    const records: ParsedRecord[] = [];
     for (const line of lines) {
       for (const cell of parseCSVRow(line)) {
         const trimmed = cell.toLowerCase().replace(/^["']|["']$/g, "");
-        if (EMAIL_REGEX.test(trimmed)) {
-          emails.push(trimmed);
+        if (EMAIL_REGEX.test(trimmed) && !seen.has(trimmed)) {
+          seen.add(trimmed);
+          records.push({ email: trimmed, metadata: {} });
         }
       }
     }
-    return [...new Set(emails)];
+    return records;
   }
 
-  // Read emails from the identified column (skip header row)
-  const emails: string[] = [];
+  // Parse rows with full metadata
+  const seen = new Set<string>();
+  const records: ParsedRecord[] = [];
   for (let i = 1; i < lines.length; i++) {
     const cells = parseCSVRow(lines[i]);
-    const cell = cells[emailColIndex];
-    if (cell) {
-      const trimmed = cell.toLowerCase().replace(/^["']|["']$/g, "");
-      if (EMAIL_REGEX.test(trimmed)) {
-        emails.push(trimmed);
+    const emailCell = cells[emailColIndex];
+    if (!emailCell) continue;
+
+    const email = emailCell.toLowerCase().replace(/^["']|["']$/g, "").trim();
+    if (!EMAIL_REGEX.test(email) || seen.has(email)) continue;
+
+    seen.add(email);
+    const metadata: Record<string, string> = {};
+    for (let j = 0; j < headers.length; j++) {
+      if (j !== emailColIndex && cells[j]) {
+        metadata[headers[j]] = cells[j];
       }
     }
+    records.push({ email, metadata });
   }
-  return [...new Set(emails)];
+  return records;
 }
 
 export async function POST(req: Request) {
@@ -104,9 +119,9 @@ export async function POST(req: Request) {
 
     const eventDate = normalizeEventDate(eventDateStr);
     const csvText = await file.text();
-    const emails = parseEmails(csvText);
+    const records = parseCSV(csvText);
 
-    if (emails.length === 0) {
+    if (records.length === 0) {
       return NextResponse.json(
         { error: "No valid emails found in CSV" },
         { status: 400 }
@@ -114,18 +129,19 @@ export async function POST(req: Request) {
     }
 
     const result = await prisma.eventCheckIn.createMany({
-      data: emails.map((email) => ({
-        email,
+      data: records.map((record) => ({
+        email: record.email,
         eventDate,
         eventLabel: eventLabel || null,
+        metadata: Object.keys(record.metadata).length > 0 ? record.metadata : undefined,
       })),
       skipDuplicates: true,
     });
 
     return NextResponse.json({
       created: result.count,
-      skipped: emails.length - result.count,
-      total: emails.length,
+      skipped: records.length - result.count,
+      total: records.length,
     });
   } catch (error) {
     console.error("[CHECKIN_UPLOAD]", error);
