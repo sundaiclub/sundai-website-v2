@@ -161,15 +161,27 @@ export default function ProjectSearch({
   const [toDate, setToDate] = useState(formatDateForInput(urlFilters.toDate || ''));
 
   // Sync state with URL parameters when they change
+  // Serialize arrays/objects to stable strings for dependency comparison
+  const filtersKey = JSON.stringify({
+    search: urlFilters.search,
+    status: urlFilters.status,
+    techTags: urlFilters.techTags,
+    domainTags: urlFilters.domainTags,
+    sort: urlFilters.sort,
+    fromDate: urlFilters.fromDate,
+    toDate: urlFilters.toDate,
+  });
+
   useEffect(() => {
-    setSearchTerm(urlFilters.search || '');
-    setSelectedStatus(urlFilters.status || []);
-    setSelectedTechTags(urlFilters.techTags || []);
-    setSelectedDomainTags(urlFilters.domainTags || []);
-    setSortBy(SORT_OPTIONS.find(option => option.value === urlFilters.sort) || SORT_OPTIONS[0]);
-    setFromDate(formatDateForInput(urlFilters.fromDate || ''));
-    setToDate(formatDateForInput(urlFilters.toDate || ''));
-  }, [urlFilters]);
+    const filters = JSON.parse(filtersKey);
+    setSearchTerm(filters.search || '');
+    setSelectedStatus(filters.status || []);
+    setSelectedTechTags(filters.techTags || []);
+    setSelectedDomainTags(filters.domainTags || []);
+    setSortBy(SORT_OPTIONS.find(option => option.value === filters.sort) || SORT_OPTIONS[0]);
+    setFromDate(formatDateForInput(filters.fromDate || ''));
+    setToDate(formatDateForInput(filters.toDate || ''));
+  }, [filtersKey]);
 
   // Function to update URL parameters
   const updateURL = useCallback((newFilters: any) => {
