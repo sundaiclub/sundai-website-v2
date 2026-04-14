@@ -263,7 +263,6 @@ graph TD
     C --> D[PostgreSQL Database]
     B --> E[Clerk Authentication]
     B --> F[Google Cloud Storage]
-    B --> G[Push Notifications]
     A --> H[PostHog Analytics]
 ```
 
