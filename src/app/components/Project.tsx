@@ -36,6 +36,7 @@ export type Project = {
   is_broken: boolean;
   thumbnail?: {
     url: string;
+    prompt?: string | null;
   } | null;
   launchLead: {
     id: string;

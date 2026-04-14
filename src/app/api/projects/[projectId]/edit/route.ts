@@ -100,6 +100,7 @@ export async function PATCH(
 
     const deleteThumbnail = formData.get('deleteThumbnail') === 'true';
     const thumbnail = formData.get('thumbnail') as File | null;
+    const thumbnailPrompt = formData.get('thumbnailPrompt')?.toString() || null;
 
     if (deleteThumbnail) {
       updateData.thumbnail = {
@@ -121,7 +122,7 @@ export async function PATCH(
             width: undefined,
             height: undefined,
             alt: title?.toString() || '',
-            description: description?.toString() || '',
+            prompt: thumbnailPrompt,
           },
         });
 

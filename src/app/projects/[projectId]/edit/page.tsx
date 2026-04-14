@@ -135,6 +135,7 @@ export default function ProjectEditPage() {
 
   const [thumbnail, setThumbnail] = useState<File | null>(null);
   const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null);
+  const [thumbnailPrompt, setThumbnailPrompt] = useState<string | null>(null);
 
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -187,6 +188,7 @@ export default function ProjectEditPage() {
       setEditableDemoUrl(project.demoUrl || "");
       setEditableBlogUrl(project.blogUrl || "");
       setThumbnailPreview(project.thumbnail?.url || null);
+      setThumbnailPrompt(project.thumbnail?.prompt || null);
     }
   }, [project]);
 
@@ -219,6 +221,7 @@ export default function ProjectEditPage() {
     const file = e.target.files?.[0];
     if (file) {
       setThumbnail(file);
+      setThumbnailPrompt(null);
       const reader = new FileReader();
       reader.onloadend = () => {
         setThumbnailPreview(reader.result as string);
@@ -230,20 +233,28 @@ export default function ProjectEditPage() {
   const handleThumbnailDelete = () => {
     setThumbnail(null);
     setThumbnailPreview(null);
+    setThumbnailPrompt(null);
     if (project?.thumbnail) {
       setProject({ ...project, thumbnail: null });
     }
   };
 
-  const handleAIGeneratedImageSelect = async (imageUrl: string) => {
+  const handleAIGeneratedImageSelect = async ({
+    url,
+    prompt,
+  }: {
+    url: string;
+    prompt: string;
+  }) => {
     try {
       // Download the image and convert it to a File object
-      const response = await fetch(imageUrl);
+      const response = await fetch(url);
       const blob = await response.blob();
       const file = new File([blob], 'ai-generated-thumbnail.webp', { type: 'image/webp' });
       
       setThumbnail(file);
-      setThumbnailPreview(imageUrl);
+      setThumbnailPreview(url);
+      setThumbnailPrompt(prompt);
       toast.success("AI-generated image selected!");
     } catch (error) {
       console.error("Error processing AI-generated image:", error);
@@ -266,6 +277,9 @@ export default function ProjectEditPage() {
       formData.append("title", editableTitle);
       if (thumbnail) {
         formData.append("thumbnail", thumbnail);
+      }
+      if (thumbnailPrompt) {
+        formData.append("thumbnailPrompt", thumbnailPrompt);
       }
       formData.append("description", editableDescription);
       formData.append("preview", editablePreview);
@@ -323,6 +337,9 @@ export default function ProjectEditPage() {
       formData.append("title", editableTitle);
       if (thumbnail) {
         formData.append("thumbnail", thumbnail);
+      }
+      if (thumbnailPrompt) {
+        formData.append("thumbnailPrompt", thumbnailPrompt);
       }
       formData.append("description", editableDescription);
       formData.append("preview", editablePreview);

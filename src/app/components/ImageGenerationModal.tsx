@@ -4,13 +4,18 @@ import { XMarkIcon, SparklesIcon, ArrowPathIcon } from "@heroicons/react/24/outl
 import Image from "next/image";
 import toast from "react-hot-toast";
 
+type GeneratedImage = {
+  url: string;
+  prompt: string;
+};
+
 interface ImageGenerationModalProps {
   showModal: boolean;
   setShowModal: (show: boolean) => void;
   projectId: string;
   projectTitle: string;
   projectDescription: string;
-  onImageSelect: (imageUrl: string) => void;
+  onImageSelect: (image: GeneratedImage) => void;
   isDarkMode: boolean;
 }
 
@@ -24,7 +29,7 @@ export default function ImageGenerationModal({
   isDarkMode,
 }: ImageGenerationModalProps) {
   const [isGenerating, setIsGenerating] = useState(false);
-  const [generatedImages, setGeneratedImages] = useState<string[]>([]);
+  const [generatedImages, setGeneratedImages] = useState<GeneratedImage[]>([]);
   const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
 
   const generateImages = async () => {
@@ -164,7 +169,7 @@ export default function ImageGenerationModal({
                   </button>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
-                  {generatedImages.map((imageUrl, index) => (
+                  {generatedImages.map((image, index) => (
                     <div
                       key={index}
                       className={`relative cursor-pointer rounded-lg overflow-hidden border-2 transition-all ${
@@ -178,7 +183,7 @@ export default function ImageGenerationModal({
                     >
                       <div className="aspect-video relative">
                         <Image
-                          src={imageUrl}
+                          src={image.url}
                           alt={`Generated image ${index + 1}`}
                           fill
                           className="object-cover"

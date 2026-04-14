@@ -1,0 +1,1 @@
+ALTER TABLE "Image" ADD COLUMN "prompt" TEXT;
