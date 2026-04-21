@@ -278,4 +278,45 @@ describe('TrendingSections Component', () => {
     // Test Hacker name might not be rendered in this component, check for project description instead
     expect(screen.getAllByText('A test project description')[0]).toBeInTheDocument()
   })
+
+  it('surfaces older projects when they receive fresh likes', async () => {
+    const staleProject = {
+      ...mockProject,
+      id: 'stale-project',
+      title: 'Stale Project',
+      likes: Array.from({ length: 4 }, (_, index) => ({
+        hackerId: `stale-${index}`,
+        createdAt: '2026-01-01T00:00:00.000Z',
+      })),
+    }
+
+    const freshProject = {
+      ...mockProject,
+      id: 'fresh-project',
+      title: 'Fresh Project',
+      likes: [
+        { hackerId: 'fresh-1', createdAt: '2026-04-13T00:00:00.000Z' },
+        { hackerId: 'fresh-2', createdAt: '2026-04-14T00:00:00.000Z' },
+      ],
+    }
+
+    jest.useFakeTimers().setSystemTime(new Date('2026-04-14T00:00:00.000Z'))
+
+    try {
+      await act(async () => {
+        render(
+          <TrendingSections
+            projects={[staleProject, freshProject]}
+            userInfo={mockHacker}
+            handleLike={mockHandleLike}
+            isDarkMode={false}
+          />
+        )
+      })
+
+      expect(screen.getAllByText('Fresh Project')[0]).toBeInTheDocument()
+    } finally {
+      jest.useRealTimers()
+    }
+  })
 })

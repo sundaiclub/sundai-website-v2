@@ -7,16 +7,14 @@ export const TOP_GROUP_QUESTIONS_SEC = 180;
 type RankableEventProject = {
   id: string;
   createdAt: string | Date;
-  project: {
-    likes: Array<unknown>;
-  };
+  pitchLikes: Array<unknown>;
 };
 
 export function compareEventProjectsByVotingResult(
   a: RankableEventProject,
   b: RankableEventProject
 ) {
-  const likeDiff = b.project.likes.length - a.project.likes.length;
+  const likeDiff = b.pitchLikes.length - a.pitchLikes.length;
   if (likeDiff !== 0) return likeDiff;
   return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
 }
@@ -39,9 +37,9 @@ export function getFrozenTopProjectIds<T extends RankableEventProject>(
     return new Set<string>();
   }
 
-  const cutoffLikes = sortedProjects[topCount - 1].project.likes.length;
+  const cutoffLikes = sortedProjects[topCount - 1].pitchLikes.length;
   const tiedTopProjects = sortedProjects.filter(
-    (project) => project.project.likes.length >= cutoffLikes
+    (project) => project.pitchLikes.length >= cutoffLikes
   );
 
   return new Set(tiedTopProjects.map(project => project.id));

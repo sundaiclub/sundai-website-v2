@@ -15,7 +15,6 @@ jest.mock('../../src/lib/prisma', () => ({
       create: jest.fn(),
       update: jest.fn(),
     },
-    projectLike: { upsert: jest.fn() },
     $transaction: jest.fn(),
   },
 }));
@@ -57,7 +56,7 @@ describe('queue endpoints', () => {
     expect(res.status).toBe(401);
   });
 
-  it('join queue auto-creates ProjectLike for submitting user', async () => {
+  it('join queue creates an event entry without changing project likes', async () => {
     mockAuth.mockReturnValue({ userId: 'clerk-1' });
     prisma.hacker.findUnique.mockResolvedValue({ id: 'h1', clerkId: 'clerk-1' });
     prisma.event.findUnique.mockResolvedValue({ id: 'e1', phase: 'VOTING' });
@@ -69,18 +68,12 @@ describe('queue endpoints', () => {
     prisma.eventProject.findUnique.mockResolvedValue(null);
     prisma.eventProject.findFirst.mockResolvedValue(null);
     prisma.eventProject.create.mockResolvedValue({ id: 'ep1', eventId: 'e1', projectId: 'p1', position: 1 });
-    prisma.projectLike.upsert.mockResolvedValue({ id: 'like1' });
 
     const request = new NextRequest('http://localhost:3000/api/events/e1/queue', { method: 'POST' });
     request.json = jest.fn().mockResolvedValue({ projectId: 'p1' });
     const res = await POST_JOIN(request as any, { params: { eventId: 'e1' } } as any);
 
     expect(res.status).toBe(200);
-    expect(prisma.projectLike.upsert).toHaveBeenCalledWith({
-      where: { projectId_hackerId: { projectId: 'p1', hackerId: 'h1' } },
-      create: { projectId: 'p1', hackerId: 'h1' },
-      update: {},
-    });
   });
 
   it('join queue works in both VOTING and PITCHING phases', async () => {
@@ -97,7 +90,6 @@ describe('queue endpoints', () => {
       prisma.eventProject.findUnique.mockResolvedValue(null);
       prisma.eventProject.findFirst.mockResolvedValue({ position: 5 });
       prisma.eventProject.create.mockResolvedValue({ id: 'ep1', eventId: 'e1', projectId: 'p1', position: 6 });
-      prisma.projectLike.upsert.mockResolvedValue({ id: 'like1' });
 
       const request = new NextRequest('http://localhost:3000/api/events/e1/queue', { method: 'POST' });
       request.json = jest.fn().mockResolvedValue({ projectId: 'p1' });
@@ -123,7 +115,6 @@ describe('queue endpoints', () => {
     prisma.eventProject.findUnique.mockResolvedValue(null);
     prisma.eventProject.findFirst.mockResolvedValue({ position: 5 });
     prisma.eventProject.create.mockResolvedValue({ id: 'ep1', eventId: 'e1', projectId: 'p1', position: 6 });
-    prisma.projectLike.upsert.mockResolvedValue({ id: 'like1' });
 
     const request = new NextRequest('http://localhost:3000/api/events/e1/queue', { method: 'POST' });
     request.json = jest.fn().mockResolvedValue({ projectId: 'p1' });
@@ -171,7 +162,6 @@ describe('queue endpoints', () => {
     prisma.eventProject.findUnique.mockResolvedValue(null);
     prisma.eventProject.findFirst.mockResolvedValue({ position: 10 });
     prisma.eventProject.create.mockResolvedValue({ id: 'ep1', eventId: 'e1', projectId: 'p1', position: 11 });
-    prisma.projectLike.upsert.mockResolvedValue({ id: 'like1' });
 
     const request = new NextRequest('http://localhost:3000/api/events/e1/queue', { method: 'POST' });
     request.json = jest.fn().mockResolvedValue({ projectId: 'p1' });

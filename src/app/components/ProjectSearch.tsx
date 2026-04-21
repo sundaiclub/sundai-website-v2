@@ -91,39 +91,6 @@ const getTagCount = (tagName: string, projects: Project[]) => {
 
 // calculateProjectScore is now imported from '@/lib/trending' for reuse across client and server
 
-// Generic function to filter projects by date range
-const getProjectsByDateRange = (projects: Project[], daysBack: number): Project[] => {
-  const now = new Date();
-  const startDate = new Date(now);
-  startDate.setDate(now.getDate() - daysBack);
-  startDate.setHours(0, 0, 0, 0);
-  
-  return projects.filter(project => {
-    const projectDate = new Date(project.startDate);
-    return projectDate >= startDate;
-  });
-};
-
-// Helper functions for categorizing projects by time periods
-export const getThisWeekProjects = (projects: Project[]): Project[] => 
-  getProjectsByDateRange(projects, 14); // Last 2 weeks
-
-export const getThisMonthProjects = (projects: Project[]): Project[] => {
-  const now = new Date();
-  const twoMonthsAgo = new Date(now);
-  twoMonthsAgo.setMonth(now.getMonth() - 2); // Last 2 months
-  twoMonthsAgo.setDate(1); // Start of that month
-  twoMonthsAgo.setHours(0, 0, 0, 0);
-  
-  return projects.filter(project => {
-    const projectDate = new Date(project.startDate);
-    return projectDate >= twoMonthsAgo;
-  });
-};
-
-export const getAllTimeProjects = (projects: Project[]): Project[] => 
-  [...projects]; // Return all projects
-
 export default function ProjectSearch({ 
   projects,
   onFilteredProjectsChange,

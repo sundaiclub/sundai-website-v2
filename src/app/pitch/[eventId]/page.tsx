@@ -26,6 +26,10 @@ type EventProjectEntry = {
   completedAt: string | null;
   allottedPresentingSec: number | null;
   allottedQuestionsSec: number | null;
+  pitchLikes: Array<{
+    hackerId: string;
+    createdAt: string;
+  }>;
 };
 
 type EventDetail = {
@@ -208,7 +212,7 @@ function VotingPhase({
   const [transitioning, setTransitioning] = useState(false);
   const [exitDirection, setExitDirection] = useState<"left" | "right">("left");
 
-  // Projects to vote on: exclude user's own (auto-liked on backend) and already seen
+  // Projects to vote on: exclude user's own projects and already seen cards.
   const deck = useMemo(() => {
     if (!userInfo) return [];
     return event.projects.filter(ep => {
@@ -221,15 +225,51 @@ function VotingPhase({
   const currentCard = deck[0] ?? null;
 
   const handleSwipeRight = useCallback(async () => {
-    if (!currentCard) return;
+    if (!currentCard || !userInfo) return;
     setExitDirection("right");
     setSeenIds(prev => new Set(prev).add(currentCard.project.id));
     try {
-      await fetch(`/api/projects/${currentCard.project.id}/like`, { method: "POST" });
+      const response = await fetch(
+        `/api/events/${event.id}/queue/${currentCard.id}/like`,
+        { method: "POST" }
+      );
+      if (!response.ok) return;
+
+      setEvent({
+        ...event,
+        projects: event.projects.map((ep) => {
+          if (ep.id !== currentCard.id) return ep;
+
+          const nextLike = {
+            hackerId: userInfo.id,
+            createdAt: new Date().toISOString() as any,
+          };
+
+          const alreadyPitchLiked = ep.pitchLikes.some(
+            (like) => like.hackerId === userInfo.id
+          );
+          const alreadyProjectLiked = ep.project.likes.some(
+            (like) => like.hackerId === userInfo.id
+          );
+
+          return {
+            ...ep,
+            pitchLikes: alreadyPitchLiked
+              ? ep.pitchLikes
+              : [...ep.pitchLikes, nextLike],
+            project: {
+              ...ep.project,
+              likes: alreadyProjectLiked
+                ? ep.project.likes
+                : [...ep.project.likes, nextLike],
+            },
+          };
+        }),
+      });
     } catch (err) {
       console.error("like error", err);
     }
-  }, [currentCard]);
+  }, [currentCard, event, setEvent, userInfo]);
 
   const handleSwipeLeft = useCallback(() => {
     if (!currentCard) return;
@@ -549,7 +589,7 @@ function VotingQueuePanel({
                       }`}
                     >
                       <span>❤</span>
-                      <span>{ep.project.likes.length}</span>
+                      <span>{ep.pitchLikes.length}</span>
                     </span>
                   </div>
                 </div>
@@ -958,7 +998,6 @@ function PitchingPhase({
           </div>
           <div className="max-h-96 overflow-y-auto space-y-2 pr-1">
             {allOrdered.map((ep, idx) => {
-              const isLiked = ep.project.likes.some(l => l.hackerId === userInfo?.id);
               const isCurrent = ep.status === "CURRENT";
               const isPast = ep.status === "DONE" || ep.status === "SKIPPED";
               const isTopGroup = topGroupIds.has(ep.id);
@@ -1166,20 +1205,17 @@ function PitchingPhase({
                           )}
                         </div>
                       )}
-                      <button
-                        onClick={e => handleLike(e, ep.project.id, isLiked)}
+                      <span
                         className={`px-2 h-7 rounded-md text-xs font-semibold flex items-center gap-1 ${
-                          isLiked
-                            ? "bg-red-600 text-white"
-                            : isDarkMode
+                          isDarkMode
                             ? "bg-gray-700 text-gray-200"
                             : "bg-gray-100 text-gray-800"
                         }`}
-                        aria-label={`Like ${ep.project.title}`}
+                        aria-label={`Pitch votes ${ep.project.title}`}
                       >
                         <span>❤</span>
-                        <span>{ep.project.likes.length}</span>
-                      </button>
+                        <span>{ep.pitchLikes.length}</span>
+                      </span>
                     </div>
                   </div>
                 </div>

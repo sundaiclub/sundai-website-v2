@@ -93,13 +93,11 @@ export async function POST(
         })
       );
     } else {
-      // Freshly entering pitching: rank by likes, assign positions/times, and start on the first project.
+      // Freshly entering pitching: rank by pitch likes, assign positions/times, and start on the first project.
       const eventProjects = await prisma.eventProject.findMany({
         where: { eventId: params.eventId },
         include: {
-          project: {
-            include: { likes: { select: { id: true } } },
-          },
+          pitchLikes: { select: { id: true } },
         },
         orderBy: { createdAt: "asc" },
       });
