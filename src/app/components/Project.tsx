@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useUser } from "@clerk/nextjs";
@@ -71,6 +71,36 @@ export type Project = {
 };
 
 const STATUS_OPTIONS = ['DRAFT', 'PENDING', 'APPROVED'] as const;
+const PROJECTS_PAGE_SIZE = 18;
+
+type ProjectsApiResponse =
+  | Project[]
+  | {
+      projects: Project[];
+      hasMore: boolean;
+    };
+
+function sortProjectsByStartDate(projects: Project[]) {
+  return [...projects].sort((a, b) => {
+    const dateA = new Date(a.startDate).getTime();
+    const dateB = new Date(b.startDate).getTime();
+    return isNaN(dateB) || isNaN(dateA) ? 0 : dateB - dateA;
+  });
+}
+
+function normalizeProjectsResponse(data: ProjectsApiResponse) {
+  if (Array.isArray(data)) {
+    return {
+      projects: sortProjectsByStartDate(data),
+      hasMore: false,
+    };
+  }
+
+  return {
+    projects: sortProjectsByStartDate(data.projects),
+    hasMore: data.hasMore,
+  };
+}
 
 export function ProjectCard({ project, userInfo, handleLike, isDarkMode, show_status, show_team = true, onStatusChange, onStarredChange, isAdmin, variant = "default", showTrendingBadge = false, openInNewTab = false }: {
   project: Project;
@@ -444,7 +474,8 @@ export default function ProjectGrid({
   show_team = true,
   showSearch = false,
   urlFilters = {},
-  variant = "default"
+  variant = "default",
+  enablePagination = false,
 }: {
   showStarredOnly?: boolean;
   statusFilter?: string;
@@ -461,13 +492,41 @@ export default function ProjectGrid({
     sort?: string;
   };
   variant?: "default" | "compact";
+  enablePagination?: boolean;
 }) {
   const { user } = useUser();
   const { isAdmin, userInfo } = useUserContext();
   const [projects, setProjects] = useState<Project[]>([]);
   const [filteredProjects, setFilteredProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
+  const [hasMoreProjects, setHasMoreProjects] = useState(false);
+  const [isFetchingMore, setIsFetchingMore] = useState(false);
+  const [requiresFullDataset, setRequiresFullDataset] = useState(false);
+  const [loadedFullDataset, setLoadedFullDataset] = useState(!enablePagination);
   const { isDarkMode } = useTheme();
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
+  const requestSequenceRef = useRef(0);
+
+  const buildProjectsUrl = useCallback(
+    (options?: { limit?: number; offset?: number; all?: boolean }) => {
+      const params = new URLSearchParams();
+
+      if (statusFilter !== "ALL") {
+        params.set("status", statusFilter);
+      }
+
+      if (options?.all) {
+        params.set("all", "true");
+      } else if (enablePagination) {
+        params.set("limit", String(options?.limit ?? PROJECTS_PAGE_SIZE));
+        params.set("offset", String(options?.offset ?? 0));
+      }
+
+      const queryString = params.toString();
+      return `/api/projects${queryString ? `?${queryString}` : ""}`;
+    },
+    [enablePagination, statusFilter]
+  );
 
   // Update projects when they're loaded (only if no search/filtering active)
   useEffect(() => {
@@ -477,29 +536,154 @@ export default function ProjectGrid({
   }, [projects, showSearch]);
 
   useEffect(() => {
+    let isCancelled = false;
+
     async function fetchProjects() {
+      const requestSequence = ++requestSequenceRef.current;
+      setLoading(true);
+      setProjects([]);
+      setFilteredProjects([]);
+      setHasMoreProjects(false);
+      setIsFetchingMore(false);
+      setRequiresFullDataset(false);
+      setLoadedFullDataset(!enablePagination);
+
       try {
-        const queryParam = statusFilter === "ALL" ? "" : `?status=${statusFilter}`;
-        const response = await fetch(`/api/projects${queryParam}`);
-        const data = await response.json();
-        
-        // Sort projects by startDate (newest first) before setting state
-        const sortedProjects = [...data].sort((a, b) => {
-          const dateA = new Date(a.startDate).getTime();
-          const dateB = new Date(b.startDate).getTime();
-          return isNaN(dateB) || isNaN(dateA) ? 0 : dateB - dateA;
-        });
-        
-        setProjects(sortedProjects);
+        const response = await fetch(
+          buildProjectsUrl(
+            enablePagination
+              ? { limit: PROJECTS_PAGE_SIZE, offset: 0 }
+              : undefined
+          )
+        );
+        const data: ProjectsApiResponse = await response.json();
+        const normalized = normalizeProjectsResponse(data);
+
+        if (!isCancelled && requestSequence === requestSequenceRef.current) {
+          setProjects(normalized.projects);
+          setHasMoreProjects(enablePagination ? normalized.hasMore : false);
+        }
       } catch (error) {
         console.error("Error fetching projects:", error);
       } finally {
-        setLoading(false);
+        if (!isCancelled) {
+          setLoading(false);
+        }
       }
     }
 
     fetchProjects();
-  }, [statusFilter]);
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [buildProjectsUrl, enablePagination]);
+
+  useEffect(() => {
+    if (!enablePagination || !requiresFullDataset || loadedFullDataset) {
+      return;
+    }
+
+    let isCancelled = false;
+
+    async function fetchAllProjects() {
+      const requestSequence = ++requestSequenceRef.current;
+      setIsFetchingMore(true);
+
+      try {
+        const response = await fetch(buildProjectsUrl({ all: true }));
+        const data: ProjectsApiResponse = await response.json();
+        const normalized = normalizeProjectsResponse(data);
+
+        if (!isCancelled && requestSequence === requestSequenceRef.current) {
+          setProjects(normalized.projects);
+          setHasMoreProjects(false);
+          setLoadedFullDataset(true);
+        }
+      } catch (error) {
+        console.error("Error fetching all projects:", error);
+      } finally {
+        if (!isCancelled) {
+          setIsFetchingMore(false);
+        }
+      }
+    }
+
+    fetchAllProjects();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [buildProjectsUrl, enablePagination, loadedFullDataset, requiresFullDataset]);
+
+  const loadMoreProjects = useCallback(async () => {
+    if (!enablePagination || loading || isFetchingMore || !hasMoreProjects || requiresFullDataset) {
+      return;
+    }
+
+    setIsFetchingMore(true);
+
+    try {
+      const response = await fetch(
+        buildProjectsUrl({
+          limit: PROJECTS_PAGE_SIZE,
+          offset: projects.length,
+        })
+      );
+      const data: ProjectsApiResponse = await response.json();
+      const normalized = normalizeProjectsResponse(data);
+
+      setProjects((currentProjects) => {
+        const projectMap = new Map(currentProjects.map((project) => [project.id, project]));
+        normalized.projects.forEach((project) => {
+          projectMap.set(project.id, project);
+        });
+        return sortProjectsByStartDate(Array.from(projectMap.values()));
+      });
+      setHasMoreProjects(normalized.hasMore);
+    } catch (error) {
+      console.error("Error loading more projects:", error);
+    } finally {
+      setIsFetchingMore(false);
+    }
+  }, [
+    buildProjectsUrl,
+    enablePagination,
+    hasMoreProjects,
+    isFetchingMore,
+    loading,
+    projects.length,
+    requiresFullDataset,
+  ]);
+
+  useEffect(() => {
+    if (!enablePagination || loading || isFetchingMore || !hasMoreProjects || requiresFullDataset) {
+      return;
+    }
+
+    const sentinel = loadMoreRef.current;
+    if (!sentinel) {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        if (entry?.isIntersecting) {
+          void loadMoreProjects();
+        }
+      },
+      {
+        rootMargin: "600px 0px",
+      }
+    );
+
+    observer.observe(sentinel);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [enablePagination, hasMoreProjects, isFetchingMore, loadMoreProjects, loading, requiresFullDataset]);
 
   const handleLike = async (
     e: React.MouseEvent,
@@ -518,8 +702,8 @@ export default function ProjectGrid({
       });
 
       if (response.ok) {
-        setProjects(
-          projects.map((project) => {
+        setProjects((currentProjects) =>
+          currentProjects.map((project) => {
             if (project.id === projectId) {
               return {
                 ...project,
@@ -558,7 +742,7 @@ export default function ProjectGrid({
       });
 
       if (response.ok) {
-        setProjects(projects.map(p => 
+        setProjects((currentProjects) => currentProjects.map(p => 
           p.id === projectId ? { ...p, status: newStatus as "DRAFT" | "PENDING" | "APPROVED" } : p
         ));
         toast.success('Project status updated successfully');
@@ -584,7 +768,7 @@ export default function ProjectGrid({
       });
 
       if (response.ok) {
-        setProjects(projects.map(p => 
+        setProjects((currentProjects) => currentProjects.map(p => 
           p.id === projectId ? { ...p, is_starred: isStarred } : p
         ));
         toast.success(`Project ${isStarred ? 'starred' : 'unstarred'} successfully`);
@@ -620,6 +804,7 @@ export default function ProjectGrid({
           projects={projects} 
           onFilteredProjectsChange={setFilteredProjects} 
           urlFilters={urlFilters}
+          onSearchStateChange={setRequiresFullDataset}
         />
       )}
       <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 ${variant === "compact" ? "gap-3 sm:gap-4" : "gap-4 sm:gap-6"}`}>
@@ -639,6 +824,26 @@ export default function ProjectGrid({
           />
         ))}
       </div>
+      {enablePagination && hasMoreProjects && !requiresFullDataset && (
+        <div ref={loadMoreRef} className="flex min-h-8 justify-center py-8" aria-hidden="true">
+          {isFetchingMore && (
+            <div
+              className={`animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 ${
+                isDarkMode ? "border-purple-400" : "border-indigo-600"
+              }`}
+            ></div>
+          )}
+        </div>
+      )}
+      {enablePagination && requiresFullDataset && isFetchingMore && (
+        <div className="flex justify-center py-8">
+          <div
+            className={`animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 ${
+              isDarkMode ? "border-purple-400" : "border-indigo-600"
+            }`}
+          ></div>
+        </div>
+      )}
     </div>
   );
 }

@@ -127,10 +127,12 @@ export const getAllTimeProjects = (projects: Project[]): Project[] =>
 export default function ProjectSearch({ 
   projects,
   onFilteredProjectsChange,
+  onSearchStateChange,
   urlFilters = {}
 }: {
   projects: Project[];
   onFilteredProjectsChange: (projects: Project[]) => void;
+  onSearchStateChange?: (hasActiveFilters: boolean) => void;
   urlFilters?: {
     techTags?: string[];
     domainTags?: string[];
@@ -314,10 +316,27 @@ export default function ProjectSearch({
       });
   }, [projects, searchTerm, selectedStatus, selectedTechTags, selectedDomainTags, fromDate, toDate, sortBy, showBroken]);
 
+  const hasActiveFilters = useMemo(() => {
+    return Boolean(
+      searchTerm.trim() ||
+      selectedStatus.length > 0 ||
+      selectedTechTags.length > 0 ||
+      selectedDomainTags.length > 0 ||
+      fromDate ||
+      toDate ||
+      sortBy.value !== 'trending' ||
+      !showBroken
+    );
+  }, [searchTerm, selectedStatus, selectedTechTags, selectedDomainTags, fromDate, toDate, sortBy.value, showBroken]);
+
   // Update parent component with filtered projects
   useEffect(() => {
     onFilteredProjectsChange(filteredProjects);
   }, [filteredProjects, onFilteredProjectsChange]);
+
+  useEffect(() => {
+    onSearchStateChange?.(hasActiveFilters);
+  }, [hasActiveFilters, onSearchStateChange]);
 
   // Update URL when filters change
   useEffect(() => {

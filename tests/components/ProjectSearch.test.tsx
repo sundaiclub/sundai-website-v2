@@ -126,6 +126,20 @@ describe('ProjectSearch', () => {
     });
   });
 
+  it('should notify when filters become active', async () => {
+    const onSearchStateChange = jest.fn();
+    render(<ProjectSearch {...defaultProps} onSearchStateChange={onSearchStateChange} />);
+
+    expect(onSearchStateChange).toHaveBeenCalledWith(false);
+
+    const searchInput = screen.getByPlaceholderText('Search projects...');
+    fireEvent.change(searchInput, { target: { value: 'Project 1' } });
+
+    await waitFor(() => {
+      expect(onSearchStateChange).toHaveBeenLastCalledWith(true);
+    });
+  });
+
   it('should sort projects by newest first by default', () => {
     render(<ProjectSearch {...defaultProps} />);
     
