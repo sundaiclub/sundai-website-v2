@@ -282,13 +282,17 @@ export default function Home() {
           </p>
           <div className="flex flex-wrap justify-center items-center gap-8 md:gap-16">
             {[
-              { src: "/images/sponsors/redhat.png", alt: "Red Hat", width: 140, height: 48, invert: false },
-              { src: "/images/sponsors/e14.png", alt: "E14 Fund", width: 100, height: 48, invert: true },
-              { src: "/images/sponsors/gai-insights-logo.webp", alt: "GAI Insights", width: 140, height: 48, invert: false },
-              { src: "/images/sponsors/hyperskill.svg", alt: "Hyperskill", width: 140, height: 48, invert: false },
+              { src: "/images/sponsors/redhat.png", alt: "Red Hat", href: "https://www.redhat.com/en", width: 140, height: 48, invert: false },
+              { src: "/images/sponsors/e14.png", alt: "E14 Fund", href: "https://www.e14.vc/", width: 100, height: 48, invert: true },
+              { src: "/images/sponsors/gai-insights-logo.webp", alt: "GAI Insights", href: "https://gaiinsights.com/", width: 140, height: 48, invert: false },
+              { src: "/images/sponsors/hyperskill.svg", alt: "Hyperskill", href: "https://hyperskill.org/", width: 140, height: 48, invert: false },
             ].map((sponsor) => (
-              <div
+              <a
                 key={sponsor.alt}
+                href={sponsor.href}
+                target="_blank"
+                rel="noreferrer"
+                aria-label={sponsor.alt}
                 className={`transition duration-300 ${isDarkMode
                   ? "opacity-70 hover:opacity-100"
                   : "opacity-60 hover:opacity-100"
@@ -301,7 +305,7 @@ export default function Home() {
                   height={sponsor.height}
                   className={`h-10 md:h-12 w-auto object-contain ${sponsor.invert && isDarkMode ? "invert" : ""}`}
                 />
-              </div>
+              </a>
             ))}
           </div>
         </div>
