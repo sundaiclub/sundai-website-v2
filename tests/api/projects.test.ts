@@ -67,6 +67,37 @@ describe('/api/projects', () => {
       expect(data).toHaveLength(1)
     })
 
+    it('returns paginated projects when limit and offset are provided', async () => {
+      const secondProject = {
+        ...mockProject,
+        id: 'test-project-id-2',
+        title: 'Another Test Project',
+      }
+      mockPrisma.project.findMany.mockResolvedValue([mockProject, secondProject])
+
+      const request = new NextRequest('http://localhost:3000/api/projects?status=APPROVED&limit=1&offset=2')
+      const response = await GET(request)
+      const data = await response.json()
+
+      expect(response.status).toBe(200)
+      expect(mockPrisma.project.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          skip: 2,
+          take: 2,
+        })
+      )
+      expect(data).toMatchObject({
+        hasMore: true,
+        projects: [
+          expect.objectContaining({
+            id: 'test-project-id',
+            title: 'Test Project',
+          }),
+        ],
+      })
+      expect(data.projects).toHaveLength(1)
+    })
+
     it('handles research site environment', async () => {
       process.env.IS_RESEARCH_SITE = 'true'
       mockPrisma.project.findMany.mockResolvedValue([])
