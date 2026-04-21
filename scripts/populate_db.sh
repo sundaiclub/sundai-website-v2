@@ -13,12 +13,11 @@ npx prisma generate
 
 # Apply latest migrations to local dev DB (non-interactive)
 echo "Applying migrations..."
-npx prisma migrate deploy
+./scripts/migrate_deploy.sh
 
 # Seed database with sample data
 echo "Seeding database..."
 npm run seed
 
 echo "Database populated successfully."
-
 

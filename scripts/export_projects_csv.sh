@@ -7,15 +7,15 @@ QUERY_PATH="$(realpath -m "$(dirname "$0")/sql/export_projects_without_user_emai
 
 mkdir -p "$(dirname "$OUTPUT_PATH")"
 
-if [ -z "${DATABASE_URL:-}" ] && [ -f ".env" ]; then
+if [ -z "${DATABASE_URL:-}" ] && [ -z "${DIRECT_URL:-}" ] && [ -f ".env" ]; then
   set -a
   # shellcheck disable=SC1091
   source .env
   set +a
 fi
 
-if [ -z "${DATABASE_URL:-}" ]; then
-  echo "DATABASE_URL is not set. Add it to .env or export it in your shell."
+if [ -z "${DATABASE_URL:-}" ] && [ -z "${DIRECT_URL:-}" ]; then
+  echo "DATABASE_URL or DIRECT_URL is not set. Add one to .env or export it in your shell."
   exit 1
 fi
 
@@ -24,7 +24,8 @@ if ! command -v psql >/dev/null 2>&1; then
   exit 1
 fi
 
-PSQL_DATABASE_URL="$DATABASE_URL"
+# Prefer a direct database connection for export operations.
+PSQL_DATABASE_URL="${DIRECT_URL:-$DATABASE_URL}"
 if [[ "$PSQL_DATABASE_URL" == *"?"* ]]; then
   DB_URL_BASE="${PSQL_DATABASE_URL%%\?*}"
   DB_URL_QUERY="${PSQL_DATABASE_URL#*\?}"

@@ -36,8 +36,6 @@ model Hacker {
   likes       ProjectLike[]
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
-  pushSubscriptions PushSubscription[]
-  notifications Notification[]
   attendanceRecords    Attendance[]
   verifiedAttendances  Attendance[] @relation("AttendanceVerifications")
   totalMinutesAttended Int          @default(0)
@@ -129,7 +127,7 @@ model Image {
   width           Int?      // Image width in pixels
   height          Int?      // Image height in pixels
   alt             String?   // Alt text for accessibility
-  description     String?   // Optional description
+  prompt          String?   // Prompt used to generate the image when applicable
   
   // Relations
   hackerAvatar    Hacker?   @relation("HackerAvatar")
@@ -159,41 +157,6 @@ model ProjectLike {
   @@unique([projectId, hackerId])
   @@index([projectId])
   @@index([hackerId])
-}
-
-model PushSubscription {
-  id          String    @id @default(uuid())
-  endpoint    String    @unique
-  p256dh      String    // Public key
-  auth        String    // Auth secret
-  hacker      Hacker    @relation(fields: [hackerId], references: [id])
-  hackerId    String
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-
-  // Notification preferences
-  notifyNewProjects     Boolean   @default(true)
-  notifyProjectUpdates  Boolean   @default(true)
-  notifyLikes          Boolean   @default(true)
-  notifyNewMembers     Boolean   @default(true)
-
-  @@index([hackerId])
-}
-
-model Notification {
-  id          String    @id @default(uuid())
-  type        NotificationType
-  title       String
-  body        String
-  icon        String?   // URL to notification icon
-  data        Json?     // Additional data like URLs
-  hacker      Hacker    @relation(fields: [hackerId], references: [id])
-  hackerId    String
-  read        Boolean   @default(false)
-  createdAt   DateTime  @default(now())
-
-  @@index([hackerId])
-  @@index([createdAt])
 }
 
 model Attendance {
@@ -249,17 +212,15 @@ enum ProjectStatus {
   APPROVED
 }
 
-enum NotificationType {
-  NEW_PROJECT
-  PROJECT_UPDATE
-  NEW_LIKE
-  NEW_MEMBER
-  CUSTOM
-}
-
 enum HackType {
   REGULAR
   RESEARCH
+}
+
+enum EventPhase {
+  VOTING
+  PITCHING
+  FINISHED
 }
 
 // Events and Pitch Queue
@@ -273,6 +234,13 @@ model Event {
   createdBy        Hacker     @relation(fields: [createdById], references: [id])
   createdById      String
   audienceCanReorder Boolean  @default(true)
+  votingEndTime    DateTime?
+  phase            EventPhase @default(VOTING)
+  topProjectCount      Int    @default(5)
+  topPresentingSec     Int    @default(120)
+  topQuestionsSec      Int    @default(180)
+  defaultPresentingSec Int    @default(60)
+  defaultQuestionsSec  Int    @default(120)
   projects         EventProject[]
   mcs              EventMC[]
   createdAt        DateTime   @default(now())
@@ -304,8 +272,17 @@ model EventProject {
   position   Int                @default(0)
   status     EventProjectStatus @default(QUEUED)
   approved   Boolean            @default(false)
+  isTopProject Boolean          @default(false)
   createdAt  DateTime           @default(now())
   updatedAt  DateTime           @updatedAt
+
+  // Timer fields
+  pitchPhase            PitchPhase @default(WAITING)
+  presentingStartedAt   DateTime?
+  questionsStartedAt    DateTime?
+  completedAt           DateTime?
+  allottedPresentingSec Int?
+  allottedQuestionsSec  Int?
 
   @@unique([eventId, projectId])
   @@index([eventId, position])
@@ -318,4 +295,11 @@ enum EventProjectStatus {
   CURRENT
   DONE
   SKIPPED
+}
+
+enum PitchPhase {
+  WAITING
+  PRESENTING
+  QUESTIONS
+  COMPLETED
 }

@@ -20,6 +20,9 @@ export async function POST(
 
     const event = await prisma.event.findUnique({ where: { id: params.eventId } });
     if (!event) return new NextResponse("Event not found", { status: 404 });
+    if (event.phase === "FINISHED") {
+      return NextResponse.json({ message: "Cannot add projects to a finished event" }, { status: 400 });
+    }
 
     // Verify the user owns or participates in the project
     const project = await prisma.project.findUnique({
@@ -32,7 +35,7 @@ export async function POST(
 
     const isOwnerOrParticipant =
       project.launchLeadId === user.id ||
-      project.participants.some((p) => p.hacker.id === user.id);
+      project.participants.some((p: any) => p.hacker.id === user.id);
 
     if (!isOwnerOrParticipant) {
       return new NextResponse("Unauthorized", { status: 401 });
@@ -60,7 +63,19 @@ export async function POST(
         projectId,
         addedById: user.id,
         position: nextPos,
+        isTopProject: false,
+        ...(event.phase === "PITCHING" && {
+          allottedPresentingSec: event.defaultPresentingSec,
+          allottedQuestionsSec: event.defaultQuestionsSec,
+        }),
       },
+    });
+
+    // Auto-like the project for the submitting user (upsert to avoid duplicates)
+    await prisma.projectLike.upsert({
+      where: { projectId_hackerId: { projectId, hackerId: user.id } },
+      create: { projectId, hackerId: user.id },
+      update: {},
     });
 
     return NextResponse.json(item);
@@ -91,6 +106,37 @@ export async function PATCH(
     const { items } = await req.json();
     if (!Array.isArray(items)) return NextResponse.json({ message: "items array required" }, { status: 400 });
 
+    // Top-group protection during PITCHING phase
+    if (event.phase === "PITCHING") {
+      const allProjects = await prisma.eventProject.findMany({
+        where: { eventId: params.eventId },
+        orderBy: { position: "asc" },
+      });
+
+      const topGroupIds = new Set(
+        allProjects
+          .filter(ep => ep.isTopProject)
+          .map(ep => ep.id)
+      );
+      const topGroupPositions = new Set(
+        allProjects
+          .filter(ep => ep.isTopProject)
+          .map(ep => ep.position)
+      );
+
+      const ids = items.map((it: { id: string }) => it.id);
+
+      // Reject if any items being moved are in the top group
+      if (ids.some((id: string) => topGroupIds.has(id))) {
+        return NextResponse.json({ message: "Cannot reorder top-group projects" }, { status: 400 });
+      }
+
+      // Reject if any items are being moved into top-group positions
+      if (items.some((it: { position: number }) => topGroupPositions.has(it.position))) {
+        return NextResponse.json({ message: "Cannot move into top-group positions" }, { status: 400 });
+      }
+    }
+
     if (!allowAll) {
       if (items.length === 0) {
         return new NextResponse("Unauthorized", { status: 401 });
@@ -102,8 +148,8 @@ export async function PATCH(
         select: { id: true, addedById: true, eventId: true },
       });
       if (eps.length !== ids.length) return new NextResponse("Not found", { status: 404 });
-      if (eps.some(ep => ep.eventId !== params.eventId)) return new NextResponse("Bad Request", { status: 400 });
-      if (eps.some(ep => ep.addedById !== hacker.id)) return new NextResponse("Unauthorized", { status: 401 });
+      if (eps.some((ep: any) => ep.eventId !== params.eventId)) return new NextResponse("Bad Request", { status: 400 });
+      if (eps.some((ep: any) => ep.addedById !== hacker.id)) return new NextResponse("Unauthorized", { status: 401 });
 
       const current = await prisma.eventProject.findFirst({ where: { eventId: params.eventId, status: 'CURRENT' }, select: { position: true } });
       if (current) {
@@ -123,5 +169,3 @@ export async function PATCH(
     return new NextResponse("Internal Error", { status: 500 });
   }
 }
-
-

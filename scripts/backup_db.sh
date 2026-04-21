@@ -13,9 +13,12 @@ BACKUP_FILE="${BACKUP_DIR}/backup_${TIMESTAMP}.sql"
 # Use PostgreSQL 16 binaries
 PG_DUMP="/opt/homebrew/opt/postgresql@16/bin/pg_dump"
 
+# Prefer a direct database connection for backup operations.
+DB_BACKUP_URL="${DIRECT_URL:-$DATABASE_URL}"
+
 # Backup
 echo "Creating backup: ${BACKUP_FILE}"
-"$PG_DUMP" "$DATABASE_URL" --no-owner --clean --if-exists > "${BACKUP_FILE}"
+"$PG_DUMP" "$DB_BACKUP_URL" --no-owner --clean --if-exists > "${BACKUP_FILE}"
 
 # Compress
 echo "Compressing backup..."
