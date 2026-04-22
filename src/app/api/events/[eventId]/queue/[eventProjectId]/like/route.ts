@@ -20,7 +20,7 @@ async function getAuthorizedHacker() {
   return { hacker };
 }
 
-async function getVotingEventProject(eventId: string, eventProjectId: string) {
+async function getActiveEventProject(eventId: string, eventProjectId: string) {
   const eventProject = await prisma.eventProject.findUnique({
     where: { id: eventProjectId },
     select: {
@@ -41,10 +41,10 @@ async function getVotingEventProject(eventId: string, eventProjectId: string) {
     };
   }
 
-  if (eventProject.event.phase !== "VOTING") {
+  if (eventProject.event.phase === "FINISHED") {
     return {
       error: NextResponse.json(
-        { message: "Pitch likes can only be changed during voting" },
+        { message: "Pitch likes can only be changed while the event is active" },
         { status: 400 }
       ),
     };
@@ -61,7 +61,7 @@ export async function POST(
     const authResult = await getAuthorizedHacker();
     if (authResult.error) return authResult.error;
 
-    const eventProjectResult = await getVotingEventProject(
+    const eventProjectResult = await getActiveEventProject(
       params.eventId,
       params.eventProjectId
     );
@@ -114,7 +114,7 @@ export async function DELETE(
     const authResult = await getAuthorizedHacker();
     if (authResult.error) return authResult.error;
 
-    const eventProjectResult = await getVotingEventProject(
+    const eventProjectResult = await getActiveEventProject(
       params.eventId,
       params.eventProjectId
     );

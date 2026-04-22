@@ -76,7 +76,7 @@ describe('/api/events/[eventId]/queue/[eventProjectId]/like', () => {
     })
   })
 
-  it('rejects pitch-like changes after voting', async () => {
+  it('allows pitch-like changes during pitching', async () => {
     mockAuth.mockReturnValue({ userId: 'clerk-1' })
     prisma.hacker.findUnique.mockResolvedValue({ id: 'h1' })
     prisma.eventProject.findUnique.mockResolvedValue({
@@ -84,6 +84,39 @@ describe('/api/events/[eventId]/queue/[eventProjectId]/like', () => {
       eventId: 'e1',
       projectId: 'p1',
       event: { phase: 'PITCHING' },
+    })
+    prisma.projectLike.upsert.mockResolvedValue({ id: 'pl1' })
+    prisma.eventProjectLike.upsert.mockResolvedValue({
+      id: 'epl1',
+      eventProjectId: 'ep1',
+      hackerId: 'h1',
+    })
+    prisma.$transaction.mockResolvedValue([
+      { id: 'pl1' },
+      { id: 'epl1', eventProjectId: 'ep1', hackerId: 'h1' },
+    ])
+
+    const request = new NextRequest('http://localhost:3000/api/events/e1/queue/ep1/like', {
+      method: 'POST',
+    })
+
+    const response = await POST(request, {
+      params: { eventId: 'e1', eventProjectId: 'ep1' },
+    } as any)
+
+    expect(response.status).toBe(200)
+    expect(prisma.projectLike.upsert).toHaveBeenCalled()
+    expect(prisma.eventProjectLike.upsert).toHaveBeenCalled()
+  })
+
+  it('rejects pitch-like changes after the event is finished', async () => {
+    mockAuth.mockReturnValue({ userId: 'clerk-1' })
+    prisma.hacker.findUnique.mockResolvedValue({ id: 'h1' })
+    prisma.eventProject.findUnique.mockResolvedValue({
+      id: 'ep1',
+      eventId: 'e1',
+      projectId: 'p1',
+      event: { phase: 'FINISHED' },
     })
 
     const request = new NextRequest('http://localhost:3000/api/events/e1/queue/ep1/like', {

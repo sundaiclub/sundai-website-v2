@@ -51,6 +51,49 @@ type EventDetail = {
   projects: EventProjectEntry[];
 };
 
+function applyPitchLikeToEvent(
+  event: EventDetail,
+  eventProjectId: string,
+  hackerId: string,
+  isLiked: boolean
+): EventDetail {
+  return {
+    ...event,
+    projects: event.projects.map((ep) => {
+      if (ep.id !== eventProjectId) return ep;
+
+      const nextLike = {
+        hackerId,
+        createdAt: new Date().toISOString(),
+      };
+
+      const alreadyPitchLiked = ep.pitchLikes.some(
+        (like) => like.hackerId === hackerId
+      );
+      const alreadyProjectLiked = ep.project.likes.some(
+        (like) => like.hackerId === hackerId
+      );
+
+      return {
+        ...ep,
+        pitchLikes: isLiked
+          ? ep.pitchLikes.filter((like) => like.hackerId !== hackerId)
+          : alreadyPitchLiked
+          ? ep.pitchLikes
+          : [...ep.pitchLikes, nextLike],
+        project: {
+          ...ep.project,
+          likes: isLiked
+            ? ep.project.likes
+            : alreadyProjectLiked
+            ? ep.project.likes
+            : [...ep.project.likes, nextLike],
+        },
+      };
+    }),
+  };
+}
+
 function getStageBadgeStyles(phase: EventPhase) {
   if (phase === "VOTING") return "bg-indigo-100 text-indigo-700";
   if (phase === "PITCHING") return "bg-purple-100 text-purple-700";
@@ -347,7 +390,7 @@ function VotingPhase({
         </div>
         {isController && (
           <div className="space-y-6">
-            <VotingQueuePanel event={event} isDarkMode={isDarkMode} isController={isController} setEvent={setEvent} />
+            <VotingQueuePanel event={event} isDarkMode={isDarkMode} isController={isController} setEvent={setEvent} userInfo={userInfo} />
           </div>
         )}
       </div>
@@ -429,7 +472,7 @@ function VotingPhase({
       </div>
       {isController && (
         <div className="space-y-6">
-          <VotingQueuePanel event={event} isDarkMode={isDarkMode} isController={isController} setEvent={setEvent} />
+          <VotingQueuePanel event={event} isDarkMode={isDarkMode} isController={isController} setEvent={setEvent} userInfo={userInfo} />
         </div>
       )}
     </div>
@@ -441,11 +484,13 @@ function VotingQueuePanel({
   isDarkMode,
   isController,
   setEvent,
+  userInfo,
 }: {
   event: EventDetail;
   isDarkMode: boolean;
   isController: boolean;
   setEvent: (e: EventDetail | null) => void;
+  userInfo?: { id?: string } | null;
 }) {
   const allOrdered = useMemo(
     () => [...event.projects].sort((a, b) => a.position - b.position),
@@ -472,6 +517,21 @@ function VotingQueuePanel({
     }
   };
 
+  const togglePitchLike = async (eventProjectId: string, isLiked: boolean) => {
+    if (!userInfo?.id) {
+      alert("Please sign in to like projects");
+      return;
+    }
+
+    const response = await fetch(
+      `/api/events/${event.id}/queue/${eventProjectId}/like`,
+      { method: isLiked ? "DELETE" : "POST" }
+    );
+    if (!response.ok) return;
+
+    setEvent(applyPitchLikeToEvent(event, eventProjectId, userInfo.id, isLiked));
+  };
+
   return (
     <div className={`w-full ${isDarkMode ? "bg-gray-800" : "bg-white"} rounded-xl p-4 shadow`}>
       <div className="flex items-center justify-between mb-3">
@@ -483,6 +543,9 @@ function VotingQueuePanel({
       ) : (
         <div className="max-h-96 overflow-y-auto space-y-2 pr-1">
           {allOrdered.map((ep, idx) => {
+            const isPitchLiked = ep.pitchLikes.some(
+              (like) => like.hackerId === userInfo?.id
+            );
             const isCurrent = ep.status === "CURRENT";
             const isPast = ep.status === "DONE" || ep.status === "SKIPPED";
             const isTopGroup = topGroupIds.has(ep.id);
@@ -583,14 +646,20 @@ function VotingQueuePanel({
                         ✕
                       </button>
                     )}
-                    <span
+                    <button
+                      onClick={() => togglePitchLike(ep.id, isPitchLiked)}
                       className={`px-2 h-7 rounded-md text-xs font-semibold flex items-center gap-1 ${
-                        isDarkMode ? "bg-gray-700 text-gray-200" : "bg-gray-100 text-gray-800"
+                        isPitchLiked
+                          ? "bg-red-600 text-white"
+                          : isDarkMode
+                          ? "bg-gray-700 text-gray-200 hover:bg-gray-600"
+                          : "bg-gray-100 text-gray-800 hover:bg-gray-200"
                       }`}
+                      aria-label={`Like ${ep.project.title} in this pitch session`}
                     >
                       <span>❤</span>
                       <span>{ep.pitchLikes.length}</span>
-                    </span>
+                    </button>
                   </div>
                 </div>
               </div>
@@ -873,6 +942,24 @@ function PitchingPhase({
     }
   };
 
+  const handlePitchLike = async (
+    eventProjectId: string,
+    isLiked: boolean
+  ) => {
+    if (!userInfo?.id) {
+      alert("Please sign in to like projects");
+      return;
+    }
+
+    const response = await fetch(
+      `/api/events/${event.id}/queue/${eventProjectId}/like`,
+      { method: isLiked ? "DELETE" : "POST" }
+    );
+    if (!response.ok) return;
+
+    setEvent(applyPitchLikeToEvent(event, eventProjectId, userInfo.id, isLiked));
+  };
+
   const advance = async () => {
     const res = await fetch(`/api/events/${event.id}/advance`, { method: "POST" });
     if (res.ok) {
@@ -998,6 +1085,9 @@ function PitchingPhase({
           </div>
           <div className="max-h-96 overflow-y-auto space-y-2 pr-1">
             {allOrdered.map((ep, idx) => {
+              const isPitchLiked = ep.pitchLikes.some(
+                (like) => like.hackerId === userInfo?.id
+              );
               const isCurrent = ep.status === "CURRENT";
               const isPast = ep.status === "DONE" || ep.status === "SKIPPED";
               const isTopGroup = topGroupIds.has(ep.id);
@@ -1205,17 +1295,21 @@ function PitchingPhase({
                           )}
                         </div>
                       )}
-                      <span
+                      <button
+                        disabled={isFinished}
+                        onClick={() => handlePitchLike(ep.id, isPitchLiked)}
                         className={`px-2 h-7 rounded-md text-xs font-semibold flex items-center gap-1 ${
-                          isDarkMode
-                            ? "bg-gray-700 text-gray-200"
-                            : "bg-gray-100 text-gray-800"
-                        }`}
-                        aria-label={`Pitch votes ${ep.project.title}`}
+                          isPitchLiked
+                            ? "bg-red-600 text-white"
+                            : isDarkMode
+                            ? "bg-gray-700 text-gray-200 hover:bg-gray-600"
+                            : "bg-gray-100 text-gray-800 hover:bg-gray-200"
+                        } ${isFinished ? "cursor-not-allowed opacity-60" : ""}`}
+                        aria-label={`Like ${ep.project.title} in this pitch session`}
                       >
                         <span>❤</span>
                         <span>{ep.pitchLikes.length}</span>
-                      </span>
+                      </button>
                     </div>
                   </div>
                 </div>
