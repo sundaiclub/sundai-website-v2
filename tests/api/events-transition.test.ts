@@ -152,7 +152,7 @@ describe('/api/events/[eventId]/transition', () => {
     });
   });
 
-  it('sorts projects by like count, assigns positions and allotted times', async () => {
+  it('sorts projects by pitch-like count, assigns positions and allotted times', async () => {
     mockAuth.mockReturnValue({ userId: 'clerk-admin' });
     prisma.hacker.findUnique.mockResolvedValue({ id: 'h-admin', role: 'ADMIN' });
     prisma.event.findUnique
@@ -161,9 +161,9 @@ describe('/api/events/[eventId]/transition', () => {
 
     const now = new Date();
     prisma.eventProject.findMany.mockResolvedValue([
-      { id: 'ep1', createdAt: now, project: { likes: [{ id: '1' }] } },
-      { id: 'ep2', createdAt: now, project: { likes: [{ id: '2' }, { id: '3' }, { id: '4' }] } },
-      { id: 'ep3', createdAt: now, project: { likes: [{ id: '5' }, { id: '6' }] } },
+      { id: 'ep1', createdAt: now, pitchVotes: [{ id: '1', value: 'LIKE' }] },
+      { id: 'ep2', createdAt: now, pitchVotes: [{ id: '2', value: 'LIKE' }, { id: '3', value: 'LIKE' }, { id: '4', value: 'LIKE' }] },
+      { id: 'ep3', createdAt: now, pitchVotes: [{ id: '5', value: 'LIKE' }, { id: '6', value: 'LIKE' }] },
     ]);
     prisma.eventProject.update.mockResolvedValue({});
     prisma.event.update.mockResolvedValue({});
@@ -209,12 +209,12 @@ describe('/api/events/[eventId]/transition', () => {
 
     const now = new Date();
     prisma.eventProject.findMany.mockResolvedValue([
-      { id: 'ep1', createdAt: now, project: { likes: Array(5).fill({ id: '1' }) } },
-      { id: 'ep2', createdAt: now, project: { likes: Array(4).fill({ id: '2' }) } },
-      { id: 'ep3', createdAt: now, project: { likes: Array(3).fill({ id: '3' }) } },
-      { id: 'ep4', createdAt: now, project: { likes: Array(2).fill({ id: '4' }) } },
-      { id: 'ep5', createdAt: now, project: { likes: Array(1).fill({ id: '5' }) } },
-      { id: 'ep6', createdAt: now, project: { likes: [] } },
+      { id: 'ep1', createdAt: now, pitchVotes: Array(5).fill({ id: '1', value: 'LIKE' }) },
+      { id: 'ep2', createdAt: now, pitchVotes: Array(4).fill({ id: '2', value: 'LIKE' }) },
+      { id: 'ep3', createdAt: now, pitchVotes: Array(3).fill({ id: '3', value: 'LIKE' }) },
+      { id: 'ep4', createdAt: now, pitchVotes: Array(2).fill({ id: '4', value: 'LIKE' }) },
+      { id: 'ep5', createdAt: now, pitchVotes: Array(1).fill({ id: '5', value: 'LIKE' }) },
+      { id: 'ep6', createdAt: now, pitchVotes: [] },
     ]);
     prisma.eventProject.update.mockResolvedValue({});
     prisma.event.update.mockResolvedValue({});
@@ -246,13 +246,13 @@ describe('/api/events/[eventId]/transition', () => {
     const early = new Date('2026-01-01');
     const later = new Date('2026-01-02');
     prisma.eventProject.findMany.mockResolvedValue([
-      { id: 'ep1', createdAt: early, project: { likes: Array(4).fill({ id: '1' }) } },
-      { id: 'ep2', createdAt: early, project: { likes: Array(4).fill({ id: '2' }) } },
-      { id: 'ep3', createdAt: early, project: { likes: Array(4).fill({ id: '3' }) } },
-      { id: 'ep4', createdAt: early, project: { likes: Array(3).fill({ id: '4' }) } },
-      { id: 'ep5', createdAt: early, project: { likes: Array(3).fill({ id: '5' }) } },
-      { id: 'ep6', createdAt: early, project: { likes: Array(3).fill({ id: '6' }) } },
-      { id: 'ep7', createdAt: later, project: { likes: Array(3).fill({ id: '7' }) } },
+      { id: 'ep1', createdAt: early, pitchVotes: Array(4).fill({ id: '1', value: 'LIKE' }) },
+      { id: 'ep2', createdAt: early, pitchVotes: Array(4).fill({ id: '2', value: 'LIKE' }) },
+      { id: 'ep3', createdAt: early, pitchVotes: Array(4).fill({ id: '3', value: 'LIKE' }) },
+      { id: 'ep4', createdAt: early, pitchVotes: Array(3).fill({ id: '4', value: 'LIKE' }) },
+      { id: 'ep5', createdAt: early, pitchVotes: Array(3).fill({ id: '5', value: 'LIKE' }) },
+      { id: 'ep6', createdAt: early, pitchVotes: Array(3).fill({ id: '6', value: 'LIKE' }) },
+      { id: 'ep7', createdAt: later, pitchVotes: Array(3).fill({ id: '7', value: 'LIKE' }) },
     ]);
     prisma.eventProject.update.mockResolvedValue({});
     prisma.event.update.mockResolvedValue({});
@@ -270,7 +270,7 @@ describe('/api/events/[eventId]/transition', () => {
     }
   });
 
-  it('handles ties correctly (same like count → ordered by createdAt)', async () => {
+  it('handles ties correctly (same pitch-like count → ordered by createdAt)', async () => {
     mockAuth.mockReturnValue({ userId: 'clerk-admin' });
     prisma.hacker.findUnique.mockResolvedValue({ id: 'h-admin', role: 'ADMIN' });
     prisma.event.findUnique
@@ -280,8 +280,8 @@ describe('/api/events/[eventId]/transition', () => {
     const early = new Date('2026-01-01');
     const late = new Date('2026-02-01');
     prisma.eventProject.findMany.mockResolvedValue([
-      { id: 'ep-late', createdAt: late, project: { likes: [{ id: '1' }, { id: '2' }] } },
-      { id: 'ep-early', createdAt: early, project: { likes: [{ id: '3' }, { id: '4' }] } },
+      { id: 'ep-late', createdAt: late, pitchVotes: [{ id: '1', value: 'LIKE' }, { id: '2', value: 'LIKE' }] },
+      { id: 'ep-early', createdAt: early, pitchVotes: [{ id: '3', value: 'LIKE' }, { id: '4', value: 'LIKE' }] },
     ]);
     prisma.eventProject.update.mockResolvedValue({});
     prisma.event.update.mockResolvedValue({});

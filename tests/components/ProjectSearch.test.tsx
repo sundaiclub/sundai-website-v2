@@ -106,8 +106,8 @@ describe('ProjectSearch', () => {
   it('should call onFilteredProjectsChange with all projects initially', () => {
     render(<ProjectSearch {...defaultProps} />);
     
-    // Default sort is Trending (time-decayed likes); newer Project 2 comes first
-    const expectedOrder = [mockProjects[1], mockProjects[0]];
+    // Default sort is Trending (recency-weighted likes).
+    const expectedOrder = [mockProjects[0], mockProjects[1]];
     expect(defaultProps.onFilteredProjectsChange).toHaveBeenCalledWith(expectedOrder);
   });
 
@@ -280,9 +280,9 @@ describe('ProjectSearch', () => {
     const resetButton = screen.getByText('Reset');
     fireEvent.click(resetButton);
     
-    // Should call callback with all projects again (default trending => Project 2 first)
+    // Should call callback with all projects again using the default trending order.
     await waitFor(() => {
-      const expectedOrder = [mockProjects[1], mockProjects[0]];
+      const expectedOrder = [mockProjects[0], mockProjects[1]];
       expect(defaultProps.onFilteredProjectsChange).toHaveBeenCalledWith(expectedOrder);
     });
   });

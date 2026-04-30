@@ -3,56 +3,83 @@ import { calculateTrendingScore } from '../../src/lib/trending';
 describe('calculateTrendingScore', () => {
   it('returns raw likes when decay is not provided', () => {
     const score = calculateTrendingScore({
-      likes: [{ hackerId: 'a' }, { hackerId: 'b' }],
-      createdAt: '2024-01-01T00:00:00.000Z',
+      likes: [
+        { hackerId: 'a', createdAt: '2026-04-10T00:00:00.000Z' },
+        { hackerId: 'b', createdAt: '2026-04-11T00:00:00.000Z' },
+      ],
     });
 
     expect(score).toBe(2);
   });
 
-  it('avoids numeric underflow for old projects when using decay', () => {
-    jest.useFakeTimers().setSystemTime(new Date('2026-03-12T00:00:00.000Z'));
+  it('favors fresh likes on older projects over stale likes on newer ones', () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-04-14T00:00:00.000Z'));
 
     try {
-      const olderWithMoreLikes = calculateTrendingScore(
+      const olderProjectWithFreshLikes = calculateTrendingScore(
         {
-          likes: [{ hackerId: 'a' }, { hackerId: 'b' }],
-          startDate: '2024-01-01T00:00:00.000Z',
+          likes: [
+            { hackerId: 'a', createdAt: '2026-04-13T00:00:00.000Z' },
+            { hackerId: 'b', createdAt: '2026-04-14T00:00:00.000Z' },
+          ],
         },
-        { timeDecayDays: 1 }
+        { timeDecayDays: 7 }
       );
 
-      const newerWithFewerLikes = calculateTrendingScore(
+      const newerProjectWithStaleLikes = calculateTrendingScore(
         {
-          likes: [{ hackerId: 'a' }],
-          startDate: '2024-01-03T00:00:00.000Z',
+          likes: [
+            { hackerId: 'a', createdAt: '2026-03-01T00:00:00.000Z' },
+            { hackerId: 'b', createdAt: '2026-03-02T00:00:00.000Z' },
+            { hackerId: 'c', createdAt: '2026-03-03T00:00:00.000Z' },
+          ],
         },
-        { timeDecayDays: 1 }
+        { timeDecayDays: 7 }
       );
 
-      expect(Number.isFinite(olderWithMoreLikes)).toBe(true);
-      expect(Number.isFinite(newerWithFewerLikes)).toBe(true);
-      expect(newerWithFewerLikes).toBeGreaterThan(olderWithMoreLikes);
+      expect(olderProjectWithFreshLikes).toBeGreaterThan(newerProjectWithStaleLikes);
     } finally {
       jest.useRealTimers();
     }
   });
 
-  it('falls back to log-likes when date is invalid', () => {
+  it('ignores age of the project itself when likes are recent', () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-04-14T00:00:00.000Z'));
+
+    try {
+      const oneFreshLike = calculateTrendingScore(
+        {
+          likes: [{ hackerId: 'a', createdAt: '2026-04-14T00:00:00.000Z' }],
+        },
+        { timeDecayDays: 30 }
+      );
+
+      const oneOldLike = calculateTrendingScore(
+        {
+          likes: [{ hackerId: 'a', createdAt: '2025-10-14T00:00:00.000Z' }],
+        },
+        { timeDecayDays: 30 }
+      );
+
+      expect(oneFreshLike).toBeGreaterThan(oneOldLike);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('falls back to counting likes when like timestamps are invalid', () => {
     const withLikes = calculateTrendingScore(
       {
-        likes: [{ hackerId: 'a' }],
-        startDate: 'invalid-date',
+        likes: [{ hackerId: 'a', createdAt: 'invalid-date' }],
       },
-      { timeDecayDays: 1 }
+      { timeDecayDays: 7 }
     );
 
     const withoutLikes = calculateTrendingScore(
       {
         likes: [],
-        startDate: 'invalid-date',
       },
-      { timeDecayDays: 1 }
+      { timeDecayDays: 7 }
     );
 
     expect(withLikes).toBeGreaterThan(withoutLikes);

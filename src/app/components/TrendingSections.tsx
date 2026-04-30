@@ -2,13 +2,7 @@
 import React from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { useTheme } from "../contexts/ThemeContext";
-import ProjectGrid, { Project as ProjectType, ProjectCard } from "./Project";
-import { 
-  getThisWeekProjects, 
-  getThisMonthProjects, 
-  getAllTimeProjects 
-} from "./ProjectSearch";
+import { Project as ProjectType, ProjectCard } from "./Project";
 import { calculateProjectScore } from '@/lib/trending';
 
 interface TrendingSectionsProps {
@@ -25,7 +19,6 @@ const TrendingProjectCard = ({ project, userInfo, handleLike, isDarkMode, showTr
   isDarkMode: boolean;
   showTrendingBadge?: boolean;
 }) => {
-  const isLiked = project.likes.some(like => like.hackerId === userInfo?.id);
   return (
     <Link href={`/projects/${project.id}`} className="block h-full w-full focus:outline-none" aria-label={`View project ${project.title}`}>
       <motion.div whileHover={{ y: -4 }}>
@@ -45,37 +38,22 @@ const TrendingProjectCard = ({ project, userInfo, handleLike, isDarkMode, showTr
 };
 
 export default function TrendingSections({ projects, userInfo, handleLike, isDarkMode }: TrendingSectionsProps) {
-  // Get projects for each category
-  const thisWeekProjects = getThisWeekProjects(projects);
-  const thisMonthProjects = getThisMonthProjects(projects);
-  const allTimeProjects = getAllTimeProjects(projects);
-
   // Sort by appropriate trending score for each category
   const sortByThisWeekTrending = (a: ProjectType, b: ProjectType) => {
-    return calculateProjectScore(b, { timeDecayDays: 1 }) - calculateProjectScore(a, { timeDecayDays: 1 });
+    return calculateProjectScore(b, { timeDecayDays: 7 }) - calculateProjectScore(a, { timeDecayDays: 7 });
   };
 
   const sortByThisMonthTrending = (a: ProjectType, b: ProjectType) => {
-    return calculateProjectScore(b, { timeDecayDays: 20 }) - calculateProjectScore(a, { timeDecayDays: 20 });
+    return calculateProjectScore(b, { timeDecayDays: 30 }) - calculateProjectScore(a, { timeDecayDays: 30 });
   };
 
   const sortByBestOfAllTime = (a: ProjectType, b: ProjectType) => {
     return calculateProjectScore(b, { timeDecayDays: undefined }) - calculateProjectScore(a, { timeDecayDays: undefined });
   };
 
-  // Always show 5 projects, but if not enough in this week, fill with recent projects
-  const trendingThisWeek = thisWeekProjects.length >= 5 
-    ? thisWeekProjects.sort(sortByThisWeekTrending).slice(0, 5)
-    : [
-        ...thisWeekProjects.sort(sortByThisWeekTrending),
-        ...projects
-          .filter(p => !thisWeekProjects.includes(p))
-          .sort(sortByThisWeekTrending)
-          .slice(0, 5 - thisWeekProjects.length)
-      ];
-
-  const trendingThisMonth = thisMonthProjects.sort(sortByThisMonthTrending).slice(0, 5);
-  const bestOfAllTime = allTimeProjects.sort(sortByBestOfAllTime).slice(0, 5);
+  const trendingThisWeek = [...projects].sort(sortByThisWeekTrending).slice(0, 5);
+  const trendingThisMonth = [...projects].sort(sortByThisMonthTrending).slice(0, 5);
+  const bestOfAllTime = [...projects].sort(sortByBestOfAllTime).slice(0, 5);
 
   const sectionVariants = {
     hidden: { opacity: 0, y: 20 },
