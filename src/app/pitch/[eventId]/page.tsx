@@ -266,14 +266,21 @@ function VotingPhase({
   const [exitDirection, setExitDirection] = useState<"left" | "right">("left");
 
   // Projects to vote on: exclude user's own projects and already seen cards.
+  // Shuffled so each voter gets a different order; voted cards are filtered out
+  // so reshuffles between swipes don't show a card twice.
   const deck = useMemo(() => {
     if (!userInfo) return [];
-    return event.projects.filter(ep => {
+    const filtered = event.projects.filter(ep => {
       if (ep.addedById === userInfo.id) return false;
       if (seenIds.has(ep.project.id)) return false;
       if (getViewerPitchVote(ep, userInfo.id)) return false;
       return true;
     });
+    for (let i = filtered.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [filtered[i], filtered[j]] = [filtered[j], filtered[i]];
+    }
+    return filtered;
   }, [event.projects, userInfo, seenIds]);
 
   const currentCard = deck[0] ?? null;
