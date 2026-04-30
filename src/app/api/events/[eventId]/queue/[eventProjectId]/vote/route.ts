@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import prisma from "@/lib/prisma";
 
+const VOTE_VALUES = new Set(["LIKE", "DISLIKE"]);
+
 async function getAuthorizedHacker() {
   const { userId: clerkId } = auth();
   if (!clerkId) {
@@ -44,7 +46,7 @@ async function getActiveEventProject(eventId: string, eventProjectId: string) {
   if (eventProject.event.phase === "FINISHED") {
     return {
       error: NextResponse.json(
-        { message: "Pitch likes can only be changed while the event is active" },
+        { message: "Pitch votes can only be changed while the event is active" },
         { status: 400 }
       ),
     };
@@ -53,7 +55,7 @@ async function getActiveEventProject(eventId: string, eventProjectId: string) {
   return { eventProject };
 }
 
-export async function POST(
+export async function PUT(
   req: Request,
   { params }: { params: { eventId: string; eventProjectId: string } }
 ) {
@@ -67,24 +69,37 @@ export async function POST(
     );
     if (eventProjectResult.error) return eventProjectResult.error;
 
+    const body = await req.json().catch(() => ({}));
+    const value = body?.value;
+    if (!VOTE_VALUES.has(value)) {
+      return NextResponse.json({ message: "value must be LIKE or DISLIKE" }, { status: 400 });
+    }
+
     const { hacker } = authResult;
     const { eventProject } = eventProjectResult;
 
-    const [, pitchLike] = await prisma.$transaction([
-      prisma.projectLike.upsert({
-        where: {
-          projectId_hackerId: {
+    const operations: any[] = [];
+
+    if (value === "LIKE") {
+      operations.push(
+        prisma.projectLike.upsert({
+          where: {
+            projectId_hackerId: {
+              projectId: eventProject.projectId,
+              hackerId: hacker.id,
+            },
+          },
+          create: {
             projectId: eventProject.projectId,
             hackerId: hacker.id,
           },
-        },
-        create: {
-          projectId: eventProject.projectId,
-          hackerId: hacker.id,
-        },
-        update: {},
-      }),
-      prisma.eventProjectLike.upsert({
+          update: {},
+        })
+      );
+    }
+
+    operations.push(
+      prisma.eventProjectVote.upsert({
         where: {
           eventProjectId_hackerId: {
             eventProjectId: eventProject.id,
@@ -94,14 +109,20 @@ export async function POST(
         create: {
           eventProjectId: eventProject.id,
           hackerId: hacker.id,
+          value,
         },
-        update: {},
-      }),
-    ]);
+        update: {
+          value,
+        },
+      })
+    );
 
-    return NextResponse.json(pitchLike);
+    const results = await prisma.$transaction(operations);
+    const vote = results[results.length - 1];
+
+    return NextResponse.json(vote);
   } catch (error) {
-    console.error("[EVENT_PROJECT_LIKE_POST]", error);
+    console.error("[EVENT_PROJECT_VOTE_PUT]", error);
     return new NextResponse("Internal Error", { status: 500 });
   }
 }
@@ -123,7 +144,7 @@ export async function DELETE(
     const { hacker } = authResult;
     const { eventProject } = eventProjectResult;
 
-    await prisma.eventProjectLike.deleteMany({
+    await prisma.eventProjectVote.deleteMany({
       where: {
         eventProjectId: eventProject.id,
         hackerId: hacker.id,
@@ -132,7 +153,7 @@ export async function DELETE(
 
     return new NextResponse(null, { status: 204 });
   } catch (error) {
-    console.error("[EVENT_PROJECT_LIKE_DELETE]", error);
+    console.error("[EVENT_PROJECT_VOTE_DELETE]", error);
     return new NextResponse("Internal Error", { status: 500 });
   }
 }

@@ -42,3 +42,7 @@ next-env.d.ts
 
 # Add this line
 sundai-dev-bucket-key.json
+
+test_screenshots
+
+.playwright-mcp

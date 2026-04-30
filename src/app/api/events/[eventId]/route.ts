@@ -14,7 +14,7 @@ export async function GET(
         projects: {
           orderBy: { position: "asc" },
           include: {
-            pitchLikes: { select: { hackerId: true, createdAt: true } },
+            pitchVotes: { select: { hackerId: true, value: true, createdAt: true } },
             project: {
               include: {
                 thumbnail: true,
@@ -148,7 +148,7 @@ export async function PATCH(
         projects: {
           orderBy: { position: "asc" },
           include: {
-            pitchLikes: { select: { hackerId: true, createdAt: true } },
+            pitchVotes: { select: { hackerId: true, value: true, createdAt: true } },
             project: {
               include: {
                 thumbnail: true,

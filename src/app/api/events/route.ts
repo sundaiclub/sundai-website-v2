@@ -11,7 +11,7 @@ export async function GET(req: Request) {
         projects: {
           orderBy: { position: "asc" },
           include: {
-            pitchLikes: { select: { hackerId: true, createdAt: true } },
+            pitchVotes: { select: { hackerId: true, value: true, createdAt: true } },
             project: {
               include: {
                 thumbnail: true,
@@ -79,4 +79,3 @@ export async function POST(req: Request) {
     return new NextResponse("Internal Error", { status: 500 });
   }
 }
-

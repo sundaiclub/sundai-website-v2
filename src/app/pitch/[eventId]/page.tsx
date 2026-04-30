@@ -11,6 +11,7 @@ import { formatDateTimeLocalValue, serializeDateTimeLocalValue } from "@/lib/dat
 
 type PitchPhase = "WAITING" | "PRESENTING" | "QUESTIONS" | "COMPLETED";
 type EventPhase = "VOTING" | "PITCHING" | "FINISHED";
+type EventProjectVoteValue = "LIKE" | "DISLIKE";
 
 type EventProjectEntry = {
   id: string;
@@ -26,8 +27,9 @@ type EventProjectEntry = {
   completedAt: string | null;
   allottedPresentingSec: number | null;
   allottedQuestionsSec: number | null;
-  pitchLikes: Array<{
+  pitchVotes: Array<{
     hackerId: string;
+    value: EventProjectVoteValue;
     createdAt: string;
   }>;
 };
@@ -51,43 +53,51 @@ type EventDetail = {
   projects: EventProjectEntry[];
 };
 
-function applyPitchLikeToEvent(
+function getPitchLikeCount(ep: EventProjectEntry) {
+  return ep.pitchVotes.filter((vote) => vote.value === "LIKE").length;
+}
+
+function getViewerPitchVote(ep: EventProjectEntry, hackerId?: string | null) {
+  return ep.pitchVotes.find((vote) => vote.hackerId === hackerId) ?? null;
+}
+
+function applyPitchVoteToEvent(
   event: EventDetail,
   eventProjectId: string,
   hackerId: string,
-  isLiked: boolean
+  value: EventProjectVoteValue | null
 ): EventDetail {
   return {
     ...event,
     projects: event.projects.map((ep) => {
       if (ep.id !== eventProjectId) return ep;
 
-      const nextLike = {
+      const nextVote = {
         hackerId,
+        value: value ?? "LIKE",
         createdAt: new Date().toISOString(),
       };
 
-      const alreadyPitchLiked = ep.pitchLikes.some(
-        (like) => like.hackerId === hackerId
-      );
       const alreadyProjectLiked = ep.project.likes.some(
         (like) => like.hackerId === hackerId
       );
 
       return {
         ...ep,
-        pitchLikes: isLiked
-          ? ep.pitchLikes.filter((like) => like.hackerId !== hackerId)
-          : alreadyPitchLiked
-          ? ep.pitchLikes
-          : [...ep.pitchLikes, nextLike],
+        pitchVotes: value === null
+          ? ep.pitchVotes.filter((vote) => vote.hackerId !== hackerId)
+          : ep.pitchVotes.some((vote) => vote.hackerId === hackerId)
+          ? ep.pitchVotes.map((vote) =>
+              vote.hackerId === hackerId ? nextVote : vote
+            )
+          : [...ep.pitchVotes, nextVote],
         project: {
           ...ep.project,
-          likes: isLiked
+          likes: value !== "LIKE"
             ? ep.project.likes
             : alreadyProjectLiked
             ? ep.project.likes
-            : [...ep.project.likes, nextLike],
+            : [...ep.project.likes, { hackerId, createdAt: nextVote.createdAt }],
         },
       };
     }),
@@ -261,6 +271,7 @@ function VotingPhase({
     return event.projects.filter(ep => {
       if (ep.addedById === userInfo.id) return false;
       if (seenIds.has(ep.project.id)) return false;
+      if (getViewerPitchVote(ep, userInfo.id)) return false;
       return true;
     });
   }, [event.projects, userInfo, seenIds]);
@@ -273,52 +284,39 @@ function VotingPhase({
     setSeenIds(prev => new Set(prev).add(currentCard.project.id));
     try {
       const response = await fetch(
-        `/api/events/${event.id}/queue/${currentCard.id}/like`,
-        { method: "POST" }
+        `/api/events/${event.id}/queue/${currentCard.id}/vote`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ value: "LIKE" }),
+        }
       );
       if (!response.ok) return;
-
-      setEvent({
-        ...event,
-        projects: event.projects.map((ep) => {
-          if (ep.id !== currentCard.id) return ep;
-
-          const nextLike = {
-            hackerId: userInfo.id,
-            createdAt: new Date().toISOString() as any,
-          };
-
-          const alreadyPitchLiked = ep.pitchLikes.some(
-            (like) => like.hackerId === userInfo.id
-          );
-          const alreadyProjectLiked = ep.project.likes.some(
-            (like) => like.hackerId === userInfo.id
-          );
-
-          return {
-            ...ep,
-            pitchLikes: alreadyPitchLiked
-              ? ep.pitchLikes
-              : [...ep.pitchLikes, nextLike],
-            project: {
-              ...ep.project,
-              likes: alreadyProjectLiked
-                ? ep.project.likes
-                : [...ep.project.likes, nextLike],
-            },
-          };
-        }),
-      });
+      setEvent(applyPitchVoteToEvent(event, currentCard.id, userInfo.id, "LIKE"));
     } catch (err) {
       console.error("like error", err);
     }
   }, [currentCard, event, setEvent, userInfo]);
 
-  const handleSwipeLeft = useCallback(() => {
-    if (!currentCard) return;
+  const handleSwipeLeft = useCallback(async () => {
+    if (!currentCard || !userInfo) return;
     setExitDirection("left");
     setSeenIds(prev => new Set(prev).add(currentCard.project.id));
-  }, [currentCard]);
+    try {
+      const response = await fetch(
+        `/api/events/${event.id}/queue/${currentCard.id}/vote`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ value: "DISLIKE" }),
+        }
+      );
+      if (!response.ok) return;
+      setEvent(applyPitchVoteToEvent(event, currentCard.id, userInfo.id, "DISLIKE"));
+    } catch (err) {
+      console.error("dislike error", err);
+    }
+  }, [currentCard, event, setEvent, userInfo]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -524,12 +522,18 @@ function VotingQueuePanel({
     }
 
     const response = await fetch(
-      `/api/events/${event.id}/queue/${eventProjectId}/like`,
-      { method: isLiked ? "DELETE" : "POST" }
+      `/api/events/${event.id}/queue/${eventProjectId}/vote`,
+      isLiked
+        ? { method: "DELETE" }
+        : {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ value: "LIKE" }),
+          }
     );
     if (!response.ok) return;
 
-    setEvent(applyPitchLikeToEvent(event, eventProjectId, userInfo.id, isLiked));
+    setEvent(applyPitchVoteToEvent(event, eventProjectId, userInfo.id, isLiked ? null : "LIKE"));
   };
 
   return (
@@ -543,9 +547,7 @@ function VotingQueuePanel({
       ) : (
         <div className="max-h-96 overflow-y-auto space-y-2 pr-1">
           {allOrdered.map((ep, idx) => {
-            const isPitchLiked = ep.pitchLikes.some(
-              (like) => like.hackerId === userInfo?.id
-            );
+            const isPitchLiked = getViewerPitchVote(ep, userInfo?.id)?.value === "LIKE";
             const isCurrent = ep.status === "CURRENT";
             const isPast = ep.status === "DONE" || ep.status === "SKIPPED";
             const isTopGroup = topGroupIds.has(ep.id);
@@ -658,7 +660,7 @@ function VotingQueuePanel({
                       aria-label={`Like ${ep.project.title} in this pitch session`}
                     >
                       <span>❤</span>
-                      <span>{ep.pitchLikes.length}</span>
+                      <span>{getPitchLikeCount(ep)}</span>
                     </button>
                   </div>
                 </div>
@@ -952,12 +954,18 @@ function PitchingPhase({
     }
 
     const response = await fetch(
-      `/api/events/${event.id}/queue/${eventProjectId}/like`,
-      { method: isLiked ? "DELETE" : "POST" }
+      `/api/events/${event.id}/queue/${eventProjectId}/vote`,
+      isLiked
+        ? { method: "DELETE" }
+        : {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ value: "LIKE" }),
+          }
     );
     if (!response.ok) return;
 
-    setEvent(applyPitchLikeToEvent(event, eventProjectId, userInfo.id, isLiked));
+    setEvent(applyPitchVoteToEvent(event, eventProjectId, userInfo.id, isLiked ? null : "LIKE"));
   };
 
   const advance = async () => {
@@ -1085,9 +1093,7 @@ function PitchingPhase({
           </div>
           <div className="max-h-96 overflow-y-auto space-y-2 pr-1">
             {allOrdered.map((ep, idx) => {
-              const isPitchLiked = ep.pitchLikes.some(
-                (like) => like.hackerId === userInfo?.id
-              );
+              const isPitchLiked = getViewerPitchVote(ep, userInfo?.id)?.value === "LIKE";
               const isCurrent = ep.status === "CURRENT";
               const isPast = ep.status === "DONE" || ep.status === "SKIPPED";
               const isTopGroup = topGroupIds.has(ep.id);
@@ -1308,7 +1314,7 @@ function PitchingPhase({
                         aria-label={`Like ${ep.project.title} in this pitch session`}
                       >
                         <span>❤</span>
-                        <span>{ep.pitchLikes.length}</span>
+                        <span>{getPitchLikeCount(ep)}</span>
                       </button>
                     </div>
                   </div>

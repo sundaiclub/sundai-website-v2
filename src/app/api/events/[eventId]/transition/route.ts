@@ -97,7 +97,7 @@ export async function POST(
       const eventProjects = await prisma.eventProject.findMany({
         where: { eventId: params.eventId },
         include: {
-          pitchLikes: { select: { id: true } },
+          pitchVotes: { select: { id: true, value: true } },
         },
         orderBy: { createdAt: "asc" },
       });

@@ -34,7 +34,7 @@ model Hacker {
   ledProjects Project[] @relation("LaunchLead")
   images      Image[]   @relation("HackerImages")
   likes       ProjectLike[]
-  pitchLikes  EventProjectLike[]
+  pitchVotes  EventProjectVote[]
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   attendanceRecords    Attendance[]
@@ -284,24 +284,31 @@ model EventProject {
   completedAt           DateTime?
   allottedPresentingSec Int?
   allottedQuestionsSec  Int?
-  pitchLikes            EventProjectLike[]
+  pitchVotes            EventProjectVote[]
 
   @@unique([eventId, projectId])
   @@index([eventId, position])
   @@index([status])
 }
 
-model EventProjectLike {
+model EventProjectVote {
   id             String       @id @default(uuid())
   eventProject   EventProject @relation(fields: [eventProjectId], references: [id])
   eventProjectId String
   hacker         Hacker       @relation(fields: [hackerId], references: [id])
   hackerId       String
+  value          EventProjectVoteValue
   createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 
   @@unique([eventProjectId, hackerId])
   @@index([eventProjectId])
   @@index([hackerId])
+}
+
+enum EventProjectVoteValue {
+  LIKE
+  DISLIKE
 }
 
 enum EventProjectStatus {
