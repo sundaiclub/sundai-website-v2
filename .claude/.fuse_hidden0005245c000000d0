@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx jest:*)",
+      "Bash(ls:*)",
+      "Bash(wc:*)",
+      "Bash(grep:*)",
+      "Bash(npx tsc:*)",
+      "Bash(grep -n \"current\\\\|advance\\\\|fetch.*api\" /run/media/andrew/spinny_boi/coding/sundai-website-v2/src/app/pitch/[eventId]/page.tsx)",
+      "Bash(grep -n \"QueuePanel\\\\|setCurrentProject\\\\|/api/events.*current\" /run/media/andrew/spinny_boi/coding/sundai-website-v2/src/app/pitch/[eventId]/page.tsx)"
+    ]
+  }
+}

@@ -32,6 +32,7 @@ export default function AllProjectsList() {
           showSearch={true}
           urlFilters={urlFilters}
           variant="compact"
+          enablePagination={true}
         />
       </div>
     </div>

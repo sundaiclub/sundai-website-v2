@@ -13,6 +13,14 @@ export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
     const status = searchParams.get("status");
+    const limitParam = searchParams.get("limit");
+    const offsetParam = searchParams.get("offset");
+    const shouldReturnAll = searchParams.get("all") === "true";
+    const limit = Number.parseInt(limitParam || "", 10);
+    const offset = Number.parseInt(offsetParam || "", 10);
+    const hasPagination = !shouldReturnAll && Number.isFinite(limit) && limit > 0;
+    const safeLimit = hasPagination ? Math.min(limit, 50) : undefined;
+    const safeOffset = Number.isFinite(offset) && offset >= 0 ? offset : 0;
 
     // Determine hack_type based on environment
     const isResearchSite = process.env.IS_RESEARCH_SITE === 'true';
@@ -78,19 +86,32 @@ export async function GET(req: Request) {
           createdAt: "desc",
         },
       ],
+      ...(hasPagination
+        ? {
+            skip: safeOffset,
+            take: safeLimit! + 1,
+          }
+        : {}),
     });
 
-    return NextResponse.json(
-      projects.map((project) => ({
-        ...project,
-        likes: project.likes.map((like) => ({
-          hackerId: like.hackerId,
-          createdAt: like.createdAt,
-        })),
-        createdAt: project.createdAt.toISOString(),
-        updatedAt: project.updatedAt.toISOString(),
-      }))
-    );
+    const serializedProjects = projects.map((project) => ({
+      ...project,
+      likes: project.likes.map((like) => ({
+        hackerId: like.hackerId,
+        createdAt: like.createdAt,
+      })),
+      createdAt: project.createdAt.toISOString(),
+      updatedAt: project.updatedAt.toISOString(),
+    }));
+
+    if (hasPagination) {
+      return NextResponse.json({
+        projects: serializedProjects.slice(0, safeLimit),
+        hasMore: serializedProjects.length > safeLimit!,
+      });
+    }
+
+    return NextResponse.json(serializedProjects);
   } catch (error) {
     console.error("Error fetching projects:", error);
     return NextResponse.json(

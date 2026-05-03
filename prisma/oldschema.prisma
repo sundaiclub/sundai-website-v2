@@ -32,8 +32,6 @@ model Hacker {
   likes       ProjectLike[]
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
-  pushSubscriptions PushSubscription[]
-  notifications Notification[]
   attendanceRecords    Attendance[]
   verifiedAttendances  Attendance[] @relation("AttendanceVerifications")
   totalMinutesAttended Int          @default(0)
@@ -119,41 +117,6 @@ model ProjectLike {
   @@index([hackerId])
 }
 
-model PushSubscription {
-  id          String    @id @default(uuid())
-  endpoint    String    @unique
-  p256dh      String    // Public key
-  auth        String    // Auth secret
-  hacker      Hacker    @relation(fields: [hackerId], references: [id])
-  hackerId    String
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-
-  // Notification preferences
-  notifyNewProjects     Boolean   @default(true)
-  notifyProjectUpdates  Boolean   @default(true)
-  notifyLikes          Boolean   @default(true)
-  notifyNewMembers     Boolean   @default(true)
-
-  @@index([hackerId])
-}
-
-model Notification {
-  id          String    @id @default(uuid())
-  type        NotificationType
-  title       String
-  body        String
-  icon        String?   // URL to notification icon
-  data        Json?     // Additional data like URLs
-  hacker      Hacker    @relation(fields: [hackerId], references: [id])
-  hackerId    String
-  read        Boolean   @default(false)
-  createdAt   DateTime  @default(now())
-
-  @@index([hackerId])
-  @@index([createdAt])
-}
-
 model Attendance {
   id          String    @id @default(uuid())
   hacker      Hacker    @relation(fields: [hackerId], references: [id])
@@ -203,12 +166,4 @@ enum Role {
 enum ProjectStatus {
   PENDING
   APPROVED
-}
-
-enum NotificationType {
-  NEW_PROJECT
-  PROJECT_UPDATE
-  NEW_LIKE
-  NEW_MEMBER
-  CUSTOM
 }

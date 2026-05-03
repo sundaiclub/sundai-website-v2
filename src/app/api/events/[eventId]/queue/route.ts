@@ -71,13 +71,6 @@ export async function POST(
       },
     });
 
-    // Auto-like the project for the submitting user (upsert to avoid duplicates)
-    await prisma.projectLike.upsert({
-      where: { projectId_hackerId: { projectId, hackerId: user.id } },
-      create: { projectId, hackerId: user.id },
-      update: {},
-    });
-
     return NextResponse.json(item);
   } catch (error) {
     console.error("[QUEUE_JOIN_POST]", error);
