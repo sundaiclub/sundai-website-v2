@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { useUser, SignInButton } from "@clerk/nextjs";
 import { useTheme } from "../../contexts/ThemeContext";
@@ -8,6 +8,7 @@ import { Project, ProjectCard } from "../../components/Project";
 import { motion, AnimatePresence, PanInfo } from "framer-motion";
 import ReactMarkdown from "react-markdown";
 import { formatDateTimeLocalValue, serializeDateTimeLocalValue } from "@/lib/datetimeLocal";
+import { reconcileVoteDeckIds } from "@/lib/votingDeck";
 
 type PitchPhase = "WAITING" | "PRESENTING" | "QUESTIONS" | "COMPLETED";
 type EventPhase = "VOTING" | "PITCHING" | "FINISHED";
@@ -102,6 +103,15 @@ function applyPitchVoteToEvent(
       };
     }),
   };
+}
+
+function shuffleProjectIds(projectIds: string[]) {
+  const shuffled = [...projectIds];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
 }
 
 function getStageBadgeStyles(phase: EventPhase) {
@@ -262,33 +272,68 @@ function VotingPhase({
 }) {
   const [votingStarted, setVotingStarted] = useState(false);
   const [seenIds, setSeenIds] = useState<Set<string>>(new Set());
+  const [deckIds, setDeckIds] = useState<string[]>([]);
   const [transitioning, setTransitioning] = useState(false);
   const [exitDirection, setExitDirection] = useState<"left" | "right">("left");
+  const deckInitializedRef = useRef(false);
+  const userId = userInfo?.id;
 
-  // Projects to vote on: exclude user's own projects and already seen cards.
-  // Shuffled so each voter gets a different order; voted cards are filtered out
-  // so reshuffles between swipes don't show a card twice.
-  const deck = useMemo(() => {
-    if (!userInfo) return [];
-    const filtered = event.projects.filter(ep => {
-      if (ep.addedById === userInfo.id) return false;
-      if (seenIds.has(ep.project.id)) return false;
-      if (getViewerPitchVote(ep, userInfo.id)) return false;
-      return true;
-    });
-    for (let i = filtered.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [filtered[i], filtered[j]] = [filtered[j], filtered[i]];
+  const eligibleProjectIds = useMemo(() => {
+    if (!userId) return [];
+    return event.projects
+      .filter(ep => {
+        if (ep.addedById === userId) return false;
+        if (seenIds.has(ep.project.id)) return false;
+        if (getViewerPitchVote(ep, userId)) return false;
+        return true;
+      })
+      .map(ep => ep.project.id);
+  }, [event.projects, userId, seenIds]);
+
+  const eventProjectByProjectId = useMemo(() => {
+    return new Map(event.projects.map(ep => [ep.project.id, ep]));
+  }, [event.projects]);
+
+  useEffect(() => {
+    deckInitializedRef.current = false;
+    setDeckIds([]);
+    setSeenIds(new Set());
+  }, [event.id, userId]);
+
+  useEffect(() => {
+    if (!userId) {
+      deckInitializedRef.current = false;
+      setDeckIds([]);
+      return;
     }
-    return filtered;
-  }, [event.projects, userInfo, seenIds]);
 
-  const currentCard = deck[0] ?? null;
+    const nextEligibleProjectIds = deckInitializedRef.current
+      ? eligibleProjectIds
+      : shuffleProjectIds(eligibleProjectIds);
+
+    setDeckIds(prev => {
+      const next = reconcileVoteDeckIds(prev, nextEligibleProjectIds, seenIds);
+      if (next.length === prev.length && next.every((id, index) => id === prev[index])) {
+        return prev;
+      }
+      return next;
+    });
+    deckInitializedRef.current = true;
+  }, [eligibleProjectIds, seenIds, userId]);
+
+  const currentCard = useMemo(() => {
+    for (const projectId of deckIds) {
+      const eventProject = eventProjectByProjectId.get(projectId);
+      if (eventProject) return eventProject;
+    }
+    return null;
+  }, [deckIds, eventProjectByProjectId]);
 
   const handleSwipeRight = useCallback(async () => {
-    if (!currentCard || !userInfo) return;
+    if (!currentCard || !userId) return;
     setExitDirection("right");
     setSeenIds(prev => new Set(prev).add(currentCard.project.id));
+    setDeckIds(prev => prev.filter(projectId => projectId !== currentCard.project.id));
     try {
       const response = await fetch(
         `/api/events/${event.id}/queue/${currentCard.id}/vote`,
@@ -299,16 +344,17 @@ function VotingPhase({
         }
       );
       if (!response.ok) return;
-      setEvent(applyPitchVoteToEvent(event, currentCard.id, userInfo.id, "LIKE"));
+      setEvent(applyPitchVoteToEvent(event, currentCard.id, userId, "LIKE"));
     } catch (err) {
       console.error("like error", err);
     }
-  }, [currentCard, event, setEvent, userInfo]);
+  }, [currentCard, event, setEvent, userId]);
 
   const handleSwipeLeft = useCallback(async () => {
-    if (!currentCard || !userInfo) return;
+    if (!currentCard || !userId) return;
     setExitDirection("left");
     setSeenIds(prev => new Set(prev).add(currentCard.project.id));
+    setDeckIds(prev => prev.filter(projectId => projectId !== currentCard.project.id));
     try {
       const response = await fetch(
         `/api/events/${event.id}/queue/${currentCard.id}/vote`,
@@ -319,11 +365,11 @@ function VotingPhase({
         }
       );
       if (!response.ok) return;
-      setEvent(applyPitchVoteToEvent(event, currentCard.id, userInfo.id, "DISLIKE"));
+      setEvent(applyPitchVoteToEvent(event, currentCard.id, userId, "DISLIKE"));
     } catch (err) {
       console.error("dislike error", err);
     }
-  }, [currentCard, event, setEvent, userInfo]);
+  }, [currentCard, event, setEvent, userId]);
 
   // Keyboard shortcuts
   useEffect(() => {
