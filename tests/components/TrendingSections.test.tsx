@@ -279,26 +279,31 @@ describe('TrendingSections Component', () => {
     expect(screen.getAllByText('A test project description')[0]).toBeInTheDocument()
   })
 
-  it('surfaces older projects when they receive fresh likes', async () => {
-    const staleProject = {
+  it('surfaces older projects in Hot This Week when they receive likes in the previous 14 days', async () => {
+    const olderProjectWithFreshLikes = {
       ...mockProject,
-      id: 'stale-project',
-      title: 'Stale Project',
-      likes: Array.from({ length: 4 }, (_, index) => ({
-        hackerId: `stale-${index}`,
-        createdAt: '2026-01-01T00:00:00.000Z',
-      })),
-    }
-
-    const freshProject = {
-      ...mockProject,
-      id: 'fresh-project',
-      title: 'Fresh Project',
+      id: 'old-project-with-fresh-likes',
+      title: 'Old Project With Fresh Likes',
+      startDate: new Date('2024-01-01'),
       likes: [
         { hackerId: 'fresh-1', createdAt: '2026-04-13T00:00:00.000Z' },
         { hackerId: 'fresh-2', createdAt: '2026-04-14T00:00:00.000Z' },
+        { hackerId: 'stale-1', createdAt: '2026-01-01T00:00:00.000Z' },
+        { hackerId: 'stale-2', createdAt: '2026-01-02T00:00:00.000Z' },
+        { hackerId: 'stale-3', createdAt: '2026-01-03T00:00:00.000Z' },
       ],
     }
+
+    const newerProjectsWithStaleLikes = Array.from({ length: 5 }, (_, projectIndex) => ({
+      ...mockProject,
+      id: `new-project-${projectIndex}`,
+      title: `New Project ${projectIndex}`,
+      startDate: new Date('2026-04-14'),
+      likes: Array.from({ length: 4 }, (_, likeIndex) => ({
+        hackerId: `stale-${projectIndex}-${likeIndex}`,
+        createdAt: '2026-01-01T00:00:00.000Z',
+      })),
+    }))
 
     jest.useFakeTimers().setSystemTime(new Date('2026-04-14T00:00:00.000Z'))
 
@@ -306,7 +311,7 @@ describe('TrendingSections Component', () => {
       await act(async () => {
         render(
           <TrendingSections
-            projects={[staleProject, freshProject]}
+            projects={[...newerProjectsWithStaleLikes, olderProjectWithFreshLikes]}
             userInfo={mockHacker}
             handleLike={mockHandleLike}
             isDarkMode={false}
@@ -314,7 +319,11 @@ describe('TrendingSections Component', () => {
         )
       })
 
-      expect(screen.getAllByText('Fresh Project')[0]).toBeInTheDocument()
+      expect(screen.getAllByRole('link', { name: /view project/i })[0]).toHaveAttribute(
+        'href',
+        '/projects/old-project-with-fresh-likes'
+      )
+      expect(screen.getAllByText('5')[0]).toBeInTheDocument()
     } finally {
       jest.useRealTimers()
     }

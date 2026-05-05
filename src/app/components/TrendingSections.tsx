@@ -5,6 +5,8 @@ import Link from "next/link";
 import { Project as ProjectType, ProjectCard } from "./Project";
 import { calculateProjectScore } from '@/lib/trending';
 
+const HOT_PROJECT_LIKE_WINDOW_DAYS = 14;
+
 interface TrendingSectionsProps {
   projects: ProjectType[];
   userInfo: any;
@@ -40,7 +42,10 @@ const TrendingProjectCard = ({ project, userInfo, handleLike, isDarkMode, showTr
 export default function TrendingSections({ projects, userInfo, handleLike, isDarkMode }: TrendingSectionsProps) {
   // Sort by appropriate trending score for each category
   const sortByThisWeekTrending = (a: ProjectType, b: ProjectType) => {
-    return calculateProjectScore(b, { timeDecayDays: 7 }) - calculateProjectScore(a, { timeDecayDays: 7 });
+    return (
+      calculateProjectScore(b, { recentLikeWindowDays: HOT_PROJECT_LIKE_WINDOW_DAYS }) -
+      calculateProjectScore(a, { recentLikeWindowDays: HOT_PROJECT_LIKE_WINDOW_DAYS })
+    );
   };
 
   const sortByThisMonthTrending = (a: ProjectType, b: ProjectType) => {

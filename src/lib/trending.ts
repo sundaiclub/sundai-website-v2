@@ -7,12 +7,31 @@ export type Trendable = {
 
 export function calculateTrendingScore(
   project: Trendable,
-  options: { timeDecayDays?: number } = {}
+  options: { timeDecayDays?: number; recentLikeWindowDays?: number } = {}
 ): number {
-  const { timeDecayDays } = options;
+  const { timeDecayDays, recentLikeWindowDays } = options;
 
   const likes = project.likes || [];
   const likesCount = likes.length;
+
+  if (recentLikeWindowDays !== undefined) {
+    if (recentLikeWindowDays <= 0) {
+      return likesCount;
+    }
+
+    const now = new Date();
+    const cutoff = new Date(now);
+    cutoff.setDate(now.getDate() - recentLikeWindowDays);
+
+    return likes.filter((like) => {
+      const likeDate = new Date(like.createdAt as any);
+      return (
+        !Number.isNaN(likeDate.getTime()) &&
+        likeDate >= cutoff &&
+        likeDate <= now
+      );
+    }).length;
+  }
 
   if (timeDecayDays === undefined) {
     return likesCount;
@@ -40,7 +59,7 @@ export function calculateTrendingScore(
 // Alias with the same name used in client code
 export function calculateProjectScore(
   project: Trendable,
-  options: { timeDecayDays?: number } = {}
+  options: { timeDecayDays?: number; recentLikeWindowDays?: number } = {}
 ): number {
   return calculateTrendingScore(project, options);
 }

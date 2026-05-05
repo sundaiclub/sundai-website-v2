@@ -12,6 +12,38 @@ describe('calculateTrendingScore', () => {
     expect(score).toBe(2);
   });
 
+  it('counts only likes from the configured recent window', () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-04-14T00:00:00.000Z'));
+
+    try {
+      const score = calculateTrendingScore(
+        {
+          likes: [
+            { hackerId: 'a', createdAt: '2026-04-01T00:00:00.000Z' },
+            { hackerId: 'b', createdAt: '2026-03-30T23:59:59.000Z' },
+            { hackerId: 'c', createdAt: '2026-04-14T00:00:00.000Z' },
+          ],
+        },
+        { recentLikeWindowDays: 14 }
+      );
+
+      expect(score).toBe(2);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('does not count invalid timestamps in a recent-like window', () => {
+    const score = calculateTrendingScore(
+      {
+        likes: [{ hackerId: 'a', createdAt: 'invalid-date' }],
+      },
+      { recentLikeWindowDays: 14 }
+    );
+
+    expect(score).toBe(0);
+  });
+
   it('favors fresh likes on older projects over stale likes on newer ones', () => {
     jest.useFakeTimers().setSystemTime(new Date('2026-04-14T00:00:00.000Z'));
 
