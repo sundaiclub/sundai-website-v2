@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Project as ProjectType, ProjectCard } from "./Project";
 import { calculateProjectScore } from '@/lib/trending';
 
-const HOT_PROJECT_LIKE_WINDOW_DAYS = 14;
+const HOT_PROJECT_LIKE_WINDOW_DAYS = 7;
 
 interface TrendingSectionsProps {
   projects: ProjectType[];

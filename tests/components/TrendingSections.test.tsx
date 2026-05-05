@@ -279,7 +279,7 @@ describe('TrendingSections Component', () => {
     expect(screen.getAllByText('A test project description')[0]).toBeInTheDocument()
   })
 
-  it('surfaces older projects in Hot This Week when they receive likes in the previous 14 days', async () => {
+  it('surfaces older projects in Hot This Week when they receive likes in the previous 7 days', async () => {
     const olderProjectWithFreshLikes = {
       ...mockProject,
       id: 'old-project-with-fresh-likes',

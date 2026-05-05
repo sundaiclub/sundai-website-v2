@@ -111,7 +111,7 @@ describe('ProjectSearch', () => {
     expect(defaultProps.onFilteredProjectsChange).toHaveBeenCalledWith(expectedOrder);
   });
 
-  it('should sort trending by likes from the previous 14 days across all projects', () => {
+  it('should sort trending by likes from the previous 7 days across all projects', () => {
     jest.useFakeTimers().setSystemTime(new Date('2026-04-14T00:00:00.000Z'));
 
     const olderProjectWithRecentLikes: Project = {
