@@ -1,14 +1,29 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useParams } from "next/navigation";
 import { useUser } from "@clerk/nextjs";
 import NextImage from "next/image";
 import Link from "next/link";
-import { Cog6ToothIcon } from "@heroicons/react/24/outline";
 import { HeartIcon } from "@heroicons/react/24/solid";
-import { PencilIcon, XMarkIcon, CheckIcon } from "@heroicons/react/24/outline";
+import { PencilIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import { useTheme } from "../../contexts/ThemeContext";
 import { swapFirstLetters } from "../../utils/nameUtils";
+
+type ProjectSummary = {
+  id: string;
+  title: string;
+  description: string;
+  thumbnail?: {
+    url: string;
+  } | null;
+  status: "PENDING" | "APPROVED";
+  startDate?: string | null;
+  createdAt?: string | null;
+  likes: Array<{
+    hackerId: string;
+    createdAt: string;
+  }>;
+};
 
 type HackerProfile = {
   id: string;
@@ -27,68 +42,11 @@ type HackerProfile = {
   } | null;
   projects: Array<{
     role: string;
-    project: {
-      id: string;
-      title: string;
-      description: string;
-      thumbnail?: {
-        url: string;
-      } | null;
-      status: "PENDING" | "APPROVED";
-      likes: Array<{
-        hackerId: string;
-        createdAt: string;
-      }>;
-    };
+    project: ProjectSummary;
   }>;
-  ledProjects: Array<{
-    id: string;
-    title: string;
-    description: string;
-    thumbnail?: {
-      url: string;
-    } | null;
-    status: "PENDING" | "APPROVED";
-    likes: Array<{
-      hackerId: string;
-      createdAt: string;
-    }>;
-  }>;
-  likedProjects: Array<{
-    createdAt: string;
-    project: {
-      id: string;
-      title: string;
-      description: string;
-      thumbnail?: {
-        url: string;
-      } | null;
-      status: "PENDING" | "APPROVED";
-      launchLead: {
-        name: string;
-        avatar?: {
-          url: string;
-        } | null;
-      };
-    };
-  }>;
+  ledProjects: ProjectSummary[];
 };
 
-// Add this CSS class to your globals.css or a new CSS module
-const scrollableSection = `
-  overflow-x-auto
-  flex
-  space-x-6
-  pb-4
-  scrollbar-thin
-  scrollbar-thumb-gray-300
-  scrollbar-track-transparent
-  hover:scrollbar-thumb-gray-400
-  -mx-4
-  px-4
-`;
-
-// Add this type for the edit form
 type EditableFields = {
   name: string;
   username: string;
@@ -101,17 +59,25 @@ type EditableFields = {
   phoneNumber: string;
 };
 
-// Add this helper function at the top of the file, after the types
+type ProjectFilter = "all" | "led" | "contributed";
+type ProjectSort = "recent" | "liked";
+
+type DisplayProject = {
+  project: ProjectSummary;
+  source: "led" | "contributed";
+  role: string;
+};
+
 const getStatusBadgeClasses = (status: string) => {
   switch (status) {
-    case 'DRAFT':
-      return 'bg-gray-500';
-    case 'PENDING':
-      return 'bg-orange-500';
-    case 'APPROVED':
-      return 'bg-green-500';
+    case "DRAFT":
+      return "bg-gray-500";
+    case "PENDING":
+      return "bg-orange-500";
+    case "APPROVED":
+      return "bg-green-500";
     default:
-      return 'bg-gray-500';
+      return "bg-gray-500";
   }
 };
 
@@ -135,6 +101,8 @@ export default function HackerProfile() {
   const [currentUserHackerId, setCurrentUserHackerId] = useState<string | null>(
     null
   );
+  const [projectFilter, setProjectFilter] = useState<ProjectFilter>("all");
+  const [projectSort, setProjectSort] = useState<ProjectSort>("recent");
   const { isDarkMode } = useTheme();
 
   const AvatarImage = ({ src, alt, size }: { src: string | null; alt: string; size: number }) => {
@@ -155,7 +123,6 @@ export default function HackerProfile() {
           preloader.onerror = () => setImgSrc(defaultSrc);
           preloader.src = src;
         } else {
-          // If Image constructor not available, optimistically use src
           setImgSrc(src);
         }
       } catch {
@@ -231,7 +198,6 @@ export default function HackerProfile() {
           ...data,
           ledProjects: data.ledProjects || [],
           projects: data.projects || [],
-          likedProjects: data.likedProjects || [],
         });
       } catch (error) {
         console.error("Error fetching hacker data:", error);
@@ -245,6 +211,20 @@ export default function HackerProfile() {
       fetchHacker();
     }
   }, [params?.hackerId]);
+
+  useEffect(() => {
+    if (!isEditing) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setIsEditing(false);
+    };
+    window.addEventListener("keydown", onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [isEditing]);
 
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -268,6 +248,46 @@ export default function HackerProfile() {
       console.error("Error updating profile:", error);
     }
   };
+
+  const allProjects: DisplayProject[] = useMemo(() => {
+    if (!hacker) return [];
+    const seen = new Set<string>();
+    const out: DisplayProject[] = [];
+    for (const project of hacker.ledProjects || []) {
+      if (seen.has(project.id)) continue;
+      seen.add(project.id);
+      out.push({ project, source: "led", role: "Lead" });
+    }
+    for (const { project, role } of hacker.projects || []) {
+      if (seen.has(project.id)) continue;
+      seen.add(project.id);
+      out.push({ project, source: "contributed", role: role || "Contributor" });
+    }
+    return out;
+  }, [hacker]);
+
+  const totalLikes = useMemo(
+    () => allProjects.reduce((sum, p) => sum + (p.project.likes?.length || 0), 0),
+    [allProjects]
+  );
+
+  const visibleProjects = useMemo(() => {
+    const filtered = allProjects.filter((p) => {
+      if (projectFilter === "all") return true;
+      return p.source === projectFilter;
+    });
+    const getRecency = (p: DisplayProject) => {
+      const v = p.project.startDate || p.project.createdAt;
+      return v ? new Date(v).getTime() : 0;
+    };
+    const sorted = [...filtered].sort((a, b) => {
+      if (projectSort === "liked") {
+        return (b.project.likes?.length || 0) - (a.project.likes?.length || 0);
+      }
+      return getRecency(b) - getRecency(a);
+    });
+    return sorted;
+  }, [allProjects, projectFilter, projectSort]);
 
   if (loading) {
     return (
@@ -313,6 +333,25 @@ export default function HackerProfile() {
     );
   }
 
+  const filterButton = (value: ProjectFilter, label: string) => {
+    const active = projectFilter === value;
+    return (
+      <button
+        key={value}
+        onClick={() => setProjectFilter(value)}
+        className={`px-3 py-1.5 rounded-full text-sm font-fira-code transition-colors ${
+          active
+            ? "bg-indigo-600 text-white"
+            : isDarkMode
+            ? "bg-gray-700 text-gray-200 hover:bg-gray-600"
+            : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+        }`}
+      >
+        {label}
+      </button>
+    );
+  };
+
   return (
     <div
       className={`min-h-screen py-20 ${
@@ -333,398 +372,110 @@ export default function HackerProfile() {
                 <AvatarImage src={hacker.avatar?.url || null} alt={swapFirstLetters(hacker.name)} size={192} />
               </div>
               <div className="mt-4 sm:mt-0 sm:ml-6 text-center sm:text-left flex-grow">
-                {isEditing ? (
-                  <form onSubmit={handleEditSubmit} className="space-y-4">
-                    <input
-                      type="text"
-                      value={editForm.name}
-                      onChange={(e) =>
-                        setEditForm({ ...editForm, name: e.target.value })
-                      }
-                      className={`w-full px-3 py-2 border rounded-lg ${
-                        isDarkMode
-                          ? "bg-gray-700 border-gray-600 text-gray-100"
-                          : "bg-white border-gray-300 text-gray-900"
-                      }`}
-                      placeholder="Name"
-                    />
-                    <input
-                      type="text"
-                      value={editForm.username}
-                      onChange={(e) =>
-                        setEditForm({ ...editForm, username: e.target.value })
-                      }
-                      className={`w-full px-3 py-2 border rounded-lg ${
-                        isDarkMode
-                          ? "bg-gray-700 border-gray-600 text-gray-100"
-                          : "bg-white border-gray-300 text-gray-900"
-                      }`}
-                      placeholder="Username"
-                    />
-                    <textarea
-                      value={editForm.bio}
-                      onChange={(e) =>
-                        setEditForm({ ...editForm, bio: e.target.value })
-                      }
-                      className={`w-full px-3 py-2 border rounded-lg ${
-                        isDarkMode
-                          ? "bg-gray-700 border-gray-600 text-gray-100"
-                          : "bg-white border-gray-300 text-gray-900"
-                      }`}
-                      placeholder="Bio"
-                      rows={3}
-                    />
-                    <input
-                      type="url"
-                      value={editForm.githubUrl}
-                      onChange={(e) =>
-                        setEditForm({ ...editForm, githubUrl: e.target.value })
-                      }
-                      className={`w-full px-3 py-2 border rounded-lg ${
-                        isDarkMode
-                          ? "bg-gray-700 border-gray-600 text-gray-100"
-                          : "bg-white border-gray-300 text-gray-900"
-                      }`}
-                      placeholder="GitHub URL"
-                    />
-                    <input
-                      type="url"
-                      value={editForm.linkedinUrl}
-                      onChange={(e) =>
-                        setEditForm({ ...editForm, linkedinUrl: e.target.value })
-                      }
-                      className={`w-full px-3 py-2 border rounded-lg ${
-                        isDarkMode
-                          ? "bg-gray-700 border-gray-600 text-gray-100"
-                          : "bg-white border-gray-300 text-gray-900"
-                      }`}
-                      placeholder="LinkedIn URL"
-                    />
-                    <input
-                      type="url"
-                      value={editForm.twitterUrl}
-                      onChange={(e) =>
-                        setEditForm({ ...editForm, twitterUrl: e.target.value })
-                      }
-                      className={`w-full px-3 py-2 border rounded-lg ${
-                        isDarkMode
-                          ? "bg-gray-700 border-gray-600 text-gray-100"
-                          : "bg-white border-gray-300 text-gray-900"
-                      }`}
-                      placeholder="Twitter URL"
-                    />
-                    <input
-                      type="text"
-                      value={editForm.discordName}
-                      onChange={(e) =>
-                        setEditForm({ ...editForm, discordName: e.target.value })
-                      }
-                      className={`w-full px-3 py-2 border rounded-lg ${
-                        isDarkMode
-                          ? "bg-gray-700 border-gray-600 text-gray-100"
-                          : "bg-white border-gray-300 text-gray-900"
-                      }`}
-                      placeholder="Discord Handle (e.g. @username)"
-                    />
-                    <input
-                      type="url"
-                      value={editForm.websiteUrl}
-                      onChange={(e) =>
-                        setEditForm({ ...editForm, websiteUrl: e.target.value })
-                      }
-                      className={`w-full px-3 py-2 border rounded-lg ${
-                        isDarkMode
-                          ? "bg-gray-700 border-gray-600 text-gray-100"
-                          : "bg-white border-gray-300 text-gray-900"
-                      }`}
-                      placeholder="Website URL"
-                    />
-                    <input
-                      type="tel"
-                      value={editForm.phoneNumber}
-                      onChange={(e) =>
-                        setEditForm({
-                          ...editForm,
-                          phoneNumber: e.target.value,
-                        })
-                      }
-                      className={`w-full px-3 py-2 border rounded-lg ${
-                        isDarkMode
-                          ? "bg-gray-700 border-gray-600 text-gray-100"
-                          : "bg-white border-gray-300 text-gray-900"
-                      }`}
-                      placeholder="Phone Number"
-                    />
-                    <div className="flex justify-end space-x-2">
-                      <button
-                        type="button"
-                        onClick={() => setIsEditing(false)}
-                        className="px-4 py-2 text-gray-600 hover:text-gray-800"
-                      >
-                        <XMarkIcon className="h-5 w-5" />
-                      </button>
-                      <button
-                        type="submit"
-                        className="px-4 py-2 text-green-600 hover:text-green-800"
-                      >
-                        <CheckIcon className="h-5 w-5" />
-                      </button>
-                    </div>
-                  </form>
-                ) : (
-                  <>
-                    <div className="flex justify-between items-start">
-                      <h1
-                        className={`text-3xl font-bold ${
-                          isDarkMode ? "text-gray-100" : "text-gray-900"
-                        }`}
-                      >
-                        {swapFirstLetters(hacker.name)}
-                      </h1>
-                      {isOwnProfile && (
-                        <button
-                          onClick={() => setIsEditing(true)}
-                          className="p-2 text-gray-600 hover:text-gray-800"
-                        >
-                          <PencilIcon className="h-5 w-5" />
-                        </button>
-                      )}
-                    </div>
-                    {hacker.bio && (
-                      <p
-                        className={`mt-2 ${
-                          isDarkMode ? "text-gray-300" : "text-gray-600"
-                        } max-w-2xl font-fira-code`}
-                      >
-                        {hacker.bio.length > 100 
-                          ? `${hacker.bio.substring(0, 100)}...` 
-                          : hacker.bio}
-                      </p>
-                    )}
-                  </>
+                <div className="flex justify-between items-start">
+                  <h1
+                    className={`text-3xl font-bold ${
+                      isDarkMode ? "text-gray-100" : "text-gray-900"
+                    }`}
+                  >
+                    {swapFirstLetters(hacker.name)}
+                  </h1>
+                  {isOwnProfile && (
+                    <button
+                      onClick={() => setIsEditing(true)}
+                      aria-label="Edit profile"
+                      className="p-2 text-gray-600 hover:text-gray-800"
+                    >
+                      <PencilIcon className="h-5 w-5" />
+                    </button>
+                  )}
+                </div>
+                {hacker.bio && (
+                  <p
+                    className={`mt-2 ${
+                      isDarkMode ? "text-gray-300" : "text-gray-600"
+                    } max-w-2xl font-fira-code`}
+                  >
+                    {hacker.bio.length > 100
+                      ? `${hacker.bio.substring(0, 100)}...`
+                      : hacker.bio}
+                  </p>
                 )}
+                <div className="mt-3 flex items-center justify-center sm:justify-start gap-2">
+                  <div
+                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-fira-code ${
+                      isDarkMode
+                        ? "bg-gray-700 text-gray-100"
+                        : "bg-pink-50 text-pink-700"
+                    }`}
+                    aria-label="Total likes across all projects"
+                  >
+                    <HeartIcon className="h-4 w-4 text-pink-500" />
+                    <span>
+                      <span className="font-semibold">{totalLikes}</span>{" "}
+                      total {totalLikes === 1 ? "like" : "likes"}
+                    </span>
+                  </div>
+                </div>
               </div>
             </div>
-
-            {/* Contact & Links */}
-            {/* !isEditing && (
-              <div className="flex flex-wrap gap-4 justify-center sm:justify-start">
-                {hacker.githubUrl && (
-                  <Link
-                    href={hacker.githubUrl}
-                    target="_blank"
-                    className={`flex items-center px-4 py-2 ${
-                      isDarkMode
-                        ? "bg-gray-700 hover:bg-gray-600"
-                        : "bg-gray-100 hover:bg-gray-200"
-                    } rounded-full transition-colors`}
-                  >
-                    <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
-                      <path
-                        fill="currentColor"
-                        d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"
-                      />
-                    </svg>
-                    GitHub
-                  </Link>
-                )}
-                {hacker.linkedinUrl && (
-                  <Link
-                    href={hacker.linkedinUrl}
-                    target="_blank"
-                    className={`flex items-center px-4 py-2 ${
-                      isDarkMode
-                        ? "bg-gray-700 hover:bg-gray-600"
-                        : "bg-blue-100 hover:bg-blue-200"
-                    } rounded-full transition-colors`}
-                  >
-                    <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
-                      <path
-                        fill="currentColor"
-                        d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"
-                      />
-                    </svg>
-                    LinkedIn
-                  </Link>
-                )}
-                {hacker.twitterUrl && (
-                  <Link
-                    href={hacker.twitterUrl}
-                    target="_blank"
-                    className={`flex items-center px-4 py-2 ${
-                      isDarkMode
-                        ? "bg-gray-700 hover:bg-gray-600"
-                        : "bg-sky-100 hover:bg-sky-200"
-                    } rounded-full transition-colors`}
-                  >
-                    <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
-                      <path
-                        fill="currentColor"
-                        d="M24 4.557c-.883.392-1.832.656-2.828.775 1.017-.609 1.798-1.574 2.165-2.724-.951.564-2.005.974-3.127 1.195-.897-.957-2.178-1.555-3.594-1.555-3.179 0-5.515 2.966-4.797 6.045-4.091-.205-7.719-2.165-10.148-5.144-1.29 2.213-.669 5.108 1.523 6.574-.806-.026-1.566-.247-2.229-.616-.054 2.281 1.581 4.415 3.949 4.89-.693.188-1.452.232-2.224.084.626 1.956 2.444 3.379 4.6 3.419-2.07 1.623-4.678 2.348-7.29 2.04 2.179 1.397 4.768 2.212 7.548 2.212 9.142 0 14.307-7.721 13.995-14.646.962-.695 1.797-1.562 2.457-2.549z"
-                      />
-                    </svg>
-                    Twitter
-                  </Link>
-                )}
-                {hacker.email && (
-                  <Link
-                    href={`mailto:${hacker.email}`}
-                    className={`flex items-center px-4 py-2 ${
-                      isDarkMode
-                        ? "bg-gray-700 hover:bg-gray-600 text-gray-200"
-                        : "bg-indigo-100 hover:bg-indigo-200 text-indigo-700"
-                    } rounded-full transition-colors`}
-                  >
-                    <svg
-                      className="w-5 h-5 mr-2"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-                      />
-                    </svg>
-                    Email
-                  </Link>
-                )}
-                {hacker.discordName && (
-                  <Link
-                    href={`https://discord.com/users/${hacker.discordName}`}
-                    target="_blank"
-                    className={`flex items-center px-4 py-2 ${
-                      isDarkMode
-                        ? "bg-gray-700 hover:bg-gray-600"
-                        : "bg-indigo-100 hover:bg-indigo-200"
-                    } rounded-full transition-colors`}
-                  >
-                    <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
-                      <path
-                        fill="currentColor"
-                        d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515a.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0a12.64 12.64 0 0 0-.617-1.25a.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057a19.9 19.9 0 0 0 5.993 3.03a.078.078 0 0 0 .084-.028a14.09 14.09 0 0 0 1.226-1.994a.076.076 0 0 0-.041-.106a13.107 13.107 0 0 1-1.872-.892a.077.077 0 0 1-.008-.128a10.2 10.2 0 0 0 .372-.292a.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127a12.299 12.299 0 0 1-1.873.892a.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028a19.839 19.839 0 0 0 6.002-3.03a.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419c0-1.333.956-2.419 2.157-2.419c1.21 0 2.176 1.096 2.157 2.42c0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419c0-1.333.955-2.419 2.157-2.419c1.21 0 2.176 1.096 2.157 2.42c0 1.333-.946 2.418-2.157 2.418z"
-                      />
-                    </svg>
-                    {hacker.discordName}
-                  </Link>
-                )}
-                {hacker.websiteUrl && (
-                  <Link
-                    href={hacker.websiteUrl}
-                    target="_blank"
-                    className={`flex items-center px-4 py-2 ${
-                      isDarkMode
-                        ? "bg-gray-700 hover:bg-gray-600"
-                        : "bg-purple-100 hover:bg-purple-200"
-                    } rounded-full transition-colors`}
-                  >
-                    <svg 
-                      className="w-5 h-5 mr-2" 
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z"/>
-                      <path d="M3.6 9h16.8"/>
-                      <path d="M3.6 15h16.8"/>
-                      <path d="M12 3a15 15 0 0 1 0 18"/>
-                      <path d="M12 3a15 15 0 0 0 0 18"/>
-                    </svg>
-                    Website
-                  </Link>
-                )}
-              </div>
-            )} */}
           </div>
         </div>
 
         {/* Projects Section */}
         <div className="space-y-8">
-          {/* Led Projects */}
-          {Array.isArray(hacker.ledProjects) &&
-            hacker.ledProjects.length > 0 && (
-              <div className="mb-12">
-                <h2
-                  className={`text-2xl font-bold ${
-                    isDarkMode ? "text-gray-100" : "text-gray-900"
-                  } mb-4`}
-                >
-                  Projects Led
-                </h2>
-                <div className={scrollableSection}>
-                  {hacker.ledProjects.map((project) => (
-                    <Link
-                      key={project.id}
-                      href={`/projects/${project.id}`}
-                      className={`flex-shrink-0 w-80 ${
-                        isDarkMode ? "bg-gray-800" : "bg-white"
-                      } rounded-lg shadow-md hover:shadow-lg transition-shadow overflow-hidden`}
-                    >
-                      <div className="relative h-48">
-                        <NextImage
-                          src={
-                            project.thumbnail?.url ||
-                            (isDarkMode
-                              ? "/images/default_project_thumbnail_dark.svg"
-                              : "/images/default_project_thumbnail_light.svg")
-                          }
-                          alt={project.title}
-                          fill
-                          className="object-cover"
-                        />
-                        <div className="absolute top-2 left-2 flex items-center space-x-1 bg-black/50 px-2 py-1 rounded-full">
-                          <HeartIcon className="h-4 w-4 text-white" />
-                          <span className="text-white text-sm">
-                            {project.likes?.length || 0}
-                          </span>
-                        </div>
-                        <div className={`absolute top-2 right-2 px-2 py-1 ${getStatusBadgeClasses(project.status)} text-white text-sm rounded-full`}>
-                          {project.status.charAt(0) + project.status.slice(1).toLowerCase()}
-                        </div>
-                      </div>
-                      <div className="p-4">
-                        <h3
-                          className={`text-xl font-semibold ${
-                            isDarkMode ? "text-gray-100" : "text-gray-900"
-                          } mb-2`}
-                        >
-                          {project.title}
-                        </h3>
-                        <p
-                          className={`${
-                            isDarkMode ? "text-gray-300" : "text-gray-600"
-                          } line-clamp-2 font-fira-code`}
-                        >
-                          {project.description}
-                        </p>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              </div>
-            )}
-
-          {/* Participated Projects */}
-          {Array.isArray(hacker.projects) && hacker.projects.length > 0 && (
-            <div className="mb-12">
+          <div className="mb-12">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
               <h2
                 className={`text-2xl font-bold ${
                   isDarkMode ? "text-gray-100" : "text-gray-900"
-                } mb-4`}
+                }`}
               >
-                Projects Contributed To
+                Projects
               </h2>
-              <div className={scrollableSection}>
-                {hacker.projects.map(({ project, role }) => (
+              <div className="flex flex-wrap items-center gap-2">
+                {filterButton("all", "All")}
+                {filterButton("led", "Led")}
+                {filterButton("contributed", "Contributed")}
+                <select
+                  value={projectSort}
+                  onChange={(e) =>
+                    setProjectSort(e.target.value as ProjectSort)
+                  }
+                  className={`px-3 py-1.5 rounded-full text-sm font-fira-code border ${
+                    isDarkMode
+                      ? "bg-gray-700 border-gray-600 text-gray-100"
+                      : "bg-white border-gray-300 text-gray-700"
+                  }`}
+                  aria-label="Sort projects"
+                >
+                  <option value="recent">Most Recent</option>
+                  <option value="liked">Most Liked</option>
+                </select>
+              </div>
+            </div>
+
+            {visibleProjects.length === 0 ? (
+              <div
+                className={`text-center py-12 ${
+                  isDarkMode ? "bg-gray-800" : "bg-white"
+                } rounded-lg shadow`}
+              >
+                <p
+                  className={`${
+                    isDarkMode ? "text-gray-300" : "text-gray-600"
+                  } font-fira-code`}
+                >
+                  No projects to show
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {visibleProjects.map(({ project, source, role }) => (
                   <Link
                     key={project.id}
                     href={`/projects/${project.id}`}
-                    className={`flex-shrink-0 w-80 ${
+                    className={`${
                       isDarkMode ? "bg-gray-800" : "bg-white"
                     } rounded-lg shadow-md hover:shadow-lg transition-shadow overflow-hidden`}
                   >
@@ -740,17 +491,26 @@ export default function HackerProfile() {
                         fill
                         className="object-cover"
                       />
-                      <div className="absolute bottom-2 left-2 px-2 py-1 bg-indigo-600 text-white text-sm rounded-full">
-                        {role}
-                      </div>
-                      <div className={`absolute top-2 right-2 px-2 py-1 ${getStatusBadgeClasses(project.status)} text-white text-sm rounded-full`}>
-                        {project.status.charAt(0) + project.status.slice(1).toLowerCase()}
-                      </div>
                       <div className="absolute top-2 left-2 flex items-center space-x-1 bg-black/50 px-2 py-1 rounded-full">
                         <HeartIcon className="h-4 w-4 text-white" />
                         <span className="text-white text-sm">
                           {project.likes?.length || 0}
                         </span>
+                      </div>
+                      <div
+                        className={`absolute top-2 right-2 px-2 py-1 ${getStatusBadgeClasses(
+                          project.status
+                        )} text-white text-sm rounded-full`}
+                      >
+                        {project.status.charAt(0) +
+                          project.status.slice(1).toLowerCase()}
+                      </div>
+                      <div
+                        className={`absolute bottom-2 left-2 px-2 py-1 text-white text-sm rounded-full ${
+                          source === "led" ? "bg-purple-600" : "bg-indigo-600"
+                        }`}
+                      >
+                        {source === "led" ? "Lead" : role}
                       </div>
                     </div>
                     <div className="p-4">
@@ -772,97 +532,143 @@ export default function HackerProfile() {
                   </Link>
                 ))}
               </div>
-            </div>
-          )}
-
-          {/* Liked Projects */}
-          {Array.isArray(hacker.likedProjects) &&
-            hacker.likedProjects.length > 0 && (
-              <div className="mb-12">
-                <h2
-                  className={`text-2xl font-bold ${
-                    isDarkMode ? "text-gray-100" : "text-gray-900"
-                  } mb-4`}
-                >
-                  Liked Projects
-                </h2>
-                <div className={scrollableSection}>
-                  {hacker.likedProjects.map(({ project, createdAt }) => (
-                    <Link
-                      key={project.id}
-                      href={`/projects/${project.id}`}
-                      className={`flex-shrink-0 w-80 ${
-                        isDarkMode ? "bg-gray-800" : "bg-white"
-                      } rounded-lg shadow-md hover:shadow-lg transition-shadow overflow-hidden`}
-                    >
-                      <div className="relative h-48">
-                        <NextImage
-                          src={
-                            project.thumbnail?.url ||
-                            (isDarkMode
-                              ? "/images/default_project_thumbnail_dark.svg"
-                              : "/images/default_project_thumbnail_light.svg")
-                          }
-                          alt={project.title}
-                          fill
-                          className="object-cover"
-                        />
-                        <div className="absolute bottom-2 left-2 flex items-center space-x-2 bg-black/50 px-3 py-1 rounded-full">
-                          <AvatarImage src={project.launchLead.avatar?.url || null} alt={project.launchLead.name} size={20} />
-                          <span className="text-white text-sm">
-                            {project.launchLead.name}
-                          </span>
-                        </div>
-                        <div className={`absolute top-2 right-2 px-2 py-1 ${getStatusBadgeClasses(project.status)} text-white text-sm rounded-full`}>
-                          {project.status.charAt(0) + project.status.slice(1).toLowerCase()}
-                        </div>
-                      </div>
-                      <div className="p-4">
-                        <div className="flex justify-between items-start mb-2">
-                          <h3
-                            className={`text-xl font-semibold ${
-                              isDarkMode ? "text-gray-100" : "text-gray-900"
-                            }`}
-                          >
-                            {project.title}
-                          </h3>
-                          <span className="text-xs text-gray-500">
-                            {new Date(createdAt).toLocaleDateString()}
-                          </span>
-                        </div>
-                        <p
-                          className={`${
-                            isDarkMode ? "text-gray-300" : "text-gray-600"
-                          } line-clamp-2 font-fira-code`}
-                        >
-                          {project.description}
-                        </p>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              </div>
             )}
-
-          {(!Array.isArray(hacker.projects) || hacker.projects.length === 0) &&
-            (!Array.isArray(hacker.ledProjects) ||
-              hacker.ledProjects.length === 0) && (
-              <div
-                className={`text-center py-12 ${
-                  isDarkMode ? "bg-gray-800" : "bg-white"
-                } rounded-lg shadow`}
-              >
-                <p
-                  className={`${
-                    isDarkMode ? "text-gray-300" : "text-gray-600"
-                  } font-fira-code`}
-                >
-                  No projects yet
-                </p>
-              </div>
-            )}
+          </div>
         </div>
       </div>
+
+      {/* Edit Profile Modal */}
+      {isEditing && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Edit profile"
+          onClick={() => setIsEditing(false)}
+        >
+          <div
+            className={`relative w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-xl shadow-2xl ${
+              isDarkMode ? "bg-gray-800" : "bg-white"
+            }`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              className={`sticky top-0 flex items-center justify-between px-6 py-4 border-b ${
+                isDarkMode
+                  ? "bg-gray-800 border-gray-700"
+                  : "bg-white border-gray-200"
+              }`}
+            >
+              <h2
+                className={`text-xl font-bold ${
+                  isDarkMode ? "text-gray-100" : "text-gray-900"
+                }`}
+              >
+                Edit Profile
+              </h2>
+              <button
+                type="button"
+                onClick={() => setIsEditing(false)}
+                aria-label="Close"
+                className={`p-1 rounded-full ${
+                  isDarkMode
+                    ? "text-gray-300 hover:bg-gray-700"
+                    : "text-gray-500 hover:bg-gray-100"
+                }`}
+              >
+                <XMarkIcon className="h-6 w-6" />
+              </button>
+            </div>
+            <form onSubmit={handleEditSubmit} className="px-6 py-4 space-y-4">
+              {(() => {
+                const fieldClasses = `w-full px-3 py-2 border rounded-lg ${
+                  isDarkMode
+                    ? "bg-gray-700 border-gray-600 text-gray-100"
+                    : "bg-white border-gray-300 text-gray-900"
+                }`;
+                const labelClasses = `block text-xs font-fira-code mb-1 ${
+                  isDarkMode ? "text-gray-400" : "text-gray-500"
+                }`;
+                const fields: Array<{
+                  key: keyof EditableFields;
+                  label: string;
+                  type?: string;
+                  textarea?: boolean;
+                  placeholder?: string;
+                }> = [
+                  { key: "name", label: "Name" },
+                  { key: "username", label: "Username" },
+                  { key: "bio", label: "Bio", textarea: true },
+                  { key: "githubUrl", label: "GitHub URL", type: "url" },
+                  { key: "linkedinUrl", label: "LinkedIn URL", type: "url" },
+                  { key: "twitterUrl", label: "Twitter URL", type: "url" },
+                  {
+                    key: "discordName",
+                    label: "Discord Handle",
+                    placeholder: "Discord Handle (e.g. @username)",
+                  },
+                  { key: "websiteUrl", label: "Website URL", type: "url" },
+                  { key: "phoneNumber", label: "Phone Number", type: "tel" },
+                ];
+                return fields.map(
+                  ({ key, label, type = "text", textarea, placeholder }) => {
+                    const value = editForm[key];
+                    return (
+                      <div key={key}>
+                        <label htmlFor={`profile-${key}`} className={labelClasses}>
+                          {label}
+                        </label>
+                        {textarea ? (
+                          <textarea
+                            id={`profile-${key}`}
+                            value={value}
+                            onChange={(e) =>
+                              setEditForm({ ...editForm, [key]: e.target.value })
+                            }
+                            className={fieldClasses}
+                            placeholder={placeholder ?? label}
+                            rows={3}
+                          />
+                        ) : (
+                          <input
+                            id={`profile-${key}`}
+                            type={type}
+                            value={value}
+                            onChange={(e) =>
+                              setEditForm({ ...editForm, [key]: e.target.value })
+                            }
+                            className={fieldClasses}
+                            placeholder={placeholder ?? label}
+                          />
+                        )}
+                      </div>
+                    );
+                  }
+                );
+              })()}
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsEditing(false)}
+                  className={`px-4 py-2 rounded-lg ${
+                    isDarkMode
+                      ? "bg-gray-700 text-gray-200 hover:bg-gray-600"
+                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                  }`}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700"
+                >
+                  Save
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
