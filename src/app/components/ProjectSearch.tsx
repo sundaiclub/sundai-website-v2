@@ -6,6 +6,8 @@ import { MagnifyingGlassIcon, FunnelIcon, ChevronUpDownIcon, XMarkIcon, Calendar
 import { Project } from './Project';
 import TagSelector from './TagSelector';
 
+const HOT_PROJECT_LIKE_WINDOW_DAYS = 7;
+
 type SortOption = {
   label: string;
   value: string;
@@ -17,8 +19,8 @@ const SORT_OPTIONS: SortOption[] = [
     label: "Trending",
     value: "trending",
     sortFn: (a: Project, b: Project) => {
-      const scoreA = calculateProjectScore(a as any, { timeDecayDays: 1 });
-      const scoreB = calculateProjectScore(b as any, { timeDecayDays: 1 });
+      const scoreA = calculateProjectScore(a as any, { recentLikeWindowDays: HOT_PROJECT_LIKE_WINDOW_DAYS });
+      const scoreB = calculateProjectScore(b as any, { recentLikeWindowDays: HOT_PROJECT_LIKE_WINDOW_DAYS });
       return scoreB - scoreA;
     }
   },
