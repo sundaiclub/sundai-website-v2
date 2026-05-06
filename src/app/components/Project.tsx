@@ -12,6 +12,7 @@ import { ChevronUpDownIcon } from '@heroicons/react/24/solid';
 import { toast } from 'react-hot-toast';
 import ProjectSearch from "./ProjectSearch";
 import { swapFirstLetters } from "../utils/nameUtils";
+import ProjectMarkdown from "./ProjectMarkdown";
 
 export type Project = {
   id: string;
@@ -368,15 +369,12 @@ export function ProjectCard({ project, userInfo, handleLike, isDarkMode, show_st
           </div>
         </div>
 
-        <Link href={`/projects/${project.id}`} target={openInNewTab ? "_blank" : undefined} rel={openInNewTab ? "noopener noreferrer" : undefined}>
-          <p
-            className={`${previewClass} ${
-              isDarkMode ? "text-gray-300" : "text-gray-600"
-            } ${previewMinHeightClass} mb-2`}
-          >
-            {project.preview}
-          </p>
-        </Link>
+        <ProjectMarkdown
+          markdown={project.preview}
+          className={`${previewClass} ${
+            isDarkMode ? "text-gray-300 prose-invert" : "text-gray-600"
+          } ${previewMinHeightClass} mb-2 line-clamp-3 prose prose-sm max-w-none prose-p:m-0 prose-ul:m-0 prose-ol:m-0 prose-li:m-0 prose-a:text-current hover:prose-a:text-current`}
+        />
 
         {/* Tags Section - anchored at bottom of content */}
         <div className={`flex flex-wrap gap-2 mt-auto ${tagsBottomMarginClass} min-h-[24px]`}>
