@@ -31,6 +31,7 @@ const customJestConfig = {
   ],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
+    '^remark-gfm$': '<rootDir>/tests/mocks/remark-gfm.js',
   },
 }
 
