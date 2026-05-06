@@ -6,7 +6,7 @@ import { useTheme } from "../../contexts/ThemeContext";
 import { useUserContext } from "../../contexts/UserContext";
 import { Project, ProjectCard } from "../../components/Project";
 import { motion, AnimatePresence, PanInfo } from "framer-motion";
-import ReactMarkdown from "react-markdown";
+import ProjectMarkdown from "../../components/ProjectMarkdown";
 import { formatDateTimeLocalValue, serializeDateTimeLocalValue } from "@/lib/datetimeLocal";
 import { reconcileVoteDeckIds } from "@/lib/votingDeck";
 
@@ -210,18 +210,22 @@ function SwipeCard({
           draggable={false}
         />
         <h3 className="text-xl font-bold mb-2">{project.title}</h3>
-        {project.preview && <p className="opacity-80 mb-2">{project.preview}</p>}
+        {project.preview && (
+          <ProjectMarkdown
+            markdown={project.preview}
+            className="opacity-80 mb-2 prose prose-sm max-w-none prose-p:m-0 prose-a:text-current"
+          />
+        )}
         {project.description && (
           <div className={`text-sm mb-3 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
-            <ReactMarkdown
+            <ProjectMarkdown
+              markdown={project.description}
               className={`prose prose-sm max-w-none ${
                 isDarkMode
                   ? "prose-invert prose-pre:bg-gray-800 prose-a:text-indigo-400"
                   : "prose-gray prose-pre:bg-gray-100 prose-a:text-indigo-600"
               }`}
-            >
-              {project.description}
-            </ReactMarkdown>
+            />
           </div>
         )}
         <div className="flex flex-wrap gap-2 mb-3">

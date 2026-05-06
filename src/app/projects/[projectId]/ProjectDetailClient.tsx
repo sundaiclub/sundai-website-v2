@@ -8,12 +8,12 @@ import { HeartIcon } from "@heroicons/react/24/outline";
 import { HeartIcon as HeartIconSolid, ShareIcon } from "@heroicons/react/24/solid";
 import { useTheme } from "../../contexts/ThemeContext";
 import { useAutoLike } from "../../hooks/useAutoLike";
-import ReactMarkdown from 'react-markdown';
 import { CheckIcon, XMarkIcon } from "@heroicons/react/24/solid";
 import toast from 'react-hot-toast';
 import { Project } from "../../components/Project";
 import { swapFirstLetters } from "../../utils/nameUtils";
 import ShareModal from "../../components/ShareModal";
+import ProjectMarkdown from "../../components/ProjectMarkdown";
 
 export default function ProjectDetailClient() {
   const params = (useParams() || {}) as { projectId?: string };
@@ -317,11 +317,10 @@ export default function ProjectDetailClient() {
                       Started {new Date(project.startDate).toLocaleDateString()}
                     </span>
                   </div>
-                  <div className="flex flex-wrap items-center gap-3">
-                    <span className="text-sm md:text-base font-medium text-gray-300">
-                      {project.preview}
-                    </span>
-                  </div>
+                  <ProjectMarkdown
+                    markdown={project.preview}
+                    className="text-sm md:text-base font-medium text-gray-300 prose prose-sm prose-invert max-w-none prose-p:m-0 prose-a:text-gray-300 hover:prose-a:text-white"
+                  />
                 </div>
                 <div className="mt-4 md:mt-0">
                   <button
@@ -431,17 +430,14 @@ export default function ProjectDetailClient() {
                     ))}
                   </div>
 
-                  <div className="prose prose-lg max-w-none mb-8">
-                    <ReactMarkdown
-                      className={`prose prose-lg max-w-none mb-8 ${
-                        isDarkMode 
-                          ? 'prose-invert prose-pre:bg-gray-800 prose-a:text-indigo-400 hover:prose-a:text-indigo-300' 
-                          : 'prose-gray prose-pre:bg-gray-100 prose-a:text-indigo-600 hover:prose-a:text-indigo-700'
-                      }`}
-                    >
-                      {project.description}
-                    </ReactMarkdown>
-                  </div>
+                  <ProjectMarkdown
+                    markdown={project.description}
+                    className={`prose prose-lg max-w-none mb-8 ${
+                      isDarkMode
+                        ? 'prose-invert prose-pre:bg-gray-800 prose-a:text-indigo-400 hover:prose-a:text-indigo-300'
+                        : 'prose-gray prose-pre:bg-gray-100 prose-a:text-indigo-600 hover:prose-a:text-indigo-700'
+                    }`}
+                  />
                 </div>
 
                 {/* Team Sidebar */}
