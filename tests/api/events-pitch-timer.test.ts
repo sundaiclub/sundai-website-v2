@@ -197,6 +197,149 @@ describe('/api/events/[eventId]/pitch-timer', () => {
     expect(res.status).toBe(200);
   });
 
+  it('pauses during PRESENTING', async () => {
+    mockAuth.mockReturnValue({ userId: 'clerk-admin' });
+    prisma.hacker.findUnique.mockResolvedValue({ id: 'h-admin', role: 'ADMIN' });
+    prisma.event.findUnique.mockResolvedValue({ id: 'e1', phase: 'PITCHING', mcs: [] });
+    prisma.eventProject.findUnique.mockResolvedValue({
+      id: 'ep1', eventId: 'e1', status: 'CURRENT', pitchPhase: 'PRESENTING',
+      presentingStartedAt: new Date(), questionsStartedAt: null, pausedAt: null,
+    });
+    prisma.eventProject.update.mockResolvedValue({});
+
+    const res = await POST(makeRequest({ action: 'pause', eventProjectId: 'ep1' }) as any, params);
+    expect(res.status).toBe(200);
+
+    const updateCall = prisma.eventProject.update.mock.calls[0][0];
+    expect(updateCall.data.pausedAt).toBeInstanceOf(Date);
+  });
+
+  it('rejects pause when not PRESENTING or QUESTIONS', async () => {
+    mockAuth.mockReturnValue({ userId: 'clerk-admin' });
+    prisma.hacker.findUnique.mockResolvedValue({ id: 'h-admin', role: 'ADMIN' });
+    prisma.event.findUnique.mockResolvedValue({ id: 'e1', phase: 'PITCHING', mcs: [] });
+    prisma.eventProject.findUnique.mockResolvedValue({
+      id: 'ep1', eventId: 'e1', status: 'CURRENT', pitchPhase: 'WAITING', pausedAt: null,
+    });
+
+    const res = await POST(makeRequest({ action: 'pause', eventProjectId: 'ep1' }) as any, params);
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.message).toContain('PRESENTING');
+  });
+
+  it('rejects pause when already paused', async () => {
+    mockAuth.mockReturnValue({ userId: 'clerk-admin' });
+    prisma.hacker.findUnique.mockResolvedValue({ id: 'h-admin', role: 'ADMIN' });
+    prisma.event.findUnique.mockResolvedValue({ id: 'e1', phase: 'PITCHING', mcs: [] });
+    prisma.eventProject.findUnique.mockResolvedValue({
+      id: 'ep1', eventId: 'e1', status: 'CURRENT', pitchPhase: 'PRESENTING',
+      presentingStartedAt: new Date(), pausedAt: new Date(),
+    });
+
+    const res = await POST(makeRequest({ action: 'pause', eventProjectId: 'ep1' }) as any, params);
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.message).toContain('already paused');
+  });
+
+  it('resume shifts presentingStartedAt forward by paused duration', async () => {
+    mockAuth.mockReturnValue({ userId: 'clerk-admin' });
+    prisma.hacker.findUnique.mockResolvedValue({ id: 'h-admin', role: 'ADMIN' });
+    prisma.event.findUnique.mockResolvedValue({ id: 'e1', phase: 'PITCHING', mcs: [] });
+
+    const presStart = new Date('2026-05-06T16:00:00Z');
+    const pausedAt = new Date('2026-05-06T16:00:30Z'); // 30s after start
+    prisma.eventProject.findUnique.mockResolvedValue({
+      id: 'ep1', eventId: 'e1', status: 'CURRENT', pitchPhase: 'PRESENTING',
+      presentingStartedAt: presStart, questionsStartedAt: null, pausedAt,
+    });
+    prisma.eventProject.update.mockResolvedValue({});
+
+    const before = Date.now();
+    const res = await POST(makeRequest({ action: 'resume', eventProjectId: 'ep1' }) as any, params);
+    const after = Date.now();
+    expect(res.status).toBe(200);
+
+    const updateCall = prisma.eventProject.update.mock.calls[0][0];
+    expect(updateCall.data.pausedAt).toBeNull();
+    const expectedShiftLow = before - pausedAt.getTime();
+    const expectedShiftHigh = after - pausedAt.getTime();
+    const actualShift = updateCall.data.presentingStartedAt.getTime() - presStart.getTime();
+    expect(actualShift).toBeGreaterThanOrEqual(expectedShiftLow);
+    expect(actualShift).toBeLessThanOrEqual(expectedShiftHigh);
+    expect(updateCall.data.questionsStartedAt).toBeUndefined();
+  });
+
+  it('resume also shifts questionsStartedAt when present', async () => {
+    mockAuth.mockReturnValue({ userId: 'clerk-admin' });
+    prisma.hacker.findUnique.mockResolvedValue({ id: 'h-admin', role: 'ADMIN' });
+    prisma.event.findUnique.mockResolvedValue({ id: 'e1', phase: 'PITCHING', mcs: [] });
+
+    const presStart = new Date('2026-05-06T16:00:00Z');
+    const qStart = new Date('2026-05-06T16:02:00Z');
+    const pausedAt = new Date('2026-05-06T16:03:00Z');
+    prisma.eventProject.findUnique.mockResolvedValue({
+      id: 'ep1', eventId: 'e1', status: 'CURRENT', pitchPhase: 'QUESTIONS',
+      presentingStartedAt: presStart, questionsStartedAt: qStart, pausedAt,
+    });
+    prisma.eventProject.update.mockResolvedValue({});
+
+    const res = await POST(makeRequest({ action: 'resume', eventProjectId: 'ep1' }) as any, params);
+    expect(res.status).toBe(200);
+
+    const updateCall = prisma.eventProject.update.mock.calls[0][0];
+    const presShift = updateCall.data.presentingStartedAt.getTime() - presStart.getTime();
+    const qShift = updateCall.data.questionsStartedAt.getTime() - qStart.getTime();
+    expect(presShift).toBe(qShift);
+    expect(presShift).toBeGreaterThan(0);
+  });
+
+  it('rejects resume when not paused', async () => {
+    mockAuth.mockReturnValue({ userId: 'clerk-admin' });
+    prisma.hacker.findUnique.mockResolvedValue({ id: 'h-admin', role: 'ADMIN' });
+    prisma.event.findUnique.mockResolvedValue({ id: 'e1', phase: 'PITCHING', mcs: [] });
+    prisma.eventProject.findUnique.mockResolvedValue({
+      id: 'ep1', eventId: 'e1', status: 'CURRENT', pitchPhase: 'PRESENTING',
+      presentingStartedAt: new Date(), pausedAt: null,
+    });
+
+    const res = await POST(makeRequest({ action: 'resume', eventProjectId: 'ep1' }) as any, params);
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.message).toContain('not paused');
+  });
+
+  it('rejects start_questions while paused', async () => {
+    mockAuth.mockReturnValue({ userId: 'clerk-admin' });
+    prisma.hacker.findUnique.mockResolvedValue({ id: 'h-admin', role: 'ADMIN' });
+    prisma.event.findUnique.mockResolvedValue({ id: 'e1', phase: 'PITCHING', mcs: [] });
+    prisma.eventProject.findUnique.mockResolvedValue({
+      id: 'ep1', eventId: 'e1', status: 'CURRENT', pitchPhase: 'PRESENTING',
+      presentingStartedAt: new Date(), pausedAt: new Date(),
+    });
+
+    const res = await POST(makeRequest({ action: 'start_questions', eventProjectId: 'ep1' }) as any, params);
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.message).toContain('Resume');
+  });
+
+  it('rejects finish while paused', async () => {
+    mockAuth.mockReturnValue({ userId: 'clerk-admin' });
+    prisma.hacker.findUnique.mockResolvedValue({ id: 'h-admin', role: 'ADMIN' });
+    prisma.event.findUnique.mockResolvedValue({ id: 'e1', phase: 'PITCHING', mcs: [] });
+    prisma.eventProject.findUnique.mockResolvedValue({
+      id: 'ep1', eventId: 'e1', status: 'CURRENT', pitchPhase: 'QUESTIONS',
+      questionsStartedAt: new Date(), pausedAt: new Date(),
+    });
+
+    const res = await POST(makeRequest({ action: 'finish', eventProjectId: 'ep1' }) as any, params);
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.message).toContain('Resume');
+  });
+
   it('rejects event project from different event', async () => {
     mockAuth.mockReturnValue({ userId: 'clerk-admin' });
     prisma.hacker.findUnique.mockResolvedValue({ id: 'h-admin', role: 'ADMIN' });

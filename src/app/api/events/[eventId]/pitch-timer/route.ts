@@ -63,6 +63,9 @@ export async function POST(
         if (ep.pitchPhase !== "PRESENTING") {
           return NextResponse.json({ message: "Must be presenting to start questions" }, { status: 400 });
         }
+        if (ep.pausedAt) {
+          return NextResponse.json({ message: "Resume the timer before starting Q&A" }, { status: 400 });
+        }
         await prisma.eventProject.update({
           where: { id: eventProjectId },
           data: { pitchPhase: "QUESTIONS", questionsStartedAt: now },
@@ -73,9 +76,43 @@ export async function POST(
         if (ep.pitchPhase !== "QUESTIONS") {
           return NextResponse.json({ message: "Must be in questions to finish" }, { status: 400 });
         }
+        if (ep.pausedAt) {
+          return NextResponse.json({ message: "Resume the timer before finishing" }, { status: 400 });
+        }
         await prisma.eventProject.update({
           where: { id: eventProjectId },
           data: { pitchPhase: "COMPLETED", completedAt: now },
+        });
+        break;
+      }
+      case "pause": {
+        if (ep.pitchPhase !== "PRESENTING" && ep.pitchPhase !== "QUESTIONS") {
+          return NextResponse.json({ message: "Can only pause during PRESENTING or QUESTIONS" }, { status: 400 });
+        }
+        if (ep.pausedAt) {
+          return NextResponse.json({ message: "Timer is already paused" }, { status: 400 });
+        }
+        await prisma.eventProject.update({
+          where: { id: eventProjectId },
+          data: { pausedAt: now },
+        });
+        break;
+      }
+      case "resume": {
+        if (!ep.pausedAt) {
+          return NextResponse.json({ message: "Timer is not paused" }, { status: 400 });
+        }
+        const pausedMs = now.getTime() - ep.pausedAt.getTime();
+        const shifted: { presentingStartedAt?: Date; questionsStartedAt?: Date } = {};
+        if (ep.presentingStartedAt) {
+          shifted.presentingStartedAt = new Date(ep.presentingStartedAt.getTime() + pausedMs);
+        }
+        if (ep.questionsStartedAt) {
+          shifted.questionsStartedAt = new Date(ep.questionsStartedAt.getTime() + pausedMs);
+        }
+        await prisma.eventProject.update({
+          where: { id: eventProjectId },
+          data: { pausedAt: null, ...shifted },
         });
         break;
       }

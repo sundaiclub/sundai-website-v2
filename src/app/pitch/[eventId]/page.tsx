@@ -26,6 +26,7 @@ type EventProjectEntry = {
   presentingStartedAt: string | null;
   questionsStartedAt: string | null;
   completedAt: string | null;
+  pausedAt: string | null;
   allottedPresentingSec: number | null;
   allottedQuestionsSec: number | null;
   pitchVotes: Array<{
@@ -742,30 +743,39 @@ function TimerDisplay({
   allottedSec,
   isDarkMode,
   label,
+  pausedAt,
 }: {
   startedAt: string;
   allottedSec: number;
   isDarkMode: boolean;
   label: string;
+  pausedAt?: string | null;
 }) {
   const [elapsed, setElapsed] = useState(0);
 
   useEffect(() => {
     const start = new Date(startedAt).getTime();
+    if (pausedAt) {
+      setElapsed((new Date(pausedAt).getTime() - start) / 1000);
+      return;
+    }
     const tick = () => setElapsed((Date.now() - start) / 1000);
     tick();
     const id = setInterval(tick, 100);
     return () => clearInterval(id);
-  }, [startedAt]);
+  }, [startedAt, pausedAt]);
 
   const overtime = Math.max(0, elapsed - allottedSec);
   const isOver = overtime > 0;
   const remaining = Math.max(0, allottedSec - elapsed);
+  const isPaused = !!pausedAt;
 
   return (
     <div className="flex flex-col items-center gap-1">
-      <span className="text-xs uppercase tracking-wider opacity-70">{label}</span>
-      <div className={`text-4xl font-mono font-bold tabular-nums ${isOver ? "text-red-500" : isDarkMode ? "text-white" : "text-gray-900"}`}>
+      <span className="text-xs uppercase tracking-wider opacity-70">
+        {label}{isPaused && " · Paused"}
+      </span>
+      <div className={`text-4xl font-mono font-bold tabular-nums ${isPaused ? "opacity-60" : ""} ${isOver ? "text-red-500" : isDarkMode ? "text-white" : "text-gray-900"}`}>
         {isOver ? formatTime(elapsed) : formatTime(remaining)}
       </div>
       <div className="flex items-center gap-3 text-sm">
@@ -848,18 +858,20 @@ function PitchTimer({
   };
 
   const phase = currentItem.pitchPhase;
+  const isPaused = !!currentItem.pausedAt;
 
   return (
     <div className={`rounded-xl p-5 shadow ${isDarkMode ? "bg-gray-800" : "bg-white"}`}>
       <div className="flex items-center justify-between mb-4">
         <h3 className="font-semibold">Timer</h3>
         <span className={`text-xs uppercase tracking-wider px-2 py-1 rounded-full font-semibold ${
+          isPaused ? "bg-amber-100 text-amber-700" :
           phase === "WAITING" ? "bg-gray-200 text-gray-600" :
           phase === "PRESENTING" ? "bg-indigo-100 text-indigo-700" :
           phase === "QUESTIONS" ? "bg-purple-100 text-purple-700" :
           "bg-gray-200 text-gray-600"
         }`}>
-          {phase === "WAITING" ? "Ready" : phase === "PRESENTING" ? "Presenting" : phase === "QUESTIONS" ? "Q&A" : "Done"}
+          {isPaused ? "Paused" : phase === "WAITING" ? "Ready" : phase === "PRESENTING" ? "Presenting" : phase === "QUESTIONS" ? "Q&A" : "Done"}
         </span>
       </div>
 
@@ -888,15 +900,26 @@ function PitchTimer({
               allottedSec={currentItem.allottedPresentingSec ?? 120}
               isDarkMode={isDarkMode}
               label="Presenting"
+              pausedAt={currentItem.pausedAt}
             />
             {isController && (
-              <button
-                disabled={acting}
-                onClick={() => timerAction("start_questions")}
-                className={`px-4 py-2 rounded text-white text-sm font-semibold transition duration-300 shrink-0 ${acting ? "bg-gray-400" : "bg-indigo-600 hover:bg-indigo-700"}`}
-              >
-                {acting ? "Starting..." : "Q&A Started"}
-              </button>
+              <div className="flex gap-2 shrink-0">
+                <button
+                  disabled={acting}
+                  onClick={() => timerAction(isPaused ? "resume" : "pause")}
+                  title={isPaused ? "Resume the timer" : "Pause the timer (e.g. for AV issues)"}
+                  className={`px-4 py-2 rounded text-white text-sm font-semibold transition duration-300 ${acting ? "bg-gray-400" : isPaused ? "bg-emerald-600 hover:bg-emerald-700" : "bg-amber-600 hover:bg-amber-700"}`}
+                >
+                  {isPaused ? "Resume" : "Pause"}
+                </button>
+                <button
+                  disabled={acting || isPaused}
+                  onClick={() => timerAction("start_questions")}
+                  className={`px-4 py-2 rounded text-white text-sm font-semibold transition duration-300 ${acting || isPaused ? "bg-gray-400" : "bg-indigo-600 hover:bg-indigo-700"}`}
+                >
+                  {acting ? "Starting..." : "Q&A Started"}
+                </button>
+              </div>
             )}
           </>
         )}
@@ -908,15 +931,26 @@ function PitchTimer({
               allottedSec={currentItem.allottedQuestionsSec ?? 180}
               isDarkMode={isDarkMode}
               label="Q&A"
+              pausedAt={currentItem.pausedAt}
             />
             {isController && (
-              <button
-                disabled={acting}
-                onClick={() => timerAction("finish")}
-                className={`px-4 py-2 rounded text-white text-sm font-semibold transition duration-300 shrink-0 ${acting ? "bg-gray-400" : "bg-indigo-600 hover:bg-indigo-700"}`}
-              >
-                {acting ? "Finishing..." : "Finished"}
-              </button>
+              <div className="flex gap-2 shrink-0">
+                <button
+                  disabled={acting}
+                  onClick={() => timerAction(isPaused ? "resume" : "pause")}
+                  title={isPaused ? "Resume the timer" : "Pause the timer (e.g. for AV issues)"}
+                  className={`px-4 py-2 rounded text-white text-sm font-semibold transition duration-300 ${acting ? "bg-gray-400" : isPaused ? "bg-emerald-600 hover:bg-emerald-700" : "bg-amber-600 hover:bg-amber-700"}`}
+                >
+                  {isPaused ? "Resume" : "Pause"}
+                </button>
+                <button
+                  disabled={acting || isPaused}
+                  onClick={() => timerAction("finish")}
+                  className={`px-4 py-2 rounded text-white text-sm font-semibold transition duration-300 ${acting || isPaused ? "bg-gray-400" : "bg-indigo-600 hover:bg-indigo-700"}`}
+                >
+                  {acting ? "Finishing..." : "Finished"}
+                </button>
+              </div>
             )}
           </>
         )}
