@@ -140,7 +140,7 @@ const Navbar = () => {
                 </Link>
 
                 <Link
-                  href={`/hacker/${hackerId}`}
+                  href={hackerId ? `/hacker/${hackerId}` : "/me"}
                   className={`${isPWA ? "px-4 py-3" : "px-3 py-2"
                     } mx-2 rounded-lg active:bg-indigo-100`}
                 >
@@ -228,7 +228,7 @@ const Navbar = () => {
                 </span>
               </Link>
               <Link
-                href={`/hacker/${hackerId}`}
+                href={hackerId ? `/hacker/${hackerId}` : "/me"}
                 className="block px-4 py-2 rounded-lg"
                 onClick={() => setIsMenuOpen(false)}
               >
