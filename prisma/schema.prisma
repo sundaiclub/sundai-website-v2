@@ -283,6 +283,7 @@ model EventProject {
   presentingStartedAt   DateTime?
   questionsStartedAt    DateTime?
   completedAt           DateTime?
+  pausedAt              DateTime?
   allottedPresentingSec Int?
   allottedQuestionsSec  Int?
   pitchVotes            EventProjectVote[]

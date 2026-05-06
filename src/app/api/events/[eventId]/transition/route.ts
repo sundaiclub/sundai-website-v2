@@ -89,6 +89,7 @@ export async function POST(
             presentingStartedAt: null,
             questionsStartedAt: null,
             completedAt: null,
+            pausedAt: null,
           },
         })
       );
@@ -118,6 +119,7 @@ export async function POST(
             presentingStartedAt: null,
             questionsStartedAt: null,
             completedAt: null,
+            pausedAt: null,
             allottedPresentingSec: isTopProject
               ? event.topPresentingSec
               : event.defaultPresentingSec,
