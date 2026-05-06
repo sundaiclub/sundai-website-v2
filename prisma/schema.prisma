@@ -300,7 +300,7 @@ model EventProjectVote {
   hackerId       String
   value          EventProjectVoteValue
   createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  updatedAt      DateTime     @default(now()) @updatedAt
 
   @@unique([eventProjectId, hackerId])
   @@index([eventProjectId])
