@@ -163,6 +163,19 @@ describe('Navbar Component', () => {
     })
   })
 
+  it('links My Profile to /me while the hacker ID is unresolved', async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: false,
+    })
+
+    await act(async () => {
+      render(<Navbar />)
+    })
+
+    const profileLink = screen.getAllByText('My Profile')[0].closest('a')
+    expect(profileLink).toHaveAttribute('href', '/me')
+  })
+
   it('handles fetch error gracefully', async () => {
     global.fetch = jest.fn().mockRejectedValue(new Error('Network error'))
     

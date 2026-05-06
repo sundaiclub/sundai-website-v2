@@ -11,11 +11,13 @@ jest.mock('@clerk/nextjs', () => ({
 
 // Mock Next.js router
 const mockPush = jest.fn();
+const mockBack = jest.fn();
+const mockRouter = {
+  push: mockPush,
+  back: mockBack,
+};
 jest.mock('next/navigation', () => ({
-  useRouter: () => ({
-    push: mockPush,
-    back: jest.fn(),
-  }),
+  useRouter: () => mockRouter,
 }));
 
 // Mock the API call
@@ -72,24 +74,42 @@ describe('MeRedirect', () => {
     });
   });
 
-  it('should redirect to new hacker page when hacker is not found', async () => {
+  it('should retry until the hacker profile is found', async () => {
+    mockGetHackerByClerkId
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(mockHacker);
+
+    render(<MePage />);
+
+    await waitFor(() => {
+      expect(mockPush).toHaveBeenCalledWith('/hacker/test-hacker-id');
+    });
+
+    expect(mockGetHackerByClerkId).toHaveBeenCalledTimes(2);
+  });
+
+  it('should show setup message when the hacker profile is not found after retries', async () => {
     mockGetHackerByClerkId.mockResolvedValue(null);
 
     render(<MePage />);
 
     await waitFor(() => {
-      expect(mockPush).toHaveBeenCalledWith('/hacker/new');
+      expect(screen.getByText('Your profile is still being created. Please refresh in a moment.')).toBeInTheDocument();
     });
+
+    expect(mockPush).not.toHaveBeenCalled();
   });
 
-  it('should handle error and redirect to new hacker page', async () => {
+  it('should handle repeated errors without redirecting to a missing profile', async () => {
     mockGetHackerByClerkId.mockRejectedValue(new Error('API Error'));
 
     render(<MePage />);
 
     await waitFor(() => {
-      expect(mockPush).toHaveBeenCalledWith('/hacker/new');
+      expect(screen.getByText('Your profile is still being created. Please refresh in a moment.')).toBeInTheDocument();
     });
+
+    expect(mockPush).not.toHaveBeenCalled();
   });
 
   it('should handle unauthenticated user', async () => {

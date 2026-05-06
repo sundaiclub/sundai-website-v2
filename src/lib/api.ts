@@ -93,7 +93,7 @@ export async function getHacker(hackerId: string): Promise<Hacker | null> {
 
 export async function getHackerByClerkId(clerkId: string): Promise<Hacker | null> {
   try {
-    const response = await fetch(`/api/hackers/by-clerk-id/${clerkId}`);
+    const response = await fetch(`/api/hackers?clerkId=${encodeURIComponent(clerkId)}`);
     if (!response.ok) {
       if (response.status === 404) {
         return null;
