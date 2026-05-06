@@ -4,8 +4,13 @@ import { useParams } from "next/navigation";
 import { useUser } from "@clerk/nextjs";
 import NextImage from "next/image";
 import Link from "next/link";
-import { HeartIcon } from "@heroicons/react/24/solid";
-import { PencilIcon, XMarkIcon } from "@heroicons/react/24/outline";
+import { HeartIcon, StarIcon as StarIconSolid } from "@heroicons/react/24/solid";
+import {
+  PencilIcon,
+  XMarkIcon,
+  CameraIcon,
+  StarIcon as StarIconOutline,
+} from "@heroicons/react/24/outline";
 import { useTheme } from "../../contexts/ThemeContext";
 import { swapFirstLetters } from "../../utils/nameUtils";
 
@@ -45,7 +50,10 @@ type HackerProfile = {
     project: ProjectSummary;
   }>;
   ledProjects: ProjectSummary[];
+  featuredProjectIds: string[];
 };
+
+const MAX_FEATURED = 3;
 
 type EditableFields = {
   name: string;
@@ -103,6 +111,8 @@ export default function HackerProfile() {
   );
   const [projectFilter, setProjectFilter] = useState<ProjectFilter>("all");
   const [projectSort, setProjectSort] = useState<ProjectSort>("recent");
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [avatarError, setAvatarError] = useState<string | null>(null);
   const { isDarkMode } = useTheme();
 
   const AvatarImage = ({ src, alt, size }: { src: string | null; alt: string; size: number }) => {
@@ -198,6 +208,7 @@ export default function HackerProfile() {
           ...data,
           ledProjects: data.ledProjects || [],
           projects: data.projects || [],
+          featuredProjectIds: data.featuredProjectIds || [],
         });
       } catch (error) {
         console.error("Error fetching hacker data:", error);
@@ -225,6 +236,44 @@ export default function HackerProfile() {
       document.body.style.overflow = prevOverflow;
     };
   }, [isEditing]);
+
+  const handleAvatarUpload = async (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setAvatarError("Please select an image file");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setAvatarError("Image must be smaller than 5MB");
+      return;
+    }
+
+    setAvatarError(null);
+    setUploadingAvatar(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const response = await fetch(
+        `/api/hackers/${params?.hackerId}/avatar`,
+        { method: "POST", body: formData }
+      );
+      if (!response.ok) {
+        throw new Error("Failed to upload avatar");
+      }
+      const updated = await response.json();
+      setHacker((prev) => (prev ? { ...prev, avatar: updated.avatar } : prev));
+    } catch (error) {
+      console.error("Error uploading avatar:", error);
+      setAvatarError("Upload failed. Please try again.");
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
 
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -270,6 +319,53 @@ export default function HackerProfile() {
     () => allProjects.reduce((sum, p) => sum + (p.project.likes?.length || 0), 0),
     [allProjects]
   );
+
+  const totalProjectCount = allProjects.length;
+  const ledProjectCount = useMemo(
+    () => allProjects.filter((p) => p.source === "led").length,
+    [allProjects]
+  );
+
+  const featuredProjects = useMemo(() => {
+    if (!hacker) return [] as DisplayProject[];
+    const ids = hacker.featuredProjectIds || [];
+    const byId = new Map(allProjects.map((p) => [p.project.id, p]));
+    return ids
+      .map((id) => byId.get(id))
+      .filter((p): p is DisplayProject => Boolean(p));
+  }, [hacker, allProjects]);
+
+  const toggleFeatured = async (projectId: string) => {
+    if (!hacker || !isOwnProfile) return;
+    const current = hacker.featuredProjectIds || [];
+    const isCurrentlyFeatured = current.includes(projectId);
+    let next: string[];
+    if (isCurrentlyFeatured) {
+      next = current.filter((id) => id !== projectId);
+    } else {
+      if (current.length >= MAX_FEATURED) return;
+      next = [...current, projectId];
+    }
+
+    const previous = current;
+    setHacker((prev) => (prev ? { ...prev, featuredProjectIds: next } : prev));
+    try {
+      const response = await fetch(
+        `/api/hackers/${params?.hackerId}/featured-projects`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ featuredProjectIds: next }),
+        }
+      );
+      if (!response.ok) throw new Error("Failed to update featured projects");
+    } catch (error) {
+      console.error(error);
+      setHacker((prev) =>
+        prev ? { ...prev, featuredProjectIds: previous } : prev
+      );
+    }
+  };
 
   const visibleProjects = useMemo(() => {
     const filtered = allProjects.filter((p) => {
@@ -333,13 +429,137 @@ export default function HackerProfile() {
     );
   }
 
+  const renderSocialLinks = () => {
+    const iconClass = "h-4 w-4";
+    const linkClass = `inline-flex items-center justify-center w-9 h-9 rounded-md transition-colors ${
+      isDarkMode
+        ? "bg-gray-700 text-gray-200 hover:bg-gray-600"
+        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+    }`;
+    const items: Array<{ key: string; node: React.ReactNode } | null> = [];
+
+    if (hacker.githubUrl) {
+      items.push({
+        key: "github",
+        node: (
+          <a
+            key="github"
+            href={hacker.githubUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="GitHub"
+            title="GitHub"
+            className={linkClass}
+          >
+            <svg className={iconClass} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M12 .5C5.73.5.5 5.73.5 12c0 5.08 3.29 9.39 7.86 10.91.58.11.79-.25.79-.56 0-.28-.01-1.02-.02-2-3.2.69-3.87-1.54-3.87-1.54-.52-1.32-1.27-1.67-1.27-1.67-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.18 1.76 1.18 1.02 1.75 2.69 1.24 3.35.95.1-.74.4-1.24.72-1.53-2.55-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.29 1.18-3.1-.12-.29-.51-1.46.11-3.05 0 0 .96-.31 3.15 1.18a10.95 10.95 0 0 1 5.74 0c2.19-1.49 3.15-1.18 3.15-1.18.62 1.59.23 2.76.11 3.05.74.81 1.18 1.84 1.18 3.1 0 4.42-2.69 5.39-5.25 5.68.41.36.78 1.07.78 2.16 0 1.56-.01 2.81-.01 3.19 0 .31.21.68.8.56C20.21 21.39 23.5 17.08 23.5 12 23.5 5.73 18.27.5 12 .5z" />
+            </svg>
+          </a>
+        ),
+      });
+    }
+    if (hacker.linkedinUrl) {
+      items.push({
+        key: "linkedin",
+        node: (
+          <a
+            key="linkedin"
+            href={hacker.linkedinUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="LinkedIn"
+            title="LinkedIn"
+            className={linkClass}
+          >
+            <svg className={iconClass} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M20.45 20.45h-3.55v-5.57c0-1.33-.03-3.04-1.85-3.04-1.85 0-2.13 1.45-2.13 2.95v5.66H9.36V9h3.41v1.56h.05c.48-.9 1.64-1.85 3.37-1.85 3.6 0 4.27 2.37 4.27 5.45v6.29ZM5.34 7.43a2.06 2.06 0 1 1 0-4.12 2.06 2.06 0 0 1 0 4.12ZM7.12 20.45H3.56V9h3.56v11.45ZM22.22 0H1.77C.79 0 0 .77 0 1.72v20.56C0 23.23.79 24 1.77 24h20.45c.98 0 1.78-.77 1.78-1.72V1.72C24 .77 23.2 0 22.22 0Z" />
+            </svg>
+          </a>
+        ),
+      });
+    }
+    if (hacker.twitterUrl) {
+      items.push({
+        key: "twitter",
+        node: (
+          <a
+            key="twitter"
+            href={hacker.twitterUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Twitter / X"
+            title="Twitter / X"
+            className={linkClass}
+          >
+            <svg className={iconClass} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231 5.451-6.231Zm-1.161 17.52h1.833L7.084 4.126H5.117L17.083 19.77Z" />
+            </svg>
+          </a>
+        ),
+      });
+    }
+    if (hacker.websiteUrl) {
+      items.push({
+        key: "website",
+        node: (
+          <a
+            key="website"
+            href={hacker.websiteUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Website"
+            title="Website"
+            className={linkClass}
+          >
+            <svg className={iconClass} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="10" />
+              <path d="M2 12h20" />
+              <path d="M12 2a15.3 15.3 0 0 1 0 20" />
+              <path d="M12 2a15.3 15.3 0 0 0 0 20" />
+            </svg>
+          </a>
+        ),
+      });
+    }
+    if (hacker.discordName) {
+      items.push({
+        key: "discord",
+        node: (
+          <span
+            key="discord"
+            aria-label={`Discord: ${hacker.discordName}`}
+            title={`Discord: ${hacker.discordName}`}
+            className={`inline-flex items-center gap-1.5 px-2.5 h-9 rounded-md text-sm font-fira-code ${
+              isDarkMode
+                ? "bg-gray-700 text-gray-200"
+                : "bg-gray-100 text-gray-700"
+            }`}
+          >
+            <svg className={iconClass} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M20.317 4.369A19.79 19.79 0 0 0 16.558 3.2a.077.077 0 0 0-.082.038c-.357.636-.752 1.464-1.029 2.114a18.27 18.27 0 0 0-5.487 0 12.57 12.57 0 0 0-1.045-2.114.08.08 0 0 0-.082-.038A19.736 19.736 0 0 0 5.07 4.369a.069.069 0 0 0-.032.027C1.42 9.737.508 14.945.97 20.082a.082.082 0 0 0 .031.056 19.9 19.9 0 0 0 5.993 3.029.078.078 0 0 0 .084-.028c.462-.63.873-1.295 1.226-1.994a.076.076 0 0 0-.041-.105 13.1 13.1 0 0 1-1.872-.892.077.077 0 0 1-.008-.128c.126-.094.252-.192.372-.291a.074.074 0 0 1 .078-.01c3.927 1.793 8.18 1.793 12.061 0a.074.074 0 0 1 .078.009c.12.099.246.198.373.292a.077.077 0 0 1-.006.128 12.3 12.3 0 0 1-1.873.891.077.077 0 0 0-.04.106c.36.699.772 1.364 1.225 1.993a.076.076 0 0 0 .084.029 19.84 19.84 0 0 0 6.002-3.029.077.077 0 0 0 .032-.054c.5-5.94-.838-11.105-3.549-15.687a.061.061 0 0 0-.031-.028zM8.02 16.96c-1.183 0-2.157-1.087-2.157-2.421 0-1.334.955-2.421 2.157-2.421 1.21 0 2.176 1.096 2.157 2.421 0 1.334-.955 2.421-2.157 2.421zm7.974 0c-1.183 0-2.157-1.087-2.157-2.421 0-1.334.955-2.421 2.157-2.421 1.21 0 2.176 1.096 2.157 2.421 0 1.334-.946 2.421-2.157 2.421z" />
+            </svg>
+            <span className="truncate max-w-[12rem]">{hacker.discordName}</span>
+          </span>
+        ),
+      });
+    }
+
+    if (items.length === 0) return null;
+
+    return (
+      <div className="mt-3 flex flex-wrap items-center justify-center sm:justify-start gap-2">
+        {items.map((item) => item!.node)}
+      </div>
+    );
+  };
+
   const filterButton = (value: ProjectFilter, label: string) => {
     const active = projectFilter === value;
     return (
       <button
         key={value}
         onClick={() => setProjectFilter(value)}
-        className={`px-3 py-1.5 rounded-full text-sm font-fira-code transition-colors ${
+        className={`px-3 py-1.5 rounded-md text-sm font-fira-code transition-colors ${
           active
             ? "bg-indigo-600 text-white"
             : isDarkMode
@@ -349,6 +569,107 @@ export default function HackerProfile() {
       >
         {label}
       </button>
+    );
+  };
+
+  const renderProjectCard = ({ project }: DisplayProject) => {
+    const isFeatured = (hacker?.featuredProjectIds || []).includes(project.id);
+    const canFeatureMore =
+      (hacker?.featuredProjectIds || []).length < MAX_FEATURED;
+    const starDisabled = !isFeatured && !canFeatureMore;
+    return (
+      <div
+        key={project.id}
+        className={`relative ${
+          isDarkMode ? "bg-gray-800" : "bg-white"
+        } rounded-lg shadow-md hover:shadow-lg transition-shadow overflow-hidden`}
+      >
+        <Link href={`/projects/${project.id}`} className="block">
+          <div className="relative h-48">
+            <NextImage
+              src={
+                project.thumbnail?.url ||
+                (isDarkMode
+                  ? "/images/default_project_thumbnail_dark.svg"
+                  : "/images/default_project_thumbnail_light.svg")
+              }
+              alt={project.title}
+              fill
+              className="object-cover"
+            />
+            <div className="absolute top-2 left-2 flex items-center space-x-1 bg-black/50 px-2 py-1 rounded-md">
+              <HeartIcon className="h-4 w-4 text-white" />
+              <span className="text-white text-sm">
+                {project.likes?.length || 0}
+              </span>
+            </div>
+            {isOwnProfile && (
+              <div
+                className={`absolute top-2 right-2 px-2 py-1 ${getStatusBadgeClasses(
+                  project.status
+                )} text-white text-sm rounded-md`}
+              >
+                {project.status.charAt(0) +
+                  project.status.slice(1).toLowerCase()}
+              </div>
+            )}
+          </div>
+          <div className="p-4">
+            <h3
+              className={`text-xl font-semibold ${
+                isDarkMode ? "text-gray-100" : "text-gray-900"
+              } mb-2`}
+            >
+              {project.title}
+            </h3>
+            <p
+              className={`${
+                isDarkMode ? "text-gray-300" : "text-gray-600"
+              } line-clamp-2 font-fira-code`}
+            >
+              {project.description}
+            </p>
+          </div>
+        </Link>
+        {isOwnProfile && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              if (!starDisabled) toggleFeatured(project.id);
+            }}
+            disabled={starDisabled}
+            aria-label={
+              isFeatured
+                ? "Unfeature project"
+                : starDisabled
+                ? `Featured limit reached (${MAX_FEATURED})`
+                : "Feature project"
+            }
+            title={
+              isFeatured
+                ? "Unfeature"
+                : starDisabled
+                ? `You can feature up to ${MAX_FEATURED} projects`
+                : "Feature on profile"
+            }
+            className={`absolute bottom-2 right-2 p-1.5 rounded-md shadow ${
+              isFeatured
+                ? "bg-yellow-400 text-white hover:bg-yellow-500"
+                : isDarkMode
+                ? "bg-gray-900/70 text-gray-200 hover:bg-gray-900"
+                : "bg-white/90 text-gray-700 hover:bg-white"
+            } ${starDisabled ? "opacity-50 cursor-not-allowed" : ""}`}
+          >
+            {isFeatured ? (
+              <StarIconSolid className="h-4 w-4" />
+            ) : (
+              <StarIconOutline className="h-4 w-4" />
+            )}
+          </button>
+        )}
+      </div>
     );
   };
 
@@ -365,14 +686,43 @@ export default function HackerProfile() {
             isDarkMode ? "bg-gray-800" : "bg-white"
           } rounded-xl shadow-lg overflow-hidden mb-8`}
         >
-          <div className="bg-gradient-to-r from-indigo-500 to-purple-600 h-32 sm:h-48"></div>
-          <div className="px-4 sm:px-8 pb-8">
-            <div className="flex flex-col sm:flex-row items-center sm:items-end -mt-16 sm:-mt-24 mb-4 sm:mb-8">
-              <div className="relative w-32 h-32 sm:w-48 sm:h-48 rounded-full border-4 border-white overflow-hidden bg-white shadow-lg">
-                <AvatarImage src={hacker.avatar?.url || null} alt={swapFirstLetters(hacker.name)} size={192} />
+          <div className="px-4 sm:px-8 py-6 sm:py-8">
+            <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 sm:gap-6">
+              <div
+                className={`relative w-32 h-32 sm:w-40 sm:h-40 rounded-full overflow-hidden bg-white shadow-md flex-shrink-0 ${
+                  isDarkMode ? "ring-1 ring-gray-700" : "ring-1 ring-gray-200"
+                }`}
+              >
+                <AvatarImage
+                  src={hacker.avatar?.url || null}
+                  alt={swapFirstLetters(hacker.name)}
+                  size={160}
+                />
+                {isOwnProfile && (
+                  <label
+                    className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 hover:opacity-100 transition-opacity cursor-pointer"
+                    aria-label="Change profile picture"
+                  >
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="sr-only"
+                      onChange={handleAvatarUpload}
+                      disabled={uploadingAvatar}
+                    />
+                    {uploadingAvatar ? (
+                      <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-white" />
+                    ) : (
+                      <div className="flex flex-col items-center text-white">
+                        <CameraIcon className="h-8 w-8" />
+                        <span className="text-xs mt-1 font-fira-code">Change</span>
+                      </div>
+                    )}
+                  </label>
+                )}
               </div>
-              <div className="mt-4 sm:mt-0 sm:ml-6 text-center sm:text-left flex-grow">
-                <div className="flex justify-between items-start">
+              <div className="text-center sm:text-left flex-grow w-full">
+                <div className="flex justify-between items-start gap-2">
                   <h1
                     className={`text-3xl font-bold ${
                       isDarkMode ? "text-gray-100" : "text-gray-900"
@@ -384,7 +734,11 @@ export default function HackerProfile() {
                     <button
                       onClick={() => setIsEditing(true)}
                       aria-label="Edit profile"
-                      className="p-2 text-gray-600 hover:text-gray-800"
+                      className={`p-2 ${
+                        isDarkMode
+                          ? "text-gray-400 hover:text-gray-200"
+                          : "text-gray-600 hover:text-gray-800"
+                      }`}
                     >
                       <PencilIcon className="h-5 w-5" />
                     </button>
@@ -401,7 +755,38 @@ export default function HackerProfile() {
                       : hacker.bio}
                   </p>
                 )}
-                <div className="mt-3 flex items-center justify-center sm:justify-start gap-2">
+                {avatarError && (
+                  <p className="mt-2 text-sm text-red-500 font-fira-code">
+                    {avatarError}
+                  </p>
+                )}
+                <div className="mt-3 flex flex-wrap items-center justify-center sm:justify-start gap-2">
+                  <div
+                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-fira-code ${
+                      isDarkMode
+                        ? "bg-gray-700 text-gray-100"
+                        : "bg-indigo-50 text-indigo-700"
+                    }`}
+                    aria-label="Total projects"
+                  >
+                    <span>
+                      <span className="font-semibold">{totalProjectCount}</span>{" "}
+                      {totalProjectCount === 1 ? "project" : "projects"}
+                    </span>
+                  </div>
+                  <div
+                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-fira-code ${
+                      isDarkMode
+                        ? "bg-gray-700 text-gray-100"
+                        : "bg-purple-50 text-purple-700"
+                    }`}
+                    aria-label="Projects led"
+                  >
+                    <span>
+                      <span className="font-semibold">{ledProjectCount}</span>{" "}
+                      led
+                    </span>
+                  </div>
                   <div
                     className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-fira-code ${
                       isDarkMode
@@ -417,10 +802,55 @@ export default function HackerProfile() {
                     </span>
                   </div>
                 </div>
+                {renderSocialLinks()}
               </div>
             </div>
           </div>
         </div>
+
+        {/* Featured Projects Section */}
+        {(featuredProjects.length > 0 || isOwnProfile) && (
+          <div className="mb-8">
+            <div className="flex items-center justify-between mb-4">
+              <h2
+                className={`text-2xl font-bold flex items-center gap-2 ${
+                  isDarkMode ? "text-gray-100" : "text-gray-900"
+                }`}
+              >
+                <StarIconSolid className="h-6 w-6 text-yellow-400" />
+                Featured
+              </h2>
+              {isOwnProfile && (
+                <span
+                  className={`text-sm font-fira-code ${
+                    isDarkMode ? "text-gray-400" : "text-gray-500"
+                  }`}
+                >
+                  {featuredProjects.length}/{MAX_FEATURED}
+                </span>
+              )}
+            </div>
+            {featuredProjects.length === 0 ? (
+              <div
+                className={`text-center py-8 ${
+                  isDarkMode ? "bg-gray-800" : "bg-white"
+                } rounded-lg shadow`}
+              >
+                <p
+                  className={`${
+                    isDarkMode ? "text-gray-300" : "text-gray-600"
+                  } font-fira-code text-sm`}
+                >
+                  Tap the star on any project below to feature it here (up to {MAX_FEATURED}).
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {featuredProjects.map((dp) => renderProjectCard(dp))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Projects Section */}
         <div className="space-y-8">
@@ -442,7 +872,7 @@ export default function HackerProfile() {
                   onChange={(e) =>
                     setProjectSort(e.target.value as ProjectSort)
                   }
-                  className={`px-3 py-1.5 rounded-full text-sm font-fira-code border ${
+                  className={`px-3 py-1.5 rounded-md text-sm font-fira-code border ${
                     isDarkMode
                       ? "bg-gray-700 border-gray-600 text-gray-100"
                       : "bg-white border-gray-300 text-gray-700"
@@ -471,66 +901,7 @@ export default function HackerProfile() {
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                {visibleProjects.map(({ project, source, role }) => (
-                  <Link
-                    key={project.id}
-                    href={`/projects/${project.id}`}
-                    className={`${
-                      isDarkMode ? "bg-gray-800" : "bg-white"
-                    } rounded-lg shadow-md hover:shadow-lg transition-shadow overflow-hidden`}
-                  >
-                    <div className="relative h-48">
-                      <NextImage
-                        src={
-                          project.thumbnail?.url ||
-                          (isDarkMode
-                            ? "/images/default_project_thumbnail_dark.svg"
-                            : "/images/default_project_thumbnail_light.svg")
-                        }
-                        alt={project.title}
-                        fill
-                        className="object-cover"
-                      />
-                      <div className="absolute top-2 left-2 flex items-center space-x-1 bg-black/50 px-2 py-1 rounded-full">
-                        <HeartIcon className="h-4 w-4 text-white" />
-                        <span className="text-white text-sm">
-                          {project.likes?.length || 0}
-                        </span>
-                      </div>
-                      <div
-                        className={`absolute top-2 right-2 px-2 py-1 ${getStatusBadgeClasses(
-                          project.status
-                        )} text-white text-sm rounded-full`}
-                      >
-                        {project.status.charAt(0) +
-                          project.status.slice(1).toLowerCase()}
-                      </div>
-                      <div
-                        className={`absolute bottom-2 left-2 px-2 py-1 text-white text-sm rounded-full ${
-                          source === "led" ? "bg-purple-600" : "bg-indigo-600"
-                        }`}
-                      >
-                        {source === "led" ? "Lead" : role}
-                      </div>
-                    </div>
-                    <div className="p-4">
-                      <h3
-                        className={`text-xl font-semibold ${
-                          isDarkMode ? "text-gray-100" : "text-gray-900"
-                        } mb-2`}
-                      >
-                        {project.title}
-                      </h3>
-                      <p
-                        className={`${
-                          isDarkMode ? "text-gray-300" : "text-gray-600"
-                        } line-clamp-2 font-fira-code`}
-                      >
-                        {project.description}
-                      </p>
-                    </div>
-                  </Link>
-                ))}
+                {visibleProjects.map((dp) => renderProjectCard(dp))}
               </div>
             )}
           </div>

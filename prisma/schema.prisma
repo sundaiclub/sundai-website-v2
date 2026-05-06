@@ -30,6 +30,7 @@ model Hacker {
   attended    Int       @default(0)
   avatar      Image?    @relation("HackerAvatar", fields: [avatarId], references: [id])
   avatarId    String?   @unique
+  featuredProjectIds String[] @default([])
   projects    ProjectToParticipant[]
   ledProjects Project[] @relation("LaunchLead")
   images      Image[]   @relation("HackerImages")
