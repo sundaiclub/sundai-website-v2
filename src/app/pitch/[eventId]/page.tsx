@@ -1,13 +1,14 @@
 "use client";
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { useUser, SignInButton } from "@clerk/nextjs";
 import { useTheme } from "../../contexts/ThemeContext";
 import { useUserContext } from "../../contexts/UserContext";
 import { Project, ProjectCard } from "../../components/Project";
 import { motion, AnimatePresence, PanInfo } from "framer-motion";
-import ReactMarkdown from "react-markdown";
+import ProjectMarkdown from "../../components/ProjectMarkdown";
 import { formatDateTimeLocalValue, serializeDateTimeLocalValue } from "@/lib/datetimeLocal";
+import { reconcileVoteDeckIds } from "@/lib/votingDeck";
 
 type PitchPhase = "WAITING" | "PRESENTING" | "QUESTIONS" | "COMPLETED";
 type EventPhase = "VOTING" | "PITCHING" | "FINISHED";
@@ -25,6 +26,7 @@ type EventProjectEntry = {
   presentingStartedAt: string | null;
   questionsStartedAt: string | null;
   completedAt: string | null;
+  pausedAt: string | null;
   allottedPresentingSec: number | null;
   allottedQuestionsSec: number | null;
   pitchVotes: Array<{
@@ -102,6 +104,15 @@ function applyPitchVoteToEvent(
       };
     }),
   };
+}
+
+function shuffleProjectIds(projectIds: string[]) {
+  const shuffled = [...projectIds];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
 }
 
 function getStageBadgeStyles(phase: EventPhase) {
@@ -200,18 +211,22 @@ function SwipeCard({
           draggable={false}
         />
         <h3 className="text-xl font-bold mb-2">{project.title}</h3>
-        {project.preview && <p className="opacity-80 mb-2">{project.preview}</p>}
+        {project.preview && (
+          <ProjectMarkdown
+            markdown={project.preview}
+            className="opacity-80 mb-2 prose prose-sm max-w-none prose-p:m-0 prose-a:text-current"
+          />
+        )}
         {project.description && (
           <div className={`text-sm mb-3 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
-            <ReactMarkdown
+            <ProjectMarkdown
+              markdown={project.description}
               className={`prose prose-sm max-w-none ${
                 isDarkMode
                   ? "prose-invert prose-pre:bg-gray-800 prose-a:text-indigo-400"
                   : "prose-gray prose-pre:bg-gray-100 prose-a:text-indigo-600"
               }`}
-            >
-              {project.description}
-            </ReactMarkdown>
+            />
           </div>
         )}
         <div className="flex flex-wrap gap-2 mb-3">
@@ -262,33 +277,68 @@ function VotingPhase({
 }) {
   const [votingStarted, setVotingStarted] = useState(false);
   const [seenIds, setSeenIds] = useState<Set<string>>(new Set());
+  const [deckIds, setDeckIds] = useState<string[]>([]);
   const [transitioning, setTransitioning] = useState(false);
   const [exitDirection, setExitDirection] = useState<"left" | "right">("left");
+  const deckInitializedRef = useRef(false);
+  const userId = userInfo?.id;
 
-  // Projects to vote on: exclude user's own projects and already seen cards.
-  // Shuffled so each voter gets a different order; voted cards are filtered out
-  // so reshuffles between swipes don't show a card twice.
-  const deck = useMemo(() => {
-    if (!userInfo) return [];
-    const filtered = event.projects.filter(ep => {
-      if (ep.addedById === userInfo.id) return false;
-      if (seenIds.has(ep.project.id)) return false;
-      if (getViewerPitchVote(ep, userInfo.id)) return false;
-      return true;
-    });
-    for (let i = filtered.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [filtered[i], filtered[j]] = [filtered[j], filtered[i]];
+  const eligibleProjectIds = useMemo(() => {
+    if (!userId) return [];
+    return event.projects
+      .filter(ep => {
+        if (ep.addedById === userId) return false;
+        if (seenIds.has(ep.project.id)) return false;
+        if (getViewerPitchVote(ep, userId)) return false;
+        return true;
+      })
+      .map(ep => ep.project.id);
+  }, [event.projects, userId, seenIds]);
+
+  const eventProjectByProjectId = useMemo(() => {
+    return new Map(event.projects.map(ep => [ep.project.id, ep]));
+  }, [event.projects]);
+
+  useEffect(() => {
+    deckInitializedRef.current = false;
+    setDeckIds([]);
+    setSeenIds(new Set());
+  }, [event.id, userId]);
+
+  useEffect(() => {
+    if (!userId) {
+      deckInitializedRef.current = false;
+      setDeckIds([]);
+      return;
     }
-    return filtered;
-  }, [event.projects, userInfo, seenIds]);
 
-  const currentCard = deck[0] ?? null;
+    const nextEligibleProjectIds = deckInitializedRef.current
+      ? eligibleProjectIds
+      : shuffleProjectIds(eligibleProjectIds);
+
+    setDeckIds(prev => {
+      const next = reconcileVoteDeckIds(prev, nextEligibleProjectIds, seenIds);
+      if (next.length === prev.length && next.every((id, index) => id === prev[index])) {
+        return prev;
+      }
+      return next;
+    });
+    deckInitializedRef.current = true;
+  }, [eligibleProjectIds, seenIds, userId]);
+
+  const currentCard = useMemo(() => {
+    for (const projectId of deckIds) {
+      const eventProject = eventProjectByProjectId.get(projectId);
+      if (eventProject) return eventProject;
+    }
+    return null;
+  }, [deckIds, eventProjectByProjectId]);
 
   const handleSwipeRight = useCallback(async () => {
-    if (!currentCard || !userInfo) return;
+    if (!currentCard || !userId) return;
     setExitDirection("right");
     setSeenIds(prev => new Set(prev).add(currentCard.project.id));
+    setDeckIds(prev => prev.filter(projectId => projectId !== currentCard.project.id));
     try {
       const response = await fetch(
         `/api/events/${event.id}/queue/${currentCard.id}/vote`,
@@ -299,16 +349,17 @@ function VotingPhase({
         }
       );
       if (!response.ok) return;
-      setEvent(applyPitchVoteToEvent(event, currentCard.id, userInfo.id, "LIKE"));
+      setEvent(applyPitchVoteToEvent(event, currentCard.id, userId, "LIKE"));
     } catch (err) {
       console.error("like error", err);
     }
-  }, [currentCard, event, setEvent, userInfo]);
+  }, [currentCard, event, setEvent, userId]);
 
   const handleSwipeLeft = useCallback(async () => {
-    if (!currentCard || !userInfo) return;
+    if (!currentCard || !userId) return;
     setExitDirection("left");
     setSeenIds(prev => new Set(prev).add(currentCard.project.id));
+    setDeckIds(prev => prev.filter(projectId => projectId !== currentCard.project.id));
     try {
       const response = await fetch(
         `/api/events/${event.id}/queue/${currentCard.id}/vote`,
@@ -319,11 +370,11 @@ function VotingPhase({
         }
       );
       if (!response.ok) return;
-      setEvent(applyPitchVoteToEvent(event, currentCard.id, userInfo.id, "DISLIKE"));
+      setEvent(applyPitchVoteToEvent(event, currentCard.id, userId, "DISLIKE"));
     } catch (err) {
       console.error("dislike error", err);
     }
-  }, [currentCard, event, setEvent, userInfo]);
+  }, [currentCard, event, setEvent, userId]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -692,30 +743,39 @@ function TimerDisplay({
   allottedSec,
   isDarkMode,
   label,
+  pausedAt,
 }: {
   startedAt: string;
   allottedSec: number;
   isDarkMode: boolean;
   label: string;
+  pausedAt?: string | null;
 }) {
   const [elapsed, setElapsed] = useState(0);
 
   useEffect(() => {
     const start = new Date(startedAt).getTime();
+    if (pausedAt) {
+      setElapsed((new Date(pausedAt).getTime() - start) / 1000);
+      return;
+    }
     const tick = () => setElapsed((Date.now() - start) / 1000);
     tick();
     const id = setInterval(tick, 100);
     return () => clearInterval(id);
-  }, [startedAt]);
+  }, [startedAt, pausedAt]);
 
   const overtime = Math.max(0, elapsed - allottedSec);
   const isOver = overtime > 0;
   const remaining = Math.max(0, allottedSec - elapsed);
+  const isPaused = !!pausedAt;
 
   return (
     <div className="flex flex-col items-center gap-1">
-      <span className="text-xs uppercase tracking-wider opacity-70">{label}</span>
-      <div className={`text-4xl font-mono font-bold tabular-nums ${isOver ? "text-red-500" : isDarkMode ? "text-white" : "text-gray-900"}`}>
+      <span className="text-xs uppercase tracking-wider opacity-70">
+        {label}{isPaused && " · Paused"}
+      </span>
+      <div className={`text-4xl font-mono font-bold tabular-nums ${isPaused ? "opacity-60" : ""} ${isOver ? "text-red-500" : isDarkMode ? "text-white" : "text-gray-900"}`}>
         {isOver ? formatTime(elapsed) : formatTime(remaining)}
       </div>
       <div className="flex items-center gap-3 text-sm">
@@ -798,18 +858,20 @@ function PitchTimer({
   };
 
   const phase = currentItem.pitchPhase;
+  const isPaused = !!currentItem.pausedAt;
 
   return (
     <div className={`rounded-xl p-5 shadow ${isDarkMode ? "bg-gray-800" : "bg-white"}`}>
       <div className="flex items-center justify-between mb-4">
         <h3 className="font-semibold">Timer</h3>
         <span className={`text-xs uppercase tracking-wider px-2 py-1 rounded-full font-semibold ${
+          isPaused ? "bg-amber-100 text-amber-700" :
           phase === "WAITING" ? "bg-gray-200 text-gray-600" :
           phase === "PRESENTING" ? "bg-indigo-100 text-indigo-700" :
           phase === "QUESTIONS" ? "bg-purple-100 text-purple-700" :
           "bg-gray-200 text-gray-600"
         }`}>
-          {phase === "WAITING" ? "Ready" : phase === "PRESENTING" ? "Presenting" : phase === "QUESTIONS" ? "Q&A" : "Done"}
+          {isPaused ? "Paused" : phase === "WAITING" ? "Ready" : phase === "PRESENTING" ? "Presenting" : phase === "QUESTIONS" ? "Q&A" : "Done"}
         </span>
       </div>
 
@@ -838,15 +900,26 @@ function PitchTimer({
               allottedSec={currentItem.allottedPresentingSec ?? 120}
               isDarkMode={isDarkMode}
               label="Presenting"
+              pausedAt={currentItem.pausedAt}
             />
             {isController && (
-              <button
-                disabled={acting}
-                onClick={() => timerAction("start_questions")}
-                className={`px-4 py-2 rounded text-white text-sm font-semibold transition duration-300 shrink-0 ${acting ? "bg-gray-400" : "bg-indigo-600 hover:bg-indigo-700"}`}
-              >
-                {acting ? "Starting..." : "Q&A Started"}
-              </button>
+              <div className="flex gap-2 shrink-0">
+                <button
+                  disabled={acting}
+                  onClick={() => timerAction(isPaused ? "resume" : "pause")}
+                  title={isPaused ? "Resume the timer" : "Pause the timer (e.g. for AV issues)"}
+                  className={`px-4 py-2 rounded text-white text-sm font-semibold transition duration-300 ${acting ? "bg-gray-400" : isPaused ? "bg-emerald-600 hover:bg-emerald-700" : "bg-amber-600 hover:bg-amber-700"}`}
+                >
+                  {isPaused ? "Resume" : "Pause"}
+                </button>
+                <button
+                  disabled={acting || isPaused}
+                  onClick={() => timerAction("start_questions")}
+                  className={`px-4 py-2 rounded text-white text-sm font-semibold transition duration-300 ${acting || isPaused ? "bg-gray-400" : "bg-indigo-600 hover:bg-indigo-700"}`}
+                >
+                  {acting ? "Starting..." : "Q&A Started"}
+                </button>
+              </div>
             )}
           </>
         )}
@@ -858,15 +931,26 @@ function PitchTimer({
               allottedSec={currentItem.allottedQuestionsSec ?? 180}
               isDarkMode={isDarkMode}
               label="Q&A"
+              pausedAt={currentItem.pausedAt}
             />
             {isController && (
-              <button
-                disabled={acting}
-                onClick={() => timerAction("finish")}
-                className={`px-4 py-2 rounded text-white text-sm font-semibold transition duration-300 shrink-0 ${acting ? "bg-gray-400" : "bg-indigo-600 hover:bg-indigo-700"}`}
-              >
-                {acting ? "Finishing..." : "Finished"}
-              </button>
+              <div className="flex gap-2 shrink-0">
+                <button
+                  disabled={acting}
+                  onClick={() => timerAction(isPaused ? "resume" : "pause")}
+                  title={isPaused ? "Resume the timer" : "Pause the timer (e.g. for AV issues)"}
+                  className={`px-4 py-2 rounded text-white text-sm font-semibold transition duration-300 ${acting ? "bg-gray-400" : isPaused ? "bg-emerald-600 hover:bg-emerald-700" : "bg-amber-600 hover:bg-amber-700"}`}
+                >
+                  {isPaused ? "Resume" : "Pause"}
+                </button>
+                <button
+                  disabled={acting || isPaused}
+                  onClick={() => timerAction("finish")}
+                  className={`px-4 py-2 rounded text-white text-sm font-semibold transition duration-300 ${acting || isPaused ? "bg-gray-400" : "bg-indigo-600 hover:bg-indigo-700"}`}
+                >
+                  {acting ? "Finishing..." : "Finished"}
+                </button>
+              </div>
             )}
           </>
         )}

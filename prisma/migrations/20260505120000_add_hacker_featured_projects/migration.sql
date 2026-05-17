@@ -1,0 +1,1 @@
+ALTER TABLE "Hacker" ADD COLUMN "featuredProjectIds" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[];

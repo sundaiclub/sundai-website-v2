@@ -235,7 +235,7 @@ describe('API functions', () => {
 
       const result = await getHackerByClerkId('clerk-123');
 
-      expect(mockFetch).toHaveBeenCalledWith('/api/hackers/by-clerk-id/clerk-123');
+      expect(mockFetch).toHaveBeenCalledWith('/api/hackers?clerkId=clerk-123');
       expect(result).toEqual(mockHacker);
     });
 

@@ -111,6 +111,52 @@ describe('ProjectSearch', () => {
     expect(defaultProps.onFilteredProjectsChange).toHaveBeenCalledWith(expectedOrder);
   });
 
+  it('should sort trending by likes from the previous 7 days across all projects', () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-04-14T00:00:00.000Z'));
+
+    const olderProjectWithRecentLikes: Project = {
+      ...mockProjects[0],
+      id: 'older-with-recent-likes',
+      title: 'Older Project With Recent Likes',
+      startDate: new Date('2024-01-01'),
+      likes: [
+        { hackerId: 'recent-1', createdAt: '2026-04-13T00:00:00Z' },
+        { hackerId: 'recent-2', createdAt: '2026-04-14T00:00:00Z' },
+      ],
+    };
+
+    const newerProjectWithOldLikes: Project = {
+      ...mockProjects[1],
+      id: 'newer-with-old-likes',
+      title: 'Newer Project With Old Likes',
+      startDate: new Date('2026-04-14'),
+      likes: [
+        { hackerId: 'old-1', createdAt: '2026-03-01T00:00:00Z' },
+        { hackerId: 'old-2', createdAt: '2026-03-02T00:00:00Z' },
+        { hackerId: 'old-3', createdAt: '2026-03-03T00:00:00Z' },
+      ],
+    };
+
+    try {
+      const onFilteredProjectsChange = jest.fn();
+
+      render(
+        <ProjectSearch
+          {...defaultProps}
+          projects={[newerProjectWithOldLikes, olderProjectWithRecentLikes]}
+          onFilteredProjectsChange={onFilteredProjectsChange}
+        />
+      );
+
+      expect(onFilteredProjectsChange).toHaveBeenCalledWith([
+        olderProjectWithRecentLikes,
+        newerProjectWithOldLikes,
+      ]);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it('should filter projects by search term', async () => {
     render(<ProjectSearch {...defaultProps} />);
     
