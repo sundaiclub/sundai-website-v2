@@ -14,23 +14,12 @@ jest.mock('../../src/app/contexts/UserContext', () => ({
   useUserContext: () => mockUseUserContext(),
 }));
 
-// Mock ProjectGrid component
-jest.mock('../../src/app/components/Project', () => {
-  return function MockProjectGrid({ show_status, statusFilter, showSearch }: any) {
-    return (
-      <div data-testid="project-grid" data-show-status={show_status} data-status-filter={statusFilter} data-show-search={showSearch}>
-        Mock Project Grid
-      </div>
-    );
-  };
-});
-
 describe('AdminPage', () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
-  it('should render admin content when user is admin', () => {
+  it('should render the site-admin console when user is admin', () => {
     mockUseTheme.mockReturnValue({ isDarkMode: true });
     mockUseUserContext.mockReturnValue({ 
       isAdmin: true, 
@@ -39,11 +28,12 @@ describe('AdminPage', () => {
 
     render(<AdminPage />);
 
-    expect(screen.getByText('Full list of projects in Sundai')).toBeInTheDocument();
-    expect(screen.getByTestId('project-grid')).toBeInTheDocument();
-    expect(screen.getByTestId('project-grid')).toHaveAttribute('data-show-status', 'true');
-    expect(screen.getByTestId('project-grid')).toHaveAttribute('data-status-filter', 'ALL');
-    expect(screen.getByTestId('project-grid')).toHaveAttribute('data-show-search', 'true');
+    expect(screen.getByRole('heading', { name: 'Site admin console' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Project moderation' })).toHaveAttribute('href', '/admin/projects');
+    expect(screen.getByRole('link', { name: 'Chapters' })).toHaveAttribute('href', '/admin/chapters');
+    expect(screen.getByRole('link', { name: 'Application templates' })).toHaveAttribute('href', '/admin/application-templates');
+    expect(screen.getByRole('link', { name: 'Global moderation' })).toHaveAttribute('href', '/admin/bans');
+    expect(screen.getByRole('link', { name: 'Organizer events' })).toHaveAttribute('href', '/organizer/events');
   });
 
   it('should render permission denied message when user is not admin', () => {
@@ -57,7 +47,7 @@ describe('AdminPage', () => {
 
     expect(screen.getByText('You do not have permission to view this page.')).toBeInTheDocument();
     expect(screen.getByText('You do not have permission to view this page.')).toHaveClass('text-red-500');
-    expect(screen.queryByTestId('project-grid')).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Site admin console' })).not.toBeInTheDocument();
   });
 
   it('should apply dark mode styling when isDarkMode is true', () => {
@@ -69,7 +59,7 @@ describe('AdminPage', () => {
 
     render(<AdminPage />);
 
-    const mainContainer = screen.getByText('Full list of projects in Sundai').closest('div')?.parentElement?.parentElement;
+    const mainContainer = screen.getByRole('main');
     expect(mainContainer).toHaveClass('bg-gray-900', 'text-gray-100');
   });
 
@@ -82,7 +72,7 @@ describe('AdminPage', () => {
 
     render(<AdminPage />);
 
-    const mainContainer = screen.getByText('Full list of projects in Sundai').closest('div')?.parentElement?.parentElement;
+    const mainContainer = screen.getByRole('main');
     expect(mainContainer).toHaveClass('bg-white', 'text-gray-900');
   });
 
@@ -95,9 +85,8 @@ describe('AdminPage', () => {
 
     render(<AdminPage />);
 
-    // Check for the main container classes
-    const mainDiv = screen.getByText('Full list of projects in Sundai').closest('div')?.parentElement;
-    expect(mainDiv).toHaveClass('max-w-7xl', 'mx-auto', 'px-2', 'sm:px-4', 'lg:px-8', 'py-20');
+    const mainDiv = screen.getByRole('heading', { name: 'Site admin console' }).parentElement;
+    expect(mainDiv).toHaveClass('max-w-6xl', 'mx-auto', 'px-4', 'py-20');
   });
 
   it('should render the heading with proper styling', () => {
@@ -109,7 +98,7 @@ describe('AdminPage', () => {
 
     render(<AdminPage />);
 
-    const heading = screen.getByText('Full list of projects in Sundai');
+    const heading = screen.getByRole('heading', { name: 'Site admin console' });
     expect(heading).toHaveClass('text-3xl', 'font-bold');
   });
 

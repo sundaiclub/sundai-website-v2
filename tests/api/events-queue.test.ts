@@ -6,6 +6,8 @@ jest.mock('../../src/lib/prisma', () => ({
   __esModule: true,
   default: {
     hacker: { findUnique: jest.fn() },
+    chapterMembership: { findFirst: jest.fn() },
+    eventStaff: { findFirst: jest.fn() },
     event: { findUnique: jest.fn() },
     project: { findUnique: jest.fn() },
     eventProject: {
@@ -25,7 +27,11 @@ const prisma = require('../../src/lib/prisma').default;
 const mockAuth = require('@clerk/nextjs/server').auth as jest.Mock;
 
 describe('queue endpoints', () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+    prisma.chapterMembership.findFirst.mockResolvedValue(null);
+    prisma.eventStaff.findFirst.mockResolvedValue(null);
+  });
 
   it('join requires auth', async () => {
     mockAuth.mockReturnValue({ userId: null });
@@ -35,13 +41,45 @@ describe('queue endpoints', () => {
     expect(res.status).toBe(401);
   });
 
-  it('status patch requires admin', async () => {
+  it('status patch requires site admin or assigned event staff', async () => {
     mockAuth.mockReturnValue({ userId: 'u1' });
-    prisma.hacker.findUnique.mockResolvedValue({ role: 'HACKER' });
+    prisma.hacker.findUnique.mockResolvedValue({ id: 'h1', role: 'HACKER' });
     const request = new NextRequest('http://localhost:3000/api/events/queue/ep1/status', { method: 'PATCH' });
     request.json = jest.fn().mockResolvedValue({ status: 'APPROVED' });
     const res = await PATCH_STATUS(request as any, { params: { eventProjectId: 'ep1' } } as any);
     expect(res.status).toBe(401);
+  });
+
+  it('allows assigned EventStaff MCs to update queue item status', async () => {
+    mockAuth.mockReturnValue({ userId: 'clerk-mc' });
+    prisma.hacker.findUnique.mockResolvedValue({ id: 'h-mc', role: 'HACKER' });
+    prisma.eventProject.findUnique.mockResolvedValue({
+      id: 'ep1',
+      eventId: 'e1',
+      event: { staff: [{ hackerId: 'h-mc', role: 'MC' }] },
+    });
+    prisma.eventProject.update.mockResolvedValue({ id: 'ep1', status: 'APPROVED' });
+
+    const request = new NextRequest('http://localhost:3000/api/events/queue/ep1/status', { method: 'PATCH' });
+    request.json = jest.fn().mockResolvedValue({ status: 'APPROVED' });
+    const res = await PATCH_STATUS(request as any, { params: { eventProjectId: 'ep1' } } as any);
+    expect(res.status).toBe(200);
+  });
+
+  it('allows assigned EventStaff co-MCs to update queue item status', async () => {
+    mockAuth.mockReturnValue({ userId: 'clerk-co-mc' });
+    prisma.hacker.findUnique.mockResolvedValue({ id: 'h-co-mc', role: 'HACKER' });
+    prisma.eventProject.findUnique.mockResolvedValue({
+      id: 'ep1',
+      eventId: 'e1',
+      event: { staff: [{ hackerId: 'h-co-mc', role: 'CO_MC' }] },
+    });
+    prisma.eventProject.update.mockResolvedValue({ id: 'ep1', status: 'APPROVED' });
+
+    const request = new NextRequest('http://localhost:3000/api/events/queue/ep1/status', { method: 'PATCH' });
+    request.json = jest.fn().mockResolvedValue({ status: 'APPROVED' });
+    const res = await PATCH_STATUS(request as any, { params: { eventProjectId: 'ep1' } } as any);
+    expect(res.status).toBe(200);
   });
 
   it('reorder rejects when audience disabled and not admin', async () => {
@@ -175,7 +213,7 @@ describe('queue endpoints', () => {
 
   it('reorder rejects moving top-group projects in PITCHING phase', async () => {
     mockAuth.mockReturnValue({ userId: 'u1' });
-    prisma.hacker.findUnique.mockResolvedValue({ id: 'h1', role: 'ADMIN' });
+    prisma.hacker.findUnique.mockResolvedValue({ id: 'h1', role: 'SITE_ADMIN' });
     prisma.event.findUnique.mockResolvedValue({ id: 'e1', audienceCanReorder: true, phase: 'PITCHING' });
 
     prisma.eventProject.findMany.mockResolvedValue([
@@ -198,7 +236,7 @@ describe('queue endpoints', () => {
 
   it('reorder rejects moving non-top projects into top-group positions', async () => {
     mockAuth.mockReturnValue({ userId: 'u1' });
-    prisma.hacker.findUnique.mockResolvedValue({ id: 'h1', role: 'ADMIN' });
+    prisma.hacker.findUnique.mockResolvedValue({ id: 'h1', role: 'SITE_ADMIN' });
     prisma.event.findUnique.mockResolvedValue({ id: 'e1', audienceCanReorder: true, phase: 'PITCHING' });
 
     prisma.eventProject.findMany.mockResolvedValue([
@@ -221,7 +259,7 @@ describe('queue endpoints', () => {
 
   it('reorder allows moving non-top projects among themselves', async () => {
     mockAuth.mockReturnValue({ userId: 'u1' });
-    prisma.hacker.findUnique.mockResolvedValue({ id: 'h1', role: 'ADMIN' });
+    prisma.hacker.findUnique.mockResolvedValue({ id: 'h1', role: 'SITE_ADMIN' });
     prisma.event.findUnique.mockResolvedValue({ id: 'e1', audienceCanReorder: true, phase: 'PITCHING' });
 
     prisma.eventProject.findMany.mockResolvedValue([
@@ -240,6 +278,48 @@ describe('queue endpoints', () => {
     // Move ep6 and ep7 — both non-top, both to non-top positions
     const request = new NextRequest('http://localhost:3000/api/events/e1/queue', { method: 'PATCH' });
     request.json = jest.fn().mockResolvedValue({ items: [{ id: 'ep7', position: 6 }, { id: 'ep6', position: 7 }] });
+    const res = await PATCH_REORDER(request as any, { params: { eventId: 'e1' } } as any);
+    expect(res.status).toBe(204);
+  });
+
+  it('allows assigned EventStaff MCs to reorder when audience reordering is disabled', async () => {
+    mockAuth.mockReturnValue({ userId: 'clerk-mc' });
+    prisma.hacker.findUnique.mockResolvedValue({ id: 'h-mc', role: 'HACKER' });
+    prisma.event.findUnique.mockResolvedValue({
+      id: 'e1',
+      audienceCanReorder: false,
+      phase: 'PITCHING',
+      staff: [{ hackerId: 'h-mc', role: 'MC' }],
+    });
+    prisma.eventProject.findMany
+      .mockResolvedValueOnce([{ id: 'ep1', position: 1, isTopProject: false }])
+      .mockResolvedValueOnce([{ id: 'ep1', addedById: 'other-hacker', eventId: 'e1' }]);
+    prisma.eventProject.update.mockResolvedValue({});
+    prisma.$transaction.mockResolvedValue([]);
+
+    const request = new NextRequest('http://localhost:3000/api/events/e1/queue', { method: 'PATCH' });
+    request.json = jest.fn().mockResolvedValue({ items: [{ id: 'ep1', position: 2 }] });
+    const res = await PATCH_REORDER(request as any, { params: { eventId: 'e1' } } as any);
+    expect(res.status).toBe(204);
+  });
+
+  it('allows assigned EventStaff co-MCs to reorder when audience reordering is disabled', async () => {
+    mockAuth.mockReturnValue({ userId: 'clerk-co-mc' });
+    prisma.hacker.findUnique.mockResolvedValue({ id: 'h-co-mc', role: 'HACKER' });
+    prisma.event.findUnique.mockResolvedValue({
+      id: 'e1',
+      audienceCanReorder: false,
+      phase: 'PITCHING',
+      staff: [{ hackerId: 'h-co-mc', role: 'CO_MC' }],
+    });
+    prisma.eventProject.findMany
+      .mockResolvedValueOnce([{ id: 'ep1', position: 1, isTopProject: false }])
+      .mockResolvedValueOnce([{ id: 'ep1', addedById: 'other-hacker', eventId: 'e1' }]);
+    prisma.eventProject.update.mockResolvedValue({});
+    prisma.$transaction.mockResolvedValue([]);
+
+    const request = new NextRequest('http://localhost:3000/api/events/e1/queue', { method: 'PATCH' });
+    request.json = jest.fn().mockResolvedValue({ items: [{ id: 'ep1', position: 2 }] });
     const res = await PATCH_REORDER(request as any, { params: { eventId: 'e1' } } as any);
     expect(res.status).toBe(204);
   });

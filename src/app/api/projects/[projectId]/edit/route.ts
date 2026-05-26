@@ -31,7 +31,7 @@ export async function PATCH(
       select: { id: true, role: true },
     });
 
-    const isAdmin = user?.role === "ADMIN";
+    const isAdmin = user?.role === "SITE_ADMIN";
     const canEdit = 
       isAdmin ||
       project.launchLeadId === user?.id ||
@@ -135,7 +135,7 @@ export async function PATCH(
       }
     }
 
-    const canManageTeam = user?.role === "ADMIN" || project.launchLeadId === user?.id;
+    const canManageTeam = user?.role === "SITE_ADMIN" || project.launchLeadId === user?.id;
     
     if (canManageTeam) {
       const participantsJson = formData.get('participants');

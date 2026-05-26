@@ -47,7 +47,7 @@ export async function afterAuthHandler(auth: any, req: any) {
         if (!response.ok) throw new Error("Failed to fetch user");
         
         const userData = await response.json();
-        if (userData.role !== "ADMIN") {
+        if (userData.role !== "SITE_ADMIN") {
           return NextResponse.json("Unauthorized", { status: 401 });
         }
       }

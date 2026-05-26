@@ -90,11 +90,16 @@ export async function PATCH(
     const hacker = await prisma.hacker.findUnique({ where: { clerkId: userId }, select: { id: true, role: true } });
     if (!hacker) return new NextResponse("User not found", { status: 404 });
 
-    const event = await prisma.event.findUnique({ where: { id: params.eventId } });
+    const event = await prisma.event.findUnique({
+      where: { id: params.eventId },
+      include: { staff: { select: { hackerId: true, role: true } } },
+    });
     if (!event) return new NextResponse("Event not found", { status: 404 });
 
-    const isAdmin = hacker.role === "ADMIN";
-    const allowAll = event.audienceCanReorder || isAdmin;
+    const isAdmin = hacker.role === "SITE_ADMIN";
+    const eventStaff = event.staff ?? [];
+    const isStaff = eventStaff.some((staff) => staff.hackerId === hacker.id);
+    const allowAll = event.audienceCanReorder || isAdmin || isStaff;
 
     const { items } = await req.json();
     if (!Array.isArray(items)) return NextResponse.json({ message: "items array required" }, { status: 400 });

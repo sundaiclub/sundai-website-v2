@@ -51,7 +51,7 @@ type EventDetail = {
   topQuestionsSec: number;
   defaultPresentingSec: number;
   defaultQuestionsSec: number;
-  mcs: Array<{ id: string; hacker: { id: string; name: string } }>;
+  staff: Array<{ id: string; role: "MC" | "CO_MC"; hacker: { id: string; name: string } }>;
   projects: EventProjectEntry[];
 };
 
@@ -1498,8 +1498,8 @@ export default function PitchEventPage() {
   }, [eventId]);
 
   const isController = useMemo(
-    () => isAdmin || (event?.mcs || []).some(m => m.hacker.id === userInfo?.id),
-    [isAdmin, event?.mcs, userInfo?.id]
+    () => isAdmin || (event?.staff || []).some(m => m.hacker.id === userInfo?.id),
+    [isAdmin, event?.staff, userInfo?.id]
   );
 
   const transitionEvent = async (targetPhase: EventPhase) => {
@@ -1557,7 +1557,7 @@ export default function PitchEventPage() {
         ? formatDateTimeLocalValue(event.votingEndTime)
         : formatDateTimeLocalValue(new Date(new Date(event.startTime).getTime() + 15 * 60 * 1000))
     );
-    setEditMcIds(event.mcs.map(m => m.hacker.id));
+    setEditMcIds((event.staff || []).filter(m => m.role === "MC").map(m => m.hacker.id));
     setEditTopProjectCount(event.topProjectCount);
     setEditTopPresentingSec(event.topPresentingSec);
     setEditTopQuestionsSec(event.topQuestionsSec);

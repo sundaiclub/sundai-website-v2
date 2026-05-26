@@ -1,33 +1,53 @@
 "use client";
-import React from "react";
-import ProjectGrid from "../components/Project";
+
+import Link from "next/link";
 import { useTheme } from "../contexts/ThemeContext";
 import { useUserContext } from "../contexts/UserContext";
 
-export default function AllProjectsList() {
+const adminSections = [
+  { href: "/admin/projects", label: "Project moderation" },
+  { href: "/admin/chapters", label: "Chapters" },
+  { href: "/admin/application-templates", label: "Application templates" },
+  { href: "/admin/bans", label: "Global moderation" },
+  { href: "/organizer/events", label: "Organizer events" },
+];
+
+export default function AdminConsolePage() {
   const { isDarkMode } = useTheme();
-  const { isAdmin, userInfo } = useUserContext();
+  const { isAdmin } = useUserContext();
 
   return (
-    <div
+    <main
       className={`${
         isDarkMode ? "bg-gray-900 text-gray-100" : "bg-white text-gray-900"
-      } font-space-mono`}
+      } font-space-mono min-h-screen`}
     >
-      <div className={`max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 py-20`}>
+      <div className="max-w-6xl mx-auto px-4 py-20">
         {isAdmin ? (
-          <div className="flex flex-col space-y-4 mb-8">
-            <h1 className="text-3xl font-bold">
-              Full list of projects in Sundai
-            </h1>
-            <ProjectGrid show_status={true} statusFilter="ALL" showSearch={true}/>
-          </div>
+          <>
+            <h1 className="text-3xl font-bold mb-8">Site admin console</h1>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {adminSections.map((section) => (
+                <Link
+                  key={section.href}
+                  href={section.href}
+                  className={`border rounded-lg p-4 transition-colors ${
+                    isDarkMode
+                      ? "border-gray-700 hover:bg-gray-800"
+                      : "border-gray-200 hover:bg-gray-50"
+                  }`}
+                >
+                  <span className="font-semibold">{section.label}</span>
+                </Link>
+              ))}
+            </div>
+          </>
         ) : (
           <div className="text-center text-red-500">
             You do not have permission to view this page.
           </div>
         )}
       </div>
-    </div>
+    </main>
   );
 }

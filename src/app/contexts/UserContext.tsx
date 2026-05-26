@@ -50,7 +50,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
             throw new Error("Failed to fetch hacker profile");
           const profileData = await profileResponse.json();
 
-          const isUserAdmin = profileData.role === "ADMIN";
+          const isUserAdmin = profileData.role === "SITE_ADMIN";
           setIsAdmin(isUserAdmin);
           setUserInfo({
             id: profileData.id,

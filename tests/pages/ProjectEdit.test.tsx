@@ -10,7 +10,7 @@ import { ThemeProvider } from '../../src/app/contexts/ThemeContext';
 jest.mock('../../src/app/contexts/UserContext', () => ({
   useUserContext: () => ({
     isAdmin: true,
-    userInfo: { id: 'current-user-id', name: 'Current User', email: 'current@example.com', role: 'ADMIN' },
+    userInfo: { id: 'current-user-id', name: 'Current User', email: 'current@example.com', role: 'SITE_ADMIN' },
     loading: false,
   }),
 }));

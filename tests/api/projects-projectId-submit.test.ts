@@ -136,7 +136,7 @@ describe('/api/projects/[projectId]/submit', () => {
 
       const mockUser = {
         id: 'other-hacker-id',
-        role: 'ADMIN',
+        role: 'SITE_ADMIN',
       };
 
       const mockProject = {

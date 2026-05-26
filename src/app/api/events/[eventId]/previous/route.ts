@@ -15,13 +15,14 @@ export async function POST(
 
     const event = await prisma.event.findUnique({
       where: { id: params.eventId },
-      include: { mcs: { select: { hackerId: true } }, projects: true },
+      include: { staff: { select: { hackerId: true, role: true } }, projects: true },
     });
     if (!event) return new NextResponse("Event not found", { status: 404 });
 
-    const isMC = event.mcs.some(m => m.hackerId === me.id);
-    const isAdmin = me.role === "ADMIN";
-    if (!(isMC || isAdmin)) return new NextResponse("Unauthorized", { status: 401 });
+    const isStaff = event.staff.some((m: { hackerId: string }) => m.hackerId === me.id);
+    const isAdmin = me.role === "SITE_ADMIN";
+    const isChapterAdmin = await prisma.chapterMembership.findFirst({ where: { chapterId: event.chapterId, hackerId: me.id, role: "ADMIN", status: "ACTIVE" } });
+    if (!(isStaff || isAdmin || isChapterAdmin)) return new NextResponse("Unauthorized", { status: 401 });
 
     if (event.phase !== "PITCHING") {
       return NextResponse.json({ message: "Can only go previous during PITCHING phase" }, { status: 400 });

@@ -90,7 +90,7 @@ export default function ProjectDetailClient() {
   const allowedEdit = !!project && (
     (Array.isArray(project.participants) && project.participants.some(
       (participant) => participant?.hacker?.id === userInfo?.id
-    )) || project?.launchLead?.id === userInfo?.id || userInfo?.role === 'ADMIN'
+    )) || project?.launchLead?.id === userInfo?.id || userInfo?.role === 'SITE_ADMIN'
   );
 
   useEffect(() => {

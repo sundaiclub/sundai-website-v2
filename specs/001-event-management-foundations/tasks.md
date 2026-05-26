@@ -18,10 +18,10 @@
 
 **Purpose**: Establish cutover guardrails and implementation entry points.
 
-- [ ] T001 Audit current `Role.ADMIN`, `EventMC`, and pitch authorization usage in `src/`, `tests/`, `prisma/schema.prisma`, and `prisma/seed.ts`
-- [ ] T002 [P] Create shared event-management type definitions in `src/types/event-management.ts`
-- [ ] T003 [P] Create test fixture helpers for site admins, chapter admins, members, staff, bans, and organizer notes in `tests/utils/event-management-fixtures.ts`
-- [ ] T004 [P] Create API route test utilities for authenticated Clerk requests in `tests/utils/api-auth.ts`
+- [X] T001 Audit current `Role.ADMIN`, `EventMC`, and pitch authorization usage in `src/`, `tests/`, `prisma/schema.prisma`, and `prisma/seed.ts`
+- [X] T002 [P] Create shared event-management type definitions in `src/types/event-management.ts`
+- [X] T003 [P] Create test fixture helpers for site admins, chapter admins, members, staff, bans, and organizer notes in `tests/utils/event-management-fixtures.ts`
+- [X] T004 [P] Create API route test utilities for authenticated Clerk requests in `tests/utils/api-auth.ts`
 
 ---
 
@@ -31,24 +31,24 @@
 
 **Critical**: No user story work should begin until this phase is complete.
 
-- [ ] T005 Replace `ADMIN` with `SITE_ADMIN` in the `Role` enum and add chapter/event-management enums in `prisma/schema.prisma`
-- [ ] T006 Add `Chapter`, `ChapterMembership`, `EventStaff`, `ApplicationTemplate`, `EventRegistration`, `EventRegistrationAudit`, `UserBan`, `UserBanFlag`, `HackerOrganizerNote`, and `HackerOrganizerNoteRevision` models in `prisma/schema.prisma`
-- [ ] T007 Add event chapter, slug, visibility, application, capacity, location, approved-detail, and check-in metadata fields in `prisma/schema.prisma`
-- [ ] T008 Create Prisma migration for site-admin cutover, new tables, event metadata, indexes, Boston chapter backfill, event slug cleanup markers, and `EventMC` to `EventStaff` migration in `prisma/migrations/20260525000000_event_management_foundations/migration.sql`
-- [ ] T009 Update seed data to use `Role.SITE_ADMIN`, create the Boston chapter, create the active site application template, and seed `EventStaff` assignments in `prisma/seed.ts`
-- [ ] T010 [P] Implement shared server-side permission helpers in `src/lib/eventManagementAuth.ts`
-- [ ] T011 [P] Implement chapter visibility and membership helpers in `src/lib/chapters.ts`
-- [ ] T012 [P] Implement application template composition and site-required-field validation in `src/lib/applicationTemplates.ts`
-- [ ] T013 [P] Implement global-ban filtering and ban-flag helpers in `src/lib/moderation.ts`
-- [ ] T014 [P] Implement organizer-note relevance, current-note, and revision helpers in `src/lib/organizerNotes.ts`
-- [ ] T015 [P] Implement internal registration helpers and audit-record writing in `src/lib/eventRegistrations.ts`
-- [ ] T016 Update middleware admin checks from `ADMIN` to `SITE_ADMIN` in `src/middleware.ts`
-- [ ] T017 Update client user context admin derivation from `ADMIN` to `SITE_ADMIN` in `src/app/contexts/UserContext.tsx`
-- [ ] T018 Update existing project moderation and project management authorization from `ADMIN` to `SITE_ADMIN` in `src/app/api/projects/[projectId]/approve/route.ts`, `src/app/api/projects/[projectId]/status/route.ts`, `src/app/api/projects/[projectId]/edit/route.ts`, `src/app/api/projects/[projectId]/route.ts`, `src/app/api/projects/[projectId]/submit/route.ts`, `src/app/api/projects/[projectId]/star/route.ts`, and `src/app/projects/[projectId]/ProjectDetailClient.tsx`
-- [ ] T019 [P] Add permission matrix unit tests for site admins, chapter admins, members, MCs, co-MCs, regular users, and signed-out users in `tests/lib/eventManagementAuth.test.ts`
-- [ ] T020 [P] Add application template composition unit tests for site-required fields and event overrides in `tests/lib/applicationTemplates.test.ts`
-- [ ] T021 [P] Add migration-sensitive schema validation tests for Boston backfill, unique event slugs, and `EventStaff` migration assumptions in `tests/lib/eventManagementMigration.test.ts`
-- [ ] T022 Update existing admin-context tests from `ADMIN` to `SITE_ADMIN` in `tests/contexts/UserContext.test.tsx` and `tests/middleware-comprehensive.test.ts`
+- [X] T005 Replace `ADMIN` with `SITE_ADMIN` in the `Role` enum and add chapter/event-management enums in `prisma/schema.prisma`
+- [X] T006 Add `Chapter`, `ChapterMembership`, `EventStaff`, `ApplicationTemplate`, `EventRegistration`, `EventRegistrationAudit`, `UserBan`, `UserBanFlag`, `HackerOrganizerNote`, and `HackerOrganizerNoteRevision` models in `prisma/schema.prisma`
+- [X] T007 Add event chapter, slug, visibility, application, capacity, location, approved-detail, and check-in metadata fields in `prisma/schema.prisma`
+- [X] T008 Create Prisma migration for site-admin cutover, new tables, event metadata, indexes, Boston chapter backfill, event slug cleanup markers, and `EventMC` to `EventStaff` migration in `prisma/migrations/20260525000000_event_management_foundations/migration.sql`
+- [X] T009 Update seed data to use `Role.SITE_ADMIN`, create the Boston chapter, create the active site application template, and seed `EventStaff` assignments in `prisma/seed.ts`
+- [X] T010 [P] Implement shared server-side permission helpers in `src/lib/eventManagementAuth.ts`
+- [X] T011 [P] Implement chapter visibility and membership helpers in `src/lib/chapters.ts`
+- [X] T012 [P] Implement application template composition and site-required-field validation in `src/lib/applicationTemplates.ts`
+- [X] T013 [P] Implement global-ban filtering and ban-flag helpers in `src/lib/moderation.ts`
+- [X] T014 [P] Implement organizer-note relevance, current-note, and revision helpers in `src/lib/organizerNotes.ts`
+- [X] T015 [P] Implement internal registration helpers and audit-record writing in `src/lib/eventRegistrations.ts`
+- [X] T016 Update middleware admin checks from `ADMIN` to `SITE_ADMIN` in `src/middleware.ts`
+- [X] T017 Update client user context admin derivation from `ADMIN` to `SITE_ADMIN` in `src/app/contexts/UserContext.tsx`
+- [X] T018 Update existing project moderation and project management authorization from `ADMIN` to `SITE_ADMIN` in `src/app/api/projects/[projectId]/approve/route.ts`, `src/app/api/projects/[projectId]/status/route.ts`, `src/app/api/projects/[projectId]/edit/route.ts`, `src/app/api/projects/[projectId]/route.ts`, `src/app/api/projects/[projectId]/submit/route.ts`, `src/app/api/projects/[projectId]/star/route.ts`, and `src/app/projects/[projectId]/ProjectDetailClient.tsx`
+- [X] T019 [P] Add permission matrix unit tests for site admins, chapter admins, members, MCs, co-MCs, regular users, and signed-out users in `tests/lib/eventManagementAuth.test.ts`
+- [X] T020 [P] Add application template composition unit tests for site-required fields and event overrides in `tests/lib/applicationTemplates.test.ts`
+- [X] T021 [P] Add migration-sensitive schema validation tests for Boston backfill, unique event slugs, and `EventStaff` migration assumptions in `tests/lib/eventManagementMigration.test.ts`
+- [X] T022 Update existing admin-context tests from `ADMIN` to `SITE_ADMIN` in `tests/contexts/UserContext.test.tsx` and `tests/middleware-comprehensive.test.ts`
 
 **Checkpoint**: Foundation ready; user story implementation can now begin in parallel where capacity allows.
 
@@ -62,30 +62,30 @@
 
 ### Tests for User Story 1
 
-- [ ] T023 [P] [US1] Add API tests for site-admin chapter CRUD and non-site-admin denial in `tests/api/chapters.test.ts`
-- [ ] T024 [P] [US1] Add API tests for chapter admin assignment and only-admin removal rejection in `tests/api/chapter-admins.test.ts`
-- [ ] T025 [P] [US1] Add API tests for site template creation, update, and required-field validation in `tests/api/application-templates.test.ts`
-- [ ] T026 [P] [US1] Add API tests for global ban creation, revocation, and non-site-admin invisibility in `tests/api/admin-bans.test.ts`
-- [ ] T027 [P] [US1] Add component tests for site-admin chapter and ban surfaces in `tests/pages/AdminEventManagement.test.tsx`
+- [X] T023 [P] [US1] Add API tests for site-admin chapter CRUD and non-site-admin denial in `tests/api/chapters.test.ts`
+- [X] T024 [P] [US1] Add API tests for chapter admin assignment and only-admin removal rejection in `tests/api/chapter-admins.test.ts`
+- [X] T025 [P] [US1] Add API tests for site template creation, update, and required-field validation in `tests/api/application-templates.test.ts`
+- [X] T026 [P] [US1] Add API tests for global ban creation, revocation, and non-site-admin invisibility in `tests/api/admin-bans.test.ts`
+- [X] T027 [P] [US1] Add component tests for site-admin chapter and ban surfaces in `tests/pages/AdminEventManagement.test.tsx`
 
 ### Implementation for User Story 1
 
-- [ ] T028 [US1] Implement `GET` and `POST` for site-admin chapter listing and creation in `src/app/api/chapters/route.ts`
-- [ ] T029 [US1] Implement `GET` and `PATCH` for chapter details and settings in `src/app/api/chapters/[chapterId]/route.ts`
-- [ ] T030 [US1] Implement chapter admin assignment in `src/app/api/chapters/[chapterId]/admins/route.ts`
-- [ ] T031 [US1] Implement chapter admin removal with last-admin protection in `src/app/api/chapters/[chapterId]/admins/[hackerId]/route.ts`
-- [ ] T032 [US1] Implement member-state listing for site-admin and chapter-admin management in `src/app/api/chapters/[chapterId]/members/route.ts`
-- [ ] T033 [US1] Implement site and chapter application template list/create endpoints in `src/app/api/application-templates/route.ts`
-- [ ] T034 [US1] Implement application template update validation in `src/app/api/application-templates/[templateId]/route.ts`
-- [ ] T035 [US1] Implement merged application template preview endpoint in `src/app/api/application-templates/merged/route.ts`
-- [ ] T036 [US1] Implement global ban listing and creation in `src/app/api/admin/bans/route.ts`
-- [ ] T037 [US1] Implement global ban revocation in `src/app/api/admin/bans/[banId]/route.ts`
-- [ ] T038 [US1] Implement site-admin ban-flag list and resolution endpoints in `src/app/api/admin/ban-flags/route.ts` and `src/app/api/admin/ban-flags/[flagId]/route.ts`
-- [ ] T039 [US1] Replace the project-only admin page with a site-admin console in `src/app/admin/page.tsx`
-- [ ] T040 [US1] Create the site-admin chapter management surface in `src/app/admin/chapters/page.tsx`
-- [ ] T041 [US1] Create the site-admin application template surface in `src/app/admin/application-templates/page.tsx`
-- [ ] T042 [US1] Create the site-admin global moderation surface in `src/app/admin/bans/page.tsx`
-- [ ] T043 [US1] Move the existing project moderation surface to `src/app/admin/projects/page.tsx`
+- [X] T028 [US1] Implement `GET` and `POST` for site-admin chapter listing and creation in `src/app/api/chapters/route.ts`
+- [X] T029 [US1] Implement `GET` and `PATCH` for chapter details and settings in `src/app/api/chapters/[chapterId]/route.ts`
+- [X] T030 [US1] Implement chapter admin assignment in `src/app/api/chapters/[chapterId]/admins/route.ts`
+- [X] T031 [US1] Implement chapter admin removal with last-admin protection in `src/app/api/chapters/[chapterId]/admins/[hackerId]/route.ts`
+- [X] T032 [US1] Implement member-state listing for site-admin and chapter-admin management in `src/app/api/chapters/[chapterId]/members/route.ts`
+- [X] T033 [US1] Implement site and chapter application template list/create endpoints in `src/app/api/application-templates/route.ts`
+- [X] T034 [US1] Implement application template update validation in `src/app/api/application-templates/[templateId]/route.ts`
+- [X] T035 [US1] Implement merged application template preview endpoint in `src/app/api/application-templates/merged/route.ts`
+- [X] T036 [US1] Implement global ban listing and creation in `src/app/api/admin/bans/route.ts`
+- [X] T037 [US1] Implement global ban revocation in `src/app/api/admin/bans/[banId]/route.ts`
+- [X] T038 [US1] Implement site-admin ban-flag list and resolution endpoints in `src/app/api/admin/ban-flags/route.ts` and `src/app/api/admin/ban-flags/[flagId]/route.ts`
+- [X] T039 [US1] Replace the project-only admin page with a site-admin console in `src/app/admin/page.tsx`
+- [X] T040 [US1] Create the site-admin chapter management surface in `src/app/admin/chapters/page.tsx`
+- [X] T041 [US1] Create the site-admin application template surface in `src/app/admin/application-templates/page.tsx`
+- [X] T042 [US1] Create the site-admin global moderation surface in `src/app/admin/bans/page.tsx`
+- [X] T043 [US1] Move the existing project moderation surface to `src/app/admin/projects/page.tsx`
 
 **Checkpoint**: User Story 1 is independently functional and testable as the MVP.
 
@@ -99,23 +99,23 @@
 
 ### Tests for User Story 2
 
-- [ ] T044 [P] [US2] Add API tests for chapter-admin scoped settings, members, invitations, and cross-chapter denial in `tests/api/chapter-admin-operations.test.ts`
-- [ ] T045 [P] [US2] Add API tests for chapter-level application templates and declined-message edits in `tests/api/chapter-application-templates.test.ts`
-- [ ] T046 [P] [US2] Add API tests for chapter-admin event creation and unauthorized chapter denial in `tests/api/organizer-events.test.ts`
-- [ ] T047 [P] [US2] Add API tests for chapter-admin ban flag creation without global-ban visibility in `tests/api/chapter-ban-flags.test.ts`
-- [ ] T048 [P] [US2] Add component tests for the chapter settings organizer surface in `tests/pages/OrganizerChapterSettings.test.tsx`
+- [X] T044 [P] [US2] Add API tests for chapter-admin scoped settings, members, invitations, and cross-chapter denial in `tests/api/chapter-admin-operations.test.ts`
+- [X] T045 [P] [US2] Add API tests for chapter-level application templates and declined-message edits in `tests/api/chapter-application-templates.test.ts`
+- [X] T046 [P] [US2] Add API tests for chapter-admin event creation and unauthorized chapter denial in `tests/api/organizer-events.test.ts`
+- [X] T047 [P] [US2] Add API tests for chapter-admin ban flag creation without global-ban visibility in `tests/api/chapter-ban-flags.test.ts`
+- [X] T048 [P] [US2] Add component tests for the chapter settings organizer surface in `tests/pages/OrganizerChapterSettings.test.tsx`
 
 ### Implementation for User Story 2
 
-- [ ] T049 [US2] Extend chapter settings updates with chapter-admin scoping and default declined-message fields in `src/app/api/chapters/[chapterId]/route.ts`
-- [ ] T050 [US2] Implement private chapter invitation creation and reactivation in `src/app/api/chapters/[chapterId]/invites/route.ts`
-- [ ] T051 [US2] Implement membership revocation and role/status updates in `src/app/api/chapters/[chapterId]/members/[membershipId]/route.ts`
-- [ ] T052 [US2] Implement chapter-admin ban flag creation in `src/app/api/chapters/[chapterId]/ban-flags/route.ts`
-- [ ] T053 [US2] Implement organizer event index with site-admin and chapter-admin filtering in `src/app/organizer/events/page.tsx`
-- [ ] T054 [US2] Implement organizer event creation page for authorized chapters in `src/app/organizer/events/new/page.tsx`
-- [ ] T055 [US2] Implement chapter-admin event creation behavior in `src/app/api/events/route.ts`
-- [ ] T056 [US2] Implement chapter-specific application template editing on the organizer settings surface in `src/app/organizer/chapters/[chapterSlug]/settings/page.tsx`
-- [ ] T057 [US2] Implement chapter members, invitations, admins, and ban flags sections in `src/app/organizer/chapters/[chapterSlug]/settings/page.tsx`
+- [X] T049 [US2] Extend chapter settings updates with chapter-admin scoping and default declined-message fields in `src/app/api/chapters/[chapterId]/route.ts`
+- [X] T050 [US2] Implement private chapter invitation creation and reactivation in `src/app/api/chapters/[chapterId]/invites/route.ts`
+- [X] T051 [US2] Implement membership revocation and role/status updates in `src/app/api/chapters/[chapterId]/members/[membershipId]/route.ts`
+- [X] T052 [US2] Implement chapter-admin ban flag creation in `src/app/api/chapters/[chapterId]/ban-flags/route.ts`
+- [X] T053 [US2] Implement organizer event index with site-admin and chapter-admin filtering in `src/app/organizer/events/page.tsx`
+- [X] T054 [US2] Implement organizer event creation page for authorized chapters in `src/app/organizer/events/new/page.tsx`
+- [X] T055 [US2] Implement chapter-admin event creation behavior in `src/app/api/events/route.ts`
+- [X] T056 [US2] Implement chapter-specific application template editing on the organizer settings surface in `src/app/organizer/chapters/[chapterSlug]/settings/page.tsx`
+- [X] T057 [US2] Implement chapter members, invitations, admins, and ban flags sections in `src/app/organizer/chapters/[chapterSlug]/settings/page.tsx`
 
 **Checkpoint**: User Story 2 works for one chapter without granting access to another chapter.
 
@@ -129,19 +129,19 @@
 
 ### Tests for User Story 3
 
-- [ ] T058 [P] [US3] Add API tests for public/private chapter visibility in `tests/api/chapter-visibility.test.ts`
-- [ ] T059 [P] [US3] Add API tests for public chapter join, private invite acceptance, leave behavior, and notification preferences in `tests/api/chapter-membership.test.ts`
-- [ ] T060 [P] [US3] Add component tests for chapter directory and landing pages in `tests/pages/ChaptersPage.test.tsx`
+- [X] T058 [P] [US3] Add API tests for public/private chapter visibility in `tests/api/chapter-visibility.test.ts`
+- [X] T059 [P] [US3] Add API tests for public chapter join, private invite acceptance, leave behavior, and notification preferences in `tests/api/chapter-membership.test.ts`
+- [X] T060 [P] [US3] Add component tests for chapter directory and landing pages in `tests/pages/ChaptersPage.test.tsx`
 
 ### Implementation for User Story 3
 
-- [ ] T061 [US3] Implement visible chapter directory behavior in `src/app/api/chapters/route.ts`
-- [ ] T062 [US3] Implement public chapter join behavior in `src/app/api/chapters/[chapterId]/join/route.ts`
-- [ ] T063 [US3] Implement chapter leave behavior with only-admin protection in `src/app/api/chapters/[chapterId]/leave/route.ts`
-- [ ] T064 [US3] Implement private chapter invite acceptance in `src/app/api/chapters/[chapterId]/invites/accept/route.ts`
-- [ ] T065 [US3] Implement member notification preference updates in `src/app/api/chapters/[chapterId]/notifications/route.ts`
-- [ ] T066 [US3] Create the chapter directory page in `src/app/chapters/page.tsx`
-- [ ] T067 [US3] Create the chapter landing page with membership and invitation actions in `src/app/chapters/[chapterSlug]/page.tsx`
+- [X] T061 [US3] Implement visible chapter directory behavior in `src/app/api/chapters/route.ts`
+- [X] T062 [US3] Implement public chapter join behavior in `src/app/api/chapters/[chapterId]/join/route.ts`
+- [X] T063 [US3] Implement chapter leave behavior with only-admin protection in `src/app/api/chapters/[chapterId]/leave/route.ts`
+- [X] T064 [US3] Implement private chapter invite acceptance in `src/app/api/chapters/[chapterId]/invites/accept/route.ts`
+- [X] T065 [US3] Implement member notification preference updates in `src/app/api/chapters/[chapterId]/notifications/route.ts`
+- [X] T066 [US3] Create the chapter directory page in `src/app/chapters/page.tsx`
+- [X] T067 [US3] Create the chapter landing page with membership and invitation actions in `src/app/chapters/[chapterSlug]/page.tsx`
 
 **Checkpoint**: User Story 3 is independently testable through chapter discovery and membership flows.
 
@@ -155,17 +155,17 @@
 
 ### Tests for User Story 4
 
-- [ ] T068 [P] [US4] Update pitch transition, timer, advance, previous, and queue API tests for `EventStaff` MC and co-MC access in `tests/api/events-transition.test.ts`, `tests/api/events-pitch-timer.test.ts`, `tests/api/events-advance.test.ts`, `tests/api/events-queue.test.ts`, and `tests/api/events.test.ts`
-- [ ] T069 [P] [US4] Add API tests for event staff assignment and removal in `tests/api/event-staff.test.ts`
-- [ ] T070 [P] [US4] Add API tests denying co-MC applicant decisions in `tests/api/event-registrations.test.ts`
+- [X] T068 [P] [US4] Update pitch transition, timer, advance, previous, and queue API tests for `EventStaff` MC and co-MC access in `tests/api/events-transition.test.ts`, `tests/api/events-pitch-timer.test.ts`, `tests/api/events-advance.test.ts`, `tests/api/events-queue.test.ts`, and `tests/api/events.test.ts`
+- [X] T069 [P] [US4] Add API tests for event staff assignment and removal in `tests/api/event-staff.test.ts`
+- [X] T070 [P] [US4] Add API tests denying co-MC applicant decisions in `tests/api/event-registrations.test.ts`
 
 ### Implementation for User Story 4
 
-- [ ] T071 [US4] Replace `EventMC` includes and mutations with `EventStaff` in `src/app/api/events/route.ts` and `src/app/api/events/[eventId]/route.ts`
-- [ ] T072 [US4] Implement event staff assignment and removal endpoints in `src/app/api/events/[eventId]/staff/route.ts` and `src/app/api/events/[eventId]/staff/[staffId]/route.ts`
-- [ ] T073 [US4] Update pitch control authorization to use shared event staff helpers in `src/app/api/events/[eventId]/transition/route.ts`, `src/app/api/events/[eventId]/pitch-timer/route.ts`, `src/app/api/events/[eventId]/advance/route.ts`, `src/app/api/events/[eventId]/previous/route.ts`, `src/app/api/events/[eventId]/queue/route.ts`, `src/app/api/events/[eventId]/queue/[eventProjectId]/route.ts`, and `src/app/api/events/queue/[eventProjectId]/status/route.ts`
-- [ ] T074 [US4] Update the pitch page staff data model from `mcs` to MC and co-MC staff assignments in `src/app/pitch/[eventId]/page.tsx`
-- [ ] T075 [US4] Implement permission-specific event settings editing in `src/app/organizer/events/[eventId]/settings/page.tsx`
+- [X] T071 [US4] Replace `EventMC` includes and mutations with `EventStaff` in `src/app/api/events/route.ts` and `src/app/api/events/[eventId]/route.ts`
+- [X] T072 [US4] Implement event staff assignment and removal endpoints in `src/app/api/events/[eventId]/staff/route.ts` and `src/app/api/events/[eventId]/staff/[staffId]/route.ts`
+- [X] T073 [US4] Update pitch control authorization to use shared event staff helpers in `src/app/api/events/[eventId]/transition/route.ts`, `src/app/api/events/[eventId]/pitch-timer/route.ts`, `src/app/api/events/[eventId]/advance/route.ts`, `src/app/api/events/[eventId]/previous/route.ts`, `src/app/api/events/[eventId]/queue/route.ts`, `src/app/api/events/[eventId]/queue/[eventProjectId]/route.ts`, and `src/app/api/events/queue/[eventProjectId]/status/route.ts`
+- [X] T074 [US4] Update the pitch page staff data model from `mcs` to MC and co-MC staff assignments in `src/app/pitch/[eventId]/page.tsx`
+- [X] T075 [US4] Implement permission-specific event settings editing in `src/app/organizer/events/[eventId]/settings/page.tsx`
 
 **Checkpoint**: User Story 4 preserves existing pitch behavior and adds co-MC operational access.
 
@@ -179,16 +179,16 @@
 
 ### Tests for User Story 5
 
-- [ ] T076 [P] [US5] Add organizer note API access tests for site admin, relevant chapter admin, assigned MC, assigned co-MC, regular user, and signed-out user in `tests/api/organizer-notes.test.ts`
-- [ ] T077 [P] [US5] Add organizer note revision visibility tests in `tests/lib/organizerNotes.test.ts`
-- [ ] T078 [P] [US5] Add component tests for organizer note editing surfaces in `tests/components/OrganizerNotePanel.test.tsx`
+- [X] T076 [P] [US5] Add organizer note API access tests for site admin, relevant chapter admin, assigned MC, assigned co-MC, regular user, and signed-out user in `tests/api/organizer-notes.test.ts`
+- [X] T077 [P] [US5] Add organizer note revision visibility tests in `tests/lib/organizerNotes.test.ts`
+- [X] T078 [P] [US5] Add component tests for organizer note editing surfaces in `tests/components/OrganizerNotePanel.test.tsx`
 
 ### Implementation for User Story 5
 
-- [ ] T079 [US5] Implement current organizer note read and update endpoints in `src/app/api/hackers/[hackerId]/organizer-note/route.ts`
-- [ ] T080 [US5] Implement organizer note revision history endpoint in `src/app/api/hackers/[hackerId]/organizer-note/revisions/route.ts`
-- [ ] T081 [US5] Create the reusable organizer note panel in `src/app/components/OrganizerNotePanel.tsx`
-- [ ] T082 [US5] Add organizer note panels to relevant organizer event and chapter workflows in `src/app/organizer/events/[eventId]/settings/page.tsx` and `src/app/organizer/chapters/[chapterSlug]/settings/page.tsx`
+- [X] T079 [US5] Implement current organizer note read and update endpoints in `src/app/api/hackers/[hackerId]/organizer-note/route.ts`
+- [X] T080 [US5] Implement organizer note revision history endpoint in `src/app/api/hackers/[hackerId]/organizer-note/revisions/route.ts`
+- [X] T081 [US5] Create the reusable organizer note panel in `src/app/components/OrganizerNotePanel.tsx`
+- [X] T082 [US5] Add organizer note panels to relevant organizer event and chapter workflows in `src/app/organizer/events/[eventId]/settings/page.tsx` and `src/app/organizer/chapters/[chapterSlug]/settings/page.tsx`
 
 **Checkpoint**: User Story 5 supports current-note collaboration without leaking revision or ban data.
 
@@ -202,18 +202,18 @@
 
 ### Tests for User Story 6
 
-- [ ] T083 [P] [US6] Add API tests for rich event metadata creation, update, publish, and chapter scoping in `tests/api/event-management-foundations.test.ts`
-- [ ] T084 [P] [US6] Add API tests for internal registration creation, status updates, audit records, ban filtering, and co-MC decision denial in `tests/api/event-registrations.test.ts`
-- [ ] T085 [P] [US6] Add page tests confirming public `/events` exposes no native RSVP, application, approved-detail, RSVP status, or QR check-in flow in `tests/pages/EventsPage.test.tsx`
+- [X] T083 [P] [US6] Add API tests for rich event metadata creation, update, publish, and chapter scoping in `tests/api/event-management-foundations.test.ts`
+- [X] T084 [P] [US6] Add API tests for internal registration creation, status updates, audit records, ban filtering, and co-MC decision denial in `tests/api/event-registrations.test.ts`
+- [X] T085 [P] [US6] Add page tests confirming public `/events` exposes no native RSVP, application, approved-detail, RSVP status, or QR check-in flow in `tests/pages/EventsPage.test.tsx`
 
 ### Implementation for User Story 6
 
-- [ ] T086 [US6] Extend event creation and update endpoints with chapter, slug, visibility, capacity, location, application, and approved-detail metadata in `src/app/api/events/route.ts` and `src/app/api/events/[eventId]/route.ts`
-- [ ] T087 [US6] Implement event publishing in `src/app/api/events/[eventId]/publish/route.ts`
-- [ ] T088 [US6] Implement internal registration listing and creation with non-site-admin ban filtering in `src/app/api/events/[eventId]/registrations/route.ts`
-- [ ] T089 [US6] Implement internal registration status updates and audit records in `src/app/api/events/[eventId]/registrations/[registrationId]/route.ts`
-- [ ] T090 [US6] Implement event-specific application question editing and merged preview in `src/app/organizer/events/[eventId]/settings/page.tsx`
-- [ ] T091 [US6] Preserve existing public event listing behavior and prevent new RSVP/application/check-in actions in `src/app/events/page.tsx`
+- [X] T086 [US6] Extend event creation and update endpoints with chapter, slug, visibility, capacity, location, application, and approved-detail metadata in `src/app/api/events/route.ts` and `src/app/api/events/[eventId]/route.ts`
+- [X] T087 [US6] Implement event publishing in `src/app/api/events/[eventId]/publish/route.ts`
+- [X] T088 [US6] Implement internal registration listing and creation with non-site-admin ban filtering in `src/app/api/events/[eventId]/registrations/route.ts`
+- [X] T089 [US6] Implement internal registration status updates and audit records in `src/app/api/events/[eventId]/registrations/[registrationId]/route.ts`
+- [X] T090 [US6] Implement event-specific application question editing and merged preview in `src/app/organizer/events/[eventId]/settings/page.tsx`
+- [X] T091 [US6] Preserve existing public event listing behavior and prevent new RSVP/application/check-in actions in `src/app/events/page.tsx`
 
 **Checkpoint**: User Story 6 provides later RSVP foundations without exposing public RSVP functionality.
 
@@ -223,12 +223,12 @@
 
 **Purpose**: Validate cutover completeness, performance, and manual acceptance.
 
-- [ ] T092 [P] Remove stale `EventMC` and `Role.ADMIN` references from tests and app code in `src/`, `tests/`, `prisma/schema.prisma`, and `prisma/seed.ts`
-- [ ] T093 [P] Add indexed-query coverage or assertions for chapter visibility, staff lookup, registration filtering, and ban lookups in `tests/lib/eventManagementAuth.test.ts` and `tests/lib/chapters.test.ts`
-- [ ] T094 [P] Update implementation notes and manual acceptance checklist in `specs/001-event-management-foundations/quickstart.md`
-- [ ] T095 Run focused implementation checks with `npm run test -- tests/api/events.test.ts tests/api/events-queue.test.ts tests/contexts/UserContext.test.tsx tests/middleware-comprehensive.test.ts`
-- [ ] T096 Run the full Jest suite with `npm run test`
-- [ ] T097 Run the production build with `npm run build`
+- [X] T092 [P] Remove stale `EventMC` and `Role.ADMIN` references from tests and app code in `src/`, `tests/`, `prisma/schema.prisma`, and `prisma/seed.ts`
+- [X] T093 [P] Add indexed-query coverage or assertions for chapter visibility, staff lookup, registration filtering, and ban lookups in `tests/lib/eventManagementAuth.test.ts` and `tests/lib/chapters.test.ts`
+- [X] T094 [P] Update implementation notes and manual acceptance checklist in `specs/001-event-management-foundations/quickstart.md`
+- [X] T095 Run focused implementation checks with `npm run test -- tests/api/events.test.ts tests/api/events-queue.test.ts tests/contexts/UserContext.test.tsx tests/middleware-comprehensive.test.ts`
+- [X] T096 Run the full Jest suite with `npm run test`
+- [X] T097 Run the production build with `npm run build`
 
 ---
 
@@ -344,4 +344,3 @@ Task: "T085 [P] [US6] Add page tests confirming public /events exposes no native
 ### Validation Gate
 
 Before handoff, complete T095-T097 and run the manual acceptance flow in `specs/001-event-management-foundations/quickstart.md`.
-

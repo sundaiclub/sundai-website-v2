@@ -18,9 +18,9 @@ export async function DELETE(
     if (!ep || ep.eventId !== params.eventId) return new NextResponse("Not found", { status: 404 });
 
     // Permissions: MC/Admin can delist any; owner (addedBy) can delist their own item unless it's CURRENT
-    const event = await prisma.event.findUnique({ where: { id: params.eventId }, include: { mcs: true } });
-    const isMC = !!event?.mcs.find(m => m.hackerId === me.id);
-    const isAdmin = me.role === 'ADMIN';
+    const event = await prisma.event.findUnique({ where: { id: params.eventId }, include: { staff: true } });
+    const isMC = !!event?.staff.find((m: { hackerId: string }) => m.hackerId === me.id);
+    const isAdmin = me.role === 'SITE_ADMIN';
     const isOwner = ep.addedById === me.id;
 
     if (!(isAdmin || isMC || (isOwner && ep.status !== 'CURRENT'))) {

@@ -121,7 +121,7 @@ describe('middleware comprehensive', () => {
 
       mockFetch.mockResolvedValue({
         ok: true,
-        json: jest.fn().mockResolvedValue({ role: 'ADMIN' })
+        json: jest.fn().mockResolvedValue({ role: 'SITE_ADMIN' })
       } as any);
 
       const result = await afterAuthFunction(mockAuth, mockReq as any);
@@ -144,7 +144,7 @@ describe('middleware comprehensive', () => {
 
       mockFetch.mockResolvedValue({
         ok: true,
-        json: jest.fn().mockResolvedValue({ role: 'ADMIN' })
+        json: jest.fn().mockResolvedValue({ role: 'SITE_ADMIN' })
       } as any);
 
       const result = await afterAuthFunction(mockAuth, mockReq as any);
@@ -167,7 +167,7 @@ describe('middleware comprehensive', () => {
 
       mockFetch.mockResolvedValue({
         ok: true,
-        json: jest.fn().mockResolvedValue({ role: 'ADMIN' })
+        json: jest.fn().mockResolvedValue({ role: 'SITE_ADMIN' })
       } as any);
 
       const result = await afterAuthFunction(mockAuth, mockReq as any);

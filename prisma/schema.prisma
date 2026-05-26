@@ -44,9 +44,25 @@ model Hacker {
   lastAttendance      DateTime?
 
   // Event relations
-  createdEvents       Event[]
-  mcEvents            EventMC[]
-  addedEventProjects  EventProject[]
+  createdEvents             Event[]
+  chapterMemberships        ChapterMembership[] @relation("ChapterMembershipHacker")
+  invitedChapterMemberships ChapterMembership[] @relation("ChapterMembershipInviter")
+  eventStaffAssignments     EventStaff[]
+  addedEventProjects        EventProject[]
+  applicationTemplates      ApplicationTemplate[] @relation("ApplicationTemplateCreator")
+  eventRegistrations        EventRegistration[] @relation("EventRegistrationHacker")
+  decidedRegistrations      EventRegistration[] @relation("EventRegistrationDecider")
+  registrationAudits        EventRegistrationAudit[] @relation("RegistrationAuditActor")
+  createdUserBans           UserBan[] @relation("UserBanCreator")
+  revokedUserBans           UserBan[] @relation("UserBanRevoker")
+  userBans                  UserBan[] @relation("UserBanHacker")
+  createdBanFlags           UserBanFlag[] @relation("UserBanFlagCreator")
+  resolvedBanFlags          UserBanFlag[] @relation("UserBanFlagResolver")
+  banFlags                  UserBanFlag[] @relation("UserBanFlagHacker")
+  organizerNote             HackerOrganizerNote? @relation("OrganizerNoteHacker")
+  updatedOrganizerNotes     HackerOrganizerNote[] @relation("OrganizerNoteUpdater")
+  organizerNoteRevisions    HackerOrganizerNoteRevision[] @relation("OrganizerNoteRevisionHacker")
+  editedOrganizerRevisions  HackerOrganizerNoteRevision[] @relation("OrganizerNoteRevisionEditor")
 
   @@index([clerkId])
 }
@@ -205,7 +221,82 @@ enum Role {
   HACKER
   SPONSOR
   LEADER
+  SITE_ADMIN
+}
+
+enum ChapterStatus {
+  ACTIVE
+  PAUSED
+  ARCHIVED
+}
+
+enum ChapterAccessMode {
+  PUBLIC
+  PRIVATE
+}
+
+enum ChapterMembershipRole {
+  MEMBER
   ADMIN
+}
+
+enum ChapterMembershipStatus {
+  INVITED
+  ACTIVE
+  REVOKED
+  LEFT
+}
+
+enum EventStatus {
+  DRAFT
+  PUBLISHED
+  PAUSED
+  ARCHIVED
+}
+
+enum EventVisibility {
+  PUBLIC
+  PRIVATE
+  UNLISTED
+}
+
+enum EventApplicationMode {
+  NONE
+  INTERNAL
+  PUBLIC_LATER
+}
+
+enum EventStaffRole {
+  MC
+  CO_MC
+}
+
+enum ApplicationTemplateScope {
+  SITE
+  CHAPTER
+}
+
+enum EventRegistrationStatus {
+  PENDING
+  APPROVED
+  WAITLISTED
+  DECLINED
+  BLOCKED
+  CANCELLED
+}
+
+enum EventRegistrationSource {
+  INTERNAL
+  PUBLIC_LATER
+  IMPORT
+}
+
+enum BanFlagStatus {
+  OPEN
+  REVIEWING
+  RESOLVED_NO_ACTION
+  RESOLVED_BANNED
+  DISMISSED
 }
 
 enum ProjectStatus {
@@ -231,10 +322,33 @@ model Event {
   title            String
   description      String?
   startTime        DateTime
+  endTime          DateTime?
   meetingUrl       String?
   location         String?
+  venueName        String?
+  publicLocation   String?
+  address          String?
+  virtualUrl       String?
   createdBy        Hacker     @relation(fields: [createdById], references: [id])
   createdById      String
+  chapter          Chapter    @relation(fields: [chapterId], references: [id])
+  chapterId        String
+  slug             String
+  slugNeedsCleanup Boolean    @default(false)
+  status           EventStatus @default(DRAFT)
+  visibility       EventVisibility @default(PUBLIC)
+  programType      String?
+  publicProgramLabel String?
+  capacity         Int?
+  applicationMode  EventApplicationMode @default(NONE)
+  autoPromoteWaitlist Boolean @default(false)
+  approvedDetailsJson Json?
+  applicationQuestionsJson Json?
+  hideChapterDefaultQuestions Boolean @default(false)
+  applicationsOpen DateTime?
+  applicationsCloseReason String?
+  checkInOpensAt   DateTime?
+  checkInClosesAt  DateTime?
   audienceCanReorder Boolean  @default(true)
   votingEndTime    DateTime?
   phase            EventPhase @default(VOTING)
@@ -244,23 +358,211 @@ model Event {
   defaultPresentingSec Int    @default(60)
   defaultQuestionsSec  Int    @default(120)
   projects         EventProject[]
-  mcs              EventMC[]
+  staff            EventStaff[]
+  registrations    EventRegistration[]
+  registrationAudits EventRegistrationAudit[]
   createdAt        DateTime   @default(now())
   updatedAt        DateTime   @updatedAt
 
+  @@unique([chapterId, slug])
   @@index([startTime])
+  @@index([chapterId, status, startTime])
+  @@index([visibility, status])
 }
 
-model EventMC {
-  id       String @id @default(uuid())
-  event    Event  @relation(fields: [eventId], references: [id])
-  eventId  String
-  hacker   Hacker @relation(fields: [hackerId], references: [id])
-  hackerId String
-  role     String?
+model Chapter {
+  id                    String                @id @default(uuid())
+  name                  String
+  slug                  String                @unique
+  city                  String
+  region                String?
+  country               String
+  timezone              String
+  description           String?
+  status                ChapterStatus         @default(ACTIVE)
+  accessMode            ChapterAccessMode     @default(PUBLIC)
+  defaultDeclineMessage String?
+  mailingListName       String?
+  mailingListExternalId String?
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+  memberships           ChapterMembership[]
+  events                Event[]
+  applicationTemplates  ApplicationTemplate[]
+  banFlags              UserBanFlag[]
+
+  @@index([status, accessMode])
+  @@index([slug])
+}
+
+model ChapterMembership {
+  id                           String                  @id @default(uuid())
+  chapter                      Chapter                 @relation(fields: [chapterId], references: [id])
+  chapterId                    String
+  hacker                       Hacker                  @relation("ChapterMembershipHacker", fields: [hackerId], references: [id])
+  hackerId                     String
+  role                         ChapterMembershipRole   @default(MEMBER)
+  status                       ChapterMembershipStatus @default(INVITED)
+  invitedBy                    Hacker?                 @relation("ChapterMembershipInviter", fields: [invitedById], references: [id])
+  invitedById                  String?
+  invitedAt                    DateTime?
+  joinedAt                     DateTime?
+  leftAt                       DateTime?
+  revokedAt                    DateTime?
+  notificationsAllowed         Boolean                 @default(false)
+  emailNotificationsEnabled    Boolean                 @default(false)
+  smsNotificationsEnabled      Boolean                 @default(false)
+  notificationPreferencesJson  Json?
+  createdAt                    DateTime                @default(now())
+  updatedAt                    DateTime                @updatedAt
+
+  @@unique([chapterId, hackerId])
+  @@index([hackerId, status])
+  @@index([chapterId, role, status])
+}
+
+model EventStaff {
+  id        String         @id @default(uuid())
+  event     Event          @relation(fields: [eventId], references: [id])
+  eventId   String
+  hacker    Hacker         @relation(fields: [hackerId], references: [id])
+  hackerId  String
+  role      EventStaffRole
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  @@unique([eventId, hackerId, role])
+  @@index([eventId, role])
+  @@index([hackerId])
+}
+
+model ApplicationTemplate {
+  id          String                   @id @default(uuid())
+  scope       ApplicationTemplateScope
+  chapter     Chapter?                 @relation(fields: [chapterId], references: [id])
+  chapterId   String?
+  name        String
+  fieldsJson  Json
+  isActive    Boolean                  @default(true)
+  createdBy   Hacker                   @relation("ApplicationTemplateCreator", fields: [createdById], references: [id])
+  createdById String
+  createdAt   DateTime                 @default(now())
+  updatedAt   DateTime                 @updatedAt
+
+  @@index([scope, isActive])
+  @@index([chapterId, isActive])
+}
+
+model EventRegistration {
+  id                   String                  @id @default(uuid())
+  event                Event                   @relation(fields: [eventId], references: [id])
+  eventId              String
+  hacker               Hacker                  @relation("EventRegistrationHacker", fields: [hackerId], references: [id])
+  hackerId             String
+  status               EventRegistrationStatus @default(PENDING)
+  source               EventRegistrationSource @default(INTERNAL)
+  answersJson          Json?
+  templateSnapshotJson Json?
+  publicSafeMessage    String?
+  internalReviewNotes  String?
+  decidedBy            Hacker?                 @relation("EventRegistrationDecider", fields: [decidedById], references: [id])
+  decidedById          String?
+  decidedAt            DateTime?
+  createdAt            DateTime                @default(now())
+  updatedAt            DateTime                @updatedAt
+  audits               EventRegistrationAudit[]
 
   @@unique([eventId, hackerId])
-  @@index([hackerId])
+  @@index([eventId, status])
+  @@index([hackerId, status])
+}
+
+model EventRegistrationAudit {
+  id             String                   @id @default(uuid())
+  registration   EventRegistration        @relation(fields: [registrationId], references: [id])
+  registrationId String
+  event          Event                    @relation(fields: [eventId], references: [id])
+  eventId        String
+  actor          Hacker                   @relation("RegistrationAuditActor", fields: [actorId], references: [id])
+  actorId        String
+  fromStatus     EventRegistrationStatus?
+  toStatus       EventRegistrationStatus
+  changeJson     Json?
+  createdAt      DateTime                 @default(now())
+
+  @@index([registrationId, createdAt])
+  @@index([eventId, createdAt])
+  @@index([actorId])
+}
+
+model UserBan {
+  id                String    @id @default(uuid())
+  hacker            Hacker    @relation("UserBanHacker", fields: [hackerId], references: [id])
+  hackerId          String
+  publicSafeReason  String
+  internalNote      String?
+  createdBy         Hacker    @relation("UserBanCreator", fields: [createdById], references: [id])
+  createdById       String
+  createdAt         DateTime  @default(now())
+  revokedBy         Hacker?   @relation("UserBanRevoker", fields: [revokedById], references: [id])
+  revokedById       String?
+  revokedAt         DateTime?
+  revocationReason  String?
+
+  @@index([hackerId, revokedAt])
+  @@index([createdById])
+}
+
+model UserBanFlag {
+  id             String        @id @default(uuid())
+  chapter        Chapter       @relation(fields: [chapterId], references: [id])
+  chapterId      String
+  hacker         Hacker        @relation("UserBanFlagHacker", fields: [hackerId], references: [id])
+  hackerId       String
+  createdBy      Hacker        @relation("UserBanFlagCreator", fields: [createdById], references: [id])
+  createdById    String
+  reason         String
+  status         BanFlagStatus @default(OPEN)
+  resolutionNote String?
+  resolvedBy     Hacker?       @relation("UserBanFlagResolver", fields: [resolvedById], references: [id])
+  resolvedById   String?
+  resolvedAt     DateTime?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@index([chapterId, status])
+  @@index([hackerId, status])
+  @@index([createdById])
+}
+
+model HackerOrganizerNote {
+  id          String                         @id @default(uuid())
+  hacker      Hacker                         @relation("OrganizerNoteHacker", fields: [hackerId], references: [id])
+  hackerId    String                         @unique
+  body        String
+  updatedBy   Hacker                         @relation("OrganizerNoteUpdater", fields: [updatedById], references: [id])
+  updatedById String
+  createdAt   DateTime                       @default(now())
+  updatedAt   DateTime                       @updatedAt
+  revisions   HackerOrganizerNoteRevision[]
+
+  @@index([updatedById])
+}
+
+model HackerOrganizerNoteRevision {
+  id         String              @id @default(uuid())
+  note       HackerOrganizerNote @relation(fields: [noteId], references: [id])
+  noteId     String
+  hacker     Hacker              @relation("OrganizerNoteRevisionHacker", fields: [hackerId], references: [id])
+  hackerId   String
+  editedBy   Hacker              @relation("OrganizerNoteRevisionEditor", fields: [editedById], references: [id])
+  editedById String
+  patchText  String
+  createdAt  DateTime            @default(now())
+
+  @@index([noteId, createdAt])
+  @@index([hackerId, createdAt])
+  @@index([editedById])
 }
 
 model EventProject {

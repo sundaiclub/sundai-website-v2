@@ -28,7 +28,7 @@ describe('/api/projects/[projectId]/approve', () => {
   describe('POST', () => {
     it('should approve project successfully as admin', async () => {
       const mockUser = {
-        role: 'ADMIN',
+        role: 'SITE_ADMIN',
       };
 
       const mockProject = {
@@ -103,7 +103,7 @@ describe('/api/projects/[projectId]/approve', () => {
 
     it('should handle database errors', async () => {
       const mockUser = {
-        role: 'ADMIN',
+        role: 'SITE_ADMIN',
       };
 
       mockAuth.mockReturnValue({ userId: 'clerk-123' });

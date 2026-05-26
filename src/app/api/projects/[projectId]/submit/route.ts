@@ -39,7 +39,7 @@ export async function PATCH(
     }
 
     // Check if user is admin, launch lead, or team member
-    const isAdmin = currentUser.role === "ADMIN";
+    const isAdmin = currentUser.role === "SITE_ADMIN";
     const isLaunchLead = project.launchLeadId === currentUser.id;
     const isTeamMember = project.participants.some(p => p.hackerId === currentUser.id);
 

@@ -5,6 +5,7 @@ jest.mock('../../src/lib/prisma', () => ({
   __esModule: true,
   default: {
     hacker: { findUnique: jest.fn() },
+    chapterMembership: { findFirst: jest.fn() },
     event: { findUnique: jest.fn() },
     eventProject: { findUnique: jest.fn(), update: jest.fn() },
   },
@@ -26,7 +27,10 @@ function makeRequest(body: object) {
 const params = { params: { eventId: 'e1' } } as any;
 
 describe('/api/events/[eventId]/pitch-timer', () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+    prisma.chapterMembership.findFirst.mockResolvedValue(null);
+  });
 
   it('rejects unauthenticated requests', async () => {
     mockAuth.mockReturnValue({ userId: null });
@@ -34,10 +38,10 @@ describe('/api/events/[eventId]/pitch-timer', () => {
     expect(res.status).toBe(401);
   });
 
-  it('rejects non-admin/MC users', async () => {
+  it('rejects non-site-admin/non-staff users', async () => {
     mockAuth.mockReturnValue({ userId: 'clerk-1' });
     prisma.hacker.findUnique.mockResolvedValue({ id: 'h1', role: 'HACKER' });
-    prisma.event.findUnique.mockResolvedValue({ id: 'e1', phase: 'PITCHING', mcs: [] });
+    prisma.event.findUnique.mockResolvedValue({ id: 'e1', phase: 'PITCHING', staff: [] });
 
     const res = await POST(makeRequest({ action: 'start_presenting', eventProjectId: 'ep1' }) as any, params);
     expect(res.status).toBe(401);
@@ -45,8 +49,8 @@ describe('/api/events/[eventId]/pitch-timer', () => {
 
   it('rejects if event is not in PITCHING phase', async () => {
     mockAuth.mockReturnValue({ userId: 'clerk-admin' });
-    prisma.hacker.findUnique.mockResolvedValue({ id: 'h-admin', role: 'ADMIN' });
-    prisma.event.findUnique.mockResolvedValue({ id: 'e1', phase: 'VOTING', mcs: [] });
+    prisma.hacker.findUnique.mockResolvedValue({ id: 'h-admin', role: 'SITE_ADMIN' });
+    prisma.event.findUnique.mockResolvedValue({ id: 'e1', phase: 'VOTING', staff: [] });
 
     const res = await POST(makeRequest({ action: 'start_presenting', eventProjectId: 'ep1' }) as any, params);
     expect(res.status).toBe(400);
@@ -56,8 +60,8 @@ describe('/api/events/[eventId]/pitch-timer', () => {
 
   it('rejects if event project is not CURRENT', async () => {
     mockAuth.mockReturnValue({ userId: 'clerk-admin' });
-    prisma.hacker.findUnique.mockResolvedValue({ id: 'h-admin', role: 'ADMIN' });
-    prisma.event.findUnique.mockResolvedValue({ id: 'e1', phase: 'PITCHING', mcs: [] });
+    prisma.hacker.findUnique.mockResolvedValue({ id: 'h-admin', role: 'SITE_ADMIN' });
+    prisma.event.findUnique.mockResolvedValue({ id: 'e1', phase: 'PITCHING', staff: [] });
     prisma.eventProject.findUnique.mockResolvedValue({ id: 'ep1', eventId: 'e1', status: 'QUEUED', pitchPhase: 'WAITING' });
 
     const res = await POST(makeRequest({ action: 'start_presenting', eventProjectId: 'ep1' }) as any, params);
@@ -68,8 +72,8 @@ describe('/api/events/[eventId]/pitch-timer', () => {
 
   it('starts presenting from WAITING', async () => {
     mockAuth.mockReturnValue({ userId: 'clerk-admin' });
-    prisma.hacker.findUnique.mockResolvedValue({ id: 'h-admin', role: 'ADMIN' });
-    prisma.event.findUnique.mockResolvedValue({ id: 'e1', phase: 'PITCHING', mcs: [] });
+    prisma.hacker.findUnique.mockResolvedValue({ id: 'h-admin', role: 'SITE_ADMIN' });
+    prisma.event.findUnique.mockResolvedValue({ id: 'e1', phase: 'PITCHING', staff: [] });
     prisma.eventProject.findUnique.mockResolvedValue({ id: 'ep1', eventId: 'e1', status: 'CURRENT', pitchPhase: 'WAITING', allottedPresentingSec: 120, allottedQuestionsSec: 180 });
     prisma.eventProject.update.mockResolvedValue({});
 
@@ -83,11 +87,11 @@ describe('/api/events/[eventId]/pitch-timer', () => {
 
   it('backfills allotted time from the frozen top-project flag', async () => {
     mockAuth.mockReturnValue({ userId: 'clerk-admin' });
-    prisma.hacker.findUnique.mockResolvedValue({ id: 'h-admin', role: 'ADMIN' });
+    prisma.hacker.findUnique.mockResolvedValue({ id: 'h-admin', role: 'SITE_ADMIN' });
     prisma.event.findUnique.mockResolvedValue({
       id: 'e1',
       phase: 'PITCHING',
-      mcs: [],
+      staff: [],
       topPresentingSec: 120,
       topQuestionsSec: 180,
       defaultPresentingSec: 60,
@@ -114,8 +118,8 @@ describe('/api/events/[eventId]/pitch-timer', () => {
 
   it('rejects start_presenting if not in WAITING phase', async () => {
     mockAuth.mockReturnValue({ userId: 'clerk-admin' });
-    prisma.hacker.findUnique.mockResolvedValue({ id: 'h-admin', role: 'ADMIN' });
-    prisma.event.findUnique.mockResolvedValue({ id: 'e1', phase: 'PITCHING', mcs: [] });
+    prisma.hacker.findUnique.mockResolvedValue({ id: 'h-admin', role: 'SITE_ADMIN' });
+    prisma.event.findUnique.mockResolvedValue({ id: 'e1', phase: 'PITCHING', staff: [] });
     prisma.eventProject.findUnique.mockResolvedValue({ id: 'ep1', eventId: 'e1', status: 'CURRENT', pitchPhase: 'PRESENTING' });
 
     const res = await POST(makeRequest({ action: 'start_presenting', eventProjectId: 'ep1' }) as any, params);
@@ -126,8 +130,8 @@ describe('/api/events/[eventId]/pitch-timer', () => {
 
   it('starts questions from PRESENTING', async () => {
     mockAuth.mockReturnValue({ userId: 'clerk-admin' });
-    prisma.hacker.findUnique.mockResolvedValue({ id: 'h-admin', role: 'ADMIN' });
-    prisma.event.findUnique.mockResolvedValue({ id: 'e1', phase: 'PITCHING', mcs: [] });
+    prisma.hacker.findUnique.mockResolvedValue({ id: 'h-admin', role: 'SITE_ADMIN' });
+    prisma.event.findUnique.mockResolvedValue({ id: 'e1', phase: 'PITCHING', staff: [] });
     prisma.eventProject.findUnique.mockResolvedValue({ id: 'ep1', eventId: 'e1', status: 'CURRENT', pitchPhase: 'PRESENTING' });
     prisma.eventProject.update.mockResolvedValue({});
 
@@ -141,8 +145,8 @@ describe('/api/events/[eventId]/pitch-timer', () => {
 
   it('rejects start_questions if not PRESENTING', async () => {
     mockAuth.mockReturnValue({ userId: 'clerk-admin' });
-    prisma.hacker.findUnique.mockResolvedValue({ id: 'h-admin', role: 'ADMIN' });
-    prisma.event.findUnique.mockResolvedValue({ id: 'e1', phase: 'PITCHING', mcs: [] });
+    prisma.hacker.findUnique.mockResolvedValue({ id: 'h-admin', role: 'SITE_ADMIN' });
+    prisma.event.findUnique.mockResolvedValue({ id: 'e1', phase: 'PITCHING', staff: [] });
     prisma.eventProject.findUnique.mockResolvedValue({ id: 'ep1', eventId: 'e1', status: 'CURRENT', pitchPhase: 'WAITING', allottedPresentingSec: 120, allottedQuestionsSec: 180 });
 
     const res = await POST(makeRequest({ action: 'start_questions', eventProjectId: 'ep1' }) as any, params);
@@ -151,8 +155,8 @@ describe('/api/events/[eventId]/pitch-timer', () => {
 
   it('finishes from QUESTIONS', async () => {
     mockAuth.mockReturnValue({ userId: 'clerk-admin' });
-    prisma.hacker.findUnique.mockResolvedValue({ id: 'h-admin', role: 'ADMIN' });
-    prisma.event.findUnique.mockResolvedValue({ id: 'e1', phase: 'PITCHING', mcs: [] });
+    prisma.hacker.findUnique.mockResolvedValue({ id: 'h-admin', role: 'SITE_ADMIN' });
+    prisma.event.findUnique.mockResolvedValue({ id: 'e1', phase: 'PITCHING', staff: [] });
     prisma.eventProject.findUnique.mockResolvedValue({ id: 'ep1', eventId: 'e1', status: 'CURRENT', pitchPhase: 'QUESTIONS' });
     prisma.eventProject.update.mockResolvedValue({});
 
@@ -166,8 +170,8 @@ describe('/api/events/[eventId]/pitch-timer', () => {
 
   it('rejects finish if not in QUESTIONS', async () => {
     mockAuth.mockReturnValue({ userId: 'clerk-admin' });
-    prisma.hacker.findUnique.mockResolvedValue({ id: 'h-admin', role: 'ADMIN' });
-    prisma.event.findUnique.mockResolvedValue({ id: 'e1', phase: 'PITCHING', mcs: [] });
+    prisma.hacker.findUnique.mockResolvedValue({ id: 'h-admin', role: 'SITE_ADMIN' });
+    prisma.event.findUnique.mockResolvedValue({ id: 'e1', phase: 'PITCHING', staff: [] });
     prisma.eventProject.findUnique.mockResolvedValue({ id: 'ep1', eventId: 'e1', status: 'CURRENT', pitchPhase: 'PRESENTING' });
 
     const res = await POST(makeRequest({ action: 'finish', eventProjectId: 'ep1' }) as any, params);
@@ -176,8 +180,8 @@ describe('/api/events/[eventId]/pitch-timer', () => {
 
   it('rejects invalid action', async () => {
     mockAuth.mockReturnValue({ userId: 'clerk-admin' });
-    prisma.hacker.findUnique.mockResolvedValue({ id: 'h-admin', role: 'ADMIN' });
-    prisma.event.findUnique.mockResolvedValue({ id: 'e1', phase: 'PITCHING', mcs: [] });
+    prisma.hacker.findUnique.mockResolvedValue({ id: 'h-admin', role: 'SITE_ADMIN' });
+    prisma.event.findUnique.mockResolvedValue({ id: 'e1', phase: 'PITCHING', staff: [] });
     prisma.eventProject.findUnique.mockResolvedValue({ id: 'ep1', eventId: 'e1', status: 'CURRENT', pitchPhase: 'WAITING', allottedPresentingSec: 120, allottedQuestionsSec: 180 });
 
     const res = await POST(makeRequest({ action: 'invalid_action', eventProjectId: 'ep1' }) as any, params);
@@ -189,7 +193,18 @@ describe('/api/events/[eventId]/pitch-timer', () => {
   it('allows MC to control timer', async () => {
     mockAuth.mockReturnValue({ userId: 'clerk-mc' });
     prisma.hacker.findUnique.mockResolvedValue({ id: 'h-mc', role: 'HACKER' });
-    prisma.event.findUnique.mockResolvedValue({ id: 'e1', phase: 'PITCHING', mcs: [{ hackerId: 'h-mc' }] });
+    prisma.event.findUnique.mockResolvedValue({ id: 'e1', phase: 'PITCHING', staff: [{ hackerId: 'h-mc', role: 'MC' }] });
+    prisma.eventProject.findUnique.mockResolvedValue({ id: 'ep1', eventId: 'e1', status: 'CURRENT', pitchPhase: 'WAITING', allottedPresentingSec: 120, allottedQuestionsSec: 180 });
+    prisma.eventProject.update.mockResolvedValue({});
+
+    const res = await POST(makeRequest({ action: 'start_presenting', eventProjectId: 'ep1' }) as any, params);
+    expect(res.status).toBe(200);
+  });
+
+  it('allows co-MC to control timer', async () => {
+    mockAuth.mockReturnValue({ userId: 'clerk-co-mc' });
+    prisma.hacker.findUnique.mockResolvedValue({ id: 'h-co-mc', role: 'HACKER' });
+    prisma.event.findUnique.mockResolvedValue({ id: 'e1', phase: 'PITCHING', staff: [{ hackerId: 'h-co-mc', role: 'CO_MC' }] });
     prisma.eventProject.findUnique.mockResolvedValue({ id: 'ep1', eventId: 'e1', status: 'CURRENT', pitchPhase: 'WAITING', allottedPresentingSec: 120, allottedQuestionsSec: 180 });
     prisma.eventProject.update.mockResolvedValue({});
 
@@ -199,8 +214,8 @@ describe('/api/events/[eventId]/pitch-timer', () => {
 
   it('pauses during PRESENTING', async () => {
     mockAuth.mockReturnValue({ userId: 'clerk-admin' });
-    prisma.hacker.findUnique.mockResolvedValue({ id: 'h-admin', role: 'ADMIN' });
-    prisma.event.findUnique.mockResolvedValue({ id: 'e1', phase: 'PITCHING', mcs: [] });
+    prisma.hacker.findUnique.mockResolvedValue({ id: 'h-admin', role: 'SITE_ADMIN' });
+    prisma.event.findUnique.mockResolvedValue({ id: 'e1', phase: 'PITCHING', staff: [] });
     prisma.eventProject.findUnique.mockResolvedValue({
       id: 'ep1', eventId: 'e1', status: 'CURRENT', pitchPhase: 'PRESENTING',
       presentingStartedAt: new Date(), questionsStartedAt: null, pausedAt: null,
@@ -216,8 +231,8 @@ describe('/api/events/[eventId]/pitch-timer', () => {
 
   it('rejects pause when not PRESENTING or QUESTIONS', async () => {
     mockAuth.mockReturnValue({ userId: 'clerk-admin' });
-    prisma.hacker.findUnique.mockResolvedValue({ id: 'h-admin', role: 'ADMIN' });
-    prisma.event.findUnique.mockResolvedValue({ id: 'e1', phase: 'PITCHING', mcs: [] });
+    prisma.hacker.findUnique.mockResolvedValue({ id: 'h-admin', role: 'SITE_ADMIN' });
+    prisma.event.findUnique.mockResolvedValue({ id: 'e1', phase: 'PITCHING', staff: [] });
     prisma.eventProject.findUnique.mockResolvedValue({
       id: 'ep1', eventId: 'e1', status: 'CURRENT', pitchPhase: 'WAITING', pausedAt: null,
     });
@@ -230,8 +245,8 @@ describe('/api/events/[eventId]/pitch-timer', () => {
 
   it('rejects pause when already paused', async () => {
     mockAuth.mockReturnValue({ userId: 'clerk-admin' });
-    prisma.hacker.findUnique.mockResolvedValue({ id: 'h-admin', role: 'ADMIN' });
-    prisma.event.findUnique.mockResolvedValue({ id: 'e1', phase: 'PITCHING', mcs: [] });
+    prisma.hacker.findUnique.mockResolvedValue({ id: 'h-admin', role: 'SITE_ADMIN' });
+    prisma.event.findUnique.mockResolvedValue({ id: 'e1', phase: 'PITCHING', staff: [] });
     prisma.eventProject.findUnique.mockResolvedValue({
       id: 'ep1', eventId: 'e1', status: 'CURRENT', pitchPhase: 'PRESENTING',
       presentingStartedAt: new Date(), pausedAt: new Date(),
@@ -245,8 +260,8 @@ describe('/api/events/[eventId]/pitch-timer', () => {
 
   it('resume shifts presentingStartedAt forward by paused duration', async () => {
     mockAuth.mockReturnValue({ userId: 'clerk-admin' });
-    prisma.hacker.findUnique.mockResolvedValue({ id: 'h-admin', role: 'ADMIN' });
-    prisma.event.findUnique.mockResolvedValue({ id: 'e1', phase: 'PITCHING', mcs: [] });
+    prisma.hacker.findUnique.mockResolvedValue({ id: 'h-admin', role: 'SITE_ADMIN' });
+    prisma.event.findUnique.mockResolvedValue({ id: 'e1', phase: 'PITCHING', staff: [] });
 
     const presStart = new Date('2026-05-06T16:00:00Z');
     const pausedAt = new Date('2026-05-06T16:00:30Z'); // 30s after start
@@ -273,8 +288,8 @@ describe('/api/events/[eventId]/pitch-timer', () => {
 
   it('resume also shifts questionsStartedAt when present', async () => {
     mockAuth.mockReturnValue({ userId: 'clerk-admin' });
-    prisma.hacker.findUnique.mockResolvedValue({ id: 'h-admin', role: 'ADMIN' });
-    prisma.event.findUnique.mockResolvedValue({ id: 'e1', phase: 'PITCHING', mcs: [] });
+    prisma.hacker.findUnique.mockResolvedValue({ id: 'h-admin', role: 'SITE_ADMIN' });
+    prisma.event.findUnique.mockResolvedValue({ id: 'e1', phase: 'PITCHING', staff: [] });
 
     const presStart = new Date('2026-05-06T16:00:00Z');
     const qStart = new Date('2026-05-06T16:02:00Z');
@@ -297,8 +312,8 @@ describe('/api/events/[eventId]/pitch-timer', () => {
 
   it('rejects resume when not paused', async () => {
     mockAuth.mockReturnValue({ userId: 'clerk-admin' });
-    prisma.hacker.findUnique.mockResolvedValue({ id: 'h-admin', role: 'ADMIN' });
-    prisma.event.findUnique.mockResolvedValue({ id: 'e1', phase: 'PITCHING', mcs: [] });
+    prisma.hacker.findUnique.mockResolvedValue({ id: 'h-admin', role: 'SITE_ADMIN' });
+    prisma.event.findUnique.mockResolvedValue({ id: 'e1', phase: 'PITCHING', staff: [] });
     prisma.eventProject.findUnique.mockResolvedValue({
       id: 'ep1', eventId: 'e1', status: 'CURRENT', pitchPhase: 'PRESENTING',
       presentingStartedAt: new Date(), pausedAt: null,
@@ -312,8 +327,8 @@ describe('/api/events/[eventId]/pitch-timer', () => {
 
   it('rejects start_questions while paused', async () => {
     mockAuth.mockReturnValue({ userId: 'clerk-admin' });
-    prisma.hacker.findUnique.mockResolvedValue({ id: 'h-admin', role: 'ADMIN' });
-    prisma.event.findUnique.mockResolvedValue({ id: 'e1', phase: 'PITCHING', mcs: [] });
+    prisma.hacker.findUnique.mockResolvedValue({ id: 'h-admin', role: 'SITE_ADMIN' });
+    prisma.event.findUnique.mockResolvedValue({ id: 'e1', phase: 'PITCHING', staff: [] });
     prisma.eventProject.findUnique.mockResolvedValue({
       id: 'ep1', eventId: 'e1', status: 'CURRENT', pitchPhase: 'PRESENTING',
       presentingStartedAt: new Date(), pausedAt: new Date(),
@@ -327,8 +342,8 @@ describe('/api/events/[eventId]/pitch-timer', () => {
 
   it('rejects finish while paused', async () => {
     mockAuth.mockReturnValue({ userId: 'clerk-admin' });
-    prisma.hacker.findUnique.mockResolvedValue({ id: 'h-admin', role: 'ADMIN' });
-    prisma.event.findUnique.mockResolvedValue({ id: 'e1', phase: 'PITCHING', mcs: [] });
+    prisma.hacker.findUnique.mockResolvedValue({ id: 'h-admin', role: 'SITE_ADMIN' });
+    prisma.event.findUnique.mockResolvedValue({ id: 'e1', phase: 'PITCHING', staff: [] });
     prisma.eventProject.findUnique.mockResolvedValue({
       id: 'ep1', eventId: 'e1', status: 'CURRENT', pitchPhase: 'QUESTIONS',
       questionsStartedAt: new Date(), pausedAt: new Date(),
@@ -342,8 +357,8 @@ describe('/api/events/[eventId]/pitch-timer', () => {
 
   it('rejects event project from different event', async () => {
     mockAuth.mockReturnValue({ userId: 'clerk-admin' });
-    prisma.hacker.findUnique.mockResolvedValue({ id: 'h-admin', role: 'ADMIN' });
-    prisma.event.findUnique.mockResolvedValue({ id: 'e1', phase: 'PITCHING', mcs: [] });
+    prisma.hacker.findUnique.mockResolvedValue({ id: 'h-admin', role: 'SITE_ADMIN' });
+    prisma.event.findUnique.mockResolvedValue({ id: 'e1', phase: 'PITCHING', staff: [] });
     prisma.eventProject.findUnique.mockResolvedValue({ id: 'ep1', eventId: 'e2', status: 'CURRENT', pitchPhase: 'WAITING' });
 
     const res = await POST(makeRequest({ action: 'start_presenting', eventProjectId: 'ep1' }) as any, params);
