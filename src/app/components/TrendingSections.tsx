@@ -22,20 +22,18 @@ const TrendingProjectCard = ({ project, userInfo, handleLike, isDarkMode, showTr
   showTrendingBadge?: boolean;
 }) => {
   return (
-    <Link href={`/projects/${project.id}`} className="block h-full w-full focus:outline-none" aria-label={`View project ${project.title}`}>
-      <motion.div whileHover={{ y: -4 }}>
-        <ProjectCard
-          project={project}
-          userInfo={userInfo}
-          handleLike={handleLike}
-          isDarkMode={isDarkMode}
-          show_status={false}
-          show_team={true}
-          variant="trending"
-          showTrendingBadge={showTrendingBadge}
-        />
-      </motion.div>
-    </Link>
+    <motion.div whileHover={{ y: -4 }} className="h-full w-full">
+      <ProjectCard
+        project={project}
+        userInfo={userInfo}
+        handleLike={handleLike}
+        isDarkMode={isDarkMode}
+        show_status={false}
+        show_team={true}
+        variant="trending"
+        showTrendingBadge={showTrendingBadge}
+      />
+    </motion.div>
   );
 };
 

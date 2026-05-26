@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import AdminAuthGate from "../AdminAuthGate";
 import { useTheme } from "../../contexts/ThemeContext";
 import { useUserContext } from "../../contexts/UserContext";
 
@@ -41,7 +42,7 @@ function flagList(payload: unknown): BanFlag[] {
 
 export default function AdminBansPage() {
   const { isDarkMode } = useTheme();
-  const { isAdmin } = useUserContext();
+  const { isAdmin, loading } = useUserContext();
   const [bans, setBans] = useState<Ban[]>([]);
   const [flags, setFlags] = useState<BanFlag[]>([]);
   const [hackerId, setHackerId] = useState("");
@@ -79,7 +80,7 @@ export default function AdminBansPage() {
       } font-space-mono min-h-screen`}
     >
       <div className="max-w-6xl mx-auto px-4 py-20">
-        {isAdmin ? (
+        <AdminAuthGate isAdmin={isAdmin} loading={loading}>
           <>
             <h1 className="text-3xl font-bold mb-6">Global moderation</h1>
             <form onSubmit={createBan} className="flex gap-3 mb-8">
@@ -124,11 +125,7 @@ export default function AdminBansPage() {
               ))}
             </div>
           </>
-        ) : (
-          <div className="text-center text-red-500">
-            You do not have permission to view this page.
-          </div>
-        )}
+        </AdminAuthGate>
       </div>
     </main>
   );

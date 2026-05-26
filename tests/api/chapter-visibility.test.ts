@@ -259,6 +259,40 @@ describe('chapter visibility API', () => {
     });
   });
 
+  it('returns public chapter details when addressed by slug', async () => {
+    const publicChapter = buildChapter({ id: 'chapter-boston', slug: 'boston' });
+
+    mockSignedOutClerk();
+    prisma.chapter.findUnique.mockImplementation(async ({ where, include, select }: any) => {
+      if (where?.id === publicChapter.id) {
+        if (select) return publicChapter;
+        if (include) return { ...publicChapter, memberships: [], events: [] };
+        return publicChapter;
+      }
+      if (where?.slug === publicChapter.slug) {
+        return { id: publicChapter.id };
+      }
+      return null;
+    });
+
+    const response = await GET_CHAPTER(
+      createJsonRequest('/api/chapters/boston') as any,
+      createRouteContext({ chapterId: publicChapter.slug }) as any
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body).toMatchObject({
+      id: publicChapter.id,
+      slug: publicChapter.slug,
+    });
+    expect(prisma.chapter.findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { slug: publicChapter.slug },
+      })
+    );
+  });
+
   it('returns private chapter details to invited hackers', async () => {
     const hacker = buildHacker();
     const privateChapter = buildChapter({

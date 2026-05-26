@@ -228,6 +228,14 @@ function mockUnauthorizedUser() {
   })
 }
 
+function mockLoadingUser() {
+  mockUseUserContext.mockReturnValue({
+    isAdmin: false,
+    loading: true,
+    userInfo: null,
+  })
+}
+
 function jsonResponse(data: unknown, status = 200) {
   return Promise.resolve({
     ok: status >= 200 && status < 300,
@@ -370,6 +378,20 @@ describe('/organizer/chapters/[chapterSlug]/settings', () => {
     expect(screen.queryByText(/thanks for applying/i)).not.toBeInTheDocument()
     expect(
       screen.queryByRole('button', { name: /save|update|invite|remove|revoke|add/i }),
+    ).not.toBeInTheDocument()
+  })
+
+  it('shows loading instead of access denied while auth is still resolving', async () => {
+    mockLoadingUser()
+    mockForbiddenFetches()
+
+    renderSettingsPage()
+
+    await waitFor(() => {
+      expect(screen.getByText('Loading...')).toBeInTheDocument()
+    })
+    expect(
+      screen.queryByText('You do not have permission to view this page.'),
     ).not.toBeInTheDocument()
   })
 })

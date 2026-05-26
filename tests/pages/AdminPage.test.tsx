@@ -40,6 +40,7 @@ describe('AdminPage', () => {
     mockUseTheme.mockReturnValue({ isDarkMode: true });
     mockUseUserContext.mockReturnValue({ 
       isAdmin: false, 
+      loading: false,
       userInfo: { name: 'Regular User' } 
     });
 
@@ -47,6 +48,21 @@ describe('AdminPage', () => {
 
     expect(screen.getByText('You do not have permission to view this page.')).toBeInTheDocument();
     expect(screen.getByText('You do not have permission to view this page.')).toHaveClass('text-red-500');
+    expect(screen.queryByRole('heading', { name: 'Site admin console' })).not.toBeInTheDocument();
+  });
+
+  it('should render loading while admin status is being checked', () => {
+    mockUseTheme.mockReturnValue({ isDarkMode: true });
+    mockUseUserContext.mockReturnValue({
+      isAdmin: false,
+      loading: true,
+      userInfo: null,
+    });
+
+    render(<AdminPage />);
+
+    expect(screen.getByText('Loading...')).toBeInTheDocument();
+    expect(screen.queryByText('You do not have permission to view this page.')).not.toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Site admin console' })).not.toBeInTheDocument();
   });
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import AdminAuthGate from "../AdminAuthGate";
 import { useTheme } from "../../contexts/ThemeContext";
 import { useUserContext } from "../../contexts/UserContext";
 
@@ -28,7 +29,7 @@ function templateList(payload: unknown): Template[] {
 
 export default function AdminApplicationTemplatesPage() {
   const { isDarkMode } = useTheme();
-  const { isAdmin } = useUserContext();
+  const { isAdmin, loading } = useUserContext();
   const [templates, setTemplates] = useState<Template[]>([]);
 
   useEffect(() => {
@@ -62,7 +63,7 @@ export default function AdminApplicationTemplatesPage() {
       } font-space-mono min-h-screen`}
     >
       <div className="max-w-6xl mx-auto px-4 py-20">
-        {isAdmin ? (
+        <AdminAuthGate isAdmin={isAdmin} loading={loading}>
           <>
             <div className="flex items-center justify-between mb-6">
               <h1 className="text-3xl font-bold">Application templates</h1>
@@ -91,11 +92,7 @@ export default function AdminApplicationTemplatesPage() {
             </div>
             <div className="mt-6 text-sm font-semibold">Preview merged application</div>
           </>
-        ) : (
-          <div className="text-center text-red-500">
-            You do not have permission to view this page.
-          </div>
-        )}
+        </AdminAuthGate>
       </div>
     </main>
   );

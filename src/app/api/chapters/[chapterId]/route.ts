@@ -12,7 +12,35 @@ const chapterInclude = {
     where: { status: 'ACTIVE' as const, role: 'ADMIN' as const },
     include: { hacker: { select: { id: true, name: true, email: true } } },
   },
+  events: {
+    where: {
+      status: 'PUBLISHED' as const,
+      visibility: 'PUBLIC' as const,
+      startTime: { gte: new Date() },
+    },
+    orderBy: { startTime: 'asc' as const },
+    select: {
+      id: true,
+      title: true,
+      slug: true,
+      startTime: true,
+      publicLocation: true,
+    },
+  },
 } as const;
+
+async function resolveChapterIdentifier(chapterIdOrSlug: string) {
+  return (
+    (await prisma.chapter.findUnique({
+      where: { id: chapterIdOrSlug },
+      select: { id: true },
+    })) ??
+    (await prisma.chapter.findUnique({
+      where: { slug: chapterIdOrSlug },
+      select: { id: true },
+    }))
+  );
+}
 
 export async function GET(
   _req: Request,
@@ -20,20 +48,39 @@ export async function GET(
 ) {
   try {
     const hacker = await getCurrentHacker();
+    const resolvedChapter = await resolveChapterIdentifier(params.chapterId);
+    if (!resolvedChapter) return new NextResponse('Not Found', { status: 404 });
+
     const canView = await canViewChapterWithAuth(
       prisma,
       hacker?.id,
-      params.chapterId
+      resolvedChapter.id
     );
     if (!canView) return new NextResponse('Not Found', { status: 404 });
 
     const chapter = await prisma.chapter.findUnique({
-      where: { id: params.chapterId },
+      where: { id: resolvedChapter.id },
       include: chapterInclude,
     });
 
     if (!chapter) return new NextResponse('Not Found', { status: 404 });
-    return NextResponse.json(chapter);
+
+    const viewerMembership = hacker
+      ? await prisma.chapterMembership.findFirst({
+          where: {
+            chapterId: resolvedChapter.id,
+            hackerId: hacker.id,
+          },
+        })
+      : null;
+
+    const { events, ...chapterDetails } = chapter;
+
+    return NextResponse.json({
+      ...chapterDetails,
+      upcomingEvents: events,
+      viewerMembership,
+    });
   } catch (error) {
     console.error('[CHAPTER_GET]', error);
     return new NextResponse('Internal Error', { status: 500 });
@@ -45,7 +92,10 @@ export async function PATCH(
   { params }: { params: { chapterId: string } }
 ) {
   try {
-    const { response } = await requireChapterManager(params.chapterId);
+    const resolvedChapter = await resolveChapterIdentifier(params.chapterId);
+    if (!resolvedChapter) return new NextResponse('Not Found', { status: 404 });
+
+    const { response } = await requireChapterManager(resolvedChapter.id);
     if (response) return response;
 
     const body = await req.json();
@@ -73,7 +123,7 @@ export async function PATCH(
     }
 
     const chapter = await prisma.chapter.update({
-      where: { id: params.chapterId },
+      where: { id: resolvedChapter.id },
       data,
       include: chapterInclude,
     });

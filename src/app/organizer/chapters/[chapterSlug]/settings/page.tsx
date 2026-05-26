@@ -49,7 +49,7 @@ export default function OrganizerChapterSettingsPage({
 }: {
   params: { chapterSlug: string };
 }) {
-  const { isAdmin } = useUserContext();
+  const { isAdmin, loading } = useUserContext();
   const [chapter, setChapter] = useState<Chapter | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
   const [templates, setTemplates] = useState<Template[]>([]);
@@ -57,29 +57,66 @@ export default function OrganizerChapterSettingsPage({
   const [denied, setDenied] = useState(false);
 
   useEffect(() => {
-    fetch(`/api/chapters/${params.chapterSlug}`)
-      .then(async (response) => {
-        if (!response.ok) {
-          setDenied(true);
-          return null;
+    let isCurrent = true;
+
+    async function loadChapterSettings() {
+      try {
+        const chapterResponse = await fetch(`/api/chapters/${params.chapterSlug}`);
+        if (!chapterResponse.ok) {
+          if (isCurrent) setDenied(true);
+          return;
         }
-        return response.json();
-      })
-      .then((payload) => setChapter(firstChapter(payload)))
-      .catch(() => setDenied(true));
-    fetch(`/api/chapters/${params.chapterSlug}/members`)
-      .then((response) => (response.ok ? response.json() : []))
-      .then((payload) => setMembers(Array.isArray(payload) ? payload : []))
-      .catch(() => setMembers([]));
-    fetch(`/api/application-templates?chapterId=${params.chapterSlug}`)
-      .then((response) => (response.ok ? response.json() : []))
-      .then((payload) => setTemplates(Array.isArray(payload) ? payload : []))
-      .catch(() => setTemplates([]));
-    fetch(`/api/chapters/${params.chapterSlug}/ban-flags`)
-      .then((response) => (response.ok ? response.json() : []))
-      .then((payload) => setBanFlags(Array.isArray(payload) ? payload : []))
-      .catch(() => setBanFlags([]));
+
+        const chapterPayload = await chapterResponse.json();
+        const nextChapter = firstChapter(chapterPayload);
+        if (!nextChapter) {
+          if (isCurrent) setDenied(true);
+          return;
+        }
+
+        if (isCurrent) {
+          setChapter(nextChapter);
+          setDenied(false);
+        }
+
+        const [membersResponse, templatesResponse, banFlagsResponse] = await Promise.all([
+          fetch(`/api/chapters/${nextChapter.id}/members`),
+          fetch(`/api/application-templates?chapterId=${nextChapter.id}`),
+          fetch(`/api/chapters/${nextChapter.id}/ban-flags`),
+        ]);
+
+        const [membersPayload, templatesPayload, banFlagsPayload] = await Promise.all([
+          membersResponse.ok ? membersResponse.json() : [],
+          templatesResponse.ok ? templatesResponse.json() : [],
+          banFlagsResponse.ok ? banFlagsResponse.json() : [],
+        ]);
+
+        if (!isCurrent) return;
+
+        setMembers(Array.isArray(membersPayload) ? membersPayload : []);
+        setTemplates(Array.isArray(templatesPayload) ? templatesPayload : []);
+        setBanFlags(Array.isArray(banFlagsPayload) ? banFlagsPayload : []);
+      } catch {
+        if (isCurrent) setDenied(true);
+      }
+    }
+
+    loadChapterSettings();
+
+    return () => {
+      isCurrent = false;
+    };
   }, [params.chapterSlug]);
+
+  if (denied && loading) {
+    return (
+      <main className="min-h-screen bg-white text-gray-900 font-space-mono">
+        <div className="max-w-5xl mx-auto px-4 py-20 text-center">
+          Loading...
+        </div>
+      </main>
+    );
+  }
 
   if (denied && !isAdmin) {
     return (
@@ -125,7 +162,7 @@ export default function OrganizerChapterSettingsPage({
               Save template
             </button>
           </div>
-          <div>
+          <div id="admins">
             <h2 className="text-xl font-bold">Admins</h2>
             {members
               .filter((member) => member.role === "ADMIN")

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import AdminAuthGate from "./AdminAuthGate";
 import { useTheme } from "../contexts/ThemeContext";
 import { useUserContext } from "../contexts/UserContext";
 
@@ -14,7 +15,7 @@ const adminSections = [
 
 export default function AdminConsolePage() {
   const { isDarkMode } = useTheme();
-  const { isAdmin } = useUserContext();
+  const { isAdmin, loading } = useUserContext();
 
   return (
     <main
@@ -23,7 +24,7 @@ export default function AdminConsolePage() {
       } font-space-mono min-h-screen`}
     >
       <div className="max-w-6xl mx-auto px-4 py-20">
-        {isAdmin ? (
+        <AdminAuthGate isAdmin={isAdmin} loading={loading}>
           <>
             <h1 className="text-3xl font-bold mb-8">Site admin console</h1>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -42,11 +43,7 @@ export default function AdminConsolePage() {
               ))}
             </div>
           </>
-        ) : (
-          <div className="text-center text-red-500">
-            You do not have permission to view this page.
-          </div>
-        )}
+        </AdminAuthGate>
       </div>
     </main>
   );
