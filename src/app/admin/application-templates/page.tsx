@@ -1,9 +1,16 @@
-"use client";
+'use client';
 
-import { useEffect, useState } from "react";
-import AdminAuthGate from "../AdminAuthGate";
-import { useTheme } from "../../contexts/ThemeContext";
-import { useUserContext } from "../../contexts/UserContext";
+import { useEffect, useState } from 'react';
+import AdminAuthGate from '../AdminAuthGate';
+import {
+  ManagementBadge,
+  ManagementEmptyState,
+  ManagementHeader,
+  ManagementPage,
+  ManagementSection,
+  useManagementClasses,
+} from '../../components/ManagementSurface';
+import { useUserContext } from '../../contexts/UserContext';
 
 type Template = {
   id: string;
@@ -14,13 +21,25 @@ type Template = {
 };
 
 const defaultSiteFields = [
-  { id: "name", label: "Name", type: "TEXT", required: true, siteRequired: true },
-  { id: "email", label: "Email", type: "EMAIL", required: true, siteRequired: true },
+  {
+    id: 'name',
+    label: 'Name',
+    type: 'TEXT',
+    required: true,
+    siteRequired: true,
+  },
+  {
+    id: 'email',
+    label: 'Email',
+    type: 'EMAIL',
+    required: true,
+    siteRequired: true,
+  },
 ];
 
 function templateList(payload: unknown): Template[] {
   if (Array.isArray(payload)) return payload as Template[];
-  if (payload && typeof payload === "object") {
+  if (payload && typeof payload === 'object') {
     const value = payload as { templates?: Template[]; items?: Template[] };
     return value.templates ?? value.items ?? [];
   }
@@ -28,72 +47,93 @@ function templateList(payload: unknown): Template[] {
 }
 
 export default function AdminApplicationTemplatesPage() {
-  const { isDarkMode } = useTheme();
+  const classes = useManagementClasses();
   const { isAdmin, loading } = useUserContext();
   const [templates, setTemplates] = useState<Template[]>([]);
 
   useEffect(() => {
     if (!isAdmin) return;
-    fetch("/api/application-templates")
-      .then((response) => (response.ok ? response.json() : []))
-      .then((payload) => setTemplates(templateList(payload)))
+    fetch('/api/application-templates')
+      .then(response => (response.ok ? response.json() : []))
+      .then(payload => setTemplates(templateList(payload)))
       .catch(() => setTemplates([]));
   }, [isAdmin]);
 
   async function createDefaultSiteTemplate() {
-    const response = await fetch("/api/application-templates", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
+    const response = await fetch('/api/application-templates', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
-        scope: "SITE",
-        name: "Default site application",
+        scope: 'SITE',
+        name: 'Default site application',
         fieldsJson: defaultSiteFields,
       }),
     });
     if (response.ok) {
       const created = await response.json();
-      setTemplates((current) => [...current, created]);
+      setTemplates(current => [...current, created]);
     }
   }
 
   return (
-    <main
-      className={`${
-        isDarkMode ? "bg-gray-900 text-gray-100" : "bg-white text-gray-900"
-      } font-space-mono min-h-screen`}
-    >
-      <div className="max-w-6xl mx-auto px-4 py-20">
-        <AdminAuthGate isAdmin={isAdmin} loading={loading}>
-          <>
-            <div className="flex items-center justify-between mb-6">
-              <h1 className="text-3xl font-bold">Application templates</h1>
+    <ManagementPage>
+      <AdminAuthGate isAdmin={isAdmin} loading={loading}>
+        <>
+          <ManagementHeader
+            eyebrow="Site admin"
+            title="Application templates"
+            description="Manage site and chapter application questions used by event registrations."
+            actions={
               <button
-                className="border rounded px-4 py-2 font-semibold"
+                className={classes.primaryButton}
                 onClick={createDefaultSiteTemplate}
                 type="button"
               >
                 Create site template
               </button>
-            </div>
-            <div className="divide-y">
-              {templates.map((template) => (
-                <div key={template.id} className="py-3 flex items-center justify-between">
-                  <div>
+            }
+          />
+          <ManagementSection title="Templates">
+            <div className={`divide-y ${classes.divider}`}>
+              {templates.map(template => (
+                <div
+                  key={template.id}
+                  className="grid gap-3 py-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
+                >
+                  <div className="min-w-0">
                     <div className="font-semibold">{template.name}</div>
-                    <div className="text-sm opacity-70">
-                      {(template.fields ?? []).map((field) => field.label).join(", ")}
+                    <div className={`mt-1 text-sm ${classes.mutedText}`}>
+                      {(template.fields ?? [])
+                        .map(field => field.label)
+                        .join(', ') || 'No fields configured'}
                     </div>
                   </div>
-                  <span className="text-sm">
-                    {template.scope} / {template.isActive ? "ACTIVE" : "INACTIVE"}
-                  </span>
+                  <div className="flex flex-wrap gap-2">
+                    <ManagementBadge>{template.scope}</ManagementBadge>
+                    <ManagementBadge
+                      tone={template.isActive ? 'success' : 'default'}
+                    >
+                      {template.isActive ? 'ACTIVE' : 'INACTIVE'}
+                    </ManagementBadge>
+                  </div>
                 </div>
               ))}
+              {templates.length === 0 && (
+                <ManagementEmptyState>
+                  No templates have been created.
+                </ManagementEmptyState>
+              )}
             </div>
-            <div className="mt-6 text-sm font-semibold">Preview merged application</div>
-          </>
-        </AdminAuthGate>
-      </div>
-    </main>
+          </ManagementSection>
+          <div className="mt-5">
+            <ManagementSection title="Preview merged application">
+              <ManagementEmptyState>
+                Select a chapter or event scope to preview merged fields.
+              </ManagementEmptyState>
+            </ManagementSection>
+          </div>
+        </>
+      </AdminAuthGate>
+    </ManagementPage>
   );
 }

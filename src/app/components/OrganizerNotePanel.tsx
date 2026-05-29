@@ -1,6 +1,11 @@
-"use client";
+'use client';
 
-import { useEffect, useState } from "react";
+import { useEffect, useState } from 'react';
+import {
+  ManagementEmptyState,
+  ManagementSection,
+  useManagementClasses,
+} from './ManagementSurface';
 
 type OrganizerNote = {
   id: string;
@@ -35,50 +40,51 @@ const emptyAccess: OrganizerNoteAccess = {
 
 export default function OrganizerNotePanel({
   hackerId,
-  title = "Organizer note",
+  title = 'Organizer note',
 }: OrganizerNotePanelProps) {
+  const classes = useManagementClasses();
   const [note, setNote] = useState<OrganizerNote | null>(null);
-  const [body, setBody] = useState("");
+  const [body, setBody] = useState('');
   const [access, setAccess] = useState<OrganizerNoteAccess>(emptyAccess);
   const [revisions, setRevisions] = useState<OrganizerNoteRevision[]>([]);
-  const [status, setStatus] = useState("");
+  const [status, setStatus] = useState('');
 
   useEffect(() => {
     if (!hackerId) return;
 
     fetch(`/api/hackers/${hackerId}/organizer-note`)
-      .then(async (response) => {
+      .then(async response => {
         if (!response.ok) {
-          setStatus("Organizer note unavailable");
+          setStatus('Organizer note unavailable');
           return null;
         }
         return response.json();
       })
-      .then((payload) => {
+      .then(payload => {
         if (!payload) return;
         setNote(payload.note ?? null);
-        setBody(payload.note?.body ?? "");
+        setBody(payload.note?.body ?? '');
         setAccess(payload.access ?? emptyAccess);
       })
-      .catch(() => setStatus("Organizer note unavailable"));
+      .catch(() => setStatus('Organizer note unavailable'));
   }, [hackerId]);
 
   async function saveNote() {
     const response = await fetch(`/api/hackers/${hackerId}/organizer-note`, {
-      method: "PUT",
-      headers: { "content-type": "application/json" },
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ body }),
     });
 
     if (!response.ok) {
-      setStatus("Unable to save organizer note");
+      setStatus('Unable to save organizer note');
       return;
     }
 
     const payload = await response.json();
     setNote(payload.note ?? null);
     setAccess(payload.access ?? access);
-    setStatus("Organizer note saved");
+    setStatus('Organizer note saved');
   }
 
   async function loadRevisions() {
@@ -87,7 +93,7 @@ export default function OrganizerNotePanel({
     );
 
     if (!response.ok) {
-      setStatus("Revision history unavailable");
+      setStatus('Revision history unavailable');
       return;
     }
 
@@ -98,26 +104,24 @@ export default function OrganizerNotePanel({
 
   if (!access.canViewCurrentNote && status) {
     return (
-      <section className="border rounded p-4">
-        <h2 className="text-xl font-bold">{title}</h2>
-        <p className="mt-2 text-sm">{status}</p>
-      </section>
+      <ManagementSection title={title}>
+        <ManagementEmptyState>{status}</ManagementEmptyState>
+      </ManagementSection>
     );
   }
 
   return (
-    <section className="border rounded p-4">
-      <h2 className="text-xl font-bold">{title}</h2>
+    <ManagementSection title={title}>
       <textarea
         aria-label={title}
-        className="block border rounded px-3 py-2 mt-3 min-h-32 w-full"
+        className={`${classes.textarea} mt-3 block w-full`}
         disabled={!access.canEditCurrentNote}
         value={body}
-        onChange={(event) => setBody(event.target.value)}
+        onChange={event => setBody(event.target.value)}
       />
       <div className="mt-3 flex flex-wrap gap-2">
         <button
-          className="border rounded px-4 py-2"
+          className={classes.primaryButton}
           disabled={!access.canEditCurrentNote}
           onClick={saveNote}
           type="button"
@@ -126,7 +130,7 @@ export default function OrganizerNotePanel({
         </button>
         {access.canViewRevisions && (
           <button
-            className="border rounded px-4 py-2"
+            className={classes.secondaryButton}
             onClick={loadRevisions}
             type="button"
           >
@@ -135,15 +139,19 @@ export default function OrganizerNotePanel({
         )}
       </div>
       {note?.updatedBy?.name && (
-        <p className="mt-2 text-sm opacity-70">Updated by {note.updatedBy.name}</p>
+        <p className={`mt-2 text-sm ${classes.mutedText}`}>
+          Updated by {note.updatedBy.name}
+        </p>
       )}
-      {status && <p className="mt-2 text-sm">{status}</p>}
+      {status && (
+        <p className={`mt-2 text-sm ${classes.mutedText}`}>{status}</p>
+      )}
       {revisions.length > 0 && (
         <div className="mt-4">
           <h3 className="font-bold">Revision history</h3>
-          {revisions.map((revision) => (
+          {revisions.map(revision => (
             <pre
-              className="mt-2 whitespace-pre-wrap rounded bg-gray-100 p-3 text-xs"
+              className={`${classes.subtlePanel} mt-2 whitespace-pre-wrap p-3 text-xs`}
               key={revision.id}
             >
               {revision.patchText}
@@ -151,6 +159,6 @@ export default function OrganizerNotePanel({
           ))}
         </div>
       )}
-    </section>
+    </ManagementSection>
   );
 }

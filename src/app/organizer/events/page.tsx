@@ -1,8 +1,17 @@
-"use client";
+'use client';
 
-import Link from "next/link";
-import { useEffect, useState } from "react";
-import { useUserContext } from "../../contexts/UserContext";
+import Link from 'next/link';
+import { useEffect, useState } from 'react';
+import {
+  ManagementBadge,
+  ManagementEmptyState,
+  ManagementHeader,
+  ManagementLinkButton,
+  ManagementPage,
+  ManagementSection,
+  useManagementClasses,
+} from '../../components/ManagementSurface';
+import { useUserContext } from '../../contexts/UserContext';
 
 type EventItem = {
   id: string;
@@ -16,42 +25,64 @@ function list(payload: unknown): EventItem[] {
 }
 
 export default function OrganizerEventsPage() {
+  const classes = useManagementClasses();
   const { isAdmin } = useUserContext();
   const [events, setEvents] = useState<EventItem[]>([]);
 
   useEffect(() => {
-    fetch("/api/events")
-      .then((response) => (response.ok ? response.json() : []))
-      .then((payload) => setEvents(list(payload)))
+    fetch('/api/events')
+      .then(response => (response.ok ? response.json() : []))
+      .then(payload => setEvents(list(payload)))
       .catch(() => setEvents([]));
   }, []);
 
   return (
-    <main className="min-h-screen bg-white text-gray-900 font-space-mono">
-      <div className="max-w-6xl mx-auto px-4 py-20">
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-3xl font-bold">Organizer events</h1>
-          {isAdmin && (
-            <Link href="/organizer/events/new" className="border rounded px-4 py-2">
+    <ManagementPage>
+      <ManagementHeader
+        eyebrow="Organizer"
+        title="Organizer events"
+        description="Review events you can manage and open their operational settings."
+        actions={
+          isAdmin && (
+            <ManagementLinkButton
+              href="/organizer/events/new"
+              variant="primary"
+            >
               New event
-            </Link>
-          )}
-        </div>
-        <div className="divide-y">
-          {events.map((event) => (
+            </ManagementLinkButton>
+          )
+        }
+      />
+      <ManagementSection title="Events">
+        <div className={`divide-y ${classes.divider}`}>
+          {events.map(event => (
             <Link
               key={event.id}
               href={`/organizer/events/${event.id}/settings`}
-              className="block py-3"
+              className="grid gap-2 rounded-md py-4 transition hover:px-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
             >
-              <div className="font-semibold">{event.title}</div>
-              <div className="text-sm opacity-70">
-                {event.chapter?.name || "Chapter event"}
+              <div className="min-w-0">
+                <div className="truncate font-semibold">{event.title}</div>
+                <div className={`mt-1 text-sm ${classes.mutedText}`}>
+                  {event.chapter?.name || 'Chapter event'}
+                </div>
               </div>
+              <ManagementBadge>
+                {new Date(event.startTime).toLocaleDateString(undefined, {
+                  month: 'short',
+                  day: 'numeric',
+                  year: 'numeric',
+                })}
+              </ManagementBadge>
             </Link>
           ))}
+          {events.length === 0 && (
+            <ManagementEmptyState>
+              No organizer events are available.
+            </ManagementEmptyState>
+          )}
         </div>
-      </div>
-    </main>
+      </ManagementSection>
+    </ManagementPage>
   );
 }

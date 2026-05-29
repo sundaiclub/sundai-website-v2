@@ -1,6 +1,7 @@
-"use client";
+'use client';
 
-import type { ReactNode } from "react";
+import type { ReactNode } from 'react';
+import { ManagementAlert } from '../components/ManagementSurface';
 
 type AdminAuthGateProps = {
   isAdmin: boolean | undefined;
@@ -14,14 +15,14 @@ export default function AdminAuthGate({
   children,
 }: AdminAuthGateProps) {
   if (loading) {
-    return <div className="text-center">Loading...</div>;
+    return <ManagementAlert>Loading...</ManagementAlert>;
   }
 
   if (!isAdmin) {
     return (
-      <div className="text-center text-red-500">
+      <ManagementAlert tone="danger">
         You do not have permission to view this page.
-      </div>
+      </ManagementAlert>
     );
   }
 
