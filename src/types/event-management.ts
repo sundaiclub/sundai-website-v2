@@ -1,4 +1,4 @@
-export type JsonPrimitive = string | number | boolean | null;
+type JsonPrimitive = string | number | boolean | null;
 export type JsonValue = JsonPrimitive | JsonObject | JsonValue[];
 
 export interface JsonObject {
@@ -6,47 +6,57 @@ export interface JsonObject {
 }
 
 export type EntityId = string;
-export type ISODateTimeString = string;
+type ISODateTimeString = string;
 
 export type Role =
-  | "NOT_SET"
-  | "NEWBIE"
-  | "HACKER"
-  | "SPONSOR"
-  | "LEADER"
-  | "SITE_ADMIN";
+  | 'NOT_SET'
+  | 'NEWBIE'
+  | 'HACKER'
+  | 'SPONSOR'
+  | 'LEADER'
+  | 'SITE_ADMIN';
 
-export type ChapterStatus = "ACTIVE" | "PAUSED" | "ARCHIVED";
-export type ChapterAccessMode = "PUBLIC" | "PRIVATE";
-export type ChapterRole = "MEMBER" | "ADMIN";
-export type ChapterMembershipStatus = "INVITED" | "ACTIVE" | "REVOKED" | "LEFT";
+export type ChapterStatus = 'ACTIVE' | 'PAUSED' | 'ARCHIVED';
+export type ChapterAccessMode = 'PUBLIC' | 'PRIVATE';
+export type ChapterRole = 'MEMBER' | 'ADMIN';
+export type ChapterMembershipStatus = 'INVITED' | 'ACTIVE' | 'REVOKED' | 'LEFT';
 
-export type EventStaffRole = "MC" | "CO_MC";
-export type EventStatus = "DRAFT" | "PUBLISHED" | "PAUSED" | "ARCHIVED";
-export type EventVisibility = "PUBLIC" | "PRIVATE" | "UNLISTED";
-export type EventApplicationMode = "NONE" | "INTERNAL" | "PUBLIC_LATER";
-export type EventProgramType = string;
+export type EventStaffRole = 'MC' | 'CO_MC';
+type EventVisibility = 'PUBLIC' | 'PRIVATE' | 'UNLISTED';
+type EventApplicationMode = 'NONE' | 'INTERNAL' | 'PUBLIC_LATER';
+export type EventPhase = 'VOTING' | 'PITCHING' | 'FINISHED';
 
-export type ApplicationTemplateScope = "SITE" | "CHAPTER";
+export type ApplicationTemplateScope = 'SITE' | 'CHAPTER';
 
 export type RegistrationStatus =
-  | "PENDING"
-  | "APPROVED"
-  | "WAITLISTED"
-  | "DECLINED"
-  | "BLOCKED"
-  | "CANCELLED";
+  | 'PENDING'
+  | 'APPROVED'
+  | 'WAITLISTED'
+  | 'DECLINED'
+  | 'BLOCKED'
+  | 'CANCELLED';
 
-export type RegistrationSource = "INTERNAL" | "PUBLIC_LATER" | "IMPORT";
+export type RegistrationSource = 'INTERNAL' | 'PUBLIC_LATER' | 'IMPORT';
 
 export type BanFlagStatus =
-  | "OPEN"
-  | "REVIEWING"
-  | "RESOLVED_NO_ACTION"
-  | "RESOLVED_BANNED"
-  | "DISMISSED";
+  | 'OPEN'
+  | 'REVIEWING'
+  | 'RESOLVED_NO_ACTION'
+  | 'RESOLVED_BANNED'
+  | 'DISMISSED';
 
-export interface EventManagementHackerSummary {
+export type EventProjectStatus =
+  | 'QUEUED'
+  | 'APPROVED'
+  | 'CURRENT'
+  | 'DONE'
+  | 'SKIPPED';
+
+export type EventProjectVoteValue = 'LIKE' | 'DISLIKE';
+
+export type PitchPhase = 'WAITING' | 'PRESENTING' | 'QUESTIONS' | 'COMPLETED';
+
+interface EventManagementHackerSummary {
   id: EntityId;
   name: string;
   username?: string | null;
@@ -72,6 +82,50 @@ export interface Chapter {
   updatedAt: ISODateTimeString | Date;
 }
 
+export type ChapterMembershipSummary = Pick<
+  ChapterMembership,
+  | 'id'
+  | 'role'
+  | 'status'
+  | 'notificationsAllowed'
+  | 'emailNotificationsEnabled'
+  | 'smsNotificationsEnabled'
+> & {
+  hacker?: Pick<EventManagementHackerSummary, 'id' | 'name' | 'email' | 'role'>;
+  invitedBy?: Pick<
+    EventManagementHackerSummary,
+    'id' | 'name' | 'email'
+  > | null;
+};
+
+export type ChapterDirectoryItem = Pick<
+  Chapter,
+  'id' | 'name' | 'slug' | 'city' | 'accessMode' | 'status'
+> & {
+  viewerMembership?: Pick<ChapterMembership, 'status'> | null;
+  memberships?: Array<Pick<ChapterMembership, 'status'>>;
+};
+
+type ChapterLandingEvent = {
+  id: EntityId;
+  title: string;
+  publicLocation?: string | null;
+};
+
+export type ChapterLanding = Pick<
+  Chapter,
+  'id' | 'name' | 'slug' | 'city' | 'description' | 'accessMode'
+> & {
+  viewerMembership?: ChapterMembershipSummary | null;
+  memberships?: ChapterMembershipSummary[];
+  upcomingEvents?: ChapterLandingEvent[];
+};
+
+export type SiteAdminChapterListItem = Pick<
+  Chapter,
+  'id' | 'name' | 'slug' | 'city' | 'status' | 'accessMode'
+>;
+
 export interface ChapterMembership {
   id: EntityId;
   chapterId: EntityId;
@@ -90,10 +144,10 @@ export interface ChapterMembership {
   createdAt: ISODateTimeString | Date;
   updatedAt: ISODateTimeString | Date;
   hacker?: EventManagementHackerSummary;
-  chapter?: Pick<Chapter, "id" | "name" | "slug" | "accessMode" | "status">;
+  chapter?: Pick<Chapter, 'id' | 'name' | 'slug' | 'accessMode' | 'status'>;
 }
 
-export interface EventStaff {
+interface EventStaff {
   id: EntityId;
   eventId: EntityId;
   hackerId: EntityId;
@@ -104,17 +158,17 @@ export interface EventStaff {
 }
 
 export type TemplateFieldType =
-  | "TEXT"
-  | "TEXTAREA"
-  | "EMAIL"
-  | "PHONE"
-  | "URL"
-  | "NUMBER"
-  | "BOOLEAN"
-  | "SELECT"
-  | "MULTI_SELECT"
-  | "DATE"
-  | "DATETIME";
+  | 'TEXT'
+  | 'TEXTAREA'
+  | 'EMAIL'
+  | 'PHONE'
+  | 'URL'
+  | 'NUMBER'
+  | 'BOOLEAN'
+  | 'SELECT'
+  | 'MULTI_SELECT'
+  | 'DATE'
+  | 'DATETIME';
 
 export interface TemplateFieldOption {
   label: string;
@@ -142,7 +196,7 @@ export interface TemplateFieldDefinition {
   order?: number;
 }
 
-export interface ApplicationTemplate {
+interface ApplicationTemplate {
   id: EntityId;
   scope: ApplicationTemplateScope;
   chapterId?: EntityId | null;
@@ -152,9 +206,19 @@ export interface ApplicationTemplate {
   createdById: EntityId;
   createdAt: ISODateTimeString | Date;
   updatedAt: ISODateTimeString | Date;
-  chapter?: Pick<Chapter, "id" | "name" | "slug"> | null;
+  chapter?: Pick<Chapter, 'id' | 'name' | 'slug'> | null;
   createdBy?: EventManagementHackerSummary;
 }
+
+export type ApplicationTemplateListItem = Pick<
+  ApplicationTemplate,
+  'id' | 'name' | 'scope' | 'isActive'
+> & {
+  fields?: Array<
+    Pick<TemplateFieldDefinition, 'label'> & { id?: string; key?: string }
+  >;
+  fieldsJson?: Array<Pick<TemplateFieldDefinition, 'label'>>;
+};
 
 export interface MergedApplicationTemplate {
   siteTemplateId: EntityId;
@@ -193,6 +257,29 @@ export interface EventRegistrationAudit {
   actor?: EventManagementHackerSummary;
 }
 
+export type OrganizerEventListItem = {
+  id: EntityId;
+  title: string;
+  description?: string | null;
+  startTime: ISODateTimeString | Date;
+  endTime?: ISODateTimeString | Date | null;
+  meetingUrl?: string | null;
+  phase: EventPhase;
+  chapter?: Pick<Chapter, 'id' | 'name' | 'slug'>;
+};
+
+export type OrganizerEventSettings = {
+  id: EntityId;
+  title: string;
+  visibility?: EventVisibility;
+  applicationMode?: EventApplicationMode;
+  staff?: Array<
+    Pick<EventStaff, 'id' | 'role'> & {
+      hacker?: Pick<EventManagementHackerSummary, 'id' | 'name'> | null;
+    }
+  >;
+};
+
 export interface UserBan {
   id: EntityId;
   hackerId: EntityId;
@@ -208,6 +295,11 @@ export interface UserBan {
   revokedBy?: EventManagementHackerSummary | null;
 }
 
+export type AdminBanListItem = UserBan & {
+  hackerName?: string;
+  publicReason?: string;
+};
+
 export interface UserBanFlag {
   id: EntityId;
   chapterId: EntityId;
@@ -220,11 +312,20 @@ export interface UserBanFlag {
   resolvedAt?: ISODateTimeString | Date | null;
   createdAt: ISODateTimeString | Date;
   updatedAt: ISODateTimeString | Date;
-  chapter?: Pick<Chapter, "id" | "name" | "slug">;
+  chapter?: Pick<Chapter, 'id' | 'name' | 'slug'>;
   hacker?: EventManagementHackerSummary;
   createdBy?: EventManagementHackerSummary;
   resolvedBy?: EventManagementHackerSummary | null;
 }
+
+export type AdminBanFlagListItem = UserBanFlag & {
+  hackerName?: string;
+};
+
+export type OrganizerChapterSettings = Pick<
+  Chapter,
+  'id' | 'name' | 'slug' | 'status' | 'accessMode' | 'defaultDeclineMessage'
+>;
 
 export interface HackerOrganizerNote {
   id: EntityId;
@@ -245,38 +346,4 @@ export interface HackerOrganizerNoteRevision {
   patchText: string;
   createdAt: ISODateTimeString | Date;
   editedBy?: EventManagementHackerSummary;
-}
-
-export interface ChapterPermissionSummary {
-  chapterId: EntityId;
-  canViewChapter: boolean;
-  canManageChapterSettings: boolean;
-  canManageChapterMemberships: boolean;
-  canManageChapterApplicationTemplate: boolean;
-  canCreateBanFlags: boolean;
-  membershipRole?: ChapterRole | null;
-  membershipStatus?: ChapterMembershipStatus | null;
-}
-
-export interface EventPermissionSummary {
-  eventId: EntityId;
-  chapterId: EntityId;
-  canViewEvent: boolean;
-  canManageEventSettings: boolean;
-  canManagePitch: boolean;
-  canManageRegistrations: boolean;
-  canDecideRegistrations: boolean;
-  staffRole?: EventStaffRole | null;
-}
-
-export interface EventManagementPermissionSummary {
-  hackerId?: EntityId;
-  role?: Role | null;
-  isSiteAdmin: boolean;
-  chapters: ChapterPermissionSummary[];
-  events: EventPermissionSummary[];
-  canManageApplicationTemplates: boolean;
-  canManageGlobalBans: boolean;
-  canViewGlobalBanSignals: boolean;
-  canViewOrganizerNoteRevisions: boolean;
 }

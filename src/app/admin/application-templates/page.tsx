@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import AdminAuthGate from '../AdminAuthGate';
 import {
+  ManagementAlert,
   ManagementBadge,
   ManagementEmptyState,
   ManagementHeader,
@@ -11,14 +12,7 @@ import {
   useManagementClasses,
 } from '../../components/ManagementSurface';
 import { useUserContext } from '../../contexts/UserContext';
-
-type Template = {
-  id: string;
-  name: string;
-  scope: string;
-  isActive: boolean;
-  fields?: Array<{ id?: string; key?: string; label: string }>;
-};
+import type { ApplicationTemplateListItem } from '@/types/event-management';
 
 const defaultSiteFields = [
   {
@@ -37,10 +31,13 @@ const defaultSiteFields = [
   },
 ];
 
-function templateList(payload: unknown): Template[] {
-  if (Array.isArray(payload)) return payload as Template[];
+function templateList(payload: unknown): ApplicationTemplateListItem[] {
+  if (Array.isArray(payload)) return payload as ApplicationTemplateListItem[];
   if (payload && typeof payload === 'object') {
-    const value = payload as { templates?: Template[]; items?: Template[] };
+    const value = payload as {
+      templates?: ApplicationTemplateListItem[];
+      items?: ApplicationTemplateListItem[];
+    };
     return value.templates ?? value.items ?? [];
   }
   return [];
@@ -49,14 +46,21 @@ function templateList(payload: unknown): Template[] {
 export default function AdminApplicationTemplatesPage() {
   const classes = useManagementClasses();
   const { isAdmin, loading } = useUserContext();
-  const [templates, setTemplates] = useState<Template[]>([]);
+  const [templates, setTemplates] = useState<ApplicationTemplateListItem[]>([]);
+  const [loadError, setLoadError] = useState('');
 
   useEffect(() => {
     if (!isAdmin) return;
+    setLoadError('');
     fetch('/api/application-templates')
-      .then(response => (response.ok ? response.json() : []))
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`Request failed with status ${response.status}`);
+        }
+        return response.json() as Promise<unknown>;
+      })
       .then(payload => setTemplates(templateList(payload)))
-      .catch(() => setTemplates([]));
+      .catch(() => setLoadError('Unable to load application templates.'));
   }, [isAdmin]);
 
   async function createDefaultSiteTemplate() {
@@ -93,6 +97,11 @@ export default function AdminApplicationTemplatesPage() {
               </button>
             }
           />
+          {loadError && (
+            <div className="mb-5">
+              <ManagementAlert tone="danger">{loadError}</ManagementAlert>
+            </div>
+          )}
           <ManagementSection title="Templates">
             <div className={`divide-y ${classes.divider}`}>
               {templates.map(template => (

@@ -9,9 +9,7 @@ import type {
   TemplateFieldValidation,
 } from '@/types/event-management'
 
-export const SITE_REQUIRED_APPLICATION_FIELD_IDS = ['name', 'email'] as const
-
-export const TEMPLATE_FIELD_TYPES: readonly TemplateFieldType[] = [
+const TEMPLATE_FIELD_TYPES: readonly TemplateFieldType[] = [
   'TEXT',
   'TEXTAREA',
   'EMAIL',
@@ -25,7 +23,7 @@ export const TEMPLATE_FIELD_TYPES: readonly TemplateFieldType[] = [
   'DATETIME',
 ]
 
-export const DEFAULT_SITE_APPLICATION_FIELDS: readonly TemplateFieldDefinition[] = [
+const DEFAULT_SITE_APPLICATION_FIELDS: readonly TemplateFieldDefinition[] = [
   {
     id: 'name',
     label: 'Name',
@@ -44,7 +42,7 @@ export const DEFAULT_SITE_APPLICATION_FIELDS: readonly TemplateFieldDefinition[]
   },
 ]
 
-export type ApplicationTemplateValidationIssueCode =
+type ApplicationTemplateValidationIssueCode =
   | 'INVALID_FIELDS_JSON'
   | 'FIELD_ID_REQUIRED'
   | 'FIELD_ID_DUPLICATE'
@@ -63,7 +61,7 @@ export type ApplicationTemplateValidationIssueCode =
   | 'SITE_REQUIRED_FIELD_TYPE_CHANGED'
   | 'SITE_REQUIRED_FIELD_OVERRIDE'
 
-export interface ApplicationTemplateValidationIssue {
+interface ApplicationTemplateValidationIssue {
   code: ApplicationTemplateValidationIssueCode
   message: string
   fieldId?: string
@@ -83,7 +81,7 @@ export interface ComposeApplicationFieldsInput {
   hideChapterDefaultQuestions?: boolean | null
 }
 
-export interface ApplicationTemplatePrismaRecord {
+interface ApplicationTemplatePrismaRecord {
   id: EntityId
   scope?: ApplicationTemplateScope | string
   chapterId?: EntityId | null
@@ -91,14 +89,14 @@ export interface ApplicationTemplatePrismaRecord {
   isActive?: boolean | null
 }
 
-export interface EventApplicationQuestionPrismaRecord {
+interface EventApplicationQuestionPrismaRecord {
   id: EntityId
   chapterId?: EntityId | null
   applicationQuestionsJson?: unknown
   hideChapterDefaultQuestions?: boolean | null
 }
 
-export interface ApplicationTemplatePrismaClient {
+interface ApplicationTemplatePrismaClient {
   applicationTemplate: {
     findFirst(args: unknown): Promise<ApplicationTemplatePrismaRecord | null>
   }
@@ -107,13 +105,13 @@ export interface ApplicationTemplatePrismaClient {
   }
 }
 
-export interface FetchApplicationTemplateInput {
+interface FetchApplicationTemplateInput {
   scope: ApplicationTemplateScope
   chapterId?: EntityId | null
   prisma?: ApplicationTemplatePrismaClient
 }
 
-export interface FetchMergedApplicationTemplateInput {
+interface FetchMergedApplicationTemplateInput {
   chapterId?: EntityId | null
   eventId?: EntityId | null
   prisma?: ApplicationTemplatePrismaClient
@@ -136,15 +134,7 @@ export function getDefaultSiteApplicationFields(): TemplateFieldDefinition[] {
   return DEFAULT_SITE_APPLICATION_FIELDS.map(cloneTemplateField)
 }
 
-export function getSiteRequiredFieldIds(
-  fields: readonly TemplateFieldDefinition[] = DEFAULT_SITE_APPLICATION_FIELDS
-): string[] {
-  return fields
-    .filter((field) => field.siteRequired)
-    .map((field) => field.id)
-}
-
-export function validateApplicationTemplateFields(
+function validateApplicationTemplateFields(
   fields: readonly TemplateFieldDefinition[],
   options: ValidateApplicationTemplateFieldsOptions = {}
 ): ApplicationTemplateValidationIssue[] {
@@ -300,21 +290,7 @@ export function validateSiteRequiredFields(
   return issues
 }
 
-export function assertSiteRequiredFields(
-  fields: readonly TemplateFieldDefinition[],
-  requiredSiteFields: readonly TemplateFieldDefinition[] = DEFAULT_SITE_APPLICATION_FIELDS
-): void {
-  const issues = validateSiteRequiredFields(fields, requiredSiteFields)
-
-  if (issues.length > 0) {
-    throw new ApplicationTemplateValidationError(
-      issues,
-      'Site-required application fields cannot be removed'
-    )
-  }
-}
-
-export function validateNoSiteRequiredFieldOverrides(
+function validateNoSiteRequiredFieldOverrides(
   fields: readonly TemplateFieldDefinition[],
   requiredSiteFields: readonly TemplateFieldDefinition[] = DEFAULT_SITE_APPLICATION_FIELDS
 ): ApplicationTemplateValidationIssue[] {
@@ -327,20 +303,6 @@ export function validateNoSiteRequiredFieldOverrides(
       message: `Field "${field.id}" is site-required and cannot be overridden by chapter or event questions.`,
       fieldId: field.id,
     }))
-}
-
-export function assertNoSiteRequiredFieldOverrides(
-  fields: readonly TemplateFieldDefinition[],
-  requiredSiteFields: readonly TemplateFieldDefinition[] = DEFAULT_SITE_APPLICATION_FIELDS
-): void {
-  const issues = validateNoSiteRequiredFieldOverrides(fields, requiredSiteFields)
-
-  if (issues.length > 0) {
-    throw new ApplicationTemplateValidationError(
-      issues,
-      'Site-required application fields cannot be overridden'
-    )
-  }
 }
 
 export function composeApplicationFields(
@@ -408,7 +370,7 @@ export function parseTemplateFieldsJson(
   return normalizeTemplateFields(fields)
 }
 
-export async function fetchActiveApplicationTemplate(
+async function fetchActiveApplicationTemplate(
   input: FetchApplicationTemplateInput
 ): Promise<ApplicationTemplatePrismaRecord | null> {
   const client = input.prisma ?? getApplicationTemplatePrismaClient()
@@ -427,7 +389,7 @@ export async function fetchActiveApplicationTemplate(
   })
 }
 
-export function fetchActiveSiteApplicationTemplate(
+function fetchActiveSiteApplicationTemplate(
   client?: ApplicationTemplatePrismaClient
 ): Promise<ApplicationTemplatePrismaRecord | null> {
   return fetchActiveApplicationTemplate({
@@ -436,7 +398,7 @@ export function fetchActiveSiteApplicationTemplate(
   })
 }
 
-export function fetchActiveChapterApplicationTemplate(
+function fetchActiveChapterApplicationTemplate(
   chapterId: EntityId,
   client?: ApplicationTemplatePrismaClient
 ): Promise<ApplicationTemplatePrismaRecord | null> {
@@ -447,7 +409,7 @@ export function fetchActiveChapterApplicationTemplate(
   })
 }
 
-export async function fetchEventApplicationQuestionConfig(
+async function fetchEventApplicationQuestionConfig(
   eventId: EntityId,
   client?: ApplicationTemplatePrismaClient
 ): Promise<EventApplicationQuestionPrismaRecord | null> {

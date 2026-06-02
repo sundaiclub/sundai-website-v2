@@ -3,28 +3,22 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import {
+  ManagementAlert,
   ManagementBadge,
   ManagementEmptyState,
   ManagementHeader,
   ManagementPage,
   useManagementClasses,
 } from '../components/ManagementSurface';
+import type { ChapterDirectoryItem } from '@/types/event-management';
 
-type Chapter = {
-  id: string;
-  name: string;
-  slug: string;
-  city: string;
-  accessMode: string;
-  status: string;
-  viewerMembership?: { status: string } | null;
-  memberships?: Array<{ status: string }>;
-};
-
-function list(payload: unknown): Chapter[] {
-  if (Array.isArray(payload)) return payload as Chapter[];
+function list(payload: unknown): ChapterDirectoryItem[] {
+  if (Array.isArray(payload)) return payload as ChapterDirectoryItem[];
   if (payload && typeof payload === 'object') {
-    const value = payload as { chapters?: Chapter[]; items?: Chapter[] };
+    const value = payload as {
+      chapters?: ChapterDirectoryItem[];
+      items?: ChapterDirectoryItem[];
+    };
     return value.chapters ?? value.items ?? [];
   }
   return [];
@@ -32,13 +26,20 @@ function list(payload: unknown): Chapter[] {
 
 export default function ChaptersPage() {
   const classes = useManagementClasses();
-  const [chapters, setChapters] = useState<Chapter[]>([]);
+  const [chapters, setChapters] = useState<ChapterDirectoryItem[]>([]);
+  const [loadError, setLoadError] = useState('');
 
   useEffect(() => {
+    setLoadError('');
     fetch('/api/chapters')
-      .then(response => (response.ok ? response.json() : []))
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`Request failed with status ${response.status}`);
+        }
+        return response.json() as Promise<unknown>;
+      })
       .then(payload => setChapters(list(payload)))
-      .catch(() => setChapters([]));
+      .catch(() => setLoadError('Unable to load chapters.'));
   }, []);
 
   return (
@@ -47,6 +48,11 @@ export default function ChaptersPage() {
         title="Chapters"
         description="Find a Sundai chapter and see the membership state available to you."
       />
+      {loadError && (
+        <div className="mb-5">
+          <ManagementAlert tone="danger">{loadError}</ManagementAlert>
+        </div>
+      )}
       <div className="grid gap-4 sm:grid-cols-2">
         {chapters.map(chapter => (
           <Link

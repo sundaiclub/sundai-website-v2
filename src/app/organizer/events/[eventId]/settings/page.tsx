@@ -11,18 +11,7 @@ import {
   ManagementSection,
   useManagementClasses,
 } from '../../../../components/ManagementSurface';
-
-type EventSettings = {
-  id: string;
-  title: string;
-  visibility?: string;
-  applicationMode?: string;
-  staff?: Array<{
-    id: string;
-    role: string;
-    hacker?: { id?: string; name?: string | null } | null;
-  }>;
-};
+import type { OrganizerEventSettings } from '@/types/event-management';
 
 export default function OrganizerEventSettingsPage({
   params,
@@ -30,18 +19,25 @@ export default function OrganizerEventSettingsPage({
   params: { eventId: string };
 }) {
   const classes = useManagementClasses();
-  const [event, setEvent] = useState<EventSettings | null>(null);
+  const [event, setEvent] = useState<OrganizerEventSettings | null>(null);
   const [title, setTitle] = useState('');
   const [message, setMessage] = useState('');
+  const [loadError, setLoadError] = useState('');
 
   useEffect(() => {
+    setLoadError('');
     fetch(`/api/events/${params.eventId}`)
-      .then(response => (response.ok ? response.json() : null))
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`Request failed with status ${response.status}`);
+        }
+        return response.json() as Promise<OrganizerEventSettings>;
+      })
       .then(payload => {
         setEvent(payload);
-        setTitle(payload?.title ?? '');
+        setTitle(payload.title);
       })
-      .catch(() => setEvent(null));
+      .catch(() => setLoadError('Unable to load event settings.'));
   }, [params.eventId]);
 
   async function saveSettings() {
@@ -72,6 +68,11 @@ export default function OrganizerEventSettingsPage({
           </>
         }
       />
+      {loadError && (
+        <div className="mb-5">
+          <ManagementAlert tone="danger">{loadError}</ManagementAlert>
+        </div>
+      )}
       <div className="grid gap-5">
         <ManagementSection title="Basics">
           <label className="grid gap-2">

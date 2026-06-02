@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import {
+  ManagementAlert,
   ManagementBadge,
   ManagementEmptyState,
   ManagementHeader,
@@ -12,28 +13,29 @@ import {
   useManagementClasses,
 } from '../../components/ManagementSurface';
 import { useUserContext } from '../../contexts/UserContext';
+import type { OrganizerEventListItem } from '@/types/event-management';
 
-type EventItem = {
-  id: string;
-  title: string;
-  startTime: string;
-  chapter?: { name: string };
-};
-
-function list(payload: unknown): EventItem[] {
-  return Array.isArray(payload) ? (payload as EventItem[]) : [];
+function list(payload: unknown): OrganizerEventListItem[] {
+  return Array.isArray(payload) ? (payload as OrganizerEventListItem[]) : [];
 }
 
 export default function OrganizerEventsPage() {
   const classes = useManagementClasses();
   const { isAdmin } = useUserContext();
-  const [events, setEvents] = useState<EventItem[]>([]);
+  const [events, setEvents] = useState<OrganizerEventListItem[]>([]);
+  const [loadError, setLoadError] = useState('');
 
   useEffect(() => {
+    setLoadError('');
     fetch('/api/events')
-      .then(response => (response.ok ? response.json() : []))
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`Request failed with status ${response.status}`);
+        }
+        return response.json() as Promise<unknown>;
+      })
       .then(payload => setEvents(list(payload)))
-      .catch(() => setEvents([]));
+      .catch(() => setLoadError('Unable to load organizer events.'));
   }, []);
 
   return (
@@ -53,6 +55,11 @@ export default function OrganizerEventsPage() {
           )
         }
       />
+      {loadError && (
+        <div className="mb-5">
+          <ManagementAlert tone="danger">{loadError}</ManagementAlert>
+        </div>
+      )}
       <ManagementSection title="Events">
         <div className={`divide-y ${classes.divider}`}>
           {events.map(event => (

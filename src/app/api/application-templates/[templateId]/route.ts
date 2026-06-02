@@ -1,7 +1,10 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getCurrentHacker, isSiteAdmin } from '@/lib/eventManagementApi';
-import { parseTemplateFieldsJson } from '@/lib/applicationTemplates';
+import {
+  ApplicationTemplateValidationError,
+  parseTemplateFieldsJson,
+} from '@/lib/applicationTemplates';
 import { canManageChapterSettings } from '@/lib/eventManagementAuth';
 
 export async function PATCH(
@@ -43,9 +46,9 @@ export async function PATCH(
 
     return NextResponse.json(template);
   } catch (error) {
-    if (error instanceof Error && error.name === 'ApplicationTemplateValidationError') {
+    if (error instanceof ApplicationTemplateValidationError) {
       return NextResponse.json(
-        { message: error.message, issues: (error as any).issues },
+        { message: error.message, issues: error.issues },
         { status: 400 }
       );
     }

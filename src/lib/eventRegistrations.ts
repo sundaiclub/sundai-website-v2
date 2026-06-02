@@ -10,22 +10,11 @@ import type {
   TemplateFieldDefinition,
 } from '@/types/event-management'
 
-export const APPLICANT_DECISION_STATUSES = [
+const APPLICANT_DECISION_STATUSES = [
   'APPROVED',
   'WAITLISTED',
   'DECLINED',
 ] as const satisfies readonly RegistrationStatus[]
-
-export const ACTIVE_REGISTRATION_STATUSES = [
-  'PENDING',
-  'APPROVED',
-  'WAITLISTED',
-  'DECLINED',
-  'BLOCKED',
-] as const satisfies readonly RegistrationStatus[]
-
-export const PUBLIC_SAFE_REGISTRATION_BLOCK_MESSAGE =
-  'You are unable to register for this event at this time.'
 
 export type ApplicantDecisionStatus =
   (typeof APPLICANT_DECISION_STATUSES)[number]
@@ -36,7 +25,7 @@ export type RegistrationPermissionContext = {
   staffRole?: EventStaffRole | null
 }
 
-export type RegistrationStatusDenialReason =
+type RegistrationStatusDenialReason =
   | 'UNAUTHORIZED'
   | 'CO_MC_CANNOT_DECIDE_APPLICANTS'
 
@@ -108,24 +97,6 @@ export function isApplicantDecisionStatus(
   return APPLICANT_DECISION_STATUSES.includes(status as ApplicantDecisionStatus)
 }
 
-export function isActiveRegistrationStatus(
-  status: RegistrationStatus
-): boolean {
-  return ACTIVE_REGISTRATION_STATUSES.includes(
-    status as (typeof ACTIVE_REGISTRATION_STATUSES)[number]
-  )
-}
-
-export function canReadEventRegistrations(
-  context: RegistrationPermissionContext
-): boolean {
-  return Boolean(
-    context.isSiteAdmin ||
-      context.isChapterAdmin ||
-      context.staffRole === 'MC'
-  )
-}
-
 export function canManageRegistrationStatus(
   context: RegistrationPermissionContext,
   toStatus: RegistrationStatus
@@ -156,13 +127,13 @@ export function getRegistrationStatusGuard(
   return { allowed: false, reason: 'UNAUTHORIZED' }
 }
 
-export function shouldFilterActiveBansForRegistrations(
+function shouldFilterActiveBansForRegistrations(
   isSiteAdmin: boolean
 ): boolean {
   return !isSiteAdmin
 }
 
-export function filterRegistrationsForBanVisibility<
+function filterRegistrationsForBanVisibility<
   TRegistration extends Pick<EventRegistration, 'hackerId'>,
 >(
   registrations: TRegistration[],
@@ -179,7 +150,7 @@ export function filterRegistrationsForBanVisibility<
   )
 }
 
-export async function getActiveBannedHackerIds(
+async function getActiveBannedHackerIds(
   hackerIds: EntityId[],
   db: EventManagementPrismaClient = client
 ): Promise<EntityId[]> {
@@ -324,7 +295,7 @@ export async function updateEventRegistrationStatus(
   })
 }
 
-export async function writeEventRegistrationAudit(
+async function writeEventRegistrationAudit(
   input: {
     registrationId: EntityId
     eventId: EntityId
@@ -347,7 +318,7 @@ export async function writeEventRegistrationAudit(
   })
 }
 
-export function buildRegistrationStatusUpdateData(
+function buildRegistrationStatusUpdateData(
   input: UpdateRegistrationStatusInput
 ): Record<string, unknown> {
   const updateData: Record<string, unknown> = {
@@ -368,20 +339,4 @@ export function buildRegistrationStatusUpdateData(
   }
 
   return updateData
-}
-
-export function buildRegistrationAuditChangeJson(
-  action: string,
-  details: JsonObject = {}
-): JsonObject {
-  return {
-    action,
-    ...details,
-  }
-}
-
-export function hasPublicSafeRegistrationBlockMessage(
-  message: string | null | undefined
-): boolean {
-  return message === PUBLIC_SAFE_REGISTRATION_BLOCK_MESSAGE
 }

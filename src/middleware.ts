@@ -1,7 +1,22 @@
 import { authMiddleware } from "@clerk/nextjs/server";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
-export async function afterAuthHandler(auth: any, req: any) {
+type MiddlewareAuth = {
+  userId: string | null;
+  isPublicRoute?: boolean;
+  isApiRoute?: boolean;
+};
+
+type ProjectMutationBody = {
+  is_starred?: unknown;
+  status?: unknown;
+};
+
+function isProjectMutationBody(value: unknown): value is ProjectMutationBody {
+  return value !== null && typeof value === "object";
+}
+
+export async function afterAuthHandler(auth: MiddlewareAuth, req: NextRequest) {
   // Only check for PATCH/DELETE requests to projects
   if (req.nextUrl.pathname.startsWith("/api/projects") && 
       (req.method === "PATCH" || req.method === "DELETE")) {
@@ -15,13 +30,14 @@ export async function afterAuthHandler(auth: any, req: any) {
       }
 
       // Get the request body if it exists
-      let body;
+      let body: ProjectMutationBody = {};
       try {
         const cloned = req.clone();
-        body = await cloned.json();
-      } catch (err: any) {
+        const parsedBody: unknown = await cloned.json();
+        body = isProjectMutationBody(parsedBody) ? parsedBody : {};
+      } catch (err: unknown) {
         // If request clone fails entirely, surface 500 for general error case
-        if (err && typeof err.message === "string" && err.message.includes("Request clone error")) {
+        if (err instanceof Error && err.message.includes("Request clone error")) {
           return NextResponse.json("Internal Server Error", { status: 500 });
         }
         // If JSON parsing fails, skip admin checks gracefully

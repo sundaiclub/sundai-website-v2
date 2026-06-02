@@ -292,6 +292,7 @@ describe('chapter-admin application template operations', () => {
 
     mockActor(hacker);
     mockMembershipLookup(membership);
+    prisma.chapter.findUnique.mockResolvedValue(chapter);
     prisma.chapter.update.mockResolvedValue(updatedChapter);
 
     const response = await PATCH_CHAPTER(
@@ -334,6 +335,7 @@ describe('chapter-admin application template operations', () => {
 
     mockActor(hacker);
     mockMembershipLookup(bostonAdminMembership);
+    prisma.chapter.findUnique.mockResolvedValue(nycChapter);
     prisma.applicationTemplate.findUnique.mockResolvedValue(nycTemplate);
 
     const createResponse = await POST_APPLICATION_TEMPLATE(

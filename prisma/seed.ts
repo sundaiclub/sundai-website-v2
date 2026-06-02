@@ -16,18 +16,18 @@ const prisma = new PrismaClient();
 
 async function main() {
   // Clean up existing data
-  await prisma.eventRegistrationAudit?.deleteMany?.({});
-  await prisma.eventRegistration?.deleteMany?.({});
-  await prisma.eventProject?.deleteMany?.({});
-  await prisma.eventStaff?.deleteMany?.({});
-  await prisma.event?.deleteMany?.({});
-  await prisma.applicationTemplate?.deleteMany?.({});
-  await prisma.userBanFlag?.deleteMany?.({});
-  await prisma.userBan?.deleteMany?.({});
-  await prisma.hackerOrganizerNoteRevision?.deleteMany?.({});
-  await prisma.hackerOrganizerNote?.deleteMany?.({});
-  await prisma.chapterMembership?.deleteMany?.({});
-  await prisma.chapter?.deleteMany?.({});
+  await prisma.eventRegistrationAudit.deleteMany({});
+  await prisma.eventRegistration.deleteMany({});
+  await prisma.eventProject.deleteMany({});
+  await prisma.eventStaff.deleteMany({});
+  await prisma.event.deleteMany({});
+  await prisma.applicationTemplate.deleteMany({});
+  await prisma.userBanFlag.deleteMany({});
+  await prisma.userBan.deleteMany({});
+  await prisma.hackerOrganizerNoteRevision.deleteMany({});
+  await prisma.hackerOrganizerNote.deleteMany({});
+  await prisma.chapterMembership.deleteMany({});
+  await prisma.chapter.deleteMany({});
   await prisma.attendance.deleteMany({});
   await prisma.projectToParticipant.deleteMany({});
   await prisma.projectLike.deleteMany({});

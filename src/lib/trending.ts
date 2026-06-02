@@ -24,7 +24,8 @@ export function calculateTrendingScore(
     cutoff.setDate(now.getDate() - recentLikeWindowDays);
 
     return likes.filter((like) => {
-      const likeDate = new Date(like.createdAt as any);
+      if (!like.createdAt) return false;
+      const likeDate = new Date(like.createdAt);
       return (
         !Number.isNaN(likeDate.getTime()) &&
         likeDate >= cutoff &&
@@ -44,7 +45,10 @@ export function calculateTrendingScore(
   const now = new Date();
 
   return likes.reduce((score, like) => {
-    const likeDate = new Date(like.createdAt as any);
+    if (!like.createdAt) {
+      return score + 1;
+    }
+    const likeDate = new Date(like.createdAt);
     if (Number.isNaN(likeDate.getTime())) {
       return score + 1;
     }

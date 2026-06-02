@@ -5,12 +5,8 @@ import type {
   EntityId,
   EventStaffRole,
   Role,
-} from "@/types/event-management";
-
-type Delegate<TResult = unknown> = {
-  findUnique(args: any): Promise<TResult | null>;
-  findFirst(args: any): Promise<TResult | null>;
-};
+} from '@/types/event-management';
+import type { PrismaClient } from '@prisma/client';
 
 type HackerRecord = {
   id: EntityId;
@@ -50,26 +46,26 @@ type EventRegistrationRecord = {
 };
 
 export type EventManagementAuthPrisma = {
-  hacker: Delegate<HackerRecord>;
-  chapter: Delegate<ChapterRecord>;
-  chapterMembership: Delegate<ChapterMembershipRecord>;
-  event: Delegate<EventRecord>;
-  eventStaff: Delegate<EventStaffRecord>;
-  eventRegistration: Delegate<EventRegistrationRecord>;
+  hacker: PrismaClient['hacker'];
+  chapter: PrismaClient['chapter'];
+  chapterMembership: PrismaClient['chapterMembership'];
+  event: PrismaClient['event'];
+  eventStaff: PrismaClient['eventStaff'];
+  eventRegistration: PrismaClient['eventRegistration'];
 };
 
 export type NullableHackerId = EntityId | null | undefined;
 
 export type ChapterPermissionContext = {
-  actor?: Pick<HackerRecord, "role"> | null;
-  chapter?: Pick<ChapterRecord, "accessMode" | "status"> | null;
-  membership?: Pick<ChapterMembershipRecord, "role" | "status"> | null;
+  actor?: Pick<HackerRecord, 'role'> | null;
+  chapter?: Pick<ChapterRecord, 'accessMode' | 'status'> | null;
+  membership?: Pick<ChapterMembershipRecord, 'role' | 'status'> | null;
 };
 
 export type EventPermissionContext = {
-  actor?: Pick<HackerRecord, "role"> | null;
-  chapterMembership?: Pick<ChapterMembershipRecord, "role" | "status"> | null;
-  staff?: Pick<EventStaffRecord, "role"> | null;
+  actor?: Pick<HackerRecord, 'role'> | null;
+  chapterMembership?: Pick<ChapterMembershipRecord, 'role' | 'status'> | null;
+  staff?: Pick<EventStaffRecord, 'role'> | null;
 };
 
 export type OrganizerNotePermissionContext = EventPermissionContext & {
@@ -82,38 +78,38 @@ export type OrganizerNoteScope = {
   eventId?: EntityId | null;
 };
 
-export const SITE_ADMIN_ROLE: Role = "SITE_ADMIN";
-export const ACTIVE_MEMBERSHIP_STATUS: ChapterMembershipStatus = "ACTIVE";
-export const INVITED_MEMBERSHIP_STATUS: ChapterMembershipStatus = "INVITED";
-export const CHAPTER_ADMIN_ROLE: ChapterRole = "ADMIN";
-export const EVENT_MC_ROLE: EventStaffRole = "MC";
-export const EVENT_CO_MC_ROLE: EventStaffRole = "CO_MC";
+export const SITE_ADMIN_ROLE: Role = 'SITE_ADMIN';
+export const ACTIVE_MEMBERSHIP_STATUS: ChapterMembershipStatus = 'ACTIVE';
+export const INVITED_MEMBERSHIP_STATUS: ChapterMembershipStatus = 'INVITED';
+export const CHAPTER_ADMIN_ROLE: ChapterRole = 'ADMIN';
+export const EVENT_MC_ROLE: EventStaffRole = 'MC';
+export const EVENT_CO_MC_ROLE: EventStaffRole = 'CO_MC';
 
 export function isSiteAdminRole(role: Role | null | undefined): boolean {
   return role === SITE_ADMIN_ROLE;
 }
 
 export function isSiteAdminActor(
-  actor: Pick<HackerRecord, "role"> | null | undefined
+  actor: Pick<HackerRecord, 'role'> | null | undefined
 ): boolean {
   return isSiteAdminRole(actor?.role);
 }
 
 export function isActiveChapterMembership(
-  membership: Pick<ChapterMembershipRecord, "status"> | null | undefined
+  membership: Pick<ChapterMembershipRecord, 'status'> | null | undefined
 ): boolean {
   return membership?.status === ACTIVE_MEMBERSHIP_STATUS;
 }
 
 export function isInvitedChapterMembership(
-  membership: Pick<ChapterMembershipRecord, "status"> | null | undefined
+  membership: Pick<ChapterMembershipRecord, 'status'> | null | undefined
 ): boolean {
   return membership?.status === INVITED_MEMBERSHIP_STATUS;
 }
 
 export function isChapterAdminMembership(
   membership:
-    | Pick<ChapterMembershipRecord, "role" | "status">
+    | Pick<ChapterMembershipRecord, 'role' | 'status'>
     | null
     | undefined
 ): boolean {
@@ -124,25 +120,25 @@ export function isChapterAdminMembership(
 }
 
 export function isChapterMemberMembership(
-  membership: Pick<ChapterMembershipRecord, "status"> | null | undefined
+  membership: Pick<ChapterMembershipRecord, 'status'> | null | undefined
 ): boolean {
   return isActiveChapterMembership(membership);
 }
 
 export function isEventMcStaff(
-  staff: Pick<EventStaffRecord, "role"> | null | undefined
+  staff: Pick<EventStaffRecord, 'role'> | null | undefined
 ): boolean {
   return staff?.role === EVENT_MC_ROLE;
 }
 
 export function isEventCoMcStaff(
-  staff: Pick<EventStaffRecord, "role"> | null | undefined
+  staff: Pick<EventStaffRecord, 'role'> | null | undefined
 ): boolean {
   return staff?.role === EVENT_CO_MC_ROLE;
 }
 
 export function isEventPitchStaff(
-  staff: Pick<EventStaffRecord, "role"> | null | undefined
+  staff: Pick<EventStaffRecord, 'role'> | null | undefined
 ): boolean {
   return isEventMcStaff(staff) || isEventCoMcStaff(staff);
 }
@@ -158,7 +154,7 @@ export function canViewChapterWithContext({
   if (isActiveChapterMembership(membership)) return true;
   if (isInvitedChapterMembership(membership)) return true;
 
-  return chapter.accessMode === "PUBLIC" && chapter.status === "ACTIVE";
+  return chapter.accessMode === 'PUBLIC' && chapter.status === 'ACTIVE';
 }
 
 export function canManageChapterSettingsWithContext({
@@ -364,8 +360,6 @@ export async function canManageChapterMembers(
   return canManageChapterMembersWithContext({ actor, membership });
 }
 
-export const canManageChapterMemberships = canManageChapterMembers;
-
 export async function getEventForPermissions(
   prisma: EventManagementAuthPrisma,
   eventId: EntityId
@@ -516,26 +510,25 @@ async function getOrganizerNotePermissionContext(
   ]);
 
   const chapterId = scope.chapterId ?? event?.chapterId ?? null;
-  const [chapterMembership, targetIsRelevantToChapter, targetIsRelevantToEvent] =
-    await Promise.all([
-      chapterId
-        ? getChapterMembershipForPermissions(
-            prisma,
-            viewerHackerId,
-            chapterId
-          )
-        : null,
-      chapterId
-        ? hasChapterOrganizerNoteRelevance(prisma, targetHackerId, chapterId)
-        : false,
-      scope.eventId
-        ? hasEventRegistrationForPermissions(
-            prisma,
-            targetHackerId,
-            scope.eventId
-          )
-        : false,
-    ]);
+  const [
+    chapterMembership,
+    targetIsRelevantToChapter,
+    targetIsRelevantToEvent,
+  ] = await Promise.all([
+    chapterId
+      ? getChapterMembershipForPermissions(prisma, viewerHackerId, chapterId)
+      : null,
+    chapterId
+      ? hasChapterOrganizerNoteRelevance(prisma, targetHackerId, chapterId)
+      : false,
+    scope.eventId
+      ? hasEventRegistrationForPermissions(
+          prisma,
+          targetHackerId,
+          scope.eventId
+        )
+      : false,
+  ]);
 
   return {
     actor,
@@ -593,5 +586,3 @@ export async function canViewOrganizerNoteRevisions(
 
   return canViewOrganizerNoteRevisionsWithContext(context);
 }
-
-export const canViewOrganizerNoteRevision = canViewOrganizerNoteRevisions;

@@ -2,24 +2,26 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { useUser } from "@clerk/nextjs";
 
+export type UserInfo = {
+  id: string;
+  name: string;
+  email: string | null;
+  role: string | null;
+  avatar?: {
+    url: string;
+  } | null;
+  bio?: string | null;
+  githubUrl?: string | null;
+  phoneNumber?: string | null;
+  likes?: Array<{
+    projectId: string;
+    createdAt: string;
+  }>;
+};
+
 type UserContextType = {
   isAdmin: boolean;
-  userInfo: {
-    id: string;
-    name: string;
-    email: string | null;
-    role: string | null;
-    avatar?: {
-      url: string;
-    } | null;
-    bio?: string | null;
-    githubUrl?: string | null;
-    phoneNumber?: string | null;
-    likes?: Array<{
-      projectId: string;
-      createdAt: string;
-    }>;
-  } | null;
+  userInfo: UserInfo | null;
   loading: boolean;
 };
 

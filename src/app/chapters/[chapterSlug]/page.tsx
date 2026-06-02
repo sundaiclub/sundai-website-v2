@@ -10,31 +10,14 @@ import {
   ManagementSection,
   useManagementClasses,
 } from '../../components/ManagementSurface';
+import type {
+  ChapterLanding,
+  ChapterMembershipSummary,
+} from '@/types/event-management';
 
-type Membership = {
-  status: string;
-  notificationsAllowed?: boolean;
-  emailNotificationsEnabled?: boolean;
-  smsNotificationsEnabled?: boolean;
-};
-
-type Chapter = {
-  id: string;
-  name: string;
-  slug: string;
-  city?: string;
-  description?: string | null;
-  accessMode: string;
-  viewerMembership?: Membership | null;
-  memberships?: Membership[];
-  upcomingEvents?: Array<{
-    id: string;
-    title: string;
-    publicLocation?: string | null;
-  }>;
-};
-
-function firstMembership(chapter: Chapter | null): Membership | null {
+function firstMembership(
+  chapter: ChapterLanding | null
+): ChapterMembershipSummary | null {
   return chapter?.viewerMembership ?? chapter?.memberships?.[0] ?? null;
 }
 
@@ -44,8 +27,9 @@ export default function ChapterLandingPage({
   params: { chapterSlug: string };
 }) {
   const classes = useManagementClasses();
-  const [chapter, setChapter] = useState<Chapter | null>(null);
+  const [chapter, setChapter] = useState<ChapterLanding | null>(null);
   const [denied, setDenied] = useState(false);
+  const [loadError, setLoadError] = useState('');
   const membership = firstMembership(chapter);
   const [notificationsAllowed, setNotificationsAllowed] = useState(false);
   const [emailNotificationsEnabled, setEmailNotificationsEnabled] =
@@ -53,15 +37,21 @@ export default function ChapterLandingPage({
   const [smsNotificationsEnabled, setSmsNotificationsEnabled] = useState(false);
 
   useEffect(() => {
+    setDenied(false);
+    setLoadError('');
     fetch(`/api/chapters/${params.chapterSlug}`)
       .then(async response => {
-        if (!response.ok) {
+        if (response.status === 403 || response.status === 404) {
           setDenied(true);
           return null;
+        }
+        if (!response.ok) {
+          throw new Error(`Request failed with status ${response.status}`);
         }
         return response.json();
       })
       .then(payload => {
+        if (!payload) return;
         setChapter(payload);
         const nextMembership = firstMembership(payload);
         setNotificationsAllowed(Boolean(nextMembership?.notificationsAllowed));
@@ -72,7 +62,7 @@ export default function ChapterLandingPage({
           Boolean(nextMembership?.smsNotificationsEnabled)
         );
       })
-      .catch(() => setDenied(true));
+      .catch(() => setLoadError('Unable to load chapter.'));
   }, [params.chapterSlug]);
 
   async function join() {
@@ -138,6 +128,11 @@ export default function ChapterLandingPage({
 
   return (
     <ManagementPage maxWidth="max-w-4xl">
+      {loadError && (
+        <div className="mb-5">
+          <ManagementAlert tone="danger">{loadError}</ManagementAlert>
+        </div>
+      )}
       <ManagementHeader
         title={chapter?.name || 'Chapter'}
         description={chapter?.description || chapter?.city}

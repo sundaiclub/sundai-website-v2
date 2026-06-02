@@ -11,14 +11,14 @@ import type {
   Role,
 } from "@/types/event-management";
 
-export const ACTIVE_CHAPTER_STATUS: ChapterStatus = "ACTIVE";
-export const PUBLIC_CHAPTER_ACCESS: ChapterAccessMode = "PUBLIC";
-export const PRIVATE_CHAPTER_ACCESS: ChapterAccessMode = "PRIVATE";
-export const ACTIVE_MEMBERSHIP_STATUS: ChapterMembershipStatus = "ACTIVE";
-export const INVITED_MEMBERSHIP_STATUS: ChapterMembershipStatus = "INVITED";
-export const MEMBER_CHAPTER_ROLE: ChapterRole = "MEMBER";
-export const ADMIN_CHAPTER_ROLE: ChapterRole = "ADMIN";
-export const PRIVATE_VISIBLE_MEMBERSHIP_STATUSES: ChapterMembershipStatus[] = [
+const ACTIVE_CHAPTER_STATUS: ChapterStatus = "ACTIVE";
+const PUBLIC_CHAPTER_ACCESS: ChapterAccessMode = "PUBLIC";
+const PRIVATE_CHAPTER_ACCESS: ChapterAccessMode = "PRIVATE";
+const ACTIVE_MEMBERSHIP_STATUS: ChapterMembershipStatus = "ACTIVE";
+const INVITED_MEMBERSHIP_STATUS: ChapterMembershipStatus = "INVITED";
+const MEMBER_CHAPTER_ROLE: ChapterRole = "MEMBER";
+const ADMIN_CHAPTER_ROLE: ChapterRole = "ADMIN";
+const PRIVATE_VISIBLE_MEMBERSHIP_STATUSES: ChapterMembershipStatus[] = [
   INVITED_MEMBERSHIP_STATUS,
   ACTIVE_MEMBERSHIP_STATUS,
 ];
@@ -63,7 +63,7 @@ export type ListVisibleChaptersOptions = {
   prismaClient?: PlannedPrismaClient;
 };
 
-export type ChapterErrorCode =
+type ChapterErrorCode =
   | "CHAPTER_NOT_FOUND"
   | "CHAPTER_NOT_JOINABLE"
   | "PRIVATE_INVITE_REQUIRED"
@@ -72,7 +72,7 @@ export type ChapterErrorCode =
   | "NOT_ACTIVE_CHAPTER_ADMIN"
   | "CHAPTER_REQUIRES_ACTIVE_ADMIN";
 
-export class ChapterHelperError extends Error {
+class ChapterHelperError extends Error {
   readonly code: ChapterErrorCode;
   readonly status: number;
 
@@ -119,7 +119,7 @@ export function normalizeChapterSlug(input: string): string {
   return normalized || "chapter";
 }
 
-export function activeChapterWhere(): LooseWhere {
+function activeChapterWhere(): LooseWhere {
   return { status: ACTIVE_CHAPTER_STATUS };
 }
 
@@ -130,15 +130,11 @@ export function publicChapterWhere(): LooseWhere {
   };
 }
 
-export function privateChapterWhere(): LooseWhere {
+function privateChapterWhere(): LooseWhere {
   return {
     ...activeChapterWhere(),
     accessMode: PRIVATE_CHAPTER_ACCESS,
   };
-}
-
-export function activeMembershipWhere(): LooseWhere {
-  return { status: ACTIVE_MEMBERSHIP_STATUS };
 }
 
 export function activeChapterAdminMembershipWhere(chapterId?: EntityId, hackerId?: EntityId): LooseWhere {
@@ -198,37 +194,6 @@ export async function listVisibleChapters(options: ListVisibleChaptersOptions = 
   });
 
   return chapters as Chapter[];
-}
-
-export async function canViewChapter(
-  chapter: Pick<Chapter, "id" | "status" | "accessMode"> | null,
-  viewer?: ChapterViewer,
-  prismaClient: PlannedPrismaClient = plannedPrisma
-): Promise<boolean> {
-  if (!chapter) return false;
-  if (viewer?.role === "SITE_ADMIN") return true;
-  if (chapter.status === ACTIVE_CHAPTER_STATUS && chapter.accessMode === PUBLIC_CHAPTER_ACCESS) return true;
-  if (!viewer?.id) return false;
-
-  const membership = asMembership(
-    await prismaClient.chapterMembership.findFirst({
-      where: {
-        chapterId: chapter.id,
-        hackerId: viewer.id,
-        status: { in: PRIVATE_VISIBLE_MEMBERSHIP_STATUSES },
-      },
-      select: {
-        id: true,
-        role: true,
-        status: true,
-      },
-    })
-  );
-
-  if (!membership) return false;
-  if (membership.role === ADMIN_CHAPTER_ROLE && membership.status === ACTIVE_MEMBERSHIP_STATUS) return true;
-
-  return chapter.status === ACTIVE_CHAPTER_STATUS && chapter.accessMode === PRIVATE_CHAPTER_ACCESS;
 }
 
 export async function joinOrReactivatePublicMembership(
@@ -410,7 +375,7 @@ export async function updateChapterNotificationPreferences(
   })) as ChapterMembership;
 }
 
-export async function countActiveChapterAdmins(
+async function countActiveChapterAdmins(
   chapterId: EntityId,
   prismaClient: PlannedPrismaClient = plannedPrisma
 ): Promise<number> {
@@ -419,14 +384,14 @@ export async function countActiveChapterAdmins(
   });
 }
 
-export async function hasActiveChapterAdmin(
+async function hasActiveChapterAdmin(
   chapterId: EntityId,
   prismaClient: PlannedPrismaClient = plannedPrisma
 ): Promise<boolean> {
   return (await countActiveChapterAdmins(chapterId, prismaClient)) > 0;
 }
 
-export async function isActiveChapterAdmin(
+async function isActiveChapterAdmin(
   chapterId: EntityId,
   hackerId: EntityId,
   prismaClient: PlannedPrismaClient = plannedPrisma
@@ -439,7 +404,7 @@ export async function isActiveChapterAdmin(
   return Boolean(membership);
 }
 
-export async function isOnlyActiveChapterAdmin(
+async function isOnlyActiveChapterAdmin(
   chapterId: EntityId,
   hackerId: EntityId,
   prismaClient: PlannedPrismaClient = plannedPrisma
@@ -450,34 +415,7 @@ export async function isOnlyActiveChapterAdmin(
   return (await countActiveChapterAdmins(chapterId, prismaClient)) <= 1;
 }
 
-export async function assertActiveChapterAdmin(
-  chapterId: EntityId,
-  hackerId: EntityId,
-  prismaClient: PlannedPrismaClient = plannedPrisma
-): Promise<void> {
-  if (await isActiveChapterAdmin(chapterId, hackerId, prismaClient)) return;
-
-  throw new ChapterHelperError(
-    "NOT_ACTIVE_CHAPTER_ADMIN",
-    "An active chapter admin membership is required.",
-    403
-  );
-}
-
-export async function assertChapterHasActiveAdmin(
-  chapterId: EntityId,
-  prismaClient: PlannedPrismaClient = plannedPrisma
-): Promise<void> {
-  if (await hasActiveChapterAdmin(chapterId, prismaClient)) return;
-
-  throw new ChapterHelperError(
-    "CHAPTER_REQUIRES_ACTIVE_ADMIN",
-    "Chapter must have at least one active admin.",
-    400
-  );
-}
-
-export async function assertChapterKeepsActiveAdmin(
+async function assertChapterKeepsActiveAdmin(
   chapterId: EntityId,
   removedHackerId: EntityId,
   prismaClient: PlannedPrismaClient = plannedPrisma

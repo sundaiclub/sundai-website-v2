@@ -23,9 +23,12 @@ export async function PATCH(
     );
 
     return NextResponse.json(membership);
-  } catch (error: any) {
-    if (error?.status) {
-      return NextResponse.json({ message: error.message }, { status: error.status });
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      const status = (error as { status?: unknown }).status;
+      if (typeof status === 'number') {
+        return NextResponse.json({ message: error.message }, { status });
+      }
     }
     console.error('[CHAPTER_NOTIFICATIONS_PATCH]', error);
     return new NextResponse('Internal Error', { status: 500 });

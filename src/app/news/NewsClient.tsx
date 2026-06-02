@@ -4,6 +4,7 @@ import { toast } from "react-hot-toast";
 import { useTheme } from "../contexts/ThemeContext";
 import { useUserContext } from "../contexts/UserContext";
 import { calculateProjectScore } from "@/lib/trending";
+import type { Project } from "@/types/project";
  
 
 type WeeklyTopProject = {
@@ -16,6 +17,12 @@ type WeeklyTopProject = {
   launchLead: { id: string; name: string; linkedinUrl: string | null; twitterUrl: string | null };
   team: { id: string; name: string; linkedinUrl: string | null; twitterUrl: string | null }[];
   projectUrl: string;
+};
+
+type NewsProject = Omit<Project, "preview" | "createdAt" | "startDate"> & {
+  preview: string | null;
+  createdAt: string | Date;
+  startDate?: string | Date | null;
 };
 
 export default function NewsClient() {
@@ -39,19 +46,19 @@ export default function NewsClient() {
   const loadTopProjects = useCallback(async () => {
     // Fetch all approved projects fresh and compute trending weekly list client-side
     const resp = await fetch('/api/projects?status=APPROVED', { cache: 'no-store' });
-    const projects = await resp.json();
+    const projects = (await resp.json()) as NewsProject[];
 
     const now = new Date();
     const cutoffDate = new Date(now);
     cutoffDate.setDate(now.getDate() - 7);
     cutoffDate.setHours(0, 0, 0, 0);
 
-    const inCutoffDate = projects.filter((p: any) => {
-      const startOrCreated = new Date((p.startDate as any) || (p.createdAt as any));
+    const inCutoffDate = projects.filter((p) => {
+      const startOrCreated = new Date(p.startDate || p.createdAt);
       return startOrCreated >= cutoffDate;
     });
 
-    const byTrending = (a: any, b: any) =>
+    const byTrending = (a: NewsProject, b: NewsProject) =>
       calculateProjectScore(b, { timeDecayDays: 1 }) - calculateProjectScore(a, { timeDecayDays: 1 });
 
     const trendingThisWeek = inCutoffDate.length >= 5
@@ -59,29 +66,29 @@ export default function NewsClient() {
       : [
           ...inCutoffDate.sort(byTrending),
           ...projects
-            .filter((p: any) => !inCutoffDate.includes(p))
+            .filter((p) => !inCutoffDate.includes(p))
             .sort(byTrending)
             .slice(0, 5 - inCutoffDate.length),
         ];
 
-    const result: WeeklyTopProject[] = trendingThisWeek.map((p: any) => ({
+    const result: WeeklyTopProject[] = trendingThisWeek.map((p) => ({
       id: p.id,
       title: p.title,
       preview: p.preview || p.title,
-      createdAt: (p.createdAt instanceof Date ? p.createdAt : new Date(p.createdAt as any)).toISOString(),
-      likeCount: (p.likes?.length as number) || 0,
+      createdAt: (p.createdAt instanceof Date ? p.createdAt : new Date(p.createdAt)).toISOString(),
+      likeCount: p.likes?.length || 0,
       thumbnailUrl: p.thumbnail?.url || null,
       launchLead: {
         id: p.launchLead?.id,
         name: p.launchLead?.name,
-        linkedinUrl: (p.launchLead as any)?.linkedinUrl || null,
-        twitterUrl: (p.launchLead as any)?.twitterUrl || null,
+        linkedinUrl: p.launchLead?.linkedinUrl || null,
+        twitterUrl: p.launchLead?.twitterUrl || null,
       },
-      team: (p.participants || []).map((pp: any) => ({
+      team: (p.participants || []).map((pp) => ({
         id: pp.hacker?.id,
         name: pp.hacker?.name,
-        linkedinUrl: (pp.hacker as any)?.linkedinUrl || null,
-        twitterUrl: (pp.hacker as any)?.twitterUrl || null,
+        linkedinUrl: pp.hacker?.linkedinUrl || null,
+        twitterUrl: pp.hacker?.twitterUrl || null,
       })),
       projectUrl: `https://www.sundai.club/projects/${p.id}`,
     }));
@@ -293,11 +300,9 @@ export default function NewsClient() {
           toast.error('Generation failed. Please try again.');
         }
         // Try streaming first
-        const contentType = (resp as any).headers && typeof (resp as any).headers.get === 'function'
-          ? ((resp as any).headers.get('Content-Type') || '')
-          : '';
-        if ((resp as any).body && typeof (resp as any).body.getReader === 'function' && contentType.includes('text/plain')) {
-          const reader = (resp as any).body.getReader();
+        const contentType = resp.headers.get('Content-Type') || '';
+        if (resp.body && contentType.includes('text/plain')) {
+          const reader = resp.body.getReader();
           const decoder = new TextDecoder();
           let accum = '';
           // Set initial HTML while streaming starts
@@ -401,5 +406,3 @@ export default function NewsClient() {
     </div>
   );
 }
-
-

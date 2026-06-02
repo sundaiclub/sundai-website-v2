@@ -1,16 +1,21 @@
 "use client";
-import React, { useRef, useState } from "react";
+import React, { useState } from "react";
 import toast from 'react-hot-toast';
 import { XMarkIcon, ShareIcon } from "@heroicons/react/24/outline";
-import { Project } from "./Project";
+import type { Project } from "@/types/project";
+import type { UserInfo } from "../contexts/UserContext";
 
 interface ShareModalProps {
   showModal: boolean;
   setShowModal: (show: boolean) => void;
   project: Project;
-  userInfo: any;
+  userInfo: UserInfo | null;
   isDarkMode: boolean;
 }
+
+type ShareContentPayload = {
+  content: string;
+};
 
 const socialPlatforms = [
   { id: 'twitter', name: 'Twitter/X', icon: '𝕏', color: 'bg-black hover:bg-gray-800' },
@@ -43,7 +48,7 @@ export default function ShareModal({ showModal, setShowModal, project, userInfo,
 
       if (!response.ok) {
         // Explicit handling for unauthorized
-        if ((response as any).status === 401) {
+        if (response.status === 401) {
           toast.error('Please sign in to generate shareable content.');
           return; // Do not fallback when unauthorized
         }
@@ -57,14 +62,12 @@ export default function ShareModal({ showModal, setShowModal, project, userInfo,
         throw new Error(`Failed to generate content: ${errorText || response.statusText}`);
       }
 
-      const contentType = (response as any).headers && typeof (response as any).headers.get === 'function'
-        ? ((response as any).headers.get('Content-Type') || '')
-        : '';
+      const contentType = response.headers.get('Content-Type') || '';
 
       // Helper: letter-by-letter animation from a queued buffer
       const pendingRef = { current: '' } as React.MutableRefObject<string>;
       const animatingRef = { current: false } as React.MutableRefObject<boolean>;
-      const rafRef = { current: 0 } as React.MutableRefObject<any>;
+      const rafRef = { current: 0 } as React.MutableRefObject<number>;
       const appendFrame = () => {
         if (pendingRef.current.length === 0) {
           animatingRef.current = false;
@@ -78,7 +81,7 @@ export default function ShareModal({ showModal, setShowModal, project, userInfo,
         setCustomContent(prev => (prev || '') + chunk);
         rafRef.current = typeof requestAnimationFrame !== 'undefined'
           ? requestAnimationFrame(appendFrame)
-          : setTimeout(appendFrame, 16);
+          : window.setTimeout(appendFrame, 16);
       };
       const enqueueText = (text: string) => {
         if (!text) return;
@@ -88,8 +91,8 @@ export default function ShareModal({ showModal, setShowModal, project, userInfo,
         }
       };
 
-      if ((response as any).body && typeof (response as any).body.getReader === 'function' && contentType.includes('text/plain')) {
-        const reader = (response as any).body.getReader();
+      if (response.body && contentType.includes('text/plain')) {
+        const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let finalAll = '';
         setGeneratedContent('');
@@ -108,7 +111,7 @@ export default function ShareModal({ showModal, setShowModal, project, userInfo,
           enqueueText(tail);
         }
       } else {
-        const data = await response.json();
+        const data = (await response.json()) as ShareContentPayload;
         setGeneratedContent(data.content);
         setCustomContent(data.content);
       }
@@ -153,8 +156,7 @@ ${links}
   const copyToClipboard = async () => {
     try {
       await navigator.clipboard.writeText(customContent);
-      // TODO: Add toast notification
-      alert('Content copied to clipboard!');
+      toast.success('Content copied to clipboard.');
     } catch (error) {
       console.error('Failed to copy:', error);
     }
@@ -309,4 +311,4 @@ ${links}
       </div>
     </div>
   );
-} 
+}

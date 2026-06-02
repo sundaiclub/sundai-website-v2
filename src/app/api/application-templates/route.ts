@@ -7,6 +7,7 @@ import {
   requireSiteAdmin,
 } from '@/lib/eventManagementApi';
 import {
+  ApplicationTemplateValidationError,
   assertValidApplicationTemplateFields,
   parseTemplateFieldsJson,
 } from '@/lib/applicationTemplates';
@@ -80,7 +81,7 @@ export async function POST(req: Request) {
         scope,
         chapterId: scope === 'CHAPTER' ? chapterId : null,
         name: body?.name || (scope === 'SITE' ? 'Site template' : 'Chapter template'),
-        fieldsJson: fields as any,
+        fieldsJson: JSON.parse(JSON.stringify(fields)),
         isActive: body?.isActive ?? true,
         createdById: hacker.id,
       },
@@ -88,8 +89,8 @@ export async function POST(req: Request) {
 
     return NextResponse.json(template, { status: 201 });
   } catch (error) {
-    if (error instanceof Error && error.name === 'ApplicationTemplateValidationError') {
-      return NextResponse.json({ message: error.message, issues: (error as any).issues }, { status: 400 });
+    if (error instanceof ApplicationTemplateValidationError) {
+      return NextResponse.json({ message: error.message, issues: error.issues }, { status: 400 });
     }
     console.error('[APPLICATION_TEMPLATES_POST]', error);
     return new NextResponse('Internal Error', { status: 500 });

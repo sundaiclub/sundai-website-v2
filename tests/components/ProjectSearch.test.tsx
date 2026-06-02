@@ -1,7 +1,7 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import ProjectSearch from '../../src/app/components/ProjectSearch';
-import type { Project } from '../../src/app/components/Project';
+import type { Project } from '../../src/types/project';
 
 // Mock dependencies
 jest.mock('next/navigation', () => ({

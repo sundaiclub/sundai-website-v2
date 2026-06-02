@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server';
-import { fetchMergedApplicationTemplate } from '@/lib/applicationTemplates';
+import {
+  ApplicationTemplateValidationError,
+  fetchMergedApplicationTemplate,
+} from '@/lib/applicationTemplates';
 import { getCurrentHacker, isSiteAdmin } from '@/lib/eventManagementApi';
 import { canManageChapterSettings, canManageEventSettings } from '@/lib/eventManagementAuth';
 import prisma from '@/lib/prisma';
@@ -28,9 +31,9 @@ export async function GET(req: Request) {
 
     return NextResponse.json(merged);
   } catch (error) {
-    if (error instanceof Error && error.name === 'ApplicationTemplateValidationError') {
+    if (error instanceof ApplicationTemplateValidationError) {
       return NextResponse.json(
-        { message: error.message, issues: (error as any).issues },
+        { message: error.message, issues: error.issues },
         { status: 400 }
       );
     }

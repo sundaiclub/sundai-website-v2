@@ -1,33 +1,20 @@
-export type JsonObject = { [key: string]: JsonValue };
-export type JsonValue =
-  | string
-  | number
-  | boolean
-  | null
-  | JsonValue[]
-  | JsonObject;
+import type {
+  BanFlagStatus,
+  ChapterAccessMode,
+  ChapterMembershipStatus,
+  ChapterRole,
+  ChapterStatus,
+  EventStaffRole,
+  JsonObject,
+  JsonValue,
+  Role,
+} from '../../src/types/event-management';
 
 export type FixtureOverrides<T> = Partial<T>;
 
-export type EventManagementRole =
-  | 'NOT_SET'
-  | 'NEWBIE'
-  | 'HACKER'
-  | 'SPONSOR'
-  | 'LEADER'
-  | 'SITE_ADMIN';
-
-export type ChapterStatus = 'ACTIVE' | 'PAUSED' | 'ARCHIVED';
-export type ChapterAccessMode = 'PUBLIC' | 'PRIVATE';
-export type ChapterMembershipRole = 'ADMIN' | 'MEMBER';
-export type ChapterMembershipStatus = 'INVITED' | 'ACTIVE' | 'REVOKED' | 'LEFT';
-export type EventStaffRole = 'MC' | 'CO_MC';
-export type UserBanFlagStatus =
-  | 'OPEN'
-  | 'REVIEWING'
-  | 'RESOLVED_NO_ACTION'
-  | 'RESOLVED_BANNED'
-  | 'DISMISSED';
+type EventManagementRole = Role;
+type ChapterMembershipRole = ChapterRole;
+type UserBanFlagStatus = BanFlagStatus;
 
 export type HackerFixture = {
   id: string;
@@ -151,17 +138,6 @@ export type ChapterRoleFixture = {
 export type EventStaffRoleFixture = {
   hacker: HackerFixture;
   staff: EventStaffFixture;
-};
-
-export type BannedUserFixture = {
-  hacker: HackerFixture;
-  ban: UserBanFixture;
-};
-
-export type OrganizerNoteWithRevisionFixture = {
-  hacker: HackerFixture;
-  note: HackerOrganizerNoteFixture;
-  revision: HackerOrganizerNoteRevisionFixture;
 };
 
 const fixtureNow = () => new Date('2026-05-25T12:00:00.000Z');
@@ -382,31 +358,6 @@ export const buildUserBan = (
   ...overrides,
 });
 
-export const buildBannedUserFixture = ({
-  hacker: hackerOverrides,
-  ban: banOverrides,
-}: {
-  hacker?: FixtureOverrides<HackerFixture>;
-  ban?: FixtureOverrides<UserBanFixture>;
-} = {}): BannedUserFixture => {
-  const hacker = buildHacker({
-    id: 'hacker-banned',
-    clerkId: 'clerk-banned',
-    name: 'Banned User',
-    username: 'banneduser',
-    email: 'banned@example.com',
-    ...hackerOverrides,
-  });
-
-  return {
-    hacker,
-    ban: buildUserBan({
-      hackerId: hacker.id,
-      ...banOverrides,
-    }),
-  };
-};
-
 export const buildUserBanFlag = (
   overrides: FixtureOverrides<UserBanFlagFixture> = {}
 ): UserBanFlagFixture => ({
@@ -447,30 +398,3 @@ export const buildOrganizerNoteRevision = (
   createdAt: fixtureNow(),
   ...overrides,
 });
-
-export const buildOrganizerNoteWithRevisionFixture = ({
-  hacker: hackerOverrides,
-  note: noteOverrides,
-  revision: revisionOverrides,
-}: {
-  hacker?: FixtureOverrides<HackerFixture>;
-  note?: FixtureOverrides<HackerOrganizerNoteFixture>;
-  revision?: FixtureOverrides<HackerOrganizerNoteRevisionFixture>;
-} = {}): OrganizerNoteWithRevisionFixture => {
-  const hacker = buildHacker(hackerOverrides);
-  const note = buildOrganizerNote({
-    hackerId: hacker.id,
-    ...noteOverrides,
-  });
-
-  return {
-    hacker,
-    note,
-    revision: buildOrganizerNoteRevision({
-      noteId: note.id,
-      hackerId: hacker.id,
-      editedById: note.updatedById,
-      ...revisionOverrides,
-    }),
-  };
-};

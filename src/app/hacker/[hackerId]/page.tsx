@@ -126,9 +126,8 @@ export default function HackerProfile() {
         return;
       }
       try {
-        const GlobalImage = (typeof globalThis !== 'undefined' ? (globalThis as any).Image : undefined);
-        const preloader = GlobalImage ? new GlobalImage() : null;
-        if (preloader) {
+        if (typeof window !== "undefined" && window.Image) {
+          const preloader = new window.Image();
           preloader.onload = () => setImgSrc(src);
           preloader.onerror = () => setImgSrc(defaultSrc);
           preloader.src = src;

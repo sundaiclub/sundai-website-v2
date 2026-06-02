@@ -47,12 +47,6 @@ export async function PATCH(
       return new NextResponse("Unauthorized", { status: 401 });
     }
 
-    // TODO: eventualy allow only admins to submit projects
-    // Only allow transition from DRAFT to PENDING for non-admin users
-    // if (!isAdmin && (project.status !== "DRAFT" || status !== "PENDING")) {
-    //   return new NextResponse("Invalid status transition", { status: 400 });
-    // }
-
     const updatedProject = await prisma.project.update({
       where: { id: params.projectId },
       data: { status },

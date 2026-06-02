@@ -1,39 +1,31 @@
 import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
+import type { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
+import { requireEventPitchManager } from "@/lib/eventManagementApi";
 import {
   getFrozenTopProjectIds,
   rankEventProjectsForPitching,
 } from "@/lib/eventTopProjects";
 
 const EVENT_PHASES = ["VOTING", "PITCHING", "FINISHED"] as const;
+type EventPhaseTransition = (typeof EVENT_PHASES)[number];
+
+function isEventPhaseTransition(value: unknown): value is EventPhaseTransition {
+  return typeof value === "string" && EVENT_PHASES.includes(value as EventPhaseTransition);
+}
 
 export async function POST(
   req: Request,
   { params }: { params: { eventId: string } }
 ) {
   try {
-    const { userId } = auth();
-    if (!userId) return new NextResponse("Unauthorized", { status: 401 });
+    const { event, response } = await requireEventPitchManager(params.eventId);
+    if (response) return response;
 
-    const me = await prisma.hacker.findUnique({ where: { clerkId: userId }, select: { id: true, role: true } });
-    if (!me) return new NextResponse("User not found", { status: 404 });
-
-    const event = await prisma.event.findUnique({
-      where: { id: params.eventId },
-      include: { staff: { select: { hackerId: true, role: true } } },
-    });
-    if (!event) return new NextResponse("Event not found", { status: 404 });
-
-    const isStaff = event.staff.some((m: { hackerId: string }) => m.hackerId === me.id);
-    const isAdmin = me.role === "SITE_ADMIN";
-    const isChapterAdmin = await prisma.chapterMembership.findFirst({ where: { chapterId: event.chapterId, hackerId: me.id, role: "ADMIN", status: "ACTIVE" } });
-    if (!(isStaff || isAdmin || isChapterAdmin)) return new NextResponse("Unauthorized", { status: 401 });
-
-    const body = await req.json().catch(() => ({}));
+    const body = (await req.json().catch(() => ({}))) as { targetPhase?: unknown };
     const targetPhase = body?.targetPhase;
 
-    if (!EVENT_PHASES.includes(targetPhase)) {
+    if (!isEventPhaseTransition(targetPhase)) {
       return NextResponse.json({ message: "Valid targetPhase is required" }, { status: 400 });
     }
 
@@ -72,7 +64,7 @@ export async function POST(
       return NextResponse.json(updated);
     }
 
-    let ops: Array<ReturnType<typeof prisma.eventProject.update> | ReturnType<typeof prisma.event.update>>;
+    let ops: Prisma.PrismaPromise<unknown>[];
 
     if (event.phase === "FINISHED") {
       const ordered = await prisma.eventProject.findMany({
@@ -136,7 +128,7 @@ export async function POST(
       prisma.event.update({
         where: { id: params.eventId },
         data: { phase: targetPhase },
-      }) as any
+      })
     );
 
     await prisma.$transaction(ops);

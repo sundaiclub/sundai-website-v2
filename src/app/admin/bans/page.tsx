@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import AdminAuthGate from '../AdminAuthGate';
 import {
+  ManagementAlert,
   ManagementBadge,
   ManagementEmptyState,
   ManagementHeader,
@@ -11,40 +12,30 @@ import {
   useManagementClasses,
 } from '../../components/ManagementSurface';
 import { useUserContext } from '../../contexts/UserContext';
+import type {
+  AdminBanFlagListItem,
+  AdminBanListItem,
+} from '@/types/event-management';
 
-type Ban = {
-  id: string;
-  hackerId: string;
-  publicSafeReason: string;
-  publicReason?: string;
-  revokedAt: string | null;
-  hackerName?: string;
-  hacker?: { name: string | null; email: string | null };
-};
-
-type BanFlag = {
-  id: string;
-  hackerName?: string;
-  reason: string;
-  status: string;
-};
-
-function banList(payload: unknown): Ban[] {
-  if (Array.isArray(payload)) return payload as Ban[];
+function banList(payload: unknown): AdminBanListItem[] {
+  if (Array.isArray(payload)) return payload as AdminBanListItem[];
   if (payload && typeof payload === 'object') {
-    const value = payload as { bans?: Ban[]; items?: Ban[] };
+    const value = payload as {
+      bans?: AdminBanListItem[];
+      items?: AdminBanListItem[];
+    };
     return value.bans ?? value.items ?? [];
   }
   return [];
 }
 
-function flagList(payload: unknown): BanFlag[] {
-  if (Array.isArray(payload)) return payload as BanFlag[];
+function flagList(payload: unknown): AdminBanFlagListItem[] {
+  if (Array.isArray(payload)) return payload as AdminBanFlagListItem[];
   if (payload && typeof payload === 'object') {
     const value = payload as {
-      banFlags?: BanFlag[];
-      flags?: BanFlag[];
-      items?: BanFlag[];
+      banFlags?: AdminBanFlagListItem[];
+      flags?: AdminBanFlagListItem[];
+      items?: AdminBanFlagListItem[];
     };
     return value.banFlags ?? value.flags ?? value.items ?? [];
   }
@@ -54,20 +45,33 @@ function flagList(payload: unknown): BanFlag[] {
 export default function AdminBansPage() {
   const classes = useManagementClasses();
   const { isAdmin, loading } = useUserContext();
-  const [bans, setBans] = useState<Ban[]>([]);
-  const [flags, setFlags] = useState<BanFlag[]>([]);
+  const [bans, setBans] = useState<AdminBanListItem[]>([]);
+  const [flags, setFlags] = useState<AdminBanFlagListItem[]>([]);
+  const [loadError, setLoadError] = useState('');
   const [hackerId, setHackerId] = useState('');
 
   useEffect(() => {
     if (!isAdmin) return;
-    fetch('/api/admin/bans')
-      .then(response => (response.ok ? response.json() : []))
-      .then(payload => setBans(banList(payload)))
-      .catch(() => setBans([]));
-    fetch('/api/admin/ban-flags')
-      .then(response => (response.ok ? response.json() : []))
-      .then(payload => setFlags(flagList(payload)))
-      .catch(() => setFlags([]));
+    setLoadError('');
+    Promise.all([
+      fetch('/api/admin/bans').then(response => {
+        if (!response.ok) {
+          throw new Error(`Request failed with status ${response.status}`);
+        }
+        return response.json() as Promise<unknown>;
+      }),
+      fetch('/api/admin/ban-flags').then(response => {
+        if (!response.ok) {
+          throw new Error(`Request failed with status ${response.status}`);
+        }
+        return response.json() as Promise<unknown>;
+      }),
+    ])
+      .then(([bansPayload, flagsPayload]) => {
+        setBans(banList(bansPayload));
+        setFlags(flagList(flagsPayload));
+      })
+      .catch(() => setLoadError('Unable to load moderation data.'));
   }, [isAdmin]);
 
   async function createBan(event: React.FormEvent) {
@@ -93,6 +97,11 @@ export default function AdminBansPage() {
             title="Global moderation"
             description="Review global bans and chapter moderation flags."
           />
+          {loadError && (
+            <div className="mb-5">
+              <ManagementAlert tone="danger">{loadError}</ManagementAlert>
+            </div>
+          )}
           <ManagementSection title="Create ban">
             <form onSubmit={createBan} className="flex gap-3 mb-8">
               <input

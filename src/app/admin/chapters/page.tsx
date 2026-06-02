@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import AdminAuthGate from '../AdminAuthGate';
 import {
+  ManagementAlert,
   ManagementBadge,
   ManagementEmptyState,
   ManagementHeader,
@@ -13,20 +14,15 @@ import {
   useManagementClasses,
 } from '../../components/ManagementSurface';
 import { useUserContext } from '../../contexts/UserContext';
+import type { SiteAdminChapterListItem } from '@/types/event-management';
 
-type Chapter = {
-  id: string;
-  name: string;
-  slug: string;
-  city: string;
-  status: string;
-  accessMode: string;
-};
-
-function chapterList(payload: unknown): Chapter[] {
-  if (Array.isArray(payload)) return payload as Chapter[];
+function chapterList(payload: unknown): SiteAdminChapterListItem[] {
+  if (Array.isArray(payload)) return payload as SiteAdminChapterListItem[];
   if (payload && typeof payload === 'object') {
-    const value = payload as { chapters?: Chapter[]; items?: Chapter[] };
+    const value = payload as {
+      chapters?: SiteAdminChapterListItem[];
+      items?: SiteAdminChapterListItem[];
+    };
     return value.chapters ?? value.items ?? [];
   }
   return [];
@@ -35,16 +31,23 @@ function chapterList(payload: unknown): Chapter[] {
 export default function AdminChaptersPage() {
   const classes = useManagementClasses();
   const { isAdmin, loading } = useUserContext();
-  const [chapters, setChapters] = useState<Chapter[]>([]);
+  const [chapters, setChapters] = useState<SiteAdminChapterListItem[]>([]);
+  const [loadError, setLoadError] = useState('');
   const [name, setName] = useState('');
   const [city, setCity] = useState('');
 
   useEffect(() => {
     if (!isAdmin) return;
+    setLoadError('');
     fetch('/api/chapters')
-      .then(response => (response.ok ? response.json() : []))
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`Request failed with status ${response.status}`);
+        }
+        return response.json() as Promise<unknown>;
+      })
       .then(payload => setChapters(chapterList(payload)))
-      .catch(() => setChapters([]));
+      .catch(() => setLoadError('Unable to load chapters.'));
   }, [isAdmin]);
 
   async function createChapter(event: React.FormEvent) {
@@ -78,6 +81,11 @@ export default function AdminChaptersPage() {
             title="Chapters"
             description="Create chapters and jump into chapter-level organizer settings."
           />
+          {loadError && (
+            <div className="mb-5">
+              <ManagementAlert tone="danger">{loadError}</ManagementAlert>
+            </div>
+          )}
           <ManagementSection title="Create chapter">
             <form
               onSubmit={createChapter}

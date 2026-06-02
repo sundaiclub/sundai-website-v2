@@ -12,43 +12,16 @@ import {
   useManagementClasses,
 } from '../../../../components/ManagementSurface';
 import { useUserContext } from '../../../../contexts/UserContext';
+import type {
+  AdminBanFlagListItem,
+  ApplicationTemplateListItem,
+  ChapterMembershipSummary,
+  OrganizerChapterSettings,
+} from '@/types/event-management';
 
-type Chapter = {
-  id: string;
-  name: string;
-  slug: string;
-  status?: string;
-  accessMode?: string;
-  defaultDeclineMessage?: string | null;
-};
-
-type Member = {
-  id: string;
-  role: string;
-  status: string;
-  notificationsAllowed?: boolean;
-  emailNotificationsEnabled?: boolean;
-  smsNotificationsEnabled?: boolean;
-  hacker?: { id?: string; name?: string | null; email?: string | null };
-};
-
-type Template = {
-  id: string;
-  name: string;
-  scope: string;
-  fieldsJson?: Array<{ label: string }>;
-};
-
-type BanFlag = {
-  id: string;
-  reason: string;
-  status: string;
-  hacker?: { name?: string | null };
-};
-
-function firstChapter(payload: unknown): Chapter | null {
+function firstChapter(payload: unknown): OrganizerChapterSettings | null {
   if (payload && typeof payload === 'object' && 'id' in payload) {
-    return payload as Chapter;
+    return payload as OrganizerChapterSettings;
   }
   return null;
 }
@@ -60,10 +33,10 @@ export default function OrganizerChapterSettingsPage({
 }) {
   const classes = useManagementClasses();
   const { isAdmin, loading } = useUserContext();
-  const [chapter, setChapter] = useState<Chapter | null>(null);
-  const [members, setMembers] = useState<Member[]>([]);
-  const [templates, setTemplates] = useState<Template[]>([]);
-  const [banFlags, setBanFlags] = useState<BanFlag[]>([]);
+  const [chapter, setChapter] = useState<OrganizerChapterSettings | null>(null);
+  const [members, setMembers] = useState<ChapterMembershipSummary[]>([]);
+  const [templates, setTemplates] = useState<ApplicationTemplateListItem[]>([]);
+  const [banFlags, setBanFlags] = useState<AdminBanFlagListItem[]>([]);
   const [denied, setDenied] = useState(false);
 
   useEffect(() => {

@@ -1,33 +1,53 @@
-"use client";
-import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useUser, SignInButton } from "@clerk/nextjs";
-import { useUserContext } from "../contexts/UserContext";
-import { useTheme } from "../contexts/ThemeContext";
-import { HackerSelector, type Hacker } from "../components/HackerSelector";
-import { formatDateTimeLocalValue, serializeDateTimeLocalValue } from "@/lib/datetimeLocal";
+'use client';
+import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useUser, SignInButton } from '@clerk/nextjs';
+import { useUserContext } from '../contexts/UserContext';
+import { useTheme } from '../contexts/ThemeContext';
+import { HackerSelector, type Hacker } from '../components/HackerSelector';
+import {
+  formatDateTimeLocalValue,
+  serializeDateTimeLocalValue,
+} from '@/lib/datetimeLocal';
+import type {
+  EventPhase,
+  OrganizerEventListItem,
+} from '@/types/event-management';
 
-type EventListItem = {
-  id: string;
-  title: string;
-  description?: string | null;
+type EventListItem = Pick<
+  OrganizerEventListItem,
+  'id' | 'title' | 'description' | 'meetingUrl'
+> & {
   startTime: string;
   endTime?: string | null;
-  meetingUrl?: string | null;
-  phase: "VOTING" | "PITCHING" | "FINISHED";
+  phase: EventPhase;
 };
 
-function getPhaseBadgeStyles(phase: EventListItem["phase"]) {
-  if (phase === "VOTING") return "bg-indigo-100 text-indigo-700";
-  if (phase === "PITCHING") return "bg-purple-100 text-purple-700";
-  return "bg-gray-200 text-gray-700";
+type EventCreateRequest = {
+  title: string;
+  meetingUrl: string | null;
+  startTime: string | null;
+  endTime: string | null;
+  mcIds: string[];
+  votingEndTime: string | null;
+  topProjectCount: number;
+  topPresentingSec: number;
+  topQuestionsSec: number;
+  defaultPresentingSec: number;
+  defaultQuestionsSec: number;
+};
+
+function getPhaseBadgeStyles(phase: EventListItem['phase']) {
+  if (phase === 'VOTING') return 'bg-indigo-100 text-indigo-700';
+  if (phase === 'PITCHING') return 'bg-purple-100 text-purple-700';
+  return 'bg-gray-200 text-gray-700';
 }
 
-function getPhaseBadgeLabel(phase: EventListItem["phase"]) {
-  if (phase === "VOTING") return "Voting Open";
-  if (phase === "PITCHING") return "Pitching";
-  return "Finished";
+function getPhaseBadgeLabel(phase: EventListItem['phase']) {
+  if (phase === 'VOTING') return 'Voting Open';
+  if (phase === 'PITCHING') return 'Pitching';
+  return 'Finished';
 }
 
 function Countdown({ start }: { start: string }) {
@@ -40,7 +60,11 @@ function Countdown({ start }: { start: string }) {
   const hours = Math.floor(diff / (1000 * 60 * 60));
   const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
   const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-  return <span>{hours}h {minutes}m {seconds}s</span>;
+  return (
+    <span>
+      {hours}h {minutes}m {seconds}s
+    </span>
+  );
 }
 
 export default function PitchPage() {
@@ -53,23 +77,25 @@ export default function PitchPage() {
 
   // Create modal state
   const [showCreate, setShowCreate] = useState(false);
-  const [title, setTitle] = useState("");
-  const [meetingUrl, setMeetingUrl] = useState("");
+  const [title, setTitle] = useState('');
+  const [meetingUrl, setMeetingUrl] = useState('');
   const [startTime, setStartTime] = useState(() => {
     const now = new Date();
-    const est = new Date(now.toLocaleString("en-US", { timeZone: "America/New_York" }));
+    const est = new Date(
+      now.toLocaleString('en-US', { timeZone: 'America/New_York' })
+    );
     est.setHours(20, 0, 0, 0);
     return formatDateTimeLocalValue(est);
   });
-  const [endTime, setEndTime] = useState("");
-  const [searchTerm, setSearchTerm] = useState("");
+  const [endTime, setEndTime] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
   const [hackers, setHackers] = useState<Hacker[]>([]);
   const [selectedMCs, setSelectedMCs] = useState<string[]>([]);
   const [showSelector, setShowSelector] = useState(false);
   const [votingEndTimeManual, setVotingEndTimeManual] = useState(false);
   const [votingEndTime, setVotingEndTime] = useState(() => {
     const d = new Date(startTime);
-    if (isNaN(d.getTime())) return "";
+    if (isNaN(d.getTime())) return '';
     return formatDateTimeLocalValue(new Date(d.getTime() + 15 * 60 * 1000));
   });
   const [topProjectCount, setTopProjectCount] = useState(5);
@@ -83,16 +109,18 @@ export default function PitchPage() {
     if (votingEndTimeManual) return;
     const d = new Date(startTime);
     if (isNaN(d.getTime())) return;
-    setVotingEndTime(formatDateTimeLocalValue(new Date(d.getTime() + 15 * 60 * 1000)));
+    setVotingEndTime(
+      formatDateTimeLocalValue(new Date(d.getTime() + 15 * 60 * 1000))
+    );
   }, [startTime, votingEndTimeManual]);
 
   useEffect(() => {
-    let interval: any;
+    let interval: ReturnType<typeof setInterval>;
     const load = async () => {
       try {
-        const res = await fetch("/api/events");
-        const data = await res.json();
-        const mapped: EventListItem[] = data.map((e: any) => ({
+        const res = await fetch('/api/events');
+        const data = (await res.json()) as EventListItem[];
+        const mapped: EventListItem[] = data.map((e) => ({
           id: e.id,
           title: e.title,
           description: e.description,
@@ -108,7 +136,9 @@ export default function PitchPage() {
     };
     load();
     const onFocus = () => load();
-    const onVisibility = () => { if (!document.hidden) load(); };
+    const onVisibility = () => {
+      if (!document.hidden) load();
+    };
     window.addEventListener('focus', onFocus);
     document.addEventListener('visibilitychange', onVisibility);
     interval = setInterval(load, 10000);
@@ -131,15 +161,19 @@ export default function PitchPage() {
     }
   }, [showSelector]);
 
-  const filteredHackers = hackers.filter(h => h.name.toLowerCase().includes(searchTerm.toLowerCase()) || h.email?.toLowerCase().includes(searchTerm.toLowerCase()));
+  const filteredHackers = hackers.filter(
+    h =>
+      h.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      h.email?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   async function createEvent() {
     if (!title || !startTime) {
-      alert("Title and start time are required");
+      alert('Title and start time are required');
       return;
     }
     try {
-      const body: any = {
+      const body: EventCreateRequest = {
         title,
         meetingUrl: meetingUrl || null,
         startTime: serializeDateTimeLocalValue(startTime),
@@ -168,7 +202,18 @@ export default function PitchPage() {
       }
       const created = await res.json();
       setShowCreate(false);
-      setTitle(""); setMeetingUrl(""); setStartTime(""); setEndTime(""); setSelectedMCs([]); setVotingEndTime(""); setVotingEndTimeManual(false); setTopProjectCount(5); setTopPresentingSec(120); setTopQuestionsSec(180); setDefaultPresentingSec(60); setDefaultQuestionsSec(120);
+      setTitle('');
+      setMeetingUrl('');
+      setStartTime('');
+      setEndTime('');
+      setSelectedMCs([]);
+      setVotingEndTime('');
+      setVotingEndTimeManual(false);
+      setTopProjectCount(5);
+      setTopPresentingSec(120);
+      setTopQuestionsSec(180);
+      setDefaultPresentingSec(60);
+      setDefaultQuestionsSec(120);
       router.push(`/pitch/${created.id}`);
     } catch (e) {
       console.error(e);
@@ -177,7 +222,9 @@ export default function PitchPage() {
 
   if (!isLoaded) {
     return (
-      <div className={`min-h-screen font-space-mono flex items-center justify-center ${isDarkMode ? "bg-gradient-to-b from-gray-900 to-black text-gray-100" : "bg-gradient-to-b from-[#E5E5E5] to-[#F0F0F0] text-gray-900"}`}>
+      <div
+        className={`min-h-screen font-space-mono flex items-center justify-center ${isDarkMode ? 'bg-gradient-to-b from-gray-900 to-black text-gray-100' : 'bg-gradient-to-b from-[#E5E5E5] to-[#F0F0F0] text-gray-900'}`}
+      >
         <div className="text-center">Loading...</div>
       </div>
     );
@@ -185,9 +232,13 @@ export default function PitchPage() {
 
   if (!isSignedIn) {
     return (
-      <div className={`min-h-screen font-space-mono flex items-center justify-center ${isDarkMode ? "bg-gradient-to-b from-gray-900 to-black text-gray-100" : "bg-gradient-to-b from-[#E5E5E5] to-[#F0F0F0] text-gray-900"}`}>
+      <div
+        className={`min-h-screen font-space-mono flex items-center justify-center ${isDarkMode ? 'bg-gradient-to-b from-gray-900 to-black text-gray-100' : 'bg-gradient-to-b from-[#E5E5E5] to-[#F0F0F0] text-gray-900'}`}
+      >
         <div className="text-center">
-          <h1 className="text-2xl font-bold mb-4">You need to be logged in to view this page</h1>
+          <h1 className="text-2xl font-bold mb-4">
+            You need to be logged in to view this page
+          </h1>
           <SignInButton mode="modal">
             <button className="px-6 py-3 rounded-full bg-indigo-600 text-white hover:bg-indigo-700 transition duration-300 text-lg">
               Log In / Sign Up
@@ -199,12 +250,17 @@ export default function PitchPage() {
   }
 
   return (
-    <div className={`min-h-screen font-space-mono ${isDarkMode ? "bg-gradient-to-b from-gray-900 to-black text-gray-100" : "bg-gradient-to-b from-[#E5E5E5] to-[#F0F0F0] text-gray-900"}`}>
+    <div
+      className={`min-h-screen font-space-mono ${isDarkMode ? 'bg-gradient-to-b from-gray-900 to-black text-gray-100' : 'bg-gradient-to-b from-[#E5E5E5] to-[#F0F0F0] text-gray-900'}`}
+    >
       <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 py-16">
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-2xl md:text-3xl font-bold">Pitch at Sundai</h1>
           {isAdmin && (
-            <button onClick={() => setShowCreate(true)} className="px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition duration-300">
+            <button
+              onClick={() => setShowCreate(true)}
+              className="px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition duration-300"
+            >
               Create Event
             </button>
           )}
@@ -219,36 +275,74 @@ export default function PitchPage() {
             {(() => {
               const nowTs = Date.now();
               const TWO_HOURS = 2 * 60 * 60 * 1000;
-              const sorted = [...events].sort((a,b)=> new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+              const sorted = [...events].sort(
+                (a, b) =>
+                  new Date(a.startTime).getTime() -
+                  new Date(b.startTime).getTime()
+              );
               const ongoing = sorted.filter(e => {
                 const s = new Date(e.startTime).getTime();
-                return e.phase !== "FINISHED" && s <= nowTs && nowTs < s + TWO_HOURS;
+                return (
+                  e.phase !== 'FINISHED' && s <= nowTs && nowTs < s + TWO_HOURS
+                );
               });
               const current = ongoing.at(-1) || null;
-              const upcoming = sorted.filter(e => e.phase !== "FINISHED" && new Date(e.startTime).getTime() > nowTs);
-              const past = sorted.filter(e => e.phase === "FINISHED" || new Date(e.startTime).getTime() + TWO_HOURS <= nowTs);
+              const upcoming = sorted.filter(
+                e =>
+                  e.phase !== 'FINISHED' &&
+                  new Date(e.startTime).getTime() > nowTs
+              );
+              const past = sorted.filter(
+                e =>
+                  e.phase === 'FINISHED' ||
+                  new Date(e.startTime).getTime() + TWO_HOURS <= nowTs
+              );
 
               return (
                 <>
                   {current ? (
-                    <div className={`${isDarkMode ? "bg-gray-800" : "bg-white"} rounded-xl p-6 shadow`}>
+                    <div
+                      className={`${isDarkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl p-6 shadow`}
+                    >
                       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                         <div>
-                          <h2 className="text-xl font-semibold">Live now: {current.title}</h2>
-                          <p className="text-sm opacity-80">Started {new Date(current.startTime).toLocaleString()}</p>
+                          <h2 className="text-xl font-semibold">
+                            Live now: {current.title}
+                          </h2>
+                          <p className="text-sm opacity-80">
+                            Started{' '}
+                            {new Date(current.startTime).toLocaleString()}
+                          </p>
                         </div>
-                        <Link href={`/pitch/${current.id}`} className="px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition duration-300">Open Event</Link>
+                        <Link
+                          href={`/pitch/${current.id}`}
+                          className="px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition duration-300"
+                        >
+                          Open Event
+                        </Link>
                       </div>
                     </div>
                   ) : (
                     upcoming[0] && (
-                      <div className={`${isDarkMode ? "bg-gray-800" : "bg-white"} rounded-xl p-6 shadow`}>
+                      <div
+                        className={`${isDarkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl p-6 shadow`}
+                      >
                         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                           <div>
-                            <h2 className="text-xl font-semibold">Next up: {upcoming[0].title}</h2>
-                            <p className="text-sm opacity-80">Starts in <Countdown start={upcoming[0].startTime} /></p>
+                            <h2 className="text-xl font-semibold">
+                              Next up: {upcoming[0].title}
+                            </h2>
+                            <p className="text-sm opacity-80">
+                              Starts in{' '}
+                              <Countdown start={upcoming[0].startTime} />
+                            </p>
                           </div>
-                          <Link href={`/pitch/${upcoming[0].id}`} className="px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition duration-300">Open Event</Link>
+                          <Link
+                            href={`/pitch/${upcoming[0].id}`}
+                            className="px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition duration-300"
+                          >
+                            Open Event
+                          </Link>
                         </div>
                       </div>
                     )
@@ -258,17 +352,31 @@ export default function PitchPage() {
                     <div>
                       <h3 className="text-lg font-semibold mb-2">Upcoming</h3>
                       <ul className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {upcoming.map((e) => (
-                          <li key={e.id} className={`${isDarkMode ? "bg-gray-800" : "bg-white"} rounded-lg p-4 shadow`}>
+                        {upcoming.map(e => (
+                          <li
+                            key={e.id}
+                            className={`${isDarkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg p-4 shadow`}
+                          >
                             <div className="flex items-center justify-between gap-3">
                               <div>
                                 <div className="flex items-center gap-2">
                                   <span className="font-medium">{e.title}</span>
-                                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${getPhaseBadgeStyles(e.phase)}`}>{getPhaseBadgeLabel(e.phase)}</span>
+                                  <span
+                                    className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${getPhaseBadgeStyles(e.phase)}`}
+                                  >
+                                    {getPhaseBadgeLabel(e.phase)}
+                                  </span>
                                 </div>
-                                <div className="text-sm opacity-75"><Countdown start={e.startTime} /></div>
+                                <div className="text-sm opacity-75">
+                                  <Countdown start={e.startTime} />
+                                </div>
                               </div>
-                              <Link href={`/pitch/${e.id}`} className="px-3 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 text-sm transition duration-300">View</Link>
+                              <Link
+                                href={`/pitch/${e.id}`}
+                                className="px-3 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 text-sm transition duration-300"
+                              >
+                                View
+                              </Link>
                             </div>
                           </li>
                         ))}
@@ -278,19 +386,36 @@ export default function PitchPage() {
 
                   {past.length > 0 && (
                     <div>
-                      <h3 className="text-lg font-semibold mb-2">Past events</h3>
+                      <h3 className="text-lg font-semibold mb-2">
+                        Past events
+                      </h3>
                       <ul className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {[...past].reverse().map((e) => (
-                          <li key={e.id} className={`${isDarkMode ? "bg-gray-800" : "bg-white"} rounded-lg p-4 shadow`}>
+                        {[...past].reverse().map(e => (
+                          <li
+                            key={e.id}
+                            className={`${isDarkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg p-4 shadow`}
+                          >
                             <div className="flex items-center justify-between gap-3">
                               <div>
                                 <div className="flex items-center gap-2">
                                   <span className="font-medium">{e.title}</span>
-                                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${getPhaseBadgeStyles(e.phase)}`}>{getPhaseBadgeLabel(e.phase)}</span>
+                                  <span
+                                    className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${getPhaseBadgeStyles(e.phase)}`}
+                                  >
+                                    {getPhaseBadgeLabel(e.phase)}
+                                  </span>
                                 </div>
-                                <div className="text-sm opacity-75">Started {new Date(e.startTime).toLocaleString()}</div>
+                                <div className="text-sm opacity-75">
+                                  Started{' '}
+                                  {new Date(e.startTime).toLocaleString()}
+                                </div>
                               </div>
-                              <Link href={`/pitch/${e.id}`} className="px-3 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 text-sm transition duration-300">View</Link>
+                              <Link
+                                href={`/pitch/${e.id}`}
+                                className="px-3 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 text-sm transition duration-300"
+                              >
+                                View
+                              </Link>
                             </div>
                           </li>
                         ))}
@@ -300,78 +425,201 @@ export default function PitchPage() {
                 </>
               );
             })()}
-
           </div>
         )}
       </div>
 
       {showCreate && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className={`${isDarkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl w-full max-w-lg p-6 shadow-xl max-h-[90vh] overflow-y-auto`}>
+          <div
+            className={`${isDarkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl w-full max-w-lg p-6 shadow-xl max-h-[90vh] overflow-y-auto`}
+          >
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-semibold">Create Event</h2>
-              <button onClick={() => setShowCreate(false)} className="text-sm opacity-70">Close</button>
+              <button
+                onClick={() => setShowCreate(false)}
+                className="text-sm opacity-70"
+              >
+                Close
+              </button>
             </div>
             <div className="space-y-4">
               <div>
                 <label className="block text-sm mb-1">Title</label>
-                <input value={title} onChange={e=>setTitle(e.target.value)} className={`w-full px-3 py-2 rounded-md ${isDarkMode ? 'bg-gray-900 text-gray-100' : 'bg-gray-100 text-gray-900'}`} placeholder="Sundai Pitches" />
+                <input
+                  value={title}
+                  onChange={e => setTitle(e.target.value)}
+                  className={`w-full px-3 py-2 rounded-md ${isDarkMode ? 'bg-gray-900 text-gray-100' : 'bg-gray-100 text-gray-900'}`}
+                  placeholder="Sundai Pitches"
+                />
               </div>
               <div>
                 <label className="block text-sm mb-1">Meeting link</label>
-                <input value={meetingUrl} onChange={e=>setMeetingUrl(e.target.value)} className={`w-full px-3 py-2 rounded-md ${isDarkMode ? 'bg-gray-900 text-gray-100' : 'bg-gray-100 text-gray-900'}`} placeholder="https://zoom.us/j/…" />
+                <input
+                  value={meetingUrl}
+                  onChange={e => setMeetingUrl(e.target.value)}
+                  className={`w-full px-3 py-2 rounded-md ${isDarkMode ? 'bg-gray-900 text-gray-100' : 'bg-gray-100 text-gray-900'}`}
+                  placeholder="https://zoom.us/j/…"
+                />
               </div>
               <div>
                 <label className="block text-sm mb-1">Start time</label>
-                <input type="datetime-local" value={startTime} onChange={e=>setStartTime(e.target.value)} className={`w-full px-3 py-2 rounded-md ${isDarkMode ? 'bg-gray-900 text-gray-100' : 'bg-gray-100 text-gray-900'}`} />
+                <input
+                  type="datetime-local"
+                  value={startTime}
+                  onChange={e => setStartTime(e.target.value)}
+                  className={`w-full px-3 py-2 rounded-md ${isDarkMode ? 'bg-gray-900 text-gray-100' : 'bg-gray-100 text-gray-900'}`}
+                />
               </div>
               <div>
                 <label className="block text-sm mb-1">Voting End Time</label>
-                <input type="datetime-local" value={votingEndTime} onChange={e=>{setVotingEndTime(e.target.value); setVotingEndTimeManual(true);}} className={`w-full px-3 py-2 rounded-md ${isDarkMode ? 'bg-gray-900 text-gray-100' : 'bg-gray-100 text-gray-900'}`} placeholder="Default: 15 min after start" />
-                <p className={`text-xs mt-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Default: 15 min after start</p>
+                <input
+                  type="datetime-local"
+                  value={votingEndTime}
+                  onChange={e => {
+                    setVotingEndTime(e.target.value);
+                    setVotingEndTimeManual(true);
+                  }}
+                  className={`w-full px-3 py-2 rounded-md ${isDarkMode ? 'bg-gray-900 text-gray-100' : 'bg-gray-100 text-gray-900'}`}
+                  placeholder="Default: 15 min after start"
+                />
+                <p
+                  className={`text-xs mt-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}
+                >
+                  Default: 15 min after start
+                </p>
               </div>
               <div>
                 <label className="block text-sm mb-2">MCs</label>
                 <div className="flex flex-wrap gap-2 mb-2">
-                  {hackers.filter(h=>selectedMCs.includes(h.id)).map(h=> (
-                    <span key={h.id} className={`${isDarkMode ? 'bg-gray-900' : 'bg-gray-100'} px-2 py-1 rounded-full text-sm`}>{h.name}</span>
-                  ))}
+                  {hackers
+                    .filter(h => selectedMCs.includes(h.id))
+                    .map(h => (
+                      <span
+                        key={h.id}
+                        className={`${isDarkMode ? 'bg-gray-900' : 'bg-gray-100'} px-2 py-1 rounded-full text-sm`}
+                      >
+                        {h.name}
+                      </span>
+                    ))}
                 </div>
-                <button onClick={()=>setShowSelector(true)} className="px-3 py-2 rounded-md bg-gray-200 text-gray-900 text-sm">
+                <button
+                  onClick={() => setShowSelector(true)}
+                  className="px-3 py-2 rounded-md bg-gray-200 text-gray-900 text-sm"
+                >
                   Add MCs
                 </button>
               </div>
-              <div className={`rounded-lg p-4 ${isDarkMode ? 'bg-gray-700/50' : 'bg-gray-50'}`}>
-                <h3 className="text-sm font-semibold mb-3">Presentation Timing</h3>
+              <div
+                className={`rounded-lg p-4 ${isDarkMode ? 'bg-gray-700/50' : 'bg-gray-50'}`}
+              >
+                <h3 className="text-sm font-semibold mb-3">
+                  Presentation Timing
+                </h3>
                 <div>
-                  <label className="block text-xs font-medium mb-1">Number of Top Projects</label>
-                  <input type="number" min={0} value={topProjectCount} onChange={e=>setTopProjectCount(Math.max(0, parseInt(e.target.value) || 0))} className={`w-full px-3 py-2 rounded-md mb-3 ${isDarkMode ? 'bg-gray-900 text-gray-100' : 'bg-gray-100 text-gray-900'}`} />
+                  <label className="block text-xs font-medium mb-1">
+                    Number of Top Projects
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={topProjectCount}
+                    onChange={e =>
+                      setTopProjectCount(
+                        Math.max(0, parseInt(e.target.value) || 0)
+                      )
+                    }
+                    className={`w-full px-3 py-2 rounded-md mb-3 ${isDarkMode ? 'bg-gray-900 text-gray-100' : 'bg-gray-100 text-gray-900'}`}
+                  />
                 </div>
                 <div className="grid grid-cols-2 gap-3 mb-3">
                   <div>
-                    <label className="block text-xs font-medium mb-1">Top Presenting (sec)</label>
-                    <input type="number" min={0} step={10} value={topPresentingSec} onChange={e=>setTopPresentingSec(Math.max(0, parseInt(e.target.value) || 0))} className={`w-full px-3 py-2 rounded-md ${isDarkMode ? 'bg-gray-900 text-gray-100' : 'bg-gray-100 text-gray-900'}`} />
+                    <label className="block text-xs font-medium mb-1">
+                      Top Presenting (sec)
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      step={10}
+                      value={topPresentingSec}
+                      onChange={e =>
+                        setTopPresentingSec(
+                          Math.max(0, parseInt(e.target.value) || 0)
+                        )
+                      }
+                      className={`w-full px-3 py-2 rounded-md ${isDarkMode ? 'bg-gray-900 text-gray-100' : 'bg-gray-100 text-gray-900'}`}
+                    />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium mb-1">Top Q&A (sec)</label>
-                    <input type="number" min={0} step={10} value={topQuestionsSec} onChange={e=>setTopQuestionsSec(Math.max(0, parseInt(e.target.value) || 0))} className={`w-full px-3 py-2 rounded-md ${isDarkMode ? 'bg-gray-900 text-gray-100' : 'bg-gray-100 text-gray-900'}`} />
+                    <label className="block text-xs font-medium mb-1">
+                      Top Q&A (sec)
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      step={10}
+                      value={topQuestionsSec}
+                      onChange={e =>
+                        setTopQuestionsSec(
+                          Math.max(0, parseInt(e.target.value) || 0)
+                        )
+                      }
+                      className={`w-full px-3 py-2 rounded-md ${isDarkMode ? 'bg-gray-900 text-gray-100' : 'bg-gray-100 text-gray-900'}`}
+                    />
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-medium mb-1">Regular Presenting (sec)</label>
-                    <input type="number" min={0} step={10} value={defaultPresentingSec} onChange={e=>setDefaultPresentingSec(Math.max(0, parseInt(e.target.value) || 0))} className={`w-full px-3 py-2 rounded-md ${isDarkMode ? 'bg-gray-900 text-gray-100' : 'bg-gray-100 text-gray-900'}`} />
+                    <label className="block text-xs font-medium mb-1">
+                      Regular Presenting (sec)
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      step={10}
+                      value={defaultPresentingSec}
+                      onChange={e =>
+                        setDefaultPresentingSec(
+                          Math.max(0, parseInt(e.target.value) || 0)
+                        )
+                      }
+                      className={`w-full px-3 py-2 rounded-md ${isDarkMode ? 'bg-gray-900 text-gray-100' : 'bg-gray-100 text-gray-900'}`}
+                    />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium mb-1">Regular Q&A (sec)</label>
-                    <input type="number" min={0} step={10} value={defaultQuestionsSec} onChange={e=>setDefaultQuestionsSec(Math.max(0, parseInt(e.target.value) || 0))} className={`w-full px-3 py-2 rounded-md ${isDarkMode ? 'bg-gray-900 text-gray-100' : 'bg-gray-100 text-gray-900'}`} />
+                    <label className="block text-xs font-medium mb-1">
+                      Regular Q&A (sec)
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      step={10}
+                      value={defaultQuestionsSec}
+                      onChange={e =>
+                        setDefaultQuestionsSec(
+                          Math.max(0, parseInt(e.target.value) || 0)
+                        )
+                      }
+                      className={`w-full px-3 py-2 rounded-md ${isDarkMode ? 'bg-gray-900 text-gray-100' : 'bg-gray-100 text-gray-900'}`}
+                    />
                   </div>
                 </div>
               </div>
             </div>
             <div className="mt-6 flex justify-end gap-3">
-              <button onClick={()=>setShowCreate(false)} className={`${isDarkMode ? 'bg-gray-800 text-gray-200' : 'bg-gray-100 text-gray-800'} px-4 py-2 rounded-md`}>Cancel</button>
-              <button disabled={!title || !startTime} onClick={createEvent} className={`px-4 py-2 rounded-md ${!title || !startTime ? 'bg-gray-400' : 'bg-indigo-600 hover:bg-indigo-700'} text-white`}>Create</button>
+              <button
+                onClick={() => setShowCreate(false)}
+                className={`${isDarkMode ? 'bg-gray-800 text-gray-200' : 'bg-gray-100 text-gray-800'} px-4 py-2 rounded-md`}
+              >
+                Cancel
+              </button>
+              <button
+                disabled={!title || !startTime}
+                onClick={createEvent}
+                className={`px-4 py-2 rounded-md ${!title || !startTime ? 'bg-gray-400' : 'bg-indigo-600 hover:bg-indigo-700'} text-white`}
+              >
+                Create
+              </button>
             </div>
           </div>
         </div>
@@ -388,7 +636,13 @@ export default function PitchPage() {
         singleSelect={false}
         selectedIds={selectedMCs}
         showRoleSelector={false}
-        handleAddMember={(h)=> setSelectedMCs(prev => prev.includes(h.id) ? prev.filter(id=>id!==h.id) : [...prev, h.id])}
+        handleAddMember={h =>
+          setSelectedMCs(prev =>
+            prev.includes(h.id)
+              ? prev.filter(id => id !== h.id)
+              : [...prev, h.id]
+          )
+        }
       />
     </div>
   );

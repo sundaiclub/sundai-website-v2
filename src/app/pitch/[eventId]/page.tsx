@@ -1,23 +1,31 @@
-"use client";
-import { useEffect, useMemo, useRef, useState, useCallback } from "react";
-import { useParams } from "next/navigation";
-import { useUser, SignInButton } from "@clerk/nextjs";
-import { useTheme } from "../../contexts/ThemeContext";
-import { useUserContext } from "../../contexts/UserContext";
-import { Project, ProjectCard } from "../../components/Project";
-import { motion, AnimatePresence, PanInfo } from "framer-motion";
-import ProjectMarkdown from "../../components/ProjectMarkdown";
-import { formatDateTimeLocalValue, serializeDateTimeLocalValue } from "@/lib/datetimeLocal";
-import { reconcileVoteDeckIds } from "@/lib/votingDeck";
-
-type PitchPhase = "WAITING" | "PRESENTING" | "QUESTIONS" | "COMPLETED";
-type EventPhase = "VOTING" | "PITCHING" | "FINISHED";
-type EventProjectVoteValue = "LIKE" | "DISLIKE";
+'use client';
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import { useParams } from 'next/navigation';
+import { useUser, SignInButton } from '@clerk/nextjs';
+import { useTheme } from '../../contexts/ThemeContext';
+import { useUserContext } from '../../contexts/UserContext';
+import type { UserInfo } from '../../contexts/UserContext';
+import { ProjectCard } from '../../components/Project';
+import type { Project } from '@/types/project';
+import { motion, AnimatePresence, PanInfo } from 'framer-motion';
+import ProjectMarkdown from '../../components/ProjectMarkdown';
+import {
+  formatDateTimeLocalValue,
+  serializeDateTimeLocalValue,
+} from '@/lib/datetimeLocal';
+import { reconcileVoteDeckIds } from '@/lib/votingDeck';
+import type {
+  EventPhase,
+  EventProjectStatus,
+  EventProjectVoteValue,
+  EventStaffRole,
+  PitchPhase,
+} from '@/types/event-management';
 
 type EventProjectEntry = {
   id: string;
   position: number;
-  status: "QUEUED" | "APPROVED" | "CURRENT" | "DONE" | "SKIPPED";
+  status: EventProjectStatus;
   approved: boolean;
   isTopProject: boolean;
   addedById: string;
@@ -51,16 +59,20 @@ type EventDetail = {
   topQuestionsSec: number;
   defaultPresentingSec: number;
   defaultQuestionsSec: number;
-  staff: Array<{ id: string; role: "MC" | "CO_MC"; hacker: { id: string; name: string } }>;
+  staff: Array<{
+    id: string;
+    role: EventStaffRole;
+    hacker: { id: string; name: string };
+  }>;
   projects: EventProjectEntry[];
 };
 
 function getPitchLikeCount(ep: EventProjectEntry) {
-  return ep.pitchVotes.filter((vote) => vote.value === "LIKE").length;
+  return ep.pitchVotes.filter(vote => vote.value === 'LIKE').length;
 }
 
 function getViewerPitchVote(ep: EventProjectEntry, hackerId?: string | null) {
-  return ep.pitchVotes.find((vote) => vote.hackerId === hackerId) ?? null;
+  return ep.pitchVotes.find(vote => vote.hackerId === hackerId) ?? null;
 }
 
 function applyPitchVoteToEvent(
@@ -71,35 +83,40 @@ function applyPitchVoteToEvent(
 ): EventDetail {
   return {
     ...event,
-    projects: event.projects.map((ep) => {
+    projects: event.projects.map(ep => {
       if (ep.id !== eventProjectId) return ep;
 
       const nextVote = {
         hackerId,
-        value: value ?? "LIKE",
+        value: value ?? 'LIKE',
         createdAt: new Date().toISOString(),
       };
 
       const alreadyProjectLiked = ep.project.likes.some(
-        (like) => like.hackerId === hackerId
+        like => like.hackerId === hackerId
       );
 
       return {
         ...ep,
-        pitchVotes: value === null
-          ? ep.pitchVotes.filter((vote) => vote.hackerId !== hackerId)
-          : ep.pitchVotes.some((vote) => vote.hackerId === hackerId)
-          ? ep.pitchVotes.map((vote) =>
-              vote.hackerId === hackerId ? nextVote : vote
-            )
-          : [...ep.pitchVotes, nextVote],
+        pitchVotes:
+          value === null
+            ? ep.pitchVotes.filter(vote => vote.hackerId !== hackerId)
+            : ep.pitchVotes.some(vote => vote.hackerId === hackerId)
+              ? ep.pitchVotes.map(vote =>
+                  vote.hackerId === hackerId ? nextVote : vote
+                )
+              : [...ep.pitchVotes, nextVote],
         project: {
           ...ep.project,
-          likes: value !== "LIKE"
-            ? ep.project.likes
-            : alreadyProjectLiked
-            ? ep.project.likes
-            : [...ep.project.likes, { hackerId, createdAt: nextVote.createdAt }],
+          likes:
+            value !== 'LIKE'
+              ? ep.project.likes
+              : alreadyProjectLiked
+                ? ep.project.likes
+                : [
+                    ...ep.project.likes,
+                    { hackerId, createdAt: nextVote.createdAt },
+                  ],
         },
       };
     }),
@@ -116,28 +133,34 @@ function shuffleProjectIds(projectIds: string[]) {
 }
 
 function getStageBadgeStyles(phase: EventPhase) {
-  if (phase === "VOTING") return "bg-indigo-100 text-indigo-700";
-  if (phase === "PITCHING") return "bg-purple-100 text-purple-700";
-  return "bg-gray-200 text-gray-700";
+  if (phase === 'VOTING') return 'bg-indigo-100 text-indigo-700';
+  if (phase === 'PITCHING') return 'bg-purple-100 text-purple-700';
+  return 'bg-gray-200 text-gray-700';
 }
 
 function getStageBadgeLabel(phase: EventPhase) {
-  if (phase === "VOTING") return "Voting Open";
-  if (phase === "PITCHING") return "Pitching";
-  return "Finished";
+  if (phase === 'VOTING') return 'Voting Open';
+  if (phase === 'PITCHING') return 'Pitching';
+  return 'Finished';
 }
 
-function getPhaseActionLabel(targetPhase: EventPhase, currentPhase: EventPhase) {
-  if (targetPhase === "PITCHING" && currentPhase === "FINISHED") return "Back to Presenting";
-  if (targetPhase === "PITCHING") return "Move to Presenting";
-  if (targetPhase === "VOTING") return "Move to Voting";
-  if (currentPhase === "PITCHING") return "Finish Event";
-  return "Move to Finished";
+function getPhaseActionLabel(
+  targetPhase: EventPhase,
+  currentPhase: EventPhase
+) {
+  if (targetPhase === 'PITCHING' && currentPhase === 'FINISHED')
+    return 'Back to Presenting';
+  if (targetPhase === 'PITCHING') return 'Move to Presenting';
+  if (targetPhase === 'VOTING') return 'Move to Voting';
+  if (currentPhase === 'PITCHING') return 'Finish Event';
+  return 'Move to Finished';
 }
 
 function StageBadge({ phase }: { phase: EventPhase }) {
   return (
-    <span className={`px-2 py-1 rounded-full text-xs ${getStageBadgeStyles(phase)}`}>
+    <span
+      className={`px-2 py-1 rounded-full text-xs ${getStageBadgeStyles(phase)}`}
+    >
       {getStageBadgeLabel(phase)}
     </span>
   );
@@ -158,7 +181,7 @@ function SwipeCard({
   const [dragX, setDragX] = useState(0);
   const SWIPE_THRESHOLD = 100;
 
-  const handleDragEnd = (_: any, info: PanInfo) => {
+  const handleDragEnd = (_: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
     if (info.offset.x > SWIPE_THRESHOLD) {
       onSwipeRight();
     } else if (info.offset.x < -SWIPE_THRESHOLD) {
@@ -177,8 +200,8 @@ function SwipeCard({
       variants={{
         initial: { scale: 0.95, opacity: 0 },
         animate: { scale: 1, opacity: 1 },
-        exit: (dir: "left" | "right") => ({
-          x: dir === "right" ? 300 : -300,
+        exit: (dir: 'left' | 'right') => ({
+          x: dir === 'right' ? 300 : -300,
           opacity: 0,
           scale: 0.9,
         }),
@@ -187,7 +210,7 @@ function SwipeCard({
       animate="animate"
       exit="exit"
       custom={undefined}
-      transition={{ type: "spring", stiffness: 300, damping: 25 }}
+      transition={{ type: 'spring', stiffness: 300, damping: 25 }}
       className="relative cursor-grab active:cursor-grabbing select-none"
     >
       {/* Swipe overlay */}
@@ -195,17 +218,26 @@ function SwipeCard({
         <div
           className={`absolute inset-0 rounded-xl z-10 pointer-events-none flex items-center justify-center text-4xl font-bold transition-opacity ${
             dragX > 0
-              ? "bg-indigo-500/20 text-indigo-400"
-              : "bg-gray-500/20 text-gray-400"
+              ? 'bg-indigo-500/20 text-indigo-400'
+              : 'bg-gray-500/20 text-gray-400'
           }`}
-          style={{ opacity: Math.min(Math.abs(dragX) / SWIPE_THRESHOLD, 1) * 0.8 }}
+          style={{
+            opacity: Math.min(Math.abs(dragX) / SWIPE_THRESHOLD, 1) * 0.8,
+          }}
         >
-          {dragX > 0 ? "👍" : "👎"}
+          {dragX > 0 ? '👍' : '👎'}
         </div>
       )}
-      <div className={`${isDarkMode ? "bg-gray-800" : "bg-white"} rounded-xl p-6 shadow-lg max-h-[70vh] overflow-y-auto`}>
+      <div
+        className={`${isDarkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl p-6 shadow-lg max-h-[70vh] overflow-y-auto`}
+      >
         <img
-          src={project.thumbnail?.url || (isDarkMode ? "/images/default_project_thumbnail_dark.svg" : "/images/default_project_thumbnail_light.svg")}
+          src={
+            project.thumbnail?.url ||
+            (isDarkMode
+              ? '/images/default_project_thumbnail_dark.svg'
+              : '/images/default_project_thumbnail_light.svg')
+          }
           alt={project.title}
           className="w-full max-h-[30vh] object-cover rounded-lg mb-4"
           draggable={false}
@@ -218,20 +250,25 @@ function SwipeCard({
           />
         )}
         {project.description && (
-          <div className={`text-sm mb-3 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+          <div
+            className={`text-sm mb-3 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}
+          >
             <ProjectMarkdown
               markdown={project.description}
               className={`prose prose-sm max-w-none ${
                 isDarkMode
-                  ? "prose-invert prose-pre:bg-gray-800 prose-a:text-indigo-400"
-                  : "prose-gray prose-pre:bg-gray-100 prose-a:text-indigo-600"
+                  ? 'prose-invert prose-pre:bg-gray-800 prose-a:text-indigo-400'
+                  : 'prose-gray prose-pre:bg-gray-100 prose-a:text-indigo-600'
               }`}
             />
           </div>
         )}
         <div className="flex flex-wrap gap-2 mb-3">
           {project.techTags?.slice(0, 5).map(tag => (
-            <span key={tag.id} className={`text-xs px-2 py-1 rounded-full ${isDarkMode ? "bg-gray-700" : "bg-gray-100"}`}>
+            <span
+              key={tag.id}
+              className={`text-xs px-2 py-1 rounded-full ${isDarkMode ? 'bg-gray-700' : 'bg-gray-100'}`}
+            >
               {tag.name}
             </span>
           ))}
@@ -247,7 +284,7 @@ function SwipeCard({
             href={`/projects/${project.id}`}
             target="_blank"
             rel="noopener noreferrer"
-            className={`text-sm font-medium ${isDarkMode ? "text-indigo-400 hover:text-indigo-300" : "text-indigo-600 hover:text-indigo-700"}`}
+            className={`text-sm font-medium ${isDarkMode ? 'text-indigo-400 hover:text-indigo-300' : 'text-indigo-600 hover:text-indigo-700'}`}
           >
             View project &rarr;
           </a>
@@ -270,7 +307,7 @@ function VotingPhase({
   event: EventDetail;
   setEvent: (e: EventDetail | null) => void;
   isDarkMode: boolean;
-  userInfo: any;
+  userInfo: UserInfo | null;
   isAdmin: boolean;
   isController: boolean;
   openJoin: () => void;
@@ -279,7 +316,7 @@ function VotingPhase({
   const [seenIds, setSeenIds] = useState<Set<string>>(new Set());
   const [deckIds, setDeckIds] = useState<string[]>([]);
   const [transitioning, setTransitioning] = useState(false);
-  const [exitDirection, setExitDirection] = useState<"left" | "right">("left");
+  const [exitDirection, setExitDirection] = useState<'left' | 'right'>('left');
   const deckInitializedRef = useRef(false);
   const userId = userInfo?.id;
 
@@ -318,7 +355,10 @@ function VotingPhase({
 
     setDeckIds(prev => {
       const next = reconcileVoteDeckIds(prev, nextEligibleProjectIds, seenIds);
-      if (next.length === prev.length && next.every((id, index) => id === prev[index])) {
+      if (
+        next.length === prev.length &&
+        next.every((id, index) => id === prev[index])
+      ) {
         return prev;
       }
       return next;
@@ -336,43 +376,47 @@ function VotingPhase({
 
   const handleSwipeRight = useCallback(async () => {
     if (!currentCard || !userId) return;
-    setExitDirection("right");
+    setExitDirection('right');
     setSeenIds(prev => new Set(prev).add(currentCard.project.id));
-    setDeckIds(prev => prev.filter(projectId => projectId !== currentCard.project.id));
+    setDeckIds(prev =>
+      prev.filter(projectId => projectId !== currentCard.project.id)
+    );
     try {
       const response = await fetch(
         `/api/events/${event.id}/queue/${currentCard.id}/vote`,
         {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ value: "LIKE" }),
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ value: 'LIKE' }),
         }
       );
       if (!response.ok) return;
-      setEvent(applyPitchVoteToEvent(event, currentCard.id, userId, "LIKE"));
+      setEvent(applyPitchVoteToEvent(event, currentCard.id, userId, 'LIKE'));
     } catch (err) {
-      console.error("like error", err);
+      console.error('like error', err);
     }
   }, [currentCard, event, setEvent, userId]);
 
   const handleSwipeLeft = useCallback(async () => {
     if (!currentCard || !userId) return;
-    setExitDirection("left");
+    setExitDirection('left');
     setSeenIds(prev => new Set(prev).add(currentCard.project.id));
-    setDeckIds(prev => prev.filter(projectId => projectId !== currentCard.project.id));
+    setDeckIds(prev =>
+      prev.filter(projectId => projectId !== currentCard.project.id)
+    );
     try {
       const response = await fetch(
         `/api/events/${event.id}/queue/${currentCard.id}/vote`,
         {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ value: "DISLIKE" }),
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ value: 'DISLIKE' }),
         }
       );
       if (!response.ok) return;
-      setEvent(applyPitchVoteToEvent(event, currentCard.id, userId, "DISLIKE"));
+      setEvent(applyPitchVoteToEvent(event, currentCard.id, userId, 'DISLIKE'));
     } catch (err) {
-      console.error("dislike error", err);
+      console.error('dislike error', err);
     }
   }, [currentCard, event, setEvent, userId]);
 
@@ -380,20 +424,20 @@ function VotingPhase({
   useEffect(() => {
     if (!votingStarted) return;
     const handler = (e: KeyboardEvent) => {
-      if (e.key === "ArrowRight") handleSwipeRight();
-      else if (e.key === "ArrowLeft") handleSwipeLeft();
+      if (e.key === 'ArrowRight') handleSwipeRight();
+      else if (e.key === 'ArrowLeft') handleSwipeLeft();
     };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
   }, [votingStarted, handleSwipeRight, handleSwipeLeft]);
 
   const endVoting = async () => {
     setTransitioning(true);
     try {
       const res = await fetch(`/api/events/${event.id}/transition`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ targetPhase: "PITCHING" }),
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetPhase: 'PITCHING' }),
       });
       if (res.ok) {
         const updated = await fetch(`/api/events/${event.id}`);
@@ -406,13 +450,18 @@ function VotingPhase({
 
   if (!votingStarted) {
     return (
-      <div className={`grid grid-cols-1 gap-6 ${isController ? "lg:grid-cols-3" : ""}`}>
-        <div className={`${isController ? "lg:col-span-2" : "max-w-3xl mx-auto"} flex flex-col items-center justify-center py-16 gap-6 w-full`}>
+      <div
+        className={`grid grid-cols-1 gap-6 ${isController ? 'lg:grid-cols-3' : ''}`}
+      >
+        <div
+          className={`${isController ? 'lg:col-span-2' : 'max-w-3xl mx-auto'} flex flex-col items-center justify-center py-16 gap-6 w-full`}
+        >
           <p className="opacity-80 text-center max-w-md">
             {event.votingEndTime
-              ? `You have until ${new Date(event.votingEndTime).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })} to vote on projects. `
-              : "Vote on projects to decide who presents first. "}
-            Top projects get to present first and get more time per presentation. Make sure your card is something people will vote on!
+              ? `You have until ${new Date(event.votingEndTime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} to vote on projects. `
+              : 'Vote on projects to decide who presents first. '}
+            Top projects get to present first and get more time per
+            presentation. Make sure your card is something people will vote on!
           </p>
           <div className="flex gap-4">
             <button
@@ -428,17 +477,22 @@ function VotingPhase({
               Start Voting
             </button>
           </div>
-          <p className="text-sm opacity-60">{event.projects.length} project{event.projects.length !== 1 ? "s" : ""} submitted</p>
+          <p className="text-sm opacity-60">
+            {event.projects.length} project
+            {event.projects.length !== 1 ? 's' : ''} submitted
+          </p>
           {isController && (
             <div className="mt-4 border-t pt-4 w-full max-w-md">
               <div className="flex items-center justify-between">
-                <span className="text-sm opacity-70">{event.projects.length} submissions</span>
+                <span className="text-sm opacity-70">
+                  {event.projects.length} submissions
+                </span>
                 <button
                   onClick={endVoting}
                   disabled={transitioning}
-                  className={`px-3 py-1.5 rounded text-white transition duration-300 ${transitioning ? "bg-gray-400" : "bg-gray-600 hover:bg-gray-700"}`}
+                  className={`px-3 py-1.5 rounded text-white transition duration-300 ${transitioning ? 'bg-gray-400' : 'bg-gray-600 hover:bg-gray-700'}`}
                 >
-                  {transitioning ? "Ending..." : "End Voting"}
+                  {transitioning ? 'Ending...' : 'End Voting'}
                 </button>
               </div>
             </div>
@@ -446,7 +500,13 @@ function VotingPhase({
         </div>
         {isController && (
           <div className="space-y-6">
-            <VotingQueuePanel event={event} isDarkMode={isDarkMode} isController={isController} setEvent={setEvent} userInfo={userInfo} />
+            <VotingQueuePanel
+              event={event}
+              isDarkMode={isDarkMode}
+              isController={isController}
+              setEvent={setEvent}
+              userInfo={userInfo}
+            />
           </div>
         )}
       </div>
@@ -454,28 +514,37 @@ function VotingPhase({
   }
 
   return (
-    <div className={`grid grid-cols-1 gap-6 py-8 ${isController ? "lg:grid-cols-3" : ""}`}>
-      <div className={`${isController ? "lg:col-span-2" : "max-w-3xl mx-auto"} w-full`}>
+    <div
+      className={`grid grid-cols-1 gap-6 py-8 ${isController ? 'lg:grid-cols-3' : ''}`}
+    >
+      <div
+        className={`${isController ? 'lg:col-span-2' : 'max-w-3xl mx-auto'} w-full`}
+      >
         {isController && (
           <div className="w-full max-w-3xl mb-6 flex items-center justify-between">
-            <span className="text-sm opacity-70">{event.projects.length} submissions</span>
+            <span className="text-sm opacity-70">
+              {event.projects.length} submissions
+            </span>
             <div className="flex gap-2">
               <button
                 onClick={endVoting}
                 disabled={transitioning}
-                className={`px-3 py-1.5 rounded text-white text-sm transition duration-300 ${transitioning ? "bg-gray-400" : "bg-gray-600 hover:bg-gray-700"}`}
+                className={`px-3 py-1.5 rounded text-white text-sm transition duration-300 ${transitioning ? 'bg-gray-400' : 'bg-gray-600 hover:bg-gray-700'}`}
               >
-                {transitioning ? "Ending..." : "End Voting"}
+                {transitioning ? 'Ending...' : 'End Voting'}
               </button>
             </div>
           </div>
         )}
 
-        <div className="w-full max-w-3xl mx-auto flex items-center gap-4" style={{ minHeight: 300 }}>
+        <div
+          className="w-full max-w-3xl mx-auto flex items-center gap-4"
+          style={{ minHeight: 300 }}
+        >
           {currentCard && (
             <button
               onClick={handleSwipeLeft}
-              className={`shrink-0 w-14 h-14 rounded-full text-2xl flex items-center justify-center transition duration-300 ${isDarkMode ? "bg-gray-700 text-gray-300 hover:bg-gray-600" : "bg-gray-200 text-gray-600 hover:bg-gray-300"}`}
+              className={`shrink-0 w-14 h-14 rounded-full text-2xl flex items-center justify-center transition duration-300 ${isDarkMode ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'}`}
               aria-label="Skip"
             >
               ✕
@@ -498,13 +567,21 @@ function VotingPhase({
                   animate={{ opacity: 1 }}
                   className="text-center py-16"
                 >
-                  <p className="text-lg opacity-70">All caught up! Waiting for more projects...</p>
+                  <p className="text-lg opacity-70">
+                    All caught up! Waiting for more projects...
+                  </p>
                   {event.votingEndTime && (
                     <p className="text-sm opacity-70 mt-2">
-                      Voting ends at {new Date(event.votingEndTime).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
+                      Voting ends at{' '}
+                      {new Date(event.votingEndTime).toLocaleTimeString([], {
+                        hour: 'numeric',
+                        minute: '2-digit',
+                      })}
                     </p>
                   )}
-                  <p className="text-sm opacity-50 mt-2">New projects will appear automatically — no need to refresh.</p>
+                  <p className="text-sm opacity-50 mt-2">
+                    New projects will appear automatically — no need to refresh.
+                  </p>
                   <button
                     onClick={openJoin}
                     className="mt-4 px-3 py-1.5 rounded bg-indigo-600 text-white text-sm hover:bg-indigo-700 transition duration-300"
@@ -518,7 +595,7 @@ function VotingPhase({
           {currentCard && (
             <button
               onClick={handleSwipeRight}
-              className={`shrink-0 w-14 h-14 rounded-full text-2xl flex items-center justify-center transition duration-300 ${isDarkMode ? "bg-purple-900/50 text-purple-300 hover:bg-purple-800/50" : "bg-indigo-100 text-indigo-600 hover:bg-indigo-200"}`}
+              className={`shrink-0 w-14 h-14 rounded-full text-2xl flex items-center justify-center transition duration-300 ${isDarkMode ? 'bg-purple-900/50 text-purple-300 hover:bg-purple-800/50' : 'bg-indigo-100 text-indigo-600 hover:bg-indigo-200'}`}
               aria-label="Like"
             >
               ❤
@@ -528,7 +605,13 @@ function VotingPhase({
       </div>
       {isController && (
         <div className="space-y-6">
-          <VotingQueuePanel event={event} isDarkMode={isDarkMode} isController={isController} setEvent={setEvent} userInfo={userInfo} />
+          <VotingQueuePanel
+            event={event}
+            isDarkMode={isDarkMode}
+            isController={isController}
+            setEvent={setEvent}
+            userInfo={userInfo}
+          />
         </div>
       )}
     </div>
@@ -555,9 +638,7 @@ function VotingQueuePanel({
 
   const { topGroupIds } = useMemo(() => {
     const ids = new Set(
-      allOrdered
-        .filter(ep => ep.isTopProject)
-        .map(ep => ep.id)
+      allOrdered.filter(ep => ep.isTopProject).map(ep => ep.id)
     );
     return { topGroupIds: ids };
   }, [allOrdered]);
@@ -566,7 +647,9 @@ function VotingQueuePanel({
   const hasTopGroup = topGroupIds.size > 0;
 
   const delistItem = async (eventProjectId: string) => {
-    const res = await fetch(`/api/events/${event.id}/queue/${eventProjectId}`, { method: "DELETE" });
+    const res = await fetch(`/api/events/${event.id}/queue/${eventProjectId}`, {
+      method: 'DELETE',
+    });
     if (res.status === 204) {
       const updated = await fetch(`/api/events/${event.id}`);
       setEvent(await updated.json());
@@ -575,54 +658,70 @@ function VotingQueuePanel({
 
   const togglePitchLike = async (eventProjectId: string, isLiked: boolean) => {
     if (!userInfo?.id) {
-      alert("Please sign in to like projects");
+      alert('Please sign in to like projects');
       return;
     }
 
     const response = await fetch(
       `/api/events/${event.id}/queue/${eventProjectId}/vote`,
       isLiked
-        ? { method: "DELETE" }
+        ? { method: 'DELETE' }
         : {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ value: "LIKE" }),
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ value: 'LIKE' }),
           }
     );
     if (!response.ok) return;
 
-    setEvent(applyPitchVoteToEvent(event, eventProjectId, userInfo.id, isLiked ? null : "LIKE"));
+    setEvent(
+      applyPitchVoteToEvent(
+        event,
+        eventProjectId,
+        userInfo.id,
+        isLiked ? null : 'LIKE'
+      )
+    );
   };
 
   return (
-    <div className={`w-full ${isDarkMode ? "bg-gray-800" : "bg-white"} rounded-xl p-4 shadow`}>
+    <div
+      className={`w-full ${isDarkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl p-4 shadow`}
+    >
       <div className="flex items-center justify-between mb-3">
         <h3 className="font-semibold">Presentation queue</h3>
-        <span className="text-xs opacity-60">{allOrdered.length} project{allOrdered.length !== 1 ? "s" : ""}</span>
+        <span className="text-xs opacity-60">
+          {allOrdered.length} project{allOrdered.length !== 1 ? 's' : ''}
+        </span>
       </div>
       {allOrdered.length === 0 ? (
         <div className="text-sm opacity-70">No projects in the queue yet.</div>
       ) : (
         <div className="max-h-96 overflow-y-auto space-y-2 pr-1">
           {allOrdered.map((ep, idx) => {
-            const isPitchLiked = getViewerPitchVote(ep, userInfo?.id)?.value === "LIKE";
-            const isCurrent = ep.status === "CURRENT";
-            const isPast = ep.status === "DONE" || ep.status === "SKIPPED";
+            const isPitchLiked =
+              getViewerPitchVote(ep, userInfo?.id)?.value === 'LIKE';
+            const isCurrent = ep.status === 'CURRENT';
+            const isPast = ep.status === 'DONE' || ep.status === 'SKIPPED';
             const isTopGroup = topGroupIds.has(ep.id);
 
-            const curIdx = allOrdered.findIndex(x => x.status === "CURRENT");
-            let relLabel = "";
+            const curIdx = allOrdered.findIndex(x => x.status === 'CURRENT');
+            let relLabel = '';
             if (curIdx === -1) {
-              const firstUpcoming = allOrdered.findIndex(x => x.status === "APPROVED" || x.status === "QUEUED");
+              const firstUpcoming = allOrdered.findIndex(
+                x => x.status === 'APPROVED' || x.status === 'QUEUED'
+              );
               if (firstUpcoming !== -1) {
                 const delta = idx - firstUpcoming + 1;
-                relLabel = delta === 0 ? "0" : delta > 0 ? `+${delta}` : `${delta}`;
+                relLabel =
+                  delta === 0 ? '0' : delta > 0 ? `+${delta}` : `${delta}`;
               } else {
                 relLabel = `${idx + 1}`;
               }
             } else {
               const delta = idx - curIdx;
-              relLabel = delta === 0 ? "0" : delta > 0 ? `+${delta}` : `${delta}`;
+              relLabel =
+                delta === 0 ? '0' : delta > 0 ? `+${delta}` : `${delta}`;
             }
 
             const showDivider = hasTopGroup && idx === firstNonTopIndex;
@@ -631,26 +730,30 @@ function VotingQueuePanel({
               <div key={ep.id}>
                 {showDivider && (
                   <div className="flex items-center gap-2 py-2">
-                    <div className={`flex-1 h-px ${isDarkMode ? "bg-yellow-500/40" : "bg-yellow-400"}`} />
+                    <div
+                      className={`flex-1 h-px ${isDarkMode ? 'bg-yellow-500/40' : 'bg-yellow-400'}`}
+                    />
                     <span className="text-xs font-semibold text-yellow-600 uppercase tracking-wider">
                       Top Projects
                     </span>
-                    <div className={`flex-1 h-px ${isDarkMode ? "bg-yellow-500/40" : "bg-yellow-400"}`} />
+                    <div
+                      className={`flex-1 h-px ${isDarkMode ? 'bg-yellow-500/40' : 'bg-yellow-400'}`}
+                    />
                   </div>
                 )}
                 <div
                   className={`flex items-center justify-between rounded-lg border px-3 py-2 transition-colors ${
                     isCurrent
                       ? isDarkMode
-                        ? "border-indigo-500 bg-indigo-500/10"
-                        : "border-indigo-300 bg-indigo-50"
+                        ? 'border-indigo-500 bg-indigo-500/10'
+                        : 'border-indigo-300 bg-indigo-50'
                       : isTopGroup
-                      ? isDarkMode
-                        ? "border-yellow-600/40 bg-yellow-900/10"
-                        : "border-yellow-300 bg-yellow-50"
-                      : isDarkMode
-                      ? "border-gray-700 bg-gray-800/70"
-                      : "border-gray-200 bg-white"
+                        ? isDarkMode
+                          ? 'border-yellow-600/40 bg-yellow-900/10'
+                          : 'border-yellow-300 bg-yellow-50'
+                        : isDarkMode
+                          ? 'border-gray-700 bg-gray-800/70'
+                          : 'border-gray-200 bg-white'
                   }`}
                 >
                   <div className="flex items-center gap-2 min-w-0">
@@ -658,11 +761,11 @@ function VotingQueuePanel({
                       className={`text-xs px-2 py-0.5 rounded-full ${
                         isCurrent
                           ? isDarkMode
-                            ? "bg-indigo-700 text-indigo-100"
-                            : "bg-indigo-100 text-indigo-700"
+                            ? 'bg-indigo-700 text-indigo-100'
+                            : 'bg-indigo-100 text-indigo-700'
                           : isDarkMode
-                          ? "bg-gray-700 text-gray-300"
-                          : "bg-gray-100 text-gray-700"
+                            ? 'bg-gray-700 text-gray-300'
+                            : 'bg-gray-100 text-gray-700'
                       }`}
                     >
                       {relLabel}
@@ -674,12 +777,12 @@ function VotingQueuePanel({
                       className={`truncate mr-3 text-sm font-medium block ${
                         isCurrent
                           ? isDarkMode
-                            ? "text-indigo-200"
-                            : "text-indigo-800"
+                            ? 'text-indigo-200'
+                            : 'text-indigo-800'
                           : isDarkMode
-                          ? "text-gray-100"
-                          : "text-gray-900"
-                      } ${isPast ? "opacity-70" : ""}`}
+                            ? 'text-gray-100'
+                            : 'text-gray-900'
+                      } ${isPast ? 'opacity-70' : ''}`}
                       title={ep.project.title}
                     >
                       {ep.project.title}
@@ -710,10 +813,10 @@ function VotingQueuePanel({
                       onClick={() => togglePitchLike(ep.id, isPitchLiked)}
                       className={`px-2 h-7 rounded-md text-xs font-semibold flex items-center gap-1 ${
                         isPitchLiked
-                          ? "bg-red-600 text-white"
+                          ? 'bg-red-600 text-white'
                           : isDarkMode
-                          ? "bg-gray-700 text-gray-200 hover:bg-gray-600"
-                          : "bg-gray-100 text-gray-800 hover:bg-gray-200"
+                            ? 'bg-gray-700 text-gray-200 hover:bg-gray-600'
+                            : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
                       }`}
                       aria-label={`Like ${ep.project.title} in this pitch session`}
                     >
@@ -735,7 +838,7 @@ function VotingQueuePanel({
 function formatTime(seconds: number): string {
   const mins = Math.floor(Math.abs(seconds) / 60);
   const secs = Math.floor(Math.abs(seconds) % 60);
-  return `${mins}:${secs.toString().padStart(2, "0")}`;
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
 function TimerDisplay({
@@ -773,15 +876,20 @@ function TimerDisplay({
   return (
     <div className="flex flex-col items-center gap-1">
       <span className="text-xs uppercase tracking-wider opacity-70">
-        {label}{isPaused && " · Paused"}
+        {label}
+        {isPaused && ' · Paused'}
       </span>
-      <div className={`text-4xl font-mono font-bold tabular-nums ${isPaused ? "opacity-60" : ""} ${isOver ? "text-red-500" : isDarkMode ? "text-white" : "text-gray-900"}`}>
+      <div
+        className={`text-4xl font-mono font-bold tabular-nums ${isPaused ? 'opacity-60' : ''} ${isOver ? 'text-red-500' : isDarkMode ? 'text-white' : 'text-gray-900'}`}
+      >
         {isOver ? formatTime(elapsed) : formatTime(remaining)}
       </div>
       <div className="flex items-center gap-3 text-sm">
         <span className="opacity-60">Allotted: {formatTime(allottedSec)}</span>
         {isOver && (
-          <span className="text-red-500 font-semibold">+{formatTime(overtime)} over</span>
+          <span className="text-red-500 font-semibold">
+            +{formatTime(overtime)} over
+          </span>
         )}
       </div>
     </div>
@@ -798,7 +906,9 @@ function CompletedTimerSummary({
   if (!ep.presentingStartedAt) return null;
 
   const presStart = new Date(ep.presentingStartedAt).getTime();
-  const qStart = ep.questionsStartedAt ? new Date(ep.questionsStartedAt).getTime() : null;
+  const qStart = ep.questionsStartedAt
+    ? new Date(ep.questionsStartedAt).getTime()
+    : null;
   const end = ep.completedAt ? new Date(ep.completedAt).getTime() : null;
 
   const presDuration = qStart ? (qStart - presStart) / 1000 : null;
@@ -808,14 +918,16 @@ function CompletedTimerSummary({
   const qAllotted = ep.allottedQuestionsSec ?? 0;
 
   return (
-    <div className={`flex gap-4 text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
+    <div
+      className={`flex gap-4 text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}
+    >
       {presDuration != null && (
-        <span className={presDuration > presAllotted ? "text-red-400" : ""}>
+        <span className={presDuration > presAllotted ? 'text-red-400' : ''}>
           Pitch: {formatTime(presDuration)}/{formatTime(presAllotted)}
         </span>
       )}
       {qDuration != null && (
-        <span className={qDuration > qAllotted ? "text-red-400" : ""}>
+        <span className={qDuration > qAllotted ? 'text-red-400' : ''}>
           Q&A: {formatTime(qDuration)}/{formatTime(qAllotted)}
         </span>
       )}
@@ -842,13 +954,13 @@ function PitchTimer({
     setActing(true);
     try {
       const res = await fetch(`/api/events/${eventId}/pitch-timer`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action, eventProjectId: currentItem.id }),
       });
       if (res.ok) {
-        if (action === "finish") {
-          await fetch(`/api/events/${eventId}/advance`, { method: "POST" });
+        if (action === 'finish') {
+          await fetch(`/api/events/${eventId}/advance`, { method: 'POST' });
         }
         onUpdate();
       }
@@ -861,39 +973,67 @@ function PitchTimer({
   const isPaused = !!currentItem.pausedAt;
 
   return (
-    <div className={`rounded-xl p-5 shadow ${isDarkMode ? "bg-gray-800" : "bg-white"}`}>
+    <div
+      className={`rounded-xl p-5 shadow ${isDarkMode ? 'bg-gray-800' : 'bg-white'}`}
+    >
       <div className="flex items-center justify-between mb-4">
         <h3 className="font-semibold">Timer</h3>
-        <span className={`text-xs uppercase tracking-wider px-2 py-1 rounded-full font-semibold ${
-          isPaused ? "bg-amber-100 text-amber-700" :
-          phase === "WAITING" ? "bg-gray-200 text-gray-600" :
-          phase === "PRESENTING" ? "bg-indigo-100 text-indigo-700" :
-          phase === "QUESTIONS" ? "bg-purple-100 text-purple-700" :
-          "bg-gray-200 text-gray-600"
-        }`}>
-          {isPaused ? "Paused" : phase === "WAITING" ? "Ready" : phase === "PRESENTING" ? "Presenting" : phase === "QUESTIONS" ? "Q&A" : "Done"}
+        <span
+          className={`text-xs uppercase tracking-wider px-2 py-1 rounded-full font-semibold ${
+            isPaused
+              ? 'bg-amber-100 text-amber-700'
+              : phase === 'WAITING'
+                ? 'bg-gray-200 text-gray-600'
+                : phase === 'PRESENTING'
+                  ? 'bg-indigo-100 text-indigo-700'
+                  : phase === 'QUESTIONS'
+                    ? 'bg-purple-100 text-purple-700'
+                    : 'bg-gray-200 text-gray-600'
+          }`}
+        >
+          {isPaused
+            ? 'Paused'
+            : phase === 'WAITING'
+              ? 'Ready'
+              : phase === 'PRESENTING'
+                ? 'Presenting'
+                : phase === 'QUESTIONS'
+                  ? 'Q&A'
+                  : 'Done'}
         </span>
       </div>
 
-      <div className={isController ? "flex items-center justify-between gap-4" : "flex flex-col items-center gap-4"}>
-        {phase === "WAITING" && (
+      <div
+        className={
+          isController
+            ? 'flex items-center justify-between gap-4'
+            : 'flex flex-col items-center gap-4'
+        }
+      >
+        {phase === 'WAITING' && (
           <>
-            <div className={isController ? "text-base" : "text-center opacity-70 text-sm"}>
-              Allotted: {formatTime(currentItem.allottedPresentingSec ?? 0)} presenting, {formatTime(currentItem.allottedQuestionsSec ?? 0)} Q&A
+            <div
+              className={
+                isController ? 'text-base' : 'text-center opacity-70 text-sm'
+              }
+            >
+              Allotted: {formatTime(currentItem.allottedPresentingSec ?? 0)}{' '}
+              presenting, {formatTime(currentItem.allottedQuestionsSec ?? 0)}{' '}
+              Q&A
             </div>
             {isController && (
               <button
                 disabled={acting}
-                onClick={() => timerAction("start_presenting")}
-                className={`px-4 py-2 rounded text-white text-sm font-semibold transition duration-300 shrink-0 ${acting ? "bg-gray-400" : "bg-indigo-600 hover:bg-indigo-700"}`}
+                onClick={() => timerAction('start_presenting')}
+                className={`px-4 py-2 rounded text-white text-sm font-semibold transition duration-300 shrink-0 ${acting ? 'bg-gray-400' : 'bg-indigo-600 hover:bg-indigo-700'}`}
               >
-                {acting ? "Starting..." : "Presentation Started"}
+                {acting ? 'Starting...' : 'Presentation Started'}
               </button>
             )}
           </>
         )}
 
-        {phase === "PRESENTING" && currentItem.presentingStartedAt && (
+        {phase === 'PRESENTING' && currentItem.presentingStartedAt && (
           <>
             <TimerDisplay
               startedAt={currentItem.presentingStartedAt}
@@ -906,25 +1046,29 @@ function PitchTimer({
               <div className="flex gap-2 shrink-0">
                 <button
                   disabled={acting}
-                  onClick={() => timerAction(isPaused ? "resume" : "pause")}
-                  title={isPaused ? "Resume the timer" : "Pause the timer (e.g. for AV issues)"}
-                  className={`px-4 py-2 rounded text-white text-sm font-semibold transition duration-300 ${acting ? "bg-gray-400" : isPaused ? "bg-emerald-600 hover:bg-emerald-700" : "bg-amber-600 hover:bg-amber-700"}`}
+                  onClick={() => timerAction(isPaused ? 'resume' : 'pause')}
+                  title={
+                    isPaused
+                      ? 'Resume the timer'
+                      : 'Pause the timer (e.g. for AV issues)'
+                  }
+                  className={`px-4 py-2 rounded text-white text-sm font-semibold transition duration-300 ${acting ? 'bg-gray-400' : isPaused ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-amber-600 hover:bg-amber-700'}`}
                 >
-                  {isPaused ? "Resume" : "Pause"}
+                  {isPaused ? 'Resume' : 'Pause'}
                 </button>
                 <button
                   disabled={acting || isPaused}
-                  onClick={() => timerAction("start_questions")}
-                  className={`px-4 py-2 rounded text-white text-sm font-semibold transition duration-300 ${acting || isPaused ? "bg-gray-400" : "bg-indigo-600 hover:bg-indigo-700"}`}
+                  onClick={() => timerAction('start_questions')}
+                  className={`px-4 py-2 rounded text-white text-sm font-semibold transition duration-300 ${acting || isPaused ? 'bg-gray-400' : 'bg-indigo-600 hover:bg-indigo-700'}`}
                 >
-                  {acting ? "Starting..." : "Q&A Started"}
+                  {acting ? 'Starting...' : 'Q&A Started'}
                 </button>
               </div>
             )}
           </>
         )}
 
-        {phase === "QUESTIONS" && currentItem.questionsStartedAt && (
+        {phase === 'QUESTIONS' && currentItem.questionsStartedAt && (
           <>
             <TimerDisplay
               startedAt={currentItem.questionsStartedAt}
@@ -937,25 +1081,29 @@ function PitchTimer({
               <div className="flex gap-2 shrink-0">
                 <button
                   disabled={acting}
-                  onClick={() => timerAction(isPaused ? "resume" : "pause")}
-                  title={isPaused ? "Resume the timer" : "Pause the timer (e.g. for AV issues)"}
-                  className={`px-4 py-2 rounded text-white text-sm font-semibold transition duration-300 ${acting ? "bg-gray-400" : isPaused ? "bg-emerald-600 hover:bg-emerald-700" : "bg-amber-600 hover:bg-amber-700"}`}
+                  onClick={() => timerAction(isPaused ? 'resume' : 'pause')}
+                  title={
+                    isPaused
+                      ? 'Resume the timer'
+                      : 'Pause the timer (e.g. for AV issues)'
+                  }
+                  className={`px-4 py-2 rounded text-white text-sm font-semibold transition duration-300 ${acting ? 'bg-gray-400' : isPaused ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-amber-600 hover:bg-amber-700'}`}
                 >
-                  {isPaused ? "Resume" : "Pause"}
+                  {isPaused ? 'Resume' : 'Pause'}
                 </button>
                 <button
                   disabled={acting || isPaused}
-                  onClick={() => timerAction("finish")}
-                  className={`px-4 py-2 rounded text-white text-sm font-semibold transition duration-300 ${acting || isPaused ? "bg-gray-400" : "bg-indigo-600 hover:bg-indigo-700"}`}
+                  onClick={() => timerAction('finish')}
+                  className={`px-4 py-2 rounded text-white text-sm font-semibold transition duration-300 ${acting || isPaused ? 'bg-gray-400' : 'bg-indigo-600 hover:bg-indigo-700'}`}
                 >
-                  {acting ? "Finishing..." : "Finished"}
+                  {acting ? 'Finishing...' : 'Finished'}
                 </button>
               </div>
             )}
           </>
         )}
 
-        {phase === "COMPLETED" && (
+        {phase === 'COMPLETED' && (
           <CompletedTimerSummary ep={currentItem} isDarkMode={isDarkMode} />
         )}
       </div>
@@ -976,28 +1124,30 @@ function PitchingPhase({
   event: EventDetail;
   setEvent: (e: EventDetail | null) => void;
   isDarkMode: boolean;
-  userInfo: any;
+  userInfo: UserInfo | null;
   isAdmin: boolean;
   isController: boolean;
   openJoin: () => void;
 }) {
-  const currentItem = useMemo(() => event.projects.find(p => p.status === "CURRENT"), [event]);
+  const currentItem = useMemo(
+    () => event.projects.find(p => p.status === 'CURRENT'),
+    [event]
+  );
   const allOrdered = useMemo(
     () => [...event.projects].sort((a, b) => a.position - b.position),
     [event]
   );
-  const isFinished = event.phase === "FINISHED";
+  const isFinished = event.phase === 'FINISHED';
   const hasUpcomingItems = useMemo(
-    () => allOrdered.some(p => p.status === "QUEUED" || p.status === "APPROVED"),
+    () =>
+      allOrdered.some(p => p.status === 'QUEUED' || p.status === 'APPROVED'),
     [allOrdered]
   );
 
   // Compute top-group
   const { topGroupIds } = useMemo(() => {
     const ids = new Set(
-      allOrdered
-        .filter(ep => ep.isTopProject)
-        .map(ep => ep.id)
+      allOrdered.filter(ep => ep.isTopProject).map(ep => ep.id)
     );
     return { topGroupIds: ids };
   }, [allOrdered]);
@@ -1009,11 +1159,13 @@ function PitchingPhase({
   ) => {
     e.preventDefault();
     if (!userInfo) {
-      alert("Please sign in to like projects");
+      alert('Please sign in to like projects');
       return;
     }
     try {
-      const resp = await fetch(`/api/projects/${projectId}/like`, { method: isLiked ? "DELETE" : "POST" });
+      const resp = await fetch(`/api/projects/${projectId}/like`, {
+        method: isLiked ? 'DELETE' : 'POST',
+      });
       if (!resp.ok) return;
       setEvent({
         ...event,
@@ -1025,42 +1177,54 @@ function PitchingPhase({
               ...ep.project,
               likes: isLiked
                 ? ep.project.likes.filter(l => l.hackerId !== userInfo.id)
-                : [...ep.project.likes, { hackerId: userInfo.id, createdAt: new Date().toISOString() as any }],
+                : [
+                    ...ep.project.likes,
+                    {
+                      hackerId: userInfo.id,
+                      createdAt: new Date().toISOString(),
+                    },
+                  ],
             },
           };
         }),
       });
     } catch (err) {
-      console.error("like error", err);
+      console.error('like error', err);
     }
   };
 
-  const handlePitchLike = async (
-    eventProjectId: string,
-    isLiked: boolean
-  ) => {
+  const handlePitchLike = async (eventProjectId: string, isLiked: boolean) => {
     if (!userInfo?.id) {
-      alert("Please sign in to like projects");
+      alert('Please sign in to like projects');
       return;
     }
 
     const response = await fetch(
       `/api/events/${event.id}/queue/${eventProjectId}/vote`,
       isLiked
-        ? { method: "DELETE" }
+        ? { method: 'DELETE' }
         : {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ value: "LIKE" }),
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ value: 'LIKE' }),
           }
     );
     if (!response.ok) return;
 
-    setEvent(applyPitchVoteToEvent(event, eventProjectId, userInfo.id, isLiked ? null : "LIKE"));
+    setEvent(
+      applyPitchVoteToEvent(
+        event,
+        eventProjectId,
+        userInfo.id,
+        isLiked ? null : 'LIKE'
+      )
+    );
   };
 
   const advance = async () => {
-    const res = await fetch(`/api/events/${event.id}/advance`, { method: "POST" });
+    const res = await fetch(`/api/events/${event.id}/advance`, {
+      method: 'POST',
+    });
     if (res.ok) {
       const updated = await fetch(`/api/events/${event.id}`);
       setEvent(await updated.json());
@@ -1068,7 +1232,9 @@ function PitchingPhase({
   };
 
   const previousStep = async () => {
-    const res = await fetch(`/api/events/${event.id}/previous`, { method: "POST" });
+    const res = await fetch(`/api/events/${event.id}/previous`, {
+      method: 'POST',
+    });
     if (res.ok) {
       const updated = await fetch(`/api/events/${event.id}`);
       setEvent(await updated.json());
@@ -1077,9 +1243,9 @@ function PitchingPhase({
 
   const finishEvent = async () => {
     const res = await fetch(`/api/events/${event.id}/transition`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ targetPhase: "FINISHED" }),
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ targetPhase: 'FINISHED' }),
     });
     if (res.ok) {
       const updated = await fetch(`/api/events/${event.id}`);
@@ -1089,17 +1255,17 @@ function PitchingPhase({
 
   const reorder = async (items: Array<{ id: string; position: number }>) => {
     await fetch(`/api/events/${event.id}/queue`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ items }),
     });
     const updated = await fetch(`/api/events/${event.id}`);
     setEvent(await updated.json());
   };
 
-  const moveItem = async (eventProjectId: string, direction: "up" | "down") => {
+  const moveItem = async (eventProjectId: string, direction: 'up' | 'down') => {
     const ordered = allOrdered;
-    const movableStatuses = new Set(["QUEUED", "APPROVED"]);
+    const movableStatuses = new Set(['QUEUED', 'APPROVED']);
     const index = ordered.findIndex(x => x.id === eventProjectId);
     if (index === -1) return;
     const current = ordered[index];
@@ -1108,16 +1274,22 @@ function PitchingPhase({
     if (topGroupIds.has(current.id)) return;
 
     let neighborIndex = -1;
-    if (direction === "up") {
+    if (direction === 'up') {
       for (let i = index - 1; i >= 0; i--) {
-        if (movableStatuses.has(ordered[i].status) && !topGroupIds.has(ordered[i].id)) {
+        if (
+          movableStatuses.has(ordered[i].status) &&
+          !topGroupIds.has(ordered[i].id)
+        ) {
           neighborIndex = i;
           break;
         }
       }
     } else {
       for (let i = index + 1; i < ordered.length; i++) {
-        if (movableStatuses.has(ordered[i].status) && !topGroupIds.has(ordered[i].id)) {
+        if (
+          movableStatuses.has(ordered[i].status) &&
+          !topGroupIds.has(ordered[i].id)
+        ) {
           neighborIndex = i;
           break;
         }
@@ -1132,7 +1304,9 @@ function PitchingPhase({
   };
 
   const delistItem = async (eventProjectId: string) => {
-    const res = await fetch(`/api/events/${event.id}/queue/${eventProjectId}`, { method: "DELETE" });
+    const res = await fetch(`/api/events/${event.id}/queue/${eventProjectId}`, {
+      method: 'DELETE',
+    });
     if (res.status === 204) {
       const updated = await fetch(`/api/events/${event.id}`);
       setEvent(await updated.json());
@@ -1145,7 +1319,9 @@ function PitchingPhase({
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-      <div className={`${isDarkMode ? "bg-gray-800" : "bg-white"} rounded-xl p-4 shadow lg:col-span-2`}>
+      <div
+        className={`${isDarkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl p-4 shadow lg:col-span-2`}
+      >
         <h2 className="font-semibold mb-3">Current project</h2>
         {currentItem ? (
           <div className="max-w-5xl space-y-4">
@@ -1173,51 +1349,66 @@ function PitchingPhase({
           </div>
         ) : (
           <div className="opacity-70">
-            {isFinished ? "This event is finished. The queue is closed." : "No current project"}
+            {isFinished
+              ? 'This event is finished. The queue is closed.'
+              : 'No current project'}
           </div>
         )}
       </div>
       <div className="space-y-6">
-        <div className={`${isDarkMode ? "bg-gray-800" : "bg-white"} rounded-xl p-4 shadow`}>
+        <div
+          className={`${isDarkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl p-4 shadow`}
+        >
           <div className="flex items-center justify-between mb-3">
             <h3 className="font-semibold">Presentation queue</h3>
           </div>
           <div className="max-h-96 overflow-y-auto space-y-2 pr-1">
             {allOrdered.map((ep, idx) => {
-              const isPitchLiked = getViewerPitchVote(ep, userInfo?.id)?.value === "LIKE";
-              const isCurrent = ep.status === "CURRENT";
-              const isPast = ep.status === "DONE" || ep.status === "SKIPPED";
+              const isPitchLiked =
+                getViewerPitchVote(ep, userInfo?.id)?.value === 'LIKE';
+              const isCurrent = ep.status === 'CURRENT';
+              const isPast = ep.status === 'DONE' || ep.status === 'SKIPPED';
               const isTopGroup = topGroupIds.has(ep.id);
 
               // Compute relative index label
-              const curIdx = allOrdered.findIndex(x => x.status === "CURRENT");
-              let relLabel = "";
+              const curIdx = allOrdered.findIndex(x => x.status === 'CURRENT');
+              let relLabel = '';
               if (curIdx === -1) {
-                const firstUpcoming = allOrdered.findIndex(x => x.status === "APPROVED" || x.status === "QUEUED");
+                const firstUpcoming = allOrdered.findIndex(
+                  x => x.status === 'APPROVED' || x.status === 'QUEUED'
+                );
                 if (firstUpcoming !== -1) {
                   const delta = idx - firstUpcoming + 1;
-                  relLabel = delta === 0 ? "0" : delta > 0 ? `+${delta}` : `${delta}`;
+                  relLabel =
+                    delta === 0 ? '0' : delta > 0 ? `+${delta}` : `${delta}`;
                 } else {
                   relLabel = `${idx + 1}`;
                 }
               } else {
                 const delta = idx - curIdx;
-                relLabel = delta === 0 ? "0" : delta > 0 ? `+${delta}` : `${delta}`;
+                relLabel =
+                  delta === 0 ? '0' : delta > 0 ? `+${delta}` : `${delta}`;
               }
 
               // Determine if up/down should be enabled
-              const movable = new Set(["QUEUED", "APPROVED"]);
+              const movable = new Set(['QUEUED', 'APPROVED']);
               let canUp = false,
                 canDown = false;
               if (movable.has(ep.status) && !isTopGroup) {
                 for (let i = idx - 1; i >= 0; i--) {
-                  if (movable.has(allOrdered[i].status) && !topGroupIds.has(allOrdered[i].id)) {
+                  if (
+                    movable.has(allOrdered[i].status) &&
+                    !topGroupIds.has(allOrdered[i].id)
+                  ) {
                     canUp = true;
                     break;
                   }
                 }
                 for (let i = idx + 1; i < allOrdered.length; i++) {
-                  if (movable.has(allOrdered[i].status) && !topGroupIds.has(allOrdered[i].id)) {
+                  if (
+                    movable.has(allOrdered[i].status) &&
+                    !topGroupIds.has(allOrdered[i].id)
+                  ) {
                     canDown = true;
                     break;
                   }
@@ -1231,26 +1422,30 @@ function PitchingPhase({
                 <div key={ep.id}>
                   {showDivider && (
                     <div className="flex items-center gap-2 py-2">
-                      <div className={`flex-1 h-px ${isDarkMode ? "bg-yellow-500/40" : "bg-yellow-400"}`} />
+                      <div
+                        className={`flex-1 h-px ${isDarkMode ? 'bg-yellow-500/40' : 'bg-yellow-400'}`}
+                      />
                       <span className="text-xs font-semibold text-yellow-600 uppercase tracking-wider">
                         Top Projects
                       </span>
-                      <div className={`flex-1 h-px ${isDarkMode ? "bg-yellow-500/40" : "bg-yellow-400"}`} />
+                      <div
+                        className={`flex-1 h-px ${isDarkMode ? 'bg-yellow-500/40' : 'bg-yellow-400'}`}
+                      />
                     </div>
                   )}
                   <div
                     className={`group flex items-center justify-between rounded-lg border px-3 py-2 transition-colors ${
                       isCurrent
                         ? isDarkMode
-                          ? "border-indigo-500 bg-indigo-500/10"
-                          : "border-indigo-300 bg-indigo-50"
+                          ? 'border-indigo-500 bg-indigo-500/10'
+                          : 'border-indigo-300 bg-indigo-50'
                         : isTopGroup
-                        ? isDarkMode
-                          ? "border-yellow-600/40 bg-yellow-900/10"
-                          : "border-yellow-300 bg-yellow-50"
-                        : isDarkMode
-                        ? "border-gray-700 bg-gray-800/70 hover:bg-gray-800"
-                        : "border-gray-200 bg-white hover:bg-gray-50"
+                          ? isDarkMode
+                            ? 'border-yellow-600/40 bg-yellow-900/10'
+                            : 'border-yellow-300 bg-yellow-50'
+                          : isDarkMode
+                            ? 'border-gray-700 bg-gray-800/70 hover:bg-gray-800'
+                            : 'border-gray-200 bg-white hover:bg-gray-50'
                     }`}
                   >
                     <div className="flex items-center gap-2 min-w-0">
@@ -1258,11 +1453,11 @@ function PitchingPhase({
                         className={`text-xs px-2 py-0.5 rounded-full ${
                           isCurrent
                             ? isDarkMode
-                              ? "bg-indigo-700 text-indigo-100"
-                              : "bg-indigo-100 text-indigo-700"
+                              ? 'bg-indigo-700 text-indigo-100'
+                              : 'bg-indigo-100 text-indigo-700'
                             : isDarkMode
-                            ? "bg-gray-700 text-gray-300"
-                            : "bg-gray-100 text-gray-700"
+                              ? 'bg-gray-700 text-gray-300'
+                              : 'bg-gray-100 text-gray-700'
                         }`}
                       >
                         {relLabel}
@@ -1275,12 +1470,12 @@ function PitchingPhase({
                           className={`truncate mr-3 text-sm font-medium block ${
                             isCurrent
                               ? isDarkMode
-                                ? "text-indigo-200"
-                                : "text-indigo-800"
+                                ? 'text-indigo-200'
+                                : 'text-indigo-800'
                               : isDarkMode
-                              ? "text-gray-100"
-                              : "text-gray-900"
-                          } ${isPast ? "opacity-70" : ""}`}
+                                ? 'text-gray-100'
+                                : 'text-gray-900'
+                          } ${isPast ? 'opacity-70' : ''}`}
                           title={ep.project.title}
                         >
                           {ep.project.title}
@@ -1312,13 +1507,13 @@ function PitchingPhase({
                         <div className="flex items-center gap-1 mr-1">
                           <button
                             disabled={!canUp}
-                            onClick={() => moveItem(ep.id, "up")}
+                            onClick={() => moveItem(ep.id, 'up')}
                             className={`w-7 h-7 rounded-md text-xs ${
                               canUp
                                 ? isDarkMode
-                                  ? "bg-gray-700 text-gray-200 hover:bg-gray-600"
-                                  : "bg-gray-100 text-gray-800 hover:bg-gray-200"
-                                : "bg-gray-200 text-gray-400 cursor-not-allowed"
+                                  ? 'bg-gray-700 text-gray-200 hover:bg-gray-600'
+                                  : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+                                : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                             }`}
                             aria-label="Move up"
                           >
@@ -1326,13 +1521,13 @@ function PitchingPhase({
                           </button>
                           <button
                             disabled={!canDown}
-                            onClick={() => moveItem(ep.id, "down")}
+                            onClick={() => moveItem(ep.id, 'down')}
                             className={`w-7 h-7 rounded-md text-xs ${
                               canDown
                                 ? isDarkMode
-                                  ? "bg-gray-700 text-gray-200 hover:bg-gray-600"
-                                  : "bg-gray-100 text-gray-800 hover:bg-gray-200"
-                                : "bg-gray-200 text-gray-400 cursor-not-allowed"
+                                  ? 'bg-gray-700 text-gray-200 hover:bg-gray-600'
+                                  : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+                                : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                             }`}
                             aria-label="Move down"
                           >
@@ -1348,60 +1543,62 @@ function PitchingPhase({
                           </button>
                         </div>
                       )}
-                      {!isController && userInfo?.id === ep.addedById && !isTopGroup && (
-                        <div className="flex items-center gap-1 mr-1">
-                          <button
-                            onClick={() => delistItem(ep.id)}
-                            className="w-7 h-7 rounded-md text-xs bg-gray-500 text-white hover:bg-gray-600"
-                            aria-label="Delist"
-                            title="Remove from queue"
-                          >
-                            ✕
-                          </button>
-                          {movable.has(ep.status) && (
-                            <>
-                              <button
-                                disabled={!canUp}
-                                onClick={() => moveItem(ep.id, "up")}
-                                className={`w-7 h-7 rounded-md text-xs ${
-                                  canUp
-                                    ? isDarkMode
-                                      ? "bg-gray-700 text-gray-200 hover:bg-gray-600"
-                                      : "bg-gray-100 text-gray-800 hover:bg-gray-200"
-                                    : "bg-gray-200 text-gray-400 cursor-not-allowed"
-                                }`}
-                                aria-label="Move up"
-                              >
-                                ▲
-                              </button>
-                              <button
-                                disabled={!canDown}
-                                onClick={() => moveItem(ep.id, "down")}
-                                className={`w-7 h-7 rounded-md text-xs ${
-                                  canDown
-                                    ? isDarkMode
-                                      ? "bg-gray-700 text-gray-200 hover:bg-gray-600"
-                                      : "bg-gray-100 text-gray-800 hover:bg-gray-200"
-                                    : "bg-gray-200 text-gray-400 cursor-not-allowed"
-                                }`}
-                                aria-label="Move down"
-                              >
-                                ▼
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      )}
+                      {!isController &&
+                        userInfo?.id === ep.addedById &&
+                        !isTopGroup && (
+                          <div className="flex items-center gap-1 mr-1">
+                            <button
+                              onClick={() => delistItem(ep.id)}
+                              className="w-7 h-7 rounded-md text-xs bg-gray-500 text-white hover:bg-gray-600"
+                              aria-label="Delist"
+                              title="Remove from queue"
+                            >
+                              ✕
+                            </button>
+                            {movable.has(ep.status) && (
+                              <>
+                                <button
+                                  disabled={!canUp}
+                                  onClick={() => moveItem(ep.id, 'up')}
+                                  className={`w-7 h-7 rounded-md text-xs ${
+                                    canUp
+                                      ? isDarkMode
+                                        ? 'bg-gray-700 text-gray-200 hover:bg-gray-600'
+                                        : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+                                      : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                                  }`}
+                                  aria-label="Move up"
+                                >
+                                  ▲
+                                </button>
+                                <button
+                                  disabled={!canDown}
+                                  onClick={() => moveItem(ep.id, 'down')}
+                                  className={`w-7 h-7 rounded-md text-xs ${
+                                    canDown
+                                      ? isDarkMode
+                                        ? 'bg-gray-700 text-gray-200 hover:bg-gray-600'
+                                        : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+                                      : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                                  }`}
+                                  aria-label="Move down"
+                                >
+                                  ▼
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        )}
                       <button
                         disabled={isFinished}
                         onClick={() => handlePitchLike(ep.id, isPitchLiked)}
                         className={`px-2 h-7 rounded-md text-xs font-semibold flex items-center gap-1 ${
                           isPitchLiked
-                            ? "bg-red-600 text-white"
+                            ? 'bg-red-600 text-white'
                             : isDarkMode
-                            ? "bg-gray-700 text-gray-200 hover:bg-gray-600"
-                            : "bg-gray-100 text-gray-800 hover:bg-gray-200"
-                        } ${isFinished ? "cursor-not-allowed opacity-60" : ""}`}
+                              ? 'bg-gray-700 text-gray-200 hover:bg-gray-600'
+                              : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+                        } ${isFinished ? 'cursor-not-allowed opacity-60' : ''}`}
                         aria-label={`Like ${ep.project.title} in this pitch session`}
                       >
                         <span>❤</span>
@@ -1415,27 +1612,46 @@ function PitchingPhase({
           </div>
           <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
             {!isFinished && (
-              <button onClick={openJoin} className="w-full px-1.5 py-1 rounded bg-indigo-600 text-white text-sm hover:bg-indigo-700 transition duration-300">
+              <button
+                onClick={openJoin}
+                className="w-full px-1.5 py-1 rounded bg-indigo-600 text-white text-sm hover:bg-indigo-700 transition duration-300"
+              >
                 Add Project
               </button>
             )}
-            {isController && !isFinished && (currentItem || hasUpcomingItems) && (
-              <div className="grid grid-cols-2 gap-2">
-                <button onClick={previousStep} className="w-full px-1.5 py-1 rounded bg-gray-600 text-white text-sm hover:bg-gray-700 transition duration-300">
-                  Previous
+            {isController &&
+              !isFinished &&
+              (currentItem || hasUpcomingItems) && (
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={previousStep}
+                    className="w-full px-1.5 py-1 rounded bg-gray-600 text-white text-sm hover:bg-gray-700 transition duration-300"
+                  >
+                    Previous
+                  </button>
+                  <button
+                    onClick={advance}
+                    className="w-full px-1.5 py-1 rounded bg-indigo-600 text-white text-sm hover:bg-indigo-700 transition duration-300"
+                  >
+                    Move next
+                  </button>
+                </div>
+              )}
+            {isController &&
+              !isFinished &&
+              !currentItem &&
+              !hasUpcomingItems && (
+                <button
+                  onClick={finishEvent}
+                  className="w-full px-1.5 py-1 rounded bg-gray-600 text-white text-sm hover:bg-gray-700 transition duration-300"
+                >
+                  Finish Event
                 </button>
-                <button onClick={advance} className="w-full px-1.5 py-1 rounded bg-indigo-600 text-white text-sm hover:bg-indigo-700 transition duration-300">
-                  Move next
-                </button>
-              </div>
-            )}
-            {isController && !isFinished && !currentItem && !hasUpcomingItems && (
-              <button onClick={finishEvent} className="w-full px-1.5 py-1 rounded bg-gray-600 text-white text-sm hover:bg-gray-700 transition duration-300">
-                Finish Event
-              </button>
-            )}
+              )}
             {isFinished && (
-              <div className={`sm:col-span-2 rounded-md px-3 py-2 text-sm ${isDarkMode ? "bg-gray-800 text-gray-300" : "bg-gray-100 text-gray-700"}`}>
+              <div
+                className={`sm:col-span-2 rounded-md px-3 py-2 text-sm ${isDarkMode ? 'bg-gray-800 text-gray-300' : 'bg-gray-100 text-gray-700'}`}
+              >
                 Event finished. New projects cannot be added to this queue.
               </div>
             )}
@@ -1458,15 +1674,18 @@ export default function PitchEventPage() {
 
   // Edit event modal state
   const [showEdit, setShowEdit] = useState(false);
-  const [editTitle, setEditTitle] = useState("");
-  const [editStartTime, setEditStartTime] = useState("");
-  const [editMeetingUrl, setEditMeetingUrl] = useState("");
-  const [editVotingEndTime, setEditVotingEndTime] = useState("");
+  const [editTitle, setEditTitle] = useState('');
+  const [editStartTime, setEditStartTime] = useState('');
+  const [editMeetingUrl, setEditMeetingUrl] = useState('');
+  const [editVotingEndTime, setEditVotingEndTime] = useState('');
   const [editMcIds, setEditMcIds] = useState<string[]>([]);
-  const [allHackers, setAllHackers] = useState<Array<{ id: string; name: string }>>([]);
-  const [mcSearch, setMcSearch] = useState("");
+  const [allHackers, setAllHackers] = useState<
+    Array<{ id: string; name: string }>
+  >([]);
+  const [mcSearch, setMcSearch] = useState('');
   const [saving, setSaving] = useState(false);
-  const [phaseTransitioning, setPhaseTransitioning] = useState<EventPhase | null>(null);
+  const [phaseTransitioning, setPhaseTransitioning] =
+    useState<EventPhase | null>(null);
   const [editTopProjectCount, setEditTopProjectCount] = useState(5);
   const [editTopPresentingSec, setEditTopPresentingSec] = useState(120);
   const [editTopQuestionsSec, setEditTopQuestionsSec] = useState(180);
@@ -1476,9 +1695,9 @@ export default function PitchEventPage() {
   // Join modal state
   const [showJoin, setShowJoin] = useState(false);
   const [myProjects, setMyProjects] = useState<Project[]>([]);
-  const [selectedProjectId, setSelectedProjectId] = useState<string>("");
+  const [selectedProjectId, setSelectedProjectId] = useState<string>('');
   const [confirming, setConfirming] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
+  const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
     async function load() {
@@ -1498,7 +1717,8 @@ export default function PitchEventPage() {
   }, [eventId]);
 
   const isController = useMemo(
-    () => isAdmin || (event?.staff || []).some(m => m.hacker.id === userInfo?.id),
+    () =>
+      isAdmin || (event?.staff || []).some(m => m.hacker.id === userInfo?.id),
     [isAdmin, event?.staff, userInfo?.id]
   );
 
@@ -1507,8 +1727,8 @@ export default function PitchEventPage() {
     setPhaseTransitioning(targetPhase);
     try {
       const res = await fetch(`/api/events/${event.id}/transition`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ targetPhase }),
       });
       if (res.ok) {
@@ -1525,25 +1745,27 @@ export default function PitchEventPage() {
   };
 
   const openJoin = async () => {
-    if (event?.phase === "FINISHED") {
-      alert("This event is finished. You can no longer add projects to the queue.");
+    if (event?.phase === 'FINISHED') {
+      alert(
+        'This event is finished. You can no longer add projects to the queue.'
+      );
       return;
     }
-    if (!userInfo) return alert("Sign in first");
-    const my = await fetch("/api/projects?status=APPROVED");
+    if (!userInfo) return alert('Sign in first');
+    const my = await fetch('/api/projects?status=APPROVED');
     const all = await my.json();
     const mine = all.filter(
       (p: Project) =>
         p.launchLead.id === userInfo.id ||
         p.participants.some(pt => pt.hacker.id === userInfo.id)
     );
-    const sorted = [...mine].sort((a: any, b: any) => {
+    const sorted = [...mine].sort((a: Project, b: Project) => {
       const da = new Date(a.startDate).getTime();
       const db = new Date(b.startDate).getTime();
       return isNaN(db) || isNaN(da) ? 0 : db - da;
     });
     setMyProjects(sorted);
-    setSelectedProjectId(sorted[0]?.id || "");
+    setSelectedProjectId(sorted[0]?.id || '');
     setShowJoin(true);
   };
 
@@ -1551,21 +1773,25 @@ export default function PitchEventPage() {
     if (!event) return;
     setEditTitle(event.title);
     setEditStartTime(formatDateTimeLocalValue(event.startTime));
-    setEditMeetingUrl(event.meetingUrl || "");
+    setEditMeetingUrl(event.meetingUrl || '');
     setEditVotingEndTime(
       event.votingEndTime
         ? formatDateTimeLocalValue(event.votingEndTime)
-        : formatDateTimeLocalValue(new Date(new Date(event.startTime).getTime() + 15 * 60 * 1000))
+        : formatDateTimeLocalValue(
+            new Date(new Date(event.startTime).getTime() + 15 * 60 * 1000)
+          )
     );
-    setEditMcIds((event.staff || []).filter(m => m.role === "MC").map(m => m.hacker.id));
+    setEditMcIds(
+      (event.staff || []).filter(m => m.role === 'MC').map(m => m.hacker.id)
+    );
     setEditTopProjectCount(event.topProjectCount);
     setEditTopPresentingSec(event.topPresentingSec);
     setEditTopQuestionsSec(event.topQuestionsSec);
     setEditDefaultPresentingSec(event.defaultPresentingSec);
     setEditDefaultQuestionsSec(event.defaultQuestionsSec);
-    setMcSearch("");
+    setMcSearch('');
     try {
-      const res = await fetch("/api/hackers");
+      const res = await fetch('/api/hackers');
       setAllHackers(await res.json());
     } catch {}
     setShowEdit(true);
@@ -1576,8 +1802,8 @@ export default function PitchEventPage() {
     setSaving(true);
     try {
       const res = await fetch(`/api/events/${event.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title: editTitle,
           startTime: serializeDateTimeLocalValue(editStartTime),
@@ -1604,7 +1830,9 @@ export default function PitchEventPage() {
     const q = mcSearch.trim().toLowerCase();
     if (!q) return [];
     return allHackers
-      .filter(h => !editMcIds.includes(h.id) && h.name.toLowerCase().includes(q))
+      .filter(
+        h => !editMcIds.includes(h.id) && h.name.toLowerCase().includes(q)
+      )
       .slice(0, 10);
   }, [mcSearch, allHackers, editMcIds]);
 
@@ -1614,7 +1842,7 @@ export default function PitchEventPage() {
     return myProjects.filter(
       p =>
         p.title.toLowerCase().includes(q) ||
-        (p.preview || "").toLowerCase().includes(q)
+        (p.preview || '').toLowerCase().includes(q)
     );
   }, [searchTerm, myProjects]);
 
@@ -1623,12 +1851,12 @@ export default function PitchEventPage() {
     setConfirming(true);
     try {
       const res = await fetch(`/api/events/${eventId}/queue`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ projectId: selectedProjectId }),
       });
       if (res.status === 409) {
-        alert("This project is already in the queue");
+        alert('This project is already in the queue');
       }
       if (res.status === 400) {
         const body = await res.json().catch(() => ({}));
@@ -1646,13 +1874,24 @@ export default function PitchEventPage() {
     }
   };
 
-  if (!isLoaded || loading) return <div className={`min-h-screen font-space-mono flex items-center justify-center ${isDarkMode ? "bg-gradient-to-b from-gray-900 to-black text-gray-100" : "bg-gradient-to-b from-[#E5E5E5] to-[#F0F0F0] text-gray-900"}`}>Loading...</div>;
+  if (!isLoaded || loading)
+    return (
+      <div
+        className={`min-h-screen font-space-mono flex items-center justify-center ${isDarkMode ? 'bg-gradient-to-b from-gray-900 to-black text-gray-100' : 'bg-gradient-to-b from-[#E5E5E5] to-[#F0F0F0] text-gray-900'}`}
+      >
+        Loading...
+      </div>
+    );
 
   if (!isSignedIn) {
     return (
-      <div className={`min-h-screen font-space-mono flex items-center justify-center ${isDarkMode ? "bg-gradient-to-b from-gray-900 to-black text-gray-100" : "bg-gradient-to-b from-[#E5E5E5] to-[#F0F0F0] text-gray-900"}`}>
+      <div
+        className={`min-h-screen font-space-mono flex items-center justify-center ${isDarkMode ? 'bg-gradient-to-b from-gray-900 to-black text-gray-100' : 'bg-gradient-to-b from-[#E5E5E5] to-[#F0F0F0] text-gray-900'}`}
+      >
         <div className="text-center">
-          <h1 className="text-2xl font-bold mb-4">You need to be logged in to view this page</h1>
+          <h1 className="text-2xl font-bold mb-4">
+            You need to be logged in to view this page
+          </h1>
           <SignInButton mode="modal">
             <button className="px-6 py-3 rounded-full bg-indigo-600 text-white hover:bg-indigo-700 transition duration-300 text-lg">
               Log In / Sign Up
@@ -1663,11 +1902,20 @@ export default function PitchEventPage() {
     );
   }
 
-  if (!event) return <div className={`min-h-screen font-space-mono flex items-center justify-center ${isDarkMode ? "bg-gradient-to-b from-gray-900 to-black text-gray-100" : "bg-gradient-to-b from-[#E5E5E5] to-[#F0F0F0] text-gray-900"}`}>Event not found</div>;
+  if (!event)
+    return (
+      <div
+        className={`min-h-screen font-space-mono flex items-center justify-center ${isDarkMode ? 'bg-gradient-to-b from-gray-900 to-black text-gray-100' : 'bg-gradient-to-b from-[#E5E5E5] to-[#F0F0F0] text-gray-900'}`}
+      >
+        Event not found
+      </div>
+    );
 
   return (
     <>
-      <div className={`min-h-screen font-space-mono ${isDarkMode ? "bg-gradient-to-b from-gray-900 to-black text-gray-100" : "bg-gradient-to-b from-[#E5E5E5] to-[#F0F0F0] text-gray-900"}`}>
+      <div
+        className={`min-h-screen font-space-mono ${isDarkMode ? 'bg-gradient-to-b from-gray-900 to-black text-gray-100' : 'bg-gradient-to-b from-[#E5E5E5] to-[#F0F0F0] text-gray-900'}`}
+      >
         <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 py-16">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
@@ -1687,7 +1935,7 @@ export default function PitchEventPage() {
               {isController && (
                 <button
                   onClick={openEdit}
-                  className={`px-3 py-2 rounded-md text-sm ${isDarkMode ? "bg-gray-700 text-gray-200 hover:bg-gray-600" : "bg-gray-200 text-gray-800 hover:bg-gray-300"}`}
+                  className={`px-3 py-2 rounded-md text-sm ${isDarkMode ? 'bg-gray-700 text-gray-200 hover:bg-gray-600' : 'bg-gray-200 text-gray-800 hover:bg-gray-300'}`}
                 >
                   Edit Event
                 </button>
@@ -1697,7 +1945,7 @@ export default function PitchEventPage() {
 
           <p className="opacity-80 mb-4">{event.description}</p>
 
-          {event.phase === "VOTING" ? (
+          {event.phase === 'VOTING' ? (
             <VotingPhase
               event={event}
               setEvent={setEvent}
@@ -1723,10 +1971,15 @@ export default function PitchEventPage() {
 
       {showEdit && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className={`${isDarkMode ? "bg-gray-800" : "bg-white"} rounded-xl w-full max-w-lg p-6 shadow-xl max-h-[90vh] overflow-y-auto`}>
+          <div
+            className={`${isDarkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl w-full max-w-lg p-6 shadow-xl max-h-[90vh] overflow-y-auto`}
+          >
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-semibold">Edit Event</h2>
-              <button onClick={() => setShowEdit(false)} className="text-sm opacity-70">
+              <button
+                onClick={() => setShowEdit(false)}
+                className="text-sm opacity-70"
+              >
                 Close
               </button>
             </div>
@@ -1736,7 +1989,7 @@ export default function PitchEventPage() {
               value={editTitle}
               onChange={e => setEditTitle(e.target.value)}
               placeholder="Event title"
-              className={`w-full px-3 py-2 rounded-md mb-4 ${isDarkMode ? "bg-gray-900 text-gray-100" : "bg-gray-100 text-gray-900"}`}
+              className={`w-full px-3 py-2 rounded-md mb-4 ${isDarkMode ? 'bg-gray-900 text-gray-100' : 'bg-gray-100 text-gray-900'}`}
             />
 
             <label className="block text-sm font-medium mb-1">Start Time</label>
@@ -1744,83 +1997,121 @@ export default function PitchEventPage() {
               type="datetime-local"
               value={editStartTime}
               onChange={e => setEditStartTime(e.target.value)}
-              className={`w-full px-3 py-2 rounded-md mb-4 ${isDarkMode ? "bg-gray-900 text-gray-100" : "bg-gray-100 text-gray-900"}`}
+              className={`w-full px-3 py-2 rounded-md mb-4 ${isDarkMode ? 'bg-gray-900 text-gray-100' : 'bg-gray-100 text-gray-900'}`}
             />
 
-            <label className="block text-sm font-medium mb-1">Meeting URL</label>
+            <label className="block text-sm font-medium mb-1">
+              Meeting URL
+            </label>
             <input
               value={editMeetingUrl}
               onChange={e => setEditMeetingUrl(e.target.value)}
               placeholder="https://zoom.us/j/..."
-              className={`w-full px-3 py-2 rounded-md mb-4 ${isDarkMode ? "bg-gray-900 text-gray-100" : "bg-gray-100 text-gray-900"}`}
+              className={`w-full px-3 py-2 rounded-md mb-4 ${isDarkMode ? 'bg-gray-900 text-gray-100' : 'bg-gray-100 text-gray-900'}`}
             />
 
-            <label className="block text-sm font-medium mb-1">Voting End Time</label>
+            <label className="block text-sm font-medium mb-1">
+              Voting End Time
+            </label>
             <input
               type="datetime-local"
               value={editVotingEndTime}
               onChange={e => setEditVotingEndTime(e.target.value)}
-              className={`w-full px-3 py-2 rounded-md mb-4 ${isDarkMode ? "bg-gray-900 text-gray-100" : "bg-gray-100 text-gray-900"}`}
+              className={`w-full px-3 py-2 rounded-md mb-4 ${isDarkMode ? 'bg-gray-900 text-gray-100' : 'bg-gray-100 text-gray-900'}`}
             />
 
-            <div className={`rounded-lg p-4 mb-4 ${isDarkMode ? "bg-gray-700/50" : "bg-gray-50"}`}>
-              <h3 className="text-sm font-semibold mb-3">Presentation Timing</h3>
+            <div
+              className={`rounded-lg p-4 mb-4 ${isDarkMode ? 'bg-gray-700/50' : 'bg-gray-50'}`}
+            >
+              <h3 className="text-sm font-semibold mb-3">
+                Presentation Timing
+              </h3>
 
-              <label className="block text-xs font-medium mb-1">Number of Top Projects</label>
+              <label className="block text-xs font-medium mb-1">
+                Number of Top Projects
+              </label>
               <input
                 type="number"
                 min={0}
                 value={editTopProjectCount}
-                onChange={e => setEditTopProjectCount(Math.max(0, parseInt(e.target.value) || 0))}
-                className={`w-full px-3 py-2 rounded-md mb-3 ${isDarkMode ? "bg-gray-900 text-gray-100" : "bg-gray-100 text-gray-900"}`}
+                onChange={e =>
+                  setEditTopProjectCount(
+                    Math.max(0, parseInt(e.target.value) || 0)
+                  )
+                }
+                className={`w-full px-3 py-2 rounded-md mb-3 ${isDarkMode ? 'bg-gray-900 text-gray-100' : 'bg-gray-100 text-gray-900'}`}
               />
 
               <div className="grid grid-cols-2 gap-3 mb-3">
                 <div>
-                  <label className="block text-xs font-medium mb-1">Top Presenting (sec)</label>
+                  <label className="block text-xs font-medium mb-1">
+                    Top Presenting (sec)
+                  </label>
                   <input
                     type="number"
                     min={0}
                     step={10}
                     value={editTopPresentingSec}
-                    onChange={e => setEditTopPresentingSec(Math.max(0, parseInt(e.target.value) || 0))}
-                    className={`w-full px-3 py-2 rounded-md ${isDarkMode ? "bg-gray-900 text-gray-100" : "bg-gray-100 text-gray-900"}`}
+                    onChange={e =>
+                      setEditTopPresentingSec(
+                        Math.max(0, parseInt(e.target.value) || 0)
+                      )
+                    }
+                    className={`w-full px-3 py-2 rounded-md ${isDarkMode ? 'bg-gray-900 text-gray-100' : 'bg-gray-100 text-gray-900'}`}
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium mb-1">Top Q&A (sec)</label>
+                  <label className="block text-xs font-medium mb-1">
+                    Top Q&A (sec)
+                  </label>
                   <input
                     type="number"
                     min={0}
                     step={10}
                     value={editTopQuestionsSec}
-                    onChange={e => setEditTopQuestionsSec(Math.max(0, parseInt(e.target.value) || 0))}
-                    className={`w-full px-3 py-2 rounded-md ${isDarkMode ? "bg-gray-900 text-gray-100" : "bg-gray-100 text-gray-900"}`}
+                    onChange={e =>
+                      setEditTopQuestionsSec(
+                        Math.max(0, parseInt(e.target.value) || 0)
+                      )
+                    }
+                    className={`w-full px-3 py-2 rounded-md ${isDarkMode ? 'bg-gray-900 text-gray-100' : 'bg-gray-100 text-gray-900'}`}
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-medium mb-1">Regular Presenting (sec)</label>
+                  <label className="block text-xs font-medium mb-1">
+                    Regular Presenting (sec)
+                  </label>
                   <input
                     type="number"
                     min={0}
                     step={10}
                     value={editDefaultPresentingSec}
-                    onChange={e => setEditDefaultPresentingSec(Math.max(0, parseInt(e.target.value) || 0))}
-                    className={`w-full px-3 py-2 rounded-md ${isDarkMode ? "bg-gray-900 text-gray-100" : "bg-gray-100 text-gray-900"}`}
+                    onChange={e =>
+                      setEditDefaultPresentingSec(
+                        Math.max(0, parseInt(e.target.value) || 0)
+                      )
+                    }
+                    className={`w-full px-3 py-2 rounded-md ${isDarkMode ? 'bg-gray-900 text-gray-100' : 'bg-gray-100 text-gray-900'}`}
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium mb-1">Regular Q&A (sec)</label>
+                  <label className="block text-xs font-medium mb-1">
+                    Regular Q&A (sec)
+                  </label>
                   <input
                     type="number"
                     min={0}
                     step={10}
                     value={editDefaultQuestionsSec}
-                    onChange={e => setEditDefaultQuestionsSec(Math.max(0, parseInt(e.target.value) || 0))}
-                    className={`w-full px-3 py-2 rounded-md ${isDarkMode ? "bg-gray-900 text-gray-100" : "bg-gray-100 text-gray-900"}`}
+                    onChange={e =>
+                      setEditDefaultQuestionsSec(
+                        Math.max(0, parseInt(e.target.value) || 0)
+                      )
+                    }
+                    className={`w-full px-3 py-2 rounded-md ${isDarkMode ? 'bg-gray-900 text-gray-100' : 'bg-gray-100 text-gray-900'}`}
                   />
                 </div>
               </div>
@@ -1833,11 +2124,13 @@ export default function PitchEventPage() {
                 return (
                   <span
                     key={id}
-                    className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs ${isDarkMode ? "bg-indigo-800 text-indigo-100" : "bg-indigo-100 text-indigo-800"}`}
+                    className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs ${isDarkMode ? 'bg-indigo-800 text-indigo-100' : 'bg-indigo-100 text-indigo-800'}`}
                   >
                     {h?.name || id}
                     <button
-                      onClick={() => setEditMcIds(prev => prev.filter(x => x !== id))}
+                      onClick={() =>
+                        setEditMcIds(prev => prev.filter(x => x !== id))
+                      }
                       className="ml-1 hover:opacity-70"
                     >
                       &times;
@@ -1850,18 +2143,20 @@ export default function PitchEventPage() {
               value={mcSearch}
               onChange={e => setMcSearch(e.target.value)}
               placeholder="Search hackers to add as MC..."
-              className={`w-full px-3 py-2 rounded-md ${isDarkMode ? "bg-gray-900 text-gray-100" : "bg-gray-100 text-gray-900"}`}
+              className={`w-full px-3 py-2 rounded-md ${isDarkMode ? 'bg-gray-900 text-gray-100' : 'bg-gray-100 text-gray-900'}`}
             />
             {filteredHackers.length > 0 && (
-              <div className={`mt-1 rounded-md border max-h-40 overflow-y-auto ${isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"}`}>
+              <div
+                className={`mt-1 rounded-md border max-h-40 overflow-y-auto ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}
+              >
                 {filteredHackers.map(h => (
                   <button
                     key={h.id}
                     onClick={() => {
                       setEditMcIds(prev => [...prev, h.id]);
-                      setMcSearch("");
+                      setMcSearch('');
                     }}
-                    className={`w-full text-left px-3 py-2 text-sm ${isDarkMode ? "hover:bg-gray-700" : "hover:bg-gray-100"}`}
+                    className={`w-full text-left px-3 py-2 text-sm ${isDarkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
                   >
                     {h.name}
                   </button>
@@ -1876,7 +2171,7 @@ export default function PitchEventPage() {
                 <StageBadge phase={event.phase} />
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                {(["VOTING", "PITCHING", "FINISHED"] as EventPhase[])
+                {(['VOTING', 'PITCHING', 'FINISHED'] as EventPhase[])
                   .filter(phase => phase !== event.phase)
                   .map(phase => (
                     <button
@@ -1885,15 +2180,17 @@ export default function PitchEventPage() {
                       disabled={phaseTransitioning !== null}
                       className={`px-3 py-2 rounded-md text-sm text-white transition duration-300 ${
                         phaseTransitioning !== null
-                          ? "bg-gray-400"
-                          : phase === "VOTING"
-                          ? "bg-indigo-600 hover:bg-indigo-700"
-                          : phase === "PITCHING"
-                          ? "bg-indigo-600 hover:bg-indigo-700"
-                          : "bg-gray-600 hover:bg-gray-700"
+                          ? 'bg-gray-400'
+                          : phase === 'VOTING'
+                            ? 'bg-indigo-600 hover:bg-indigo-700'
+                            : phase === 'PITCHING'
+                              ? 'bg-indigo-600 hover:bg-indigo-700'
+                              : 'bg-gray-600 hover:bg-gray-700'
                       }`}
                     >
-                      {phaseTransitioning === phase ? "Updating..." : getPhaseActionLabel(phase, event.phase)}
+                      {phaseTransitioning === phase
+                        ? 'Updating...'
+                        : getPhaseActionLabel(phase, event.phase)}
                     </button>
                   ))}
               </div>
@@ -1902,16 +2199,16 @@ export default function PitchEventPage() {
             <div className="mt-6 flex justify-end gap-3">
               <button
                 onClick={() => setShowEdit(false)}
-                className={`${isDarkMode ? "bg-gray-800 text-gray-200" : "bg-gray-100 text-gray-800"} px-4 py-2 rounded-md`}
+                className={`${isDarkMode ? 'bg-gray-800 text-gray-200' : 'bg-gray-100 text-gray-800'} px-4 py-2 rounded-md`}
               >
                 Cancel
               </button>
               <button
                 disabled={saving}
                 onClick={saveEdit}
-                className={`px-4 py-2 rounded-md ${saving ? "bg-gray-400" : "bg-indigo-600 hover:bg-indigo-700"} text-white`}
+                className={`px-4 py-2 rounded-md ${saving ? 'bg-gray-400' : 'bg-indigo-600 hover:bg-indigo-700'} text-white`}
               >
-                {saving ? "Saving..." : "Save"}
+                {saving ? 'Saving...' : 'Save'}
               </button>
             </div>
           </div>
@@ -1920,10 +2217,15 @@ export default function PitchEventPage() {
 
       {showJoin && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className={`${isDarkMode ? "bg-gray-800" : "bg-white"} rounded-xl w-full max-w-lg p-6 shadow-xl`}>
+          <div
+            className={`${isDarkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl w-full max-w-lg p-6 shadow-xl`}
+          >
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-semibold">Choose your project</h2>
-              <button onClick={() => setShowJoin(false)} className="text-sm opacity-70">
+              <button
+                onClick={() => setShowJoin(false)}
+                className="text-sm opacity-70"
+              >
                 Close
               </button>
             </div>
@@ -1936,7 +2238,7 @@ export default function PitchEventPage() {
                     value={searchTerm}
                     onChange={e => setSearchTerm(e.target.value)}
                     placeholder="Search your projects..."
-                    className={`w-full px-3 py-2 rounded-md ${isDarkMode ? "bg-gray-900 text-gray-100" : "bg-gray-100 text-gray-900"}`}
+                    className={`w-full px-3 py-2 rounded-md ${isDarkMode ? 'bg-gray-900 text-gray-100' : 'bg-gray-100 text-gray-900'}`}
                   />
                 </div>
                 <div className="max-h-80 overflow-y-auto space-y-2 pr-1">
@@ -1945,8 +2247,8 @@ export default function PitchEventPage() {
                       key={p.id}
                       className={`flex items-start gap-3 p-3 rounded-md border ${
                         isDarkMode
-                          ? "bg-gray-800 border-gray-700 hover:bg-gray-750"
-                          : "bg-gray-50 border-gray-200 hover:bg-gray-100"
+                          ? 'bg-gray-800 border-gray-700 hover:bg-gray-750'
+                          : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
                       }`}
                     >
                       <input
@@ -1961,30 +2263,35 @@ export default function PitchEventPage() {
                         <div className="font-medium truncate" title={p.title}>
                           {p.title}
                         </div>
-                        <div className="text-xs opacity-70 truncate">{p.preview}</div>
+                        <div className="text-xs opacity-70 truncate">
+                          {p.preview}
+                        </div>
                         <div className="text-[10px] opacity-60 mt-1">
-                          Launched {new Date((p as any).startDate).toLocaleDateString()}
+                          Launched{' '}
+                          {new Date(p.startDate).toLocaleDateString()}
                         </div>
                       </div>
                     </label>
                   ))}
-                  {filteredMyProjects.length === 0 && <div className="text-sm opacity-70">No results</div>}
+                  {filteredMyProjects.length === 0 && (
+                    <div className="text-sm opacity-70">No results</div>
+                  )}
                 </div>
               </>
             )}
             <div className="mt-6 flex justify-end gap-3">
               <button
                 onClick={() => setShowJoin(false)}
-                className={`${isDarkMode ? "bg-gray-800 text-gray-200" : "bg-gray-100 text-gray-800"} px-4 py-2 rounded-md`}
+                className={`${isDarkMode ? 'bg-gray-800 text-gray-200' : 'bg-gray-100 text-gray-800'} px-4 py-2 rounded-md`}
               >
                 Cancel
               </button>
               <button
                 disabled={!selectedProjectId || confirming}
                 onClick={confirmJoin}
-                className={`px-4 py-2 rounded-full ${confirming ? "bg-gray-400" : "bg-indigo-600 hover:bg-indigo-700"} text-white transition duration-300`}
+                className={`px-4 py-2 rounded-full ${confirming ? 'bg-gray-400' : 'bg-indigo-600 hover:bg-indigo-700'} text-white transition duration-300`}
               >
-                {confirming ? "Adding..." : "Confirm"}
+                {confirming ? 'Adding...' : 'Confirm'}
               </button>
             </div>
           </div>

@@ -1,28 +1,15 @@
 import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
+import type { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
+import { requireEventPitchManager } from "@/lib/eventManagementApi";
 
 export async function POST(
   req: Request,
   { params }: { params: { eventId: string } }
 ) {
   try {
-    const { userId } = auth();
-    if (!userId) return new NextResponse("Unauthorized", { status: 401 });
-
-    const me = await prisma.hacker.findUnique({ where: { clerkId: userId }, select: { id: true, role: true } });
-    if (!me) return new NextResponse("User not found", { status: 404 });
-
-    const event = await prisma.event.findUnique({
-      where: { id: params.eventId },
-      include: { staff: { select: { hackerId: true, role: true } }, projects: true },
-    });
-    if (!event) return new NextResponse("Event not found", { status: 404 });
-
-    const isStaff = event.staff.some((m: { hackerId: string }) => m.hackerId === me.id);
-    const isAdmin = me.role === "SITE_ADMIN";
-    const isChapterAdmin = await prisma.chapterMembership.findFirst({ where: { chapterId: event.chapterId, hackerId: me.id, role: "ADMIN", status: "ACTIVE" } });
-    if (!(isStaff || isAdmin || isChapterAdmin)) return new NextResponse("Unauthorized", { status: 401 });
+    const { event, response } = await requireEventPitchManager(params.eventId);
+    if (response) return response;
 
     if (event.phase !== "PITCHING") {
       return NextResponse.json({ message: "Can only advance during PITCHING phase" }, { status: 400 });
@@ -45,7 +32,7 @@ export async function POST(
     if (currentIdx !== -1) {
       // If still presenting/questions, mark as completed with timestamp
       const current = ordered[currentIdx];
-      const completedData: any = { status: 'DONE' };
+      const completedData: Prisma.EventProjectUpdateInput = { status: 'DONE' };
       if (current.pitchPhase === 'PRESENTING' || current.pitchPhase === 'QUESTIONS') {
         completedData.pitchPhase = 'COMPLETED';
         completedData.completedAt = new Date();
@@ -70,4 +57,3 @@ export async function POST(
     return new NextResponse("Internal Error", { status: 500 });
   }
 }
-

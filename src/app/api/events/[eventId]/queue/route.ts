@@ -35,7 +35,7 @@ export async function POST(
 
     const isOwnerOrParticipant =
       project.launchLeadId === user.id ||
-      project.participants.some((p: any) => p.hacker.id === user.id);
+      project.participants.some((p) => p.hacker.id === user.id);
 
     if (!isOwnerOrParticipant) {
       return new NextResponse("Unauthorized", { status: 401 });
@@ -45,7 +45,7 @@ export async function POST(
     const existing = await prisma.eventProject.findUnique({
       where: { eventId_projectId: { eventId: params.eventId, projectId } },
       select: { id: true },
-    }).catch(() => null);
+    });
     if (existing) {
       return NextResponse.json({ message: "Project already in queue" }, { status: 409 });
     }
@@ -146,8 +146,8 @@ export async function PATCH(
         select: { id: true, addedById: true, eventId: true },
       });
       if (eps.length !== ids.length) return new NextResponse("Not found", { status: 404 });
-      if (eps.some((ep: any) => ep.eventId !== params.eventId)) return new NextResponse("Bad Request", { status: 400 });
-      if (eps.some((ep: any) => ep.addedById !== hacker.id)) return new NextResponse("Unauthorized", { status: 401 });
+      if (eps.some((ep) => ep.eventId !== params.eventId)) return new NextResponse("Bad Request", { status: 400 });
+      if (eps.some((ep) => ep.addedById !== hacker.id)) return new NextResponse("Unauthorized", { status: 401 });
 
       const current = await prisma.eventProject.findFirst({ where: { eventId: params.eventId, status: 'CURRENT' }, select: { position: true } });
       if (current) {

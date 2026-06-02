@@ -151,6 +151,7 @@ describe('chapter-admin scoped chapter operations', () => {
 
     mockActor(hacker);
     mockMembershipLookup(membership);
+    prisma.chapter.findUnique.mockResolvedValue(chapter);
     prisma.chapter.update.mockResolvedValue(updatedChapter);
 
     const response = await PATCH_CHAPTER(

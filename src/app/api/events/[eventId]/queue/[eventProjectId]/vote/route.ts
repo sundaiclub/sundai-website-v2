@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
+import type { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
 
 const VOTE_VALUES = new Set(["LIKE", "DISLIKE"]);
@@ -78,7 +79,7 @@ export async function PUT(
     const { hacker } = authResult;
     const { eventProject } = eventProjectResult;
 
-    const operations: any[] = [];
+    const operations: Prisma.PrismaPromise<unknown>[] = [];
 
     if (value === "LIKE") {
       operations.push(

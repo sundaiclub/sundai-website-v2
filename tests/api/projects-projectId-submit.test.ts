@@ -49,10 +49,6 @@ describe('/api/projects/[projectId]/submit', () => {
     });
 
     it('should return 404 if user not found', async () => {
-      // Debug: Check if auth mock is working
-      console.log('Auth mock before test:', mockAuth.mockReturnValue);
-      console.log('Auth mock calls:', mockAuth.mock.calls);
-      
       mockAuth.mockReturnValue({ userId: mockUserId });
       mockPrisma.hacker.findUnique.mockResolvedValue(null);
 
@@ -62,19 +58,11 @@ describe('/api/projects/[projectId]/submit', () => {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      try {
-        const response = await PATCH(request, { params: { projectId: mockProjectId } });
-        const data = await response.json();
+      const response = await PATCH(request, { params: { projectId: mockProjectId } });
+      const data = await response.json();
 
-        console.log('Response status:', response.status);
-        console.log('Response data:', data);
-
-        expect(response.status).toBe(404);
-        expect(data).toBe('User not found');
-      } catch (error) {
-        console.error('Error in test:', error);
-        throw error;
-      }
+      expect(response.status).toBe(404);
+      expect(data).toBe('User not found');
     });
 
     it('should return 404 if project not found', async () => {

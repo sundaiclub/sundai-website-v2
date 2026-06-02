@@ -2,6 +2,7 @@ import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import OrganizerNotePanel from '../../src/app/components/OrganizerNotePanel';
+import { ThemeProvider } from '../../src/app/contexts/ThemeContext';
 
 global.fetch = jest.fn();
 
@@ -47,6 +48,14 @@ function mockJsonResponse(body: unknown, ok = true) {
   } as Response);
 }
 
+function renderOrganizerNotePanel() {
+  return render(
+    <ThemeProvider>
+      <OrganizerNotePanel {...defaultProps} />
+    </ThemeProvider>
+  );
+}
+
 describe('OrganizerNotePanel', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -58,7 +67,7 @@ describe('OrganizerNotePanel', () => {
       await mockJsonResponse({ note: currentNote, access: editableAccess })
     );
 
-    render(<OrganizerNotePanel {...defaultProps} />);
+    renderOrganizerNotePanel();
 
     expect(screen.getByText('Organizer note for Ada Lovelace')).toBeInTheDocument();
 
@@ -93,7 +102,7 @@ describe('OrganizerNotePanel', () => {
         })
       );
 
-    render(<OrganizerNotePanel {...defaultProps} />);
+    renderOrganizerNotePanel();
 
     const noteEditor = await screen.findByLabelText(/organizer note/i);
     await waitFor(() => {
@@ -129,7 +138,7 @@ describe('OrganizerNotePanel', () => {
       })
     );
 
-    render(<OrganizerNotePanel {...defaultProps} />);
+    renderOrganizerNotePanel();
 
     const noteEditor = await screen.findByLabelText(/organizer note/i);
     await waitFor(() => {
@@ -153,7 +162,7 @@ describe('OrganizerNotePanel', () => {
         await mockJsonResponse({ revisions, access: editableAccess })
       );
 
-    render(<OrganizerNotePanel {...defaultProps} />);
+    renderOrganizerNotePanel();
 
     await user.click(await screen.findByRole('button', { name: /view revisions/i }));
 
@@ -180,7 +189,7 @@ describe('OrganizerNotePanel', () => {
       })
     );
 
-    render(<OrganizerNotePanel {...defaultProps} />);
+    renderOrganizerNotePanel();
 
     await screen.findByLabelText(/organizer note/i);
 

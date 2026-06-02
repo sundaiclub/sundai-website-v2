@@ -20,9 +20,12 @@ export async function POST(
     );
 
     return NextResponse.json(membership, { status: 201 });
-  } catch (error: any) {
-    if (error?.status) {
-      return NextResponse.json({ message: error.message }, { status: error.status });
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      const status = (error as { status?: unknown }).status;
+      if (typeof status === 'number') {
+        return NextResponse.json({ message: error.message }, { status });
+      }
     }
     console.error('[CHAPTER_JOIN_POST]', error);
     return new NextResponse('Internal Error', { status: 500 });

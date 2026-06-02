@@ -57,7 +57,3 @@ export function markdownToHtml(markdown: string): string {
   flushList();
   return htmlParts.join('');
 }
-
-export default markdownToHtml;
-
-

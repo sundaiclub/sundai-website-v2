@@ -3,8 +3,12 @@ import { useEffect } from "react";
 import { useUser } from "@clerk/nextjs";
 import { useRouter, useSearchParams } from "next/navigation";
 
+type AutoLikeUser = ReturnType<typeof useUser> & {
+  openSignIn?: (options: { redirectUrl: string }) => unknown | Promise<unknown>;
+};
+
 export function useAutoLike(projectId: string | null) {
-  const { isSignedIn, isLoaded, openSignIn } = useUser() as any;
+  const { isSignedIn, isLoaded, openSignIn } = useUser() as AutoLikeUser;
   const searchParams = useSearchParams();
   const router = useRouter();
 
@@ -45,7 +49,5 @@ export function useAutoLike(projectId: string | null) {
     };
 
     trigger();
-  }, [projectId, isSignedIn, isLoaded]);
+  }, [projectId, isSignedIn, isLoaded, openSignIn, router, searchParams]);
 }
-
-

@@ -15,7 +15,7 @@ import {
 
 import { useTheme } from "../../../contexts/ThemeContext";
 import { useUserContext } from "../../../contexts/UserContext";
-import { Project } from "../../../components/Project";
+import type { Project } from "@/types/project";
 import PermissionDenied from "../../../components/PermissionDenied";
 import TagSelector from "../../../components/TagSelector";
 import { XMarkIcon, PlusIcon, ArrowLeftIcon, SparklesIcon } from "@heroicons/react/24/outline";
@@ -26,6 +26,16 @@ import ProjectMarkdown from "../../../components/ProjectMarkdown";
 
 const MAX_TITLE_LENGTH = 32;
 const MAX_PREVIEW_LENGTH = 100;
+
+type ProjectRouteParams = {
+  projectId: string;
+};
+
+type AppRouter = ReturnType<typeof useRouter>;
+
+type UploadImageResponse = {
+  url: string;
+};
 
 /* --- Helper: Upload Image to GCS --- */
 const uploadImage = async (file: File): Promise<string> => {
@@ -42,12 +52,12 @@ const uploadImage = async (file: File): Promise<string> => {
   if (!response.ok) {
     throw new Error("Failed to upload image");
   }
-  const data = await response.json();
+  const data = (await response.json()) as UploadImageResponse;
   return data.url;
 };
 
 function ButtonPanel({ params, router, isDarkMode, handleSave, handlePublish, saving, publishing, isDraft }:
-  { params: any, router: any, isDarkMode: boolean, handleSave: () => void, handlePublish: () => void, saving: boolean, publishing: boolean, isDraft: boolean }) {
+  { params: ProjectRouteParams, router: AppRouter, isDarkMode: boolean, handleSave: () => void, handlePublish: () => void, saving: boolean, publishing: boolean, isDraft: boolean }) {
   return (
     <div className="flex items-center space-x-4 mt-4">
       <button
@@ -111,7 +121,7 @@ function getImageNameFromUrl(url: string): string {
 }
 
 export default function ProjectEditPage() {
-  const params = useParams();
+  const params = useParams<ProjectRouteParams>();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const { isAdmin, userInfo } = useUserContext();
@@ -418,10 +428,10 @@ export default function ProjectEditPage() {
       const fetchTags = async () => {
         try {
           const response = await fetch(`/api/tags/${type}`);
-          const data = await response.json();
+          const data = (await response.json()) as Project["techTags"];
           if (type === "tech") {
             setAvailableTechTags(data);
-            const newTag = data.find((tag: any) => tag.id === tagId);
+            const newTag = data.find((tag) => tag.id === tagId);
             if (newTag) {
               setProject({
                 ...project,
@@ -437,7 +447,7 @@ export default function ProjectEditPage() {
             }
           } else {
             setAvailableDomainTags(data);
-            const newTag = data.find((tag: any) => tag.id === tagId);
+            const newTag = data.find((tag) => tag.id === tagId);
             if (newTag) {
               setProject({
                 ...project,

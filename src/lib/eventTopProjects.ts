@@ -1,8 +1,4 @@
-export const TOP_PROJECT_COUNT = 5;
-export const DEFAULT_PRESENTING_SEC = 60;
-export const DEFAULT_QUESTIONS_SEC = 120;
-export const TOP_GROUP_PRESENTING_SEC = 120;
-export const TOP_GROUP_QUESTIONS_SEC = 180;
+const TOP_PROJECT_COUNT = 5;
 
 type RankableEventProject = {
   id: string;
@@ -10,11 +6,11 @@ type RankableEventProject = {
   pitchVotes: Array<{ value?: string }>;
 };
 
-export function getEventProjectLikeCount(project: RankableEventProject) {
+function getEventProjectLikeCount(project: RankableEventProject) {
   return project.pitchVotes.filter((vote) => vote.value === "LIKE").length;
 }
 
-export function compareEventProjectsByVotingResult(
+function compareEventProjectsByVotingResult(
   a: RankableEventProject,
   b: RankableEventProject
 ) {

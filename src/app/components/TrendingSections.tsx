@@ -2,21 +2,23 @@
 import React from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { Project as ProjectType, ProjectCard } from "./Project";
+import { ProjectCard } from "./Project";
+import type { Project as ProjectType } from "@/types/project";
 import { calculateProjectScore } from '@/lib/trending';
+import type { UserInfo } from "../contexts/UserContext";
 
 const HOT_PROJECT_LIKE_WINDOW_DAYS = 7;
 
 interface TrendingSectionsProps {
   projects: ProjectType[];
-  userInfo: any;
+  userInfo: UserInfo | null;
   handleLike: (e: React.MouseEvent, projectId: string, isLiked: boolean) => void;
   isDarkMode: boolean;
 }
 
 const TrendingProjectCard = ({ project, userInfo, handleLike, isDarkMode, showTrendingBadge = false }: {
   project: ProjectType;
-  userInfo: any;
+  userInfo: UserInfo | null;
   handleLike: (e: React.MouseEvent, projectId: string, isLiked: boolean) => void;
   isDarkMode: boolean;
   showTrendingBadge?: boolean;

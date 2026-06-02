@@ -98,11 +98,11 @@ export function mockClerkServerModule() {
   };
 }
 
-export function getMockAuth() {
+function getMockAuth() {
   return asMock<[], ClerkAuthResult>(clerkServer().auth);
 }
 
-export function getMockCurrentUser() {
+function getMockCurrentUser() {
   return asMock<[], Promise<MockClerkUser | null>>(clerkServer().currentUser);
 }
 
@@ -185,10 +185,6 @@ export function mockAuthenticatedClerkUser(
   return { authResult, clerkUser };
 }
 
-export const mockClerkAuth = mockAuthenticatedClerk;
-export const mockClerkCurrentUser = mockCurrentUser;
-export const mockUnauthenticatedClerk = mockSignedOutClerk;
-
 export function resetClerkMocks() {
   getMockAuth().mockReset();
   getMockCurrentUser().mockReset();
@@ -217,16 +213,6 @@ export function createJsonRequest<TBody = unknown>(
   }
 
   return request;
-}
-
-export function createAuthenticatedJsonRequest<TBody = unknown>(
-  path: string,
-  options: JsonRequestOptions<TBody> = {},
-  authOptions: MockClerkAuthOptions = {}
-) {
-  mockAuthenticatedClerk(authOptions);
-
-  return createJsonRequest(path, options);
 }
 
 export function createRouteContext<TParams extends Record<string, string>>(
