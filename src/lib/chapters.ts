@@ -130,6 +130,25 @@ export function publicChapterWhere(): LooseWhere {
   };
 }
 
+export async function resolveChapterId(
+  chapterIdOrSlug: EntityId,
+  prismaClient: PlannedPrismaClient = plannedPrisma
+): Promise<EntityId | null> {
+  const chapterById = (await prismaClient.chapter.findUnique({
+    where: { id: chapterIdOrSlug },
+    select: { id: true },
+  })) as Pick<Chapter, "id"> | null;
+
+  if (chapterById) return chapterById.id;
+
+  const chapterBySlug = (await prismaClient.chapter.findUnique({
+    where: { slug: chapterIdOrSlug },
+    select: { id: true },
+  })) as Pick<Chapter, "id"> | null;
+
+  return chapterBySlug?.id ?? null;
+}
+
 function privateChapterWhere(): LooseWhere {
   return {
     ...activeChapterWhere(),

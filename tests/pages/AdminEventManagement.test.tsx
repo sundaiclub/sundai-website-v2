@@ -268,12 +268,12 @@ describe('event-management site-admin pages', () => {
       ).toBeGreaterThan(0)
       await expectSomeText(/public/i)
       await expectSomeText(/private/i)
-      await expectSomeText(/admins?|manage admins/i)
+      await expectSomeText(/manage/i)
       expect(screen.getByRole('link', { name: /sundai boston/i })).toHaveAttribute(
         'href',
         '/chapters/boston',
       )
-      expect(screen.getAllByRole('link', { name: /manage admins/i })[0]).toHaveAttribute(
+      expect(screen.getAllByRole('link', { name: /^manage$/i })[0]).toHaveAttribute(
         'href',
         '/organizer/chapters/boston/settings#admins',
       )

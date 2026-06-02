@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import AdminAuthGate from '../AdminAuthGate';
 import {
   ManagementAlert,
+  ManagementBackButton,
   ManagementBadge,
   ManagementEmptyState,
   ManagementHeader,
@@ -30,7 +31,7 @@ function chapterList(payload: unknown): SiteAdminChapterListItem[] {
 
 export default function AdminChaptersPage() {
   const classes = useManagementClasses();
-  const { isAdmin, loading } = useUserContext();
+  const { isAdmin, loading, userInfo } = useUserContext();
   const [chapters, setChapters] = useState<SiteAdminChapterListItem[]>([]);
   const [loadError, setLoadError] = useState('');
   const [name, setName] = useState('');
@@ -74,8 +75,15 @@ export default function AdminChaptersPage() {
 
   return (
     <ManagementPage>
-      <AdminAuthGate isAdmin={isAdmin} loading={loading}>
+      <AdminAuthGate
+        isAdmin={isAdmin}
+        isAuthenticated={Boolean(userInfo)}
+        loading={loading}
+      >
         <>
+          <div className="mb-4">
+            <ManagementBackButton />
+          </div>
           <ManagementHeader
             eyebrow="Site admin"
             title="Chapters"
@@ -145,7 +153,7 @@ export default function AdminChaptersPage() {
                     <ManagementLinkButton
                       href={`/organizer/chapters/${chapter.slug}/settings#admins`}
                     >
-                      Manage admins
+                      Manage
                     </ManagementLinkButton>
                   </div>
                 ))}

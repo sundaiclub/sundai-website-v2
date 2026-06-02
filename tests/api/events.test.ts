@@ -52,6 +52,25 @@ describe('/api/events', () => {
     expect(res.status).toBe(200);
   });
 
+  it('GET organizer listing requires sign-in', async () => {
+    const request = new NextRequest('http://localhost:3000/api/events?organizer=true');
+    const res = await GET_EVENTS(request as any);
+    expect(res.status).toBe(401);
+    expect(prisma.event.findMany).not.toHaveBeenCalled();
+  });
+
+  it('GET organizer listing denies signed-in users without organizer permissions', async () => {
+    mockAuth.mockReturnValue({ userId: 'clerk-regular' });
+    prisma.hacker.findUnique.mockResolvedValue({ id: 'h-regular', role: 'HACKER' });
+    prisma.chapterMembership.findMany.mockResolvedValue([]);
+
+    const request = new NextRequest('http://localhost:3000/api/events?organizer=true');
+    const res = await GET_EVENTS(request as any);
+
+    expect(res.status).toBe(403);
+    expect(prisma.event.findMany).not.toHaveBeenCalled();
+  });
+
   it('POST requires site admin or chapter admin', async () => {
     mockAuth.mockReturnValue({ userId: 'clerk-1' });
     prisma.hacker.findUnique.mockResolvedValue({ id: 'h1', role: 'HACKER' });
@@ -105,6 +124,48 @@ describe('/api/events/[eventId]', () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.phase).toBe('VOTING');
+  });
+
+  it('GET management event details requires sign-in', async () => {
+    prisma.event.findUnique.mockResolvedValue({
+      id: 'evt-1',
+      title: 'Test',
+      phase: 'VOTING',
+      startTime: new Date().toISOString(),
+      projects: [],
+      staff: [],
+    });
+
+    const request = new NextRequest('http://localhost:3000/api/events/evt-1?management=true');
+    const res = await GET_EVENT(request as any, { params: { eventId: 'evt-1' } } as any);
+
+    expect(res.status).toBe(401);
+  });
+
+  it('GET management event details denies users without event permissions', async () => {
+    mockAuth.mockReturnValue({ userId: 'clerk-regular' });
+    prisma.hacker.findUnique.mockResolvedValue({ id: 'h-regular', role: 'HACKER' });
+    prisma.eventStaff.findFirst.mockResolvedValue(null);
+    prisma.chapterMembership.findFirst.mockResolvedValue(null);
+    prisma.event.findUnique
+      .mockResolvedValueOnce({
+        id: 'evt-1',
+        title: 'Test',
+        phase: 'VOTING',
+        chapterId: 'chapter-boston',
+        startTime: new Date().toISOString(),
+        projects: [],
+        staff: [],
+      })
+      .mockResolvedValueOnce({
+        id: 'evt-1',
+        chapterId: 'chapter-boston',
+      });
+
+    const request = new NextRequest('http://localhost:3000/api/events/evt-1?management=true');
+    const res = await GET_EVENT(request as any, { params: { eventId: 'evt-1' } } as any);
+
+    expect(res.status).toBe(403);
   });
 
   it('PATCH updates active pitching allotments when timing changes', async () => {

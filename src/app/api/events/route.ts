@@ -17,13 +17,25 @@ function slugify(value: string) {
 
 export async function GET(req: Request) {
   try {
+    const searchParams = new URL(req.url).searchParams;
+    const organizerOnly =
+      searchParams.get("organizer") === "true" ||
+      searchParams.get("manageable") === "true";
     const { userId } = auth();
+    if (organizerOnly && !userId) {
+      return new NextResponse("Unauthorized", { status: 401 });
+    }
+
     const user = userId
       ? await prisma.hacker.findUnique({
           where: { clerkId: userId },
           select: { id: true, role: true },
         })
       : null;
+    if (organizerOnly && !user) {
+      return new NextResponse("Unauthorized", { status: 401 });
+    }
+
     const chapterAdminMemberships =
       user && user.role !== "SITE_ADMIN"
         ? await prisma.chapterMembership.findMany({
@@ -38,9 +50,20 @@ export async function GET(req: Request) {
     const manageableChapterIds = chapterAdminMemberships.map(
       (membership) => membership.chapterId
     );
+    if (
+      organizerOnly &&
+      user?.role !== "SITE_ADMIN" &&
+      manageableChapterIds.length === 0
+    ) {
+      return new NextResponse("Forbidden", { status: 403 });
+    }
+
     const events = await prisma.event.findMany({
-      where:
-        user?.role === "SITE_ADMIN" || manageableChapterIds.length === 0
+      where: organizerOnly
+        ? user?.role === "SITE_ADMIN"
+          ? undefined
+          : { chapterId: { in: manageableChapterIds } }
+        : user?.role === "SITE_ADMIN" || manageableChapterIds.length === 0
           ? undefined
           : { chapterId: { in: manageableChapterIds } },
       orderBy: { startTime: "asc" },

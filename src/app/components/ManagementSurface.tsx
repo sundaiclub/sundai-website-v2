@@ -224,6 +224,39 @@ export function ManagementAlert({
   );
 }
 
+export function ManagementBackButton({
+  fallbackHref = '/admin',
+  label = 'Back',
+}: {
+  fallbackHref?: string;
+  label?: string;
+}) {
+  const classes = useManagementClasses();
+
+  function goBack() {
+    if (typeof window === 'undefined') return;
+
+    if (window.history.length > 1) {
+      window.history.back();
+      return;
+    }
+
+    window.location.assign(fallbackHref);
+  }
+
+  return (
+    <button
+      aria-label="Back to previous admin page"
+      className={classes.ghostButton}
+      onClick={goBack}
+      type="button"
+    >
+      <span aria-hidden="true">&larr;</span>
+      <span>{label}</span>
+    </button>
+  );
+}
+
 export function ManagementLinkButton({
   children,
   href,

@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import AdminAuthGate from './AdminAuthGate';
 import {
+  ManagementBackButton,
   ManagementHeader,
   ManagementPage,
   useManagementClasses,
@@ -19,12 +20,19 @@ const adminSections = [
 
 export default function AdminConsolePage() {
   const classes = useManagementClasses();
-  const { isAdmin, loading } = useUserContext();
+  const { isAdmin, loading, userInfo } = useUserContext();
 
   return (
     <ManagementPage>
-      <AdminAuthGate isAdmin={isAdmin} loading={loading}>
+      <AdminAuthGate
+        isAdmin={isAdmin}
+        isAuthenticated={Boolean(userInfo)}
+        loading={loading}
+      >
         <>
+          <div className="mb-4">
+            <ManagementBackButton />
+          </div>
           <ManagementHeader
             eyebrow="Site admin"
             title="Site admin console"

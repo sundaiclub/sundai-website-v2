@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import AdminAuthGate from '../AdminAuthGate';
 import {
   ManagementAlert,
+  ManagementBackButton,
   ManagementBadge,
   ManagementEmptyState,
   ManagementHeader,
@@ -45,7 +46,7 @@ function templateList(payload: unknown): ApplicationTemplateListItem[] {
 
 export default function AdminApplicationTemplatesPage() {
   const classes = useManagementClasses();
-  const { isAdmin, loading } = useUserContext();
+  const { isAdmin, loading, userInfo } = useUserContext();
   const [templates, setTemplates] = useState<ApplicationTemplateListItem[]>([]);
   const [loadError, setLoadError] = useState('');
 
@@ -81,8 +82,15 @@ export default function AdminApplicationTemplatesPage() {
 
   return (
     <ManagementPage>
-      <AdminAuthGate isAdmin={isAdmin} loading={loading}>
+      <AdminAuthGate
+        isAdmin={isAdmin}
+        isAuthenticated={Boolean(userInfo)}
+        loading={loading}
+      >
         <>
+          <div className="mb-4">
+            <ManagementBackButton />
+          </div>
           <ManagementHeader
             eyebrow="Site admin"
             title="Application templates"

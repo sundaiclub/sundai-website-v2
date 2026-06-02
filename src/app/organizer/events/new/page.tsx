@@ -1,8 +1,14 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import {
+  AuthStatusAlert,
+  authStatusFromResponse,
+  type AuthStatus,
+} from '../../../components/AuthStatusAlert';
 import {
   ManagementAlert,
+  ManagementBackButton,
   ManagementHeader,
   ManagementPage,
   ManagementSection,
@@ -15,6 +21,37 @@ export default function OrganizerNewEventPage() {
   const [chapterId, setChapterId] = useState('');
   const [startTime, setStartTime] = useState('');
   const [message, setMessage] = useState('');
+  const [authStatus, setAuthStatus] = useState<AuthStatus | null>(null);
+  const [isCheckingAccess, setIsCheckingAccess] = useState(true);
+
+  useEffect(() => {
+    let isCurrent = true;
+
+    setIsCheckingAccess(true);
+    setAuthStatus(null);
+    fetch('/api/events?organizer=true')
+      .then(response => {
+        const nextAuthStatus = authStatusFromResponse(response);
+        if (nextAuthStatus) {
+          if (isCurrent) setAuthStatus(nextAuthStatus);
+          return;
+        }
+
+        if (!response.ok) {
+          throw new Error(`Request failed with status ${response.status}`);
+        }
+      })
+      .catch(() => {
+        if (isCurrent) setMessage('Unable to verify event permissions.');
+      })
+      .finally(() => {
+        if (isCurrent) setIsCheckingAccess(false);
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, []);
 
   async function createEvent(event: React.FormEvent) {
     event.preventDefault();
@@ -29,11 +66,36 @@ export default function OrganizerNewEventPage() {
         applicationMode: 'NONE',
       }),
     });
+    const nextAuthStatus = authStatusFromResponse(response);
+    if (nextAuthStatus) {
+      setAuthStatus(nextAuthStatus);
+      return;
+    }
+
     setMessage(response.ok ? 'Event saved' : 'Unable to save event');
+  }
+
+  if (isCheckingAccess) {
+    return (
+      <ManagementPage maxWidth="max-w-3xl">
+        <ManagementAlert>Loading...</ManagementAlert>
+      </ManagementPage>
+    );
+  }
+
+  if (authStatus) {
+    return (
+      <ManagementPage maxWidth="max-w-3xl">
+        <AuthStatusAlert status={authStatus} />
+      </ManagementPage>
+    );
   }
 
   return (
     <ManagementPage maxWidth="max-w-3xl">
+      <div className="mb-4">
+        <ManagementBackButton />
+      </div>
       <ManagementHeader
         eyebrow="Organizer"
         title="New event"

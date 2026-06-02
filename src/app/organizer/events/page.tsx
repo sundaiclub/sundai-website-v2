@@ -3,7 +3,13 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import {
+  AuthStatusAlert,
+  authStatusFromResponse,
+  type AuthStatus,
+} from '../../components/AuthStatusAlert';
+import {
   ManagementAlert,
+  ManagementBackButton,
   ManagementBadge,
   ManagementEmptyState,
   ManagementHeader,
@@ -23,23 +29,64 @@ export default function OrganizerEventsPage() {
   const classes = useManagementClasses();
   const { isAdmin } = useUserContext();
   const [events, setEvents] = useState<OrganizerEventListItem[]>([]);
+  const [authStatus, setAuthStatus] = useState<AuthStatus | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
 
   useEffect(() => {
+    let isCurrent = true;
+
+    setIsLoading(true);
+    setAuthStatus(null);
     setLoadError('');
-    fetch('/api/events')
+    fetch('/api/events?organizer=true')
       .then(response => {
+        const nextAuthStatus = authStatusFromResponse(response);
+        if (nextAuthStatus) {
+          if (isCurrent) setAuthStatus(nextAuthStatus);
+          return null;
+        }
         if (!response.ok) {
           throw new Error(`Request failed with status ${response.status}`);
         }
         return response.json() as Promise<unknown>;
       })
-      .then(payload => setEvents(list(payload)))
-      .catch(() => setLoadError('Unable to load organizer events.'));
+      .then(payload => {
+        if (isCurrent && payload) setEvents(list(payload));
+      })
+      .catch(() => {
+        if (isCurrent) setLoadError('Unable to load organizer events.');
+      })
+      .finally(() => {
+        if (isCurrent) setIsLoading(false);
+      });
+
+    return () => {
+      isCurrent = false;
+    };
   }, []);
+
+  if (isLoading) {
+    return (
+      <ManagementPage>
+        <ManagementAlert>Loading...</ManagementAlert>
+      </ManagementPage>
+    );
+  }
+
+  if (authStatus) {
+    return (
+      <ManagementPage>
+        <AuthStatusAlert status={authStatus} />
+      </ManagementPage>
+    );
+  }
 
   return (
     <ManagementPage>
+      <div className="mb-4">
+        <ManagementBackButton />
+      </div>
       <ManagementHeader
         eyebrow="Organizer"
         title="Organizer events"

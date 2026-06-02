@@ -166,6 +166,78 @@ describe('/api/chapters/[chapterId]/ban-flags', () => {
       })
     );
   });
+
+  it('lists chapter ban flags through a chapter slug without exposing global bans', async () => {
+    const { chapter, hacker, membership } = buildChapterAdminFixture();
+    const flaggedHacker = buildHacker({
+      id: 'hacker-flagged',
+      clerkId: 'clerk-flagged',
+      name: 'Flagged Hacker',
+      email: 'flagged@example.com',
+    });
+    const flag = {
+      ...buildUserBanFlag({
+        id: 'flag-boston-review',
+        chapterId: chapter.id,
+        hackerId: flaggedHacker.id,
+        createdById: hacker.id,
+        reason: 'Repeated local code of conduct concern.',
+      }),
+      hacker: {
+        id: flaggedHacker.id,
+        name: flaggedHacker.name,
+        email: flaggedHacker.email,
+      },
+      createdBy: {
+        id: hacker.id,
+        name: hacker.name,
+        email: hacker.email,
+      },
+      chapter: {
+        id: chapter.id,
+        name: chapter.name,
+        slug: chapter.slug,
+      },
+      resolvedBy: null,
+    };
+    const { GET: GET_CHAPTER_BAN_FLAGS } = loadChapterBanFlagsRoute();
+
+    mockActor(hacker, flaggedHacker);
+    mockMembershipLookup(membership);
+    prisma.chapter.findUnique.mockImplementation(async ({ where }: any) => {
+      if (where?.id === chapter.id) return { id: chapter.id };
+      if (where?.id === chapter.slug) return null;
+      if (where?.slug === chapter.slug) return { id: chapter.id };
+      return null;
+    });
+    prisma.userBanFlag.findMany.mockResolvedValue([flag]);
+
+    const response = await GET_CHAPTER_BAN_FLAGS(
+      createJsonRequest(`/api/chapters/${chapter.slug}/ban-flags`) as any,
+      createRouteContext({ chapterId: chapter.slug }) as any
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(prisma.userBanFlag.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { chapterId: chapter.id },
+      })
+    );
+    expect(prisma.userBan.findMany).not.toHaveBeenCalled();
+    expect(body).toEqual([
+      expect.objectContaining({
+        id: flag.id,
+        chapterId: chapter.id,
+        hackerId: flaggedHacker.id,
+        status: 'OPEN',
+        hacker: expect.objectContaining({
+          id: flaggedHacker.id,
+          name: flaggedHacker.name,
+        }),
+      }),
+    ]);
+  });
 });
 
 describe('/api/admin/bans chapter-admin visibility', () => {

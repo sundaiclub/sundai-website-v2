@@ -1,9 +1,14 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import OrganizerNotePanel from '../../../../components/OrganizerNotePanel';
+import {
+  AuthStatusAlert,
+  authStatusFromResponse,
+  type AuthStatus,
+} from '../../../../components/AuthStatusAlert';
 import {
   ManagementAlert,
+  ManagementBackButton,
   ManagementBadge,
   ManagementEmptyState,
   ManagementHeader,
@@ -32,36 +37,43 @@ export default function OrganizerChapterSettingsPage({
   params: { chapterSlug: string };
 }) {
   const classes = useManagementClasses();
-  const { isAdmin, loading } = useUserContext();
+  const { loading } = useUserContext();
   const [chapter, setChapter] = useState<OrganizerChapterSettings | null>(null);
   const [members, setMembers] = useState<ChapterMembershipSummary[]>([]);
   const [templates, setTemplates] = useState<ApplicationTemplateListItem[]>([]);
   const [banFlags, setBanFlags] = useState<AdminBanFlagListItem[]>([]);
-  const [denied, setDenied] = useState(false);
+  const [authStatus, setAuthStatus] = useState<AuthStatus | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
 
   useEffect(() => {
     let isCurrent = true;
 
     async function loadChapterSettings() {
+      setIsLoading(true);
+      setAuthStatus(null);
+      setLoadError('');
+      setChapter(null);
+      setMembers([]);
+      setTemplates([]);
+      setBanFlags([]);
+
       try {
         const chapterResponse = await fetch(
           `/api/chapters/${params.chapterSlug}`
         );
         if (!chapterResponse.ok) {
-          if (isCurrent) setDenied(true);
+          if (isCurrent) {
+            setAuthStatus(authStatusFromResponse(chapterResponse) ?? 'forbidden');
+          }
           return;
         }
 
         const chapterPayload = await chapterResponse.json();
         const nextChapter = firstChapter(chapterPayload);
         if (!nextChapter) {
-          if (isCurrent) setDenied(true);
+          if (isCurrent) setAuthStatus('not-found');
           return;
-        }
-
-        if (isCurrent) {
-          setChapter(nextChapter);
-          setDenied(false);
         }
 
         const [membersResponse, templatesResponse, banFlagsResponse] =
@@ -71,20 +83,42 @@ export default function OrganizerChapterSettingsPage({
             fetch(`/api/chapters/${nextChapter.id}/ban-flags`),
           ]);
 
+        const authResponse = [
+          membersResponse,
+          templatesResponse,
+          banFlagsResponse,
+        ].find(response => authStatusFromResponse(response));
+
+        if (authResponse) {
+          if (isCurrent) setAuthStatus(authStatusFromResponse(authResponse));
+          return;
+        }
+
+        if (
+          !membersResponse.ok ||
+          !templatesResponse.ok ||
+          !banFlagsResponse.ok
+        ) {
+          throw new Error('Unable to load chapter settings');
+        }
+
         const [membersPayload, templatesPayload, banFlagsPayload] =
           await Promise.all([
-            membersResponse.ok ? membersResponse.json() : [],
-            templatesResponse.ok ? templatesResponse.json() : [],
-            banFlagsResponse.ok ? banFlagsResponse.json() : [],
+            membersResponse.json(),
+            templatesResponse.json(),
+            banFlagsResponse.json(),
           ]);
 
         if (!isCurrent) return;
 
+        setChapter(nextChapter);
         setMembers(Array.isArray(membersPayload) ? membersPayload : []);
         setTemplates(Array.isArray(templatesPayload) ? templatesPayload : []);
         setBanFlags(Array.isArray(banFlagsPayload) ? banFlagsPayload : []);
       } catch {
-        if (isCurrent) setDenied(true);
+        if (isCurrent) setLoadError('Unable to load chapter settings.');
+      } finally {
+        if (isCurrent) setIsLoading(false);
       }
     }
 
@@ -95,7 +129,7 @@ export default function OrganizerChapterSettingsPage({
     };
   }, [params.chapterSlug]);
 
-  if (denied && loading) {
+  if (isLoading || (authStatus && loading)) {
     return (
       <ManagementPage maxWidth="max-w-5xl">
         <ManagementAlert>Loading...</ManagementAlert>
@@ -103,11 +137,19 @@ export default function OrganizerChapterSettingsPage({
     );
   }
 
-  if (denied && !isAdmin) {
+  if (authStatus) {
+    return (
+      <ManagementPage maxWidth="max-w-5xl">
+        <AuthStatusAlert status={authStatus} />
+      </ManagementPage>
+    );
+  }
+
+  if (loadError || !chapter) {
     return (
       <ManagementPage maxWidth="max-w-5xl">
         <ManagementAlert tone="danger">
-          You do not have permission to view this page.
+          {loadError || 'Unable to load chapter settings.'}
         </ManagementAlert>
       </ManagementPage>
     );
@@ -115,10 +157,13 @@ export default function OrganizerChapterSettingsPage({
 
   return (
     <ManagementPage maxWidth="max-w-5xl">
+      <div className="mb-4">
+        <ManagementBackButton />
+      </div>
       <ManagementHeader
         eyebrow="Organizer"
         title={chapter?.name || 'Chapter settings'}
-        description="Manage chapter operations, application defaults, member access, notes, and local moderation signals."
+        description="Manage chapter operations, application defaults, member access, and local moderation signals."
         actions={
           <>
             <ManagementBadge tone="success">
@@ -262,28 +307,6 @@ export default function OrganizerChapterSettingsPage({
             {members.length === 0 && (
               <ManagementEmptyState>
                 No members have been added.
-              </ManagementEmptyState>
-            )}
-          </div>
-        </ManagementSection>
-
-        <ManagementSection
-          title="Organizer notes"
-          description="Private context visible to authorized organizers."
-        >
-          <div className="grid gap-3">
-            {members
-              .filter(member => member.hacker?.id)
-              .map(member => (
-                <OrganizerNotePanel
-                  hackerId={member.hacker!.id!}
-                  key={member.id}
-                  title={`Organizer note for ${member.hacker?.name || 'member'}`}
-                />
-              ))}
-            {members.filter(member => member.hacker?.id).length === 0 && (
-              <ManagementEmptyState>
-                No member notes are available.
               </ManagementEmptyState>
             )}
           </div>

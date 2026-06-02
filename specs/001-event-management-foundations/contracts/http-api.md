@@ -159,9 +159,13 @@ Lists chapter-admin ban review flags. Site-admin only.
 
 Resolves a ban flag. Site-admin only.
 
+### `GET /api/chapters/[chapterId]/ban-flags`
+
+Lists chapter-scoped ban review flags. Chapter admins for the chapter and site admins only. Supports chapter ids and slugs. Does not expose the global ban list.
+
 ### `POST /api/chapters/[chapterId]/ban-flags`
 
-Creates a site-admin review item. Chapter admins for the chapter and site admins only. Does not create a ban or expose the global ban list.
+Creates a site-admin review item. Chapter admins for the chapter and site admins only. Supports chapter ids and slugs. Does not create a ban or expose the global ban list.
 
 ## Organizer Notes
 

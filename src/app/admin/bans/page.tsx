@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import AdminAuthGate from '../AdminAuthGate';
 import {
   ManagementAlert,
+  ManagementBackButton,
   ManagementBadge,
   ManagementEmptyState,
   ManagementHeader,
@@ -44,7 +45,7 @@ function flagList(payload: unknown): AdminBanFlagListItem[] {
 
 export default function AdminBansPage() {
   const classes = useManagementClasses();
-  const { isAdmin, loading } = useUserContext();
+  const { isAdmin, loading, userInfo } = useUserContext();
   const [bans, setBans] = useState<AdminBanListItem[]>([]);
   const [flags, setFlags] = useState<AdminBanFlagListItem[]>([]);
   const [loadError, setLoadError] = useState('');
@@ -90,8 +91,15 @@ export default function AdminBansPage() {
 
   return (
     <ManagementPage>
-      <AdminAuthGate isAdmin={isAdmin} loading={loading}>
+      <AdminAuthGate
+        isAdmin={isAdmin}
+        isAuthenticated={Boolean(userInfo)}
+        loading={loading}
+      >
         <>
+          <div className="mb-4">
+            <ManagementBackButton />
+          </div>
           <ManagementHeader
             eyebrow="Site admin"
             title="Global moderation"

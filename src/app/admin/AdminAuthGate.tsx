@@ -1,16 +1,19 @@
 'use client';
 
 import type { ReactNode } from 'react';
+import { AuthStatusAlert } from '../components/AuthStatusAlert';
 import { ManagementAlert } from '../components/ManagementSurface';
 
 type AdminAuthGateProps = {
   isAdmin: boolean | undefined;
+  isAuthenticated?: boolean;
   loading: boolean | undefined;
   children: ReactNode;
 };
 
 export default function AdminAuthGate({
   isAdmin,
+  isAuthenticated = true,
   loading,
   children,
 }: AdminAuthGateProps) {
@@ -18,12 +21,12 @@ export default function AdminAuthGate({
     return <ManagementAlert>Loading...</ManagementAlert>;
   }
 
+  if (!isAuthenticated) {
+    return <AuthStatusAlert status="unauthenticated" />;
+  }
+
   if (!isAdmin) {
-    return (
-      <ManagementAlert tone="danger">
-        You do not have permission to view this page.
-      </ManagementAlert>
-    );
+    return <AuthStatusAlert status="forbidden" />;
   }
 
   return <>{children}</>;

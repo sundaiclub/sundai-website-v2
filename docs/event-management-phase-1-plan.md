@@ -687,9 +687,10 @@ Use `PATCH` for revoke so the ban record remains auditable.
 
 Chapter-admin ban flag route:
 
+- `GET /api/chapters/[chapterId]/ban-flags`
 - `POST /api/chapters/[chapterId]/ban-flags`
 
-This route creates a site-admin review item. It does not ban the user and does not expose the global ban list to chapter admins.
+This route lists and creates chapter-scoped site-admin review items. It accepts chapter ids and slugs, does not ban the user, and does not expose the global ban list to chapter admins.
 
 ### Organizer Notes
 

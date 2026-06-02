@@ -20,6 +20,10 @@ export async function GET(
   { params }: { params: { eventId: string } }
 ) {
   try {
+    const searchParams = new URL(req.url).searchParams;
+    const managementRead =
+      searchParams.get("management") === "true" ||
+      searchParams.get("manageable") === "true";
     const event = await prisma.event.findUnique({
       where: { id: params.eventId },
       include: {
@@ -44,6 +48,24 @@ export async function GET(
     });
 
     if (!event) return new NextResponse("Not Found", { status: 404 });
+
+    if (managementRead) {
+      const { userId } = auth();
+      if (!userId) return new NextResponse("Unauthorized", { status: 401 });
+
+      const user = await prisma.hacker.findUnique({
+        where: { clerkId: userId },
+        select: { id: true, role: true },
+      });
+      if (!user) return new NextResponse("Unauthorized", { status: 401 });
+
+      const canManage = await canManageEventSettings(
+        prisma,
+        user.id,
+        params.eventId
+      );
+      if (!canManage) return new NextResponse("Forbidden", { status: 403 });
+    }
 
     return NextResponse.json(event);
   } catch (error) {
