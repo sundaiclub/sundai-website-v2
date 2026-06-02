@@ -193,6 +193,15 @@ describe('/api/chapters', () => {
         where: { id: chapter.id },
       })
     );
+    expect(prisma.chapter.findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({
+        include: expect.objectContaining({
+          events: expect.objectContaining({
+            orderBy: { startTime: 'desc' },
+          }),
+        }),
+      })
+    );
   });
 
   it('updates chapter settings for a site admin', async () => {

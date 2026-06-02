@@ -16,6 +16,7 @@ import {
   ManagementSection,
   useManagementClasses,
 } from '../../../../components/ManagementSurface';
+import { ApplicationTemplateEditor } from '../../../../components/ApplicationTemplateEditor';
 import { useUserContext } from '../../../../contexts/UserContext';
 import type {
   AdminBanFlagListItem,
@@ -29,6 +30,37 @@ function firstChapter(payload: unknown): OrganizerChapterSettings | null {
     return payload as OrganizerChapterSettings;
   }
   return null;
+}
+
+function templateList(payload: unknown): ApplicationTemplateListItem[] {
+  if (!Array.isArray(payload)) return [];
+
+  return (payload as ApplicationTemplateListItem[]).map(template => ({
+    ...template,
+    isActive:
+      typeof template.isActive === 'boolean'
+        ? template.isActive
+        : (template as ApplicationTemplateListItem & { status?: string })
+            .status === 'ACTIVE',
+  }));
+}
+
+function replaceTemplate(
+  templates: ApplicationTemplateListItem[],
+  savedTemplate: ApplicationTemplateListItem
+) {
+  return templates.map(template =>
+    template.id === savedTemplate.id
+      ? {
+          ...template,
+          ...savedTemplate,
+        }
+      : savedTemplate.isActive &&
+          template.scope === savedTemplate.scope &&
+          template.chapterId === savedTemplate.chapterId
+        ? { ...template, isActive: false }
+        : template
+  );
 }
 
 export default function OrganizerChapterSettingsPage({
@@ -64,7 +96,9 @@ export default function OrganizerChapterSettingsPage({
         );
         if (!chapterResponse.ok) {
           if (isCurrent) {
-            setAuthStatus(authStatusFromResponse(chapterResponse) ?? 'forbidden');
+            setAuthStatus(
+              authStatusFromResponse(chapterResponse) ?? 'forbidden'
+            );
           }
           return;
         }
@@ -113,7 +147,7 @@ export default function OrganizerChapterSettingsPage({
 
         setChapter(nextChapter);
         setMembers(Array.isArray(membersPayload) ? membersPayload : []);
-        setTemplates(Array.isArray(templatesPayload) ? templatesPayload : []);
+        setTemplates(templateList(templatesPayload));
         setBanFlags(Array.isArray(banFlagsPayload) ? banFlagsPayload : []);
       } catch {
         if (isCurrent) setLoadError('Unable to load chapter settings.');
@@ -193,26 +227,25 @@ export default function OrganizerChapterSettingsPage({
 
         <ManagementSection
           title="Application template"
-          description="Chapter questions are composed with the site-required fields."
-          actions={
-            <button className={classes.secondaryButton} type="button">
-              Save template
-            </button>
-          }
+          description="The active site template is the base. Chapter templates add local questions without changing site-required fields."
         >
           <div className="grid gap-3">
             {templates.map(template => (
-              <div key={template.id} className={`${classes.subtlePanel} p-4`}>
-                <div className="flex flex-wrap items-center gap-2">
-                  <div className="font-semibold">{template.name}</div>
-                  <ManagementBadge>{template.scope}</ManagementBadge>
-                </div>
-                <div className={`mt-2 text-sm ${classes.mutedText}`}>
-                  {(template.fieldsJson ?? [])
-                    .map(field => field.label)
-                    .join(', ') || 'No fields configured'}
-                </div>
-              </div>
+              <ApplicationTemplateEditor
+                key={template.id}
+                template={template}
+                canEdit={template.scope === 'CHAPTER'}
+                onSaved={savedTemplate =>
+                  setTemplates(current =>
+                    replaceTemplate(current, savedTemplate)
+                  )
+                }
+                onDeleted={templateId =>
+                  setTemplates(current =>
+                    current.filter(template => template.id !== templateId)
+                  )
+                }
+              />
             ))}
             {templates.length === 0 && (
               <ManagementEmptyState>

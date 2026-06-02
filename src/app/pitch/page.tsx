@@ -292,6 +292,7 @@ export default function PitchPage() {
                   e.phase !== 'FINISHED' &&
                   new Date(e.startTime).getTime() > nowTs
               );
+              const upcomingNewestFirst = [...upcoming].reverse();
               const past = sorted.filter(
                 e =>
                   e.phase === 'FINISHED' ||
@@ -352,7 +353,7 @@ export default function PitchPage() {
                     <div>
                       <h3 className="text-lg font-semibold mb-2">Upcoming</h3>
                       <ul className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {upcoming.map(e => (
+                        {upcomingNewestFirst.map(e => (
                           <li
                             key={e.id}
                             className={`${isDarkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg p-4 shadow`}

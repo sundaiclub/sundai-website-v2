@@ -110,6 +110,8 @@ export default function OrganizerEventSettingsPage({
     );
   }
 
+  const staffMembers = event.staff ?? [];
+
   return (
     <ManagementPage maxWidth="max-w-5xl">
       <div className="mb-4">
@@ -151,7 +153,7 @@ export default function OrganizerEventSettingsPage({
           }
         >
           <div className={`divide-y ${classes.divider}`}>
-            {event.staff.map(staff => (
+            {staffMembers.map(staff => (
               <div
                 key={staff.id}
                 className="grid gap-2 py-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
@@ -162,7 +164,7 @@ export default function OrganizerEventSettingsPage({
                 <ManagementBadge>{staff.role}</ManagementBadge>
               </div>
             ))}
-            {event.staff.length === 0 && (
+            {staffMembers.length === 0 && (
               <ManagementEmptyState>
                 No staff has been assigned.
               </ManagementEmptyState>
@@ -171,25 +173,11 @@ export default function OrganizerEventSettingsPage({
         </ManagementSection>
 
         <ManagementSection
-          title="Application questions"
-          description="Preview the event application after site and chapter questions are merged."
-          actions={
-            <button className={classes.secondaryButton} type="button">
-              Preview merged application
-            </button>
-          }
-        >
-          <ManagementEmptyState>
-            No event-specific questions are shown here yet.
-          </ManagementEmptyState>
-        </ManagementSection>
-
-        <ManagementSection
           title="Organizer notes"
           description="Private staff notes for event organizers."
         >
           <div className="grid gap-3">
-            {event.staff
+            {staffMembers
               .filter(staff => staff.hacker?.id)
               .map(staff => (
                 <OrganizerNotePanel
@@ -198,7 +186,7 @@ export default function OrganizerEventSettingsPage({
                   title={`Organizer note for ${staff.hacker?.name || 'staff member'}`}
                 />
               ))}
-            {event.staff.filter(staff => staff.hacker?.id).length === 0 && (
+            {staffMembers.filter(staff => staff.hacker?.id).length === 0 && (
               <ManagementEmptyState>
                 No staff notes are available.
               </ManagementEmptyState>

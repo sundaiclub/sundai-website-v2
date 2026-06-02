@@ -59,7 +59,7 @@ describe('/api/admin/bans', () => {
     resetClerkMocks();
   });
 
-  it('creates a global ban as a site admin', async () => {
+  it('creates a global ban for a selected hacker as a site admin', async () => {
     const siteAdmin = buildSiteAdmin();
     const bannedHacker = buildHacker({
       id: 'hacker-banned',
@@ -118,6 +118,49 @@ describe('/api/admin/bans', () => {
         revokedAt: null,
       })
     );
+  });
+
+  it('rejects a ban when no selected hacker is provided', async () => {
+    const siteAdmin = buildSiteAdmin();
+
+    signInAs(siteAdmin);
+    mockPrisma.hacker.findUnique.mockResolvedValue(siteAdmin);
+
+    const response = await POST_BAN(
+      createJsonRequest('/api/admin/bans', {
+        method: 'POST',
+        body: {},
+      })
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body).toEqual({ message: 'hackerId is required' });
+    expect(mockPrisma.userBan.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects a ban when the selected hacker is not found', async () => {
+    const siteAdmin = buildSiteAdmin();
+
+    signInAs(siteAdmin);
+    mockPrisma.hacker.findUnique.mockImplementation(
+      async ({ where }: { where: Record<string, string> }) => {
+        if (where.clerkId === siteAdmin.clerkId) return siteAdmin;
+        return null;
+      }
+    );
+
+    const response = await POST_BAN(
+      createJsonRequest('/api/admin/bans', {
+        method: 'POST',
+        body: { hackerId: 'hacker-missing' },
+      })
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body).toEqual({ message: 'Selected hacker was not found' });
+    expect(mockPrisma.userBan.create).not.toHaveBeenCalled();
   });
 
   it('lists global bans only for site admins', async () => {

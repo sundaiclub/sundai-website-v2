@@ -3,9 +3,7 @@ import {
   POST as POST_APPLICATION_TEMPLATE,
   GET as GET_APPLICATION_TEMPLATES,
 } from '../../src/app/api/application-templates/route';
-import {
-  PATCH as PATCH_APPLICATION_TEMPLATE,
-} from '../../src/app/api/application-templates/[templateId]/route';
+import { PATCH as PATCH_APPLICATION_TEMPLATE } from '../../src/app/api/application-templates/[templateId]/route';
 import { PATCH as PATCH_CHAPTER } from '../../src/app/api/chapters/[chapterId]/route';
 import {
   createJsonRequest,
@@ -40,10 +38,13 @@ jest.mock('../../src/lib/prisma', () => ({
       findUnique: jest.fn(),
     },
     applicationTemplate: {
+      findFirst: jest.fn(),
       findMany: jest.fn(),
       findUnique: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
+      updateMany: jest.fn(),
+      delete: jest.fn(),
     },
     event: {
       findUnique: jest.fn(),
@@ -80,7 +81,7 @@ const mockHackerLookup = (...hackers: HackerFixture[]) => {
   prisma.hacker.findUnique.mockImplementation(async ({ where }: any) => {
     return (
       hackers.find(
-        (hacker) => where?.id === hacker.id || where?.clerkId === hacker.clerkId
+        hacker => where?.id === hacker.id || where?.clerkId === hacker.clerkId
       ) ?? null
     );
   });
@@ -100,7 +101,7 @@ const mockActor = (actor: HackerFixture, ...extraHackers: HackerFixture[]) => {
 const mockMembershipLookup = (...memberships: ChapterMembershipFixture[]) => {
   const findMembership = ({ where }: any) => {
     if (where?.id) {
-      return memberships.find((membership) => membership.id === where.id) ?? null;
+      return memberships.find(membership => membership.id === where.id) ?? null;
     }
 
     const compound = where?.chapterId_hackerId;
@@ -110,7 +111,7 @@ const mockMembershipLookup = (...memberships: ChapterMembershipFixture[]) => {
     const status = typeof where?.status === 'string' ? where.status : undefined;
 
     return (
-      memberships.find((membership) => {
+      memberships.find(membership => {
         if (chapterId && membership.chapterId !== chapterId) return false;
         if (hackerId && membership.hackerId !== hackerId) return false;
         if (role && membership.role !== role) return false;
@@ -170,7 +171,7 @@ describe('chapter-admin application template operations', () => {
     expect(prisma.applicationTemplate.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
-          OR: [{ scope: 'SITE' }, { chapterId: chapter.id }],
+          OR: [{ scope: 'SITE', isActive: true }, { chapterId: chapter.id }],
         },
       })
     );

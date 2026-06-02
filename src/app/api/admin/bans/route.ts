@@ -32,8 +32,14 @@ export async function POST(req: Request) {
     const body = await req.json();
     if (!body?.hackerId) return badRequest('hackerId is required');
 
+    const targetHacker = await prisma.hacker.findUnique({
+      where: { id: body.hackerId },
+      select: { id: true },
+    });
+    if (!targetHacker) return badRequest('Selected hacker was not found');
+
     const ban = await createGlobalBan({
-      hackerId: body.hackerId,
+      hackerId: targetHacker.id,
       createdById: hacker!.id,
       publicSafeReason: body.publicSafeReason,
       internalNote: body.internalNote,

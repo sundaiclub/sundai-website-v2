@@ -12,6 +12,43 @@ import {
   parseTemplateFieldsJson,
 } from '@/lib/applicationTemplates';
 import { canManageChapterSettings } from '@/lib/eventManagementAuth';
+import type {
+  ApplicationTemplateScope,
+  TemplateFieldDefinition,
+} from '@/types/event-management';
+
+async function getActiveSiteRequiredFields(): Promise<
+  TemplateFieldDefinition[] | undefined
+> {
+  const siteTemplate = await prisma.applicationTemplate.findFirst({
+    where: { scope: 'SITE', isActive: true },
+    orderBy: { updatedAt: 'desc' },
+    select: { fieldsJson: true },
+  });
+
+  if (!siteTemplate) return undefined;
+
+  return parseTemplateFieldsJson(
+    siteTemplate.fieldsJson,
+    'siteTemplate.fieldsJson',
+    {
+      requireSiteRequiredFields: true,
+    }
+  ).filter(field => field.siteRequired);
+}
+
+function activeTemplateScopeFilter(
+  scope: ApplicationTemplateScope,
+  chapterId: string | null
+) {
+  return scope === 'SITE'
+    ? { scope: 'SITE' as const, isActive: true }
+    : {
+        scope: 'CHAPTER' as const,
+        chapterId,
+        isActive: true,
+      };
+}
 
 export async function GET(req: Request) {
   try {
@@ -22,11 +59,11 @@ export async function GET(req: Request) {
     const chapterId = url.searchParams.get('chapterId');
     const where = isSiteAdmin(hacker)
       ? chapterId
-        ? { OR: [{ scope: 'SITE' as const }, { chapterId }] }
+        ? { OR: [{ scope: 'SITE' as const, isActive: true }, { chapterId }] }
         : {}
       : chapterId &&
           (await canManageChapterSettings(prisma, hacker.id, chapterId))
-        ? { OR: [{ scope: 'SITE' as const }, { chapterId }] }
+        ? { OR: [{ scope: 'SITE' as const, isActive: true }, { chapterId }] }
         : { scope: 'SITE' as const, isActive: true };
 
     const templates = await prisma.applicationTemplate.findMany({
@@ -57,7 +94,8 @@ export async function POST(req: Request) {
     if (scope !== 'SITE' && scope !== 'CHAPTER') {
       return badRequest('scope must be SITE or CHAPTER');
     }
-    if (scope === 'SITE' && !isSiteAdmin(hacker)) return requireSiteAdmin().then(r => r.response!);
+    if (scope === 'SITE' && !isSiteAdmin(hacker))
+      return requireSiteAdmin().then(r => r.response!);
     if (
       scope === 'CHAPTER' &&
       (!chapterId ||
@@ -67,22 +105,39 @@ export async function POST(req: Request) {
       return new NextResponse('Forbidden', { status: 403 });
     }
 
+    const requiredSiteFields =
+      scope === 'CHAPTER' ? await getActiveSiteRequiredFields() : undefined;
     const fields = parseTemplateFieldsJson(body?.fieldsJson, 'fieldsJson', {
       requireSiteRequiredFields: scope === 'SITE',
       allowSiteRequiredFieldIds: scope === 'SITE',
+      requiredSiteFields,
     });
     assertValidApplicationTemplateFields(fields, {
       requireSiteRequiredFields: scope === 'SITE',
       allowSiteRequiredFieldIds: scope === 'SITE',
+      requiredSiteFields,
     });
+
+    const isActive = body?.isActive ?? true;
+    if (isActive) {
+      await prisma.applicationTemplate.updateMany({
+        where: activeTemplateScopeFilter(
+          scope,
+          scope === 'CHAPTER' ? chapterId : null
+        ),
+        data: { isActive: false },
+      });
+    }
 
     const template = await prisma.applicationTemplate.create({
       data: {
         scope,
         chapterId: scope === 'CHAPTER' ? chapterId : null,
-        name: body?.name || (scope === 'SITE' ? 'Site template' : 'Chapter template'),
+        name:
+          body?.name ||
+          (scope === 'SITE' ? 'Site template' : 'Chapter template'),
         fieldsJson: JSON.parse(JSON.stringify(fields)),
-        isActive: body?.isActive ?? true,
+        isActive,
         createdById: hacker.id,
       },
     });
@@ -90,7 +145,10 @@ export async function POST(req: Request) {
     return NextResponse.json(template, { status: 201 });
   } catch (error) {
     if (error instanceof ApplicationTemplateValidationError) {
-      return NextResponse.json({ message: error.message, issues: error.issues }, { status: 400 });
+      return NextResponse.json(
+        { message: error.message, issues: error.issues },
+        { status: 400 }
+      );
     }
     console.error('[APPLICATION_TEMPLATES_POST]', error);
     return new NextResponse('Internal Error', { status: 500 });

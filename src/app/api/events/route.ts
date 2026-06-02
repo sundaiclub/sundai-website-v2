@@ -66,7 +66,7 @@ export async function GET(req: Request) {
         : user?.role === "SITE_ADMIN" || manageableChapterIds.length === 0
           ? undefined
           : { chapterId: { in: manageableChapterIds } },
-      orderBy: { startTime: "asc" },
+      orderBy: { startTime: "desc" },
       include: {
         chapter: { select: { id: true, name: true, slug: true } },
         staff: { include: { hacker: { include: { avatar: true } } } },

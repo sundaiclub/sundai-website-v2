@@ -1,38 +1,38 @@
-import React from 'react'
-import { render, screen, waitFor } from '@testing-library/react'
+import React from 'react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
-const mockUseTheme = jest.fn()
-const mockUseUserContext = jest.fn()
+const mockUseTheme = jest.fn();
+const mockUseUserContext = jest.fn();
 
 jest.mock('../../src/app/contexts/ThemeContext', () => ({
   useTheme: () => mockUseTheme(),
-}))
+}));
 
 jest.mock('../../src/app/contexts/UserContext', () => ({
   useUserContext: () => mockUseUserContext(),
-}))
+}));
 
 jest.mock('../../src/app/components/Project', () => {
   return function MockProjectGrid() {
-    return <div data-testid="project-grid">Project moderation grid</div>
-  }
-})
+    return <div data-testid="project-grid">Project moderation grid</div>;
+  };
+});
 
-type PageComponent = React.ComponentType
+type PageComponent = React.ComponentType;
 
 const siteAdminUser = {
   id: 'hacker-site-admin',
   name: 'Site Admin',
   role: 'SITE_ADMIN',
   roles: ['SITE_ADMIN'],
-}
+};
 
 const regularUser = {
   id: 'hacker-regular',
   name: 'Regular Hacker',
   role: 'HACKER',
   roles: ['HACKER'],
-}
+};
 
 const chapters = [
   {
@@ -61,7 +61,7 @@ const chapters = [
     admins: [],
     members: [],
   },
-]
+];
 
 const templates = [
   {
@@ -82,9 +82,11 @@ const templates = [
     chapterName: 'Sundai Boston',
     name: 'Boston Chapter Questions',
     status: 'ACTIVE',
-    fields: [{ key: 'dietary', label: 'Dietary restrictions', required: false }],
+    fields: [
+      { key: 'dietary', label: 'Dietary restrictions', required: false },
+    ],
   },
-]
+];
 
 const bans = [
   {
@@ -96,7 +98,12 @@ const bans = [
     status: 'ACTIVE',
     createdAt: '2026-05-25T12:00:00.000Z',
   },
-]
+];
+
+const hackers = [
+  { id: 'hacker-alice', name: 'Alice Hacker', email: 'alice@example.com' },
+  { id: 'hacker-bob', name: 'Bob Builder', email: 'bob@example.com' },
+];
 
 const banFlags = [
   {
@@ -107,19 +114,21 @@ const banFlags = [
     reason: 'Needs review',
     status: 'OPEN',
   },
-]
+];
 
 function loadPage(route: string, modulePath: string): PageComponent {
   try {
-    const mod = require(modulePath)
+    const mod = require(modulePath);
     if (!mod.default) {
-      throw new Error('module did not export a default React component')
+      throw new Error('module did not export a default React component');
     }
 
-    return mod.default
+    return mod.default;
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error)
-    throw new Error(`Expected ${route} page module at ${modulePath}: ${message}`)
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(
+      `Expected ${route} page module at ${modulePath}: ${message}`
+    );
   }
 }
 
@@ -128,7 +137,7 @@ function mockSiteAdmin() {
     isAdmin: true,
     loading: false,
     userInfo: siteAdminUser,
-  })
+  });
 }
 
 function mockNonSiteAdmin() {
@@ -136,7 +145,7 @@ function mockNonSiteAdmin() {
     isAdmin: false,
     loading: false,
     userInfo: regularUser,
-  })
+  });
 }
 
 function jsonResponse(data: unknown, status = 200) {
@@ -145,7 +154,7 @@ function jsonResponse(data: unknown, status = 200) {
     status,
     json: jest.fn().mockResolvedValue(data),
     text: jest.fn().mockResolvedValue(JSON.stringify(data)),
-  })
+  });
 }
 
 function mockAdminFetches() {
@@ -155,46 +164,53 @@ function mockAdminFetches() {
         ? input
         : 'url' in input
           ? input.url
-          : input.toString()
+          : input.toString();
 
     if (url.includes('/api/admin/ban-flags')) {
-      return jsonResponse({ banFlags, flags: banFlags })
+      return jsonResponse({ banFlags, flags: banFlags });
     }
 
     if (url.includes('/api/admin/bans')) {
-      return jsonResponse({ bans, items: bans })
+      return jsonResponse({ bans, items: bans });
+    }
+
+    if (url.includes('/api/hackers')) {
+      return jsonResponse(hackers);
     }
 
     if (url.includes('/api/application-templates/merged')) {
       return jsonResponse({
         fields: [...templates[0].fields, ...templates[1].fields],
-      })
+      });
     }
 
     if (url.includes('/api/application-templates')) {
-      return jsonResponse({ templates, items: templates })
+      return jsonResponse({ templates, items: templates });
     }
 
     if (url.includes('/api/chapters')) {
-      return jsonResponse({ chapters, items: chapters })
+      return jsonResponse({ chapters, items: chapters });
     }
 
-    return jsonResponse({})
-  }) as jest.Mock
+    return jsonResponse({});
+  }) as jest.Mock;
 }
 
 function mockForbiddenFetches() {
   global.fetch = jest.fn(() =>
-    jsonResponse({ error: 'You do not have permission to view this page.' }, 403),
-  ) as jest.Mock
+    jsonResponse(
+      { error: 'You do not have permission to view this page.' },
+      403
+    )
+  ) as jest.Mock;
 }
 
 async function expectSomeText(...patterns: RegExp[]) {
   await waitFor(() => {
     expect(
-      patterns.some((pattern) => screen.queryAllByText(pattern).length > 0),
-    ).toBe(true)
-  })
+      patterns.some(pattern => screen.queryAllByText(pattern).length > 0)
+    ).toBe(true);
+  });
 }
 
 async function expectAccessDenied() {
@@ -202,164 +218,247 @@ async function expectAccessDenied() {
     /you do not have permission/i,
     /access denied/i,
     /not authorized/i,
-    /forbidden/i,
-  )
+    /forbidden/i
+  );
 }
 
 describe('event-management site-admin pages', () => {
   beforeEach(() => {
-    jest.clearAllMocks()
-    mockUseTheme.mockReturnValue({ isDarkMode: false })
-    mockAdminFetches()
-  })
+    jest.clearAllMocks();
+    mockUseTheme.mockReturnValue({ isDarkMode: false });
+    mockAdminFetches();
+  });
 
   describe('/admin', () => {
     it('renders the site-admin console links for delegated event management', async () => {
-      mockSiteAdmin()
-      const AdminPage = loadPage('/admin', '../../src/app/admin/page')
+      mockSiteAdmin();
+      const AdminPage = loadPage('/admin', '../../src/app/admin/page');
 
-      render(<AdminPage />)
+      render(<AdminPage />);
 
+      expect(screen.getByRole('link', { name: /project/i })).toHaveAttribute(
+        'href',
+        '/admin/projects'
+      );
+      expect(screen.getByRole('link', { name: /chapters/i })).toHaveAttribute(
+        'href',
+        '/admin/chapters'
+      );
       expect(
-        screen.getByRole('link', { name: /project/i }),
-      ).toHaveAttribute('href', '/admin/projects')
+        screen.getByRole('link', { name: /application templates|templates/i })
+      ).toHaveAttribute('href', '/admin/application-templates');
       expect(
-        screen.getByRole('link', { name: /chapters/i }),
-      ).toHaveAttribute('href', '/admin/chapters')
-      expect(
-        screen.getByRole('link', { name: /application templates|templates/i }),
-      ).toHaveAttribute('href', '/admin/application-templates')
-      expect(
-        screen.getByRole('link', { name: /bans|global moderation/i }),
-      ).toHaveAttribute('href', '/admin/bans')
-    })
+        screen.getByRole('link', { name: /bans|global moderation/i })
+      ).toHaveAttribute('href', '/admin/bans');
+    });
 
     it('denies the console to non-site-admin users', async () => {
-      mockNonSiteAdmin()
-      mockForbiddenFetches()
-      const AdminPage = loadPage('/admin', '../../src/app/admin/page')
+      mockNonSiteAdmin();
+      mockForbiddenFetches();
+      const AdminPage = loadPage('/admin', '../../src/app/admin/page');
 
-      render(<AdminPage />)
+      render(<AdminPage />);
 
-      await expectAccessDenied()
-      expect(screen.queryByRole('link', { name: /chapters/i })).not.toBeInTheDocument()
+      await expectAccessDenied();
       expect(
-        screen.queryByRole('link', { name: /application templates|templates/i }),
-      ).not.toBeInTheDocument()
-      expect(screen.queryByRole('link', { name: /bans|global moderation/i })).not.toBeInTheDocument()
-    })
-  })
+        screen.queryByRole('link', { name: /chapters/i })
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('link', { name: /application templates|templates/i })
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('link', { name: /bans|global moderation/i })
+      ).not.toBeInTheDocument();
+    });
+  });
 
   describe('/admin/chapters', () => {
     it('renders chapter list and management controls for site admins', async () => {
-      mockSiteAdmin()
+      mockSiteAdmin();
       const ChaptersPage = loadPage(
         '/admin/chapters',
-        '../../src/app/admin/chapters/page',
-      )
+        '../../src/app/admin/chapters/page'
+      );
 
-      render(<ChaptersPage />)
+      render(<ChaptersPage />);
 
-      await expectSomeText(/sundai boston/i, /boston/i)
-      await expectSomeText(/sundai nyc/i)
+      await expectSomeText(/sundai boston/i, /boston/i);
+      await expectSomeText(/sundai nyc/i);
       expect(
         screen.getAllByRole('button', { name: /create chapter|new chapter/i })
-          .length,
-      ).toBeGreaterThan(0)
-      await expectSomeText(/public/i)
-      await expectSomeText(/private/i)
-      await expectSomeText(/manage/i)
-      expect(screen.getByRole('link', { name: /sundai boston/i })).toHaveAttribute(
-        'href',
-        '/chapters/boston',
-      )
-      expect(screen.getAllByRole('link', { name: /^manage$/i })[0]).toHaveAttribute(
-        'href',
-        '/organizer/chapters/boston/settings#admins',
-      )
-    })
+          .length
+      ).toBeGreaterThan(0);
+      await expectSomeText(/public/i);
+      await expectSomeText(/private/i);
+      await expectSomeText(/manage/i);
+      expect(
+        screen.getByRole('link', { name: /sundai boston/i })
+      ).toHaveAttribute('href', '/chapters/boston');
+      expect(
+        screen.getAllByRole('link', { name: /^manage$/i })[0]
+      ).toHaveAttribute('href', '/organizer/chapters/boston/settings#admins');
+    });
 
     it('denies chapter management to non-site-admin users', async () => {
-      mockNonSiteAdmin()
-      mockForbiddenFetches()
+      mockNonSiteAdmin();
+      mockForbiddenFetches();
       const ChaptersPage = loadPage(
         '/admin/chapters',
-        '../../src/app/admin/chapters/page',
-      )
+        '../../src/app/admin/chapters/page'
+      );
 
-      render(<ChaptersPage />)
+      render(<ChaptersPage />);
 
-      await expectAccessDenied()
-      expect(screen.queryByText(/sundai boston/i)).not.toBeInTheDocument()
-      expect(screen.queryByRole('button', { name: /create chapter|new chapter/i })).not.toBeInTheDocument()
-    })
-  })
+      await expectAccessDenied();
+      expect(screen.queryByText(/sundai boston/i)).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', { name: /create chapter|new chapter/i })
+      ).not.toBeInTheDocument();
+    });
+  });
 
   describe('/admin/application-templates', () => {
     it('renders site application template controls for site admins', async () => {
-      mockSiteAdmin()
+      mockSiteAdmin();
       const TemplatesPage = loadPage(
         '/admin/application-templates',
-        '../../src/app/admin/application-templates/page',
-      )
+        '../../src/app/admin/application-templates/page'
+      );
 
-      render(<TemplatesPage />)
+      render(<TemplatesPage />);
 
-      await expectSomeText(/sundai site requirements/i, /site template/i)
-      await expectSomeText(/name/i)
-      await expectSomeText(/email/i)
-      await expectSomeText(/boston chapter questions/i, /sundai boston/i)
+      await expectSomeText(/sundai site requirements/i, /site template/i);
+      await expectSomeText(/name/i);
+      await expectSomeText(/email/i);
+      await expectSomeText(/boston chapter questions/i, /sundai boston/i);
       expect(
-        screen.getAllByRole('button', { name: /save|update|create/i }).length,
-      ).toBeGreaterThan(0)
-      await expectSomeText(/preview merged|merged preview|composed/i)
-    })
+        screen.getAllByRole('button', { name: /save|update|create/i }).length
+      ).toBeGreaterThan(0);
+      await expectSomeText(/application preview/i);
+    });
 
     it('denies application template management to non-site-admin users', async () => {
-      mockNonSiteAdmin()
-      mockForbiddenFetches()
+      mockNonSiteAdmin();
+      mockForbiddenFetches();
       const TemplatesPage = loadPage(
         '/admin/application-templates',
-        '../../src/app/admin/application-templates/page',
-      )
+        '../../src/app/admin/application-templates/page'
+      );
 
-      render(<TemplatesPage />)
+      render(<TemplatesPage />);
 
-      await expectAccessDenied()
-      expect(screen.queryByText(/sundai site requirements/i)).not.toBeInTheDocument()
-      expect(screen.queryByRole('button', { name: /save|update|create/i })).not.toBeInTheDocument()
-    })
-  })
+      await expectAccessDenied();
+      expect(
+        screen.queryByText(/sundai site requirements/i)
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', { name: /save|update|create/i })
+      ).not.toBeInTheDocument();
+    });
+  });
 
   describe('/admin/bans', () => {
     it('renders global ban and ban-flag controls for site admins', async () => {
-      mockSiteAdmin()
-      const BansPage = loadPage('/admin/bans', '../../src/app/admin/bans/page')
+      mockSiteAdmin();
+      const BansPage = loadPage('/admin/bans', '../../src/app/admin/bans/page');
 
-      render(<BansPage />)
+      render(<BansPage />);
 
-      await expectSomeText(/banned hacker/i, /policy violation/i)
-      await expectSomeText(/flagged hacker/i)
-      expect(screen.getByRole('textbox', { name: /search/i })).toBeInTheDocument()
+      await expectSomeText(/banned hacker/i, /policy violation/i);
+      await expectSomeText(/flagged hacker/i);
       expect(
-        screen.getAllByRole('button', { name: /create ban|ban hacker|add ban/i })
-          .length,
-      ).toBeGreaterThan(0)
-      expect(screen.getAllByRole('button', { name: /revoke/i }).length).toBeGreaterThan(0)
-      expect(screen.getAllByRole('button', { name: /resolve/i }).length).toBeGreaterThan(0)
-    })
+        screen.getByRole('textbox', { name: /search/i })
+      ).toBeInTheDocument();
+      expect(screen.getByPlaceholderText(/hacker name/i)).toBeInTheDocument();
+      expect(
+        screen.getAllByRole('button', {
+          name: /create ban|ban hacker|add ban/i,
+        }).length
+      ).toBeGreaterThan(0);
+      expect(
+        screen.getAllByRole('button', { name: /revoke/i }).length
+      ).toBeGreaterThan(0);
+      expect(
+        screen.getAllByRole('button', { name: /resolve/i }).length
+      ).toBeGreaterThan(0);
+    });
+
+    it('shows matching hackers while typing and submits the selected hacker', async () => {
+      mockSiteAdmin();
+      const createdBan = {
+        id: 'ban-created',
+        hackerId: 'hacker-alice',
+        hacker: { id: 'hacker-alice', name: 'Alice Hacker' },
+        publicSafeReason: 'Policy violation',
+        createdAt: '2026-05-25T12:00:00.000Z',
+      };
+
+      global.fetch = jest.fn((input: RequestInfo | URL, init?: RequestInit) => {
+        const url =
+          typeof input === 'string'
+            ? input
+            : 'url' in input
+              ? input.url
+              : input.toString();
+
+        if (url.includes('/api/admin/ban-flags')) {
+          return jsonResponse({ banFlags: [], flags: [] });
+        }
+
+        if (url.includes('/api/admin/bans') && init?.method === 'POST') {
+          return jsonResponse(createdBan, 201);
+        }
+
+        if (url.includes('/api/admin/bans')) {
+          return jsonResponse({ bans: [], items: [] });
+        }
+
+        if (url.includes('/api/hackers')) {
+          return jsonResponse(hackers);
+        }
+
+        return jsonResponse({});
+      }) as jest.Mock;
+
+      const BansPage = loadPage('/admin/bans', '../../src/app/admin/bans/page');
+      render(<BansPage />);
+
+      await expectSomeText(/no active bans are listed/i);
+      const input = screen.getByRole('textbox', {
+        name: /search hacker by name/i,
+      });
+      fireEvent.change(input, { target: { value: 'Alice' } });
+      await expectSomeText(/alice@example.com/i);
+      fireEvent.click(screen.getByRole('option', { name: /alice hacker/i }));
+      fireEvent.click(screen.getByRole('button', { name: /create ban/i }));
+
+      await waitFor(() => {
+        expect(global.fetch).toHaveBeenCalledWith(
+          '/api/admin/bans',
+          expect.objectContaining({
+            method: 'POST',
+            body: JSON.stringify({ hackerId: 'hacker-alice' }),
+          })
+        );
+      });
+      await expectSomeText(/alice hacker/i);
+    });
 
     it('denies global moderation details to non-site-admin users', async () => {
-      mockNonSiteAdmin()
-      mockForbiddenFetches()
-      const BansPage = loadPage('/admin/bans', '../../src/app/admin/bans/page')
+      mockNonSiteAdmin();
+      mockForbiddenFetches();
+      const BansPage = loadPage('/admin/bans', '../../src/app/admin/bans/page');
 
-      render(<BansPage />)
+      render(<BansPage />);
 
-      await expectAccessDenied()
-      expect(screen.queryByText(/policy violation/i)).not.toBeInTheDocument()
-      expect(screen.queryByText(/internal moderation context/i)).not.toBeInTheDocument()
-      expect(screen.queryByRole('button', { name: /create ban|ban hacker|add ban/i })).not.toBeInTheDocument()
-    })
-  })
-})
+      await expectAccessDenied();
+      expect(screen.queryByText(/policy violation/i)).not.toBeInTheDocument();
+      expect(
+        screen.queryByText(/internal moderation context/i)
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', { name: /create ban|ban hacker|add ban/i })
+      ).not.toBeInTheDocument();
+    });
+  });
+});

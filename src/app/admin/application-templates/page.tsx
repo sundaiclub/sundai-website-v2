@@ -5,50 +5,119 @@ import AdminAuthGate from '../AdminAuthGate';
 import {
   ManagementAlert,
   ManagementBackButton,
-  ManagementBadge,
   ManagementEmptyState,
   ManagementHeader,
   ManagementPage,
   ManagementSection,
-  useManagementClasses,
 } from '../../components/ManagementSurface';
+import { ApplicationTemplateEditor } from '../../components/ApplicationTemplateEditor';
+import { ApplicationTemplatePreview } from '../../components/ApplicationTemplatePreview';
 import { useUserContext } from '../../contexts/UserContext';
-import type { ApplicationTemplateListItem } from '@/types/event-management';
-
-const defaultSiteFields = [
-  {
-    id: 'name',
-    label: 'Name',
-    type: 'TEXT',
-    required: true,
-    siteRequired: true,
-  },
-  {
-    id: 'email',
-    label: 'Email',
-    type: 'EMAIL',
-    required: true,
-    siteRequired: true,
-  },
-];
+import type {
+  ApplicationTemplateListItem,
+  TemplateFieldDefinition,
+} from '@/types/event-management';
 
 function templateList(payload: unknown): ApplicationTemplateListItem[] {
-  if (Array.isArray(payload)) return payload as ApplicationTemplateListItem[];
-  if (payload && typeof payload === 'object') {
-    const value = payload as {
-      templates?: ApplicationTemplateListItem[];
-      items?: ApplicationTemplateListItem[];
-    };
-    return value.templates ?? value.items ?? [];
+  const templates = Array.isArray(payload)
+    ? (payload as ApplicationTemplateListItem[])
+    : payload && typeof payload === 'object'
+      ? ((
+          payload as {
+            templates?: ApplicationTemplateListItem[];
+            items?: ApplicationTemplateListItem[];
+          }
+        ).templates ??
+        (
+          payload as {
+            templates?: ApplicationTemplateListItem[];
+            items?: ApplicationTemplateListItem[];
+          }
+        ).items ??
+        [])
+      : [];
+
+  return templates.map(template => ({
+    ...template,
+    isActive:
+      typeof template.isActive === 'boolean'
+        ? template.isActive
+        : (template as ApplicationTemplateListItem & { status?: string })
+            .status === 'ACTIVE',
+  }));
+}
+
+function replaceTemplate(
+  templates: ApplicationTemplateListItem[],
+  savedTemplate: ApplicationTemplateListItem
+) {
+  return templates.map(template =>
+    template.id === savedTemplate.id
+      ? {
+          ...template,
+          ...savedTemplate,
+        }
+      : savedTemplate.isActive &&
+          template.scope === savedTemplate.scope &&
+          (template.scope === 'SITE' ||
+            template.chapterId === savedTemplate.chapterId)
+        ? { ...template, isActive: false }
+        : template
+  );
+}
+
+function activeSiteTemplateCount(templates: ApplicationTemplateListItem[]) {
+  return templates.filter(
+    template => template.scope === 'SITE' && template.isActive
+  ).length;
+}
+
+function activeSiteTemplateDescription(
+  templates: ApplicationTemplateListItem[]
+) {
+  const count = activeSiteTemplateCount(templates);
+  if (count === 1) {
+    return 'The active site template is the base application for every chapter.';
   }
-  return [];
+  if (count === 0) {
+    return 'No active site template exists. Activate one site template before composing chapter applications.';
+  }
+  return 'Multiple active site templates are listed. Saving one as active will deactivate the others.';
+}
+
+function templateFields(
+  template: ApplicationTemplateListItem | undefined
+): TemplateFieldDefinition[] {
+  const fields = (template?.fieldsJson ?? template?.fields ?? []) as Array<
+    Partial<TemplateFieldDefinition> & { key?: string }
+  >;
+
+  return fields.map((field, index) => ({
+    id:
+      typeof field.id === 'string' && field.id.trim()
+        ? field.id
+        : typeof field.key === 'string' && field.key.trim()
+          ? field.key
+          : `field_${index + 1}`,
+    label: field.label ?? '',
+    type: field.type ?? 'TEXT',
+    required: field.required ?? false,
+    siteRequired: field.siteRequired,
+    helpText: field.helpText,
+    placeholder: field.placeholder,
+    options: field.options,
+    validation: field.validation,
+    order: field.order ?? index,
+  }));
 }
 
 export default function AdminApplicationTemplatesPage() {
-  const classes = useManagementClasses();
   const { isAdmin, loading, userInfo } = useUserContext();
   const [templates, setTemplates] = useState<ApplicationTemplateListItem[]>([]);
   const [loadError, setLoadError] = useState('');
+  const activeSiteTemplate = templates.find(
+    template => template.scope === 'SITE' && template.isActive
+  );
 
   useEffect(() => {
     if (!isAdmin) return;
@@ -64,22 +133,6 @@ export default function AdminApplicationTemplatesPage() {
       .catch(() => setLoadError('Unable to load application templates.'));
   }, [isAdmin]);
 
-  async function createDefaultSiteTemplate() {
-    const response = await fetch('/api/application-templates', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        scope: 'SITE',
-        name: 'Default site application',
-        fieldsJson: defaultSiteFields,
-      }),
-    });
-    if (response.ok) {
-      const created = await response.json();
-      setTemplates(current => [...current, created]);
-    }
-  }
-
   return (
     <ManagementPage>
       <AdminAuthGate
@@ -94,46 +147,33 @@ export default function AdminApplicationTemplatesPage() {
           <ManagementHeader
             eyebrow="Site admin"
             title="Application templates"
-            description="Manage site and chapter application questions used by event registrations."
-            actions={
-              <button
-                className={classes.primaryButton}
-                onClick={createDefaultSiteTemplate}
-                type="button"
-              >
-                Create site template
-              </button>
-            }
+            description={activeSiteTemplateDescription(templates)}
           />
           {loadError && (
             <div className="mb-5">
               <ManagementAlert tone="danger">{loadError}</ManagementAlert>
             </div>
           )}
-          <ManagementSection title="Templates">
-            <div className={`divide-y ${classes.divider}`}>
+          <ManagementSection
+            title="Templates"
+            description="Edit the active site template and chapter extensions. Site-required fields in the active site template cannot be removed by chapter or event questions."
+          >
+            <div className="grid gap-4">
               {templates.map(template => (
-                <div
+                <ApplicationTemplateEditor
                   key={template.id}
-                  className="grid gap-3 py-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
-                >
-                  <div className="min-w-0">
-                    <div className="font-semibold">{template.name}</div>
-                    <div className={`mt-1 text-sm ${classes.mutedText}`}>
-                      {(template.fields ?? [])
-                        .map(field => field.label)
-                        .join(', ') || 'No fields configured'}
-                    </div>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <ManagementBadge>{template.scope}</ManagementBadge>
-                    <ManagementBadge
-                      tone={template.isActive ? 'success' : 'default'}
-                    >
-                      {template.isActive ? 'ACTIVE' : 'INACTIVE'}
-                    </ManagementBadge>
-                  </div>
-                </div>
+                  template={template}
+                  onSaved={savedTemplate =>
+                    setTemplates(current =>
+                      replaceTemplate(current, savedTemplate)
+                    )
+                  }
+                  onDeleted={templateId =>
+                    setTemplates(current =>
+                      current.filter(template => template.id !== templateId)
+                    )
+                  }
+                />
               ))}
               {templates.length === 0 && (
                 <ManagementEmptyState>
@@ -143,10 +183,14 @@ export default function AdminApplicationTemplatesPage() {
             </div>
           </ManagementSection>
           <div className="mt-5">
-            <ManagementSection title="Preview merged application">
-              <ManagementEmptyState>
-                Select a chapter or event scope to preview merged fields.
-              </ManagementEmptyState>
+            <ManagementSection
+              title="Application preview"
+              description="Preview of the active site template used as the base application for every chapter."
+            >
+              <ApplicationTemplatePreview
+                title={activeSiteTemplate?.name ?? 'Active site application'}
+                fields={templateFields(activeSiteTemplate)}
+              />
             </ManagementSection>
           </div>
         </>

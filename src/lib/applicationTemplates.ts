@@ -1,4 +1,4 @@
-import prisma from '@/lib/prisma'
+import prisma from '@/lib/prisma';
 import type {
   ApplicationTemplateScope,
   EntityId,
@@ -7,7 +7,7 @@ import type {
   TemplateFieldOption,
   TemplateFieldType,
   TemplateFieldValidation,
-} from '@/types/event-management'
+} from '@/types/event-management';
 
 const TEMPLATE_FIELD_TYPES: readonly TemplateFieldType[] = [
   'TEXT',
@@ -21,9 +21,9 @@ const TEMPLATE_FIELD_TYPES: readonly TemplateFieldType[] = [
   'MULTI_SELECT',
   'DATE',
   'DATETIME',
-]
+];
 
-const DEFAULT_SITE_APPLICATION_FIELDS: readonly TemplateFieldDefinition[] = [
+const SITE_REQUIRED_FIELD_CONSTRAINTS: readonly TemplateFieldDefinition[] = [
   {
     id: 'name',
     label: 'Name',
@@ -40,7 +40,7 @@ const DEFAULT_SITE_APPLICATION_FIELDS: readonly TemplateFieldDefinition[] = [
     siteRequired: true,
     order: 1,
   },
-]
+];
 
 type ApplicationTemplateValidationIssueCode =
   | 'INVALID_FIELDS_JSON'
@@ -59,106 +59,104 @@ type ApplicationTemplateValidationIssueCode =
   | 'SITE_REQUIRED_FIELD_MISSING'
   | 'SITE_REQUIRED_FIELD_WEAKENED'
   | 'SITE_REQUIRED_FIELD_TYPE_CHANGED'
-  | 'SITE_REQUIRED_FIELD_OVERRIDE'
+  | 'SITE_REQUIRED_FIELD_OVERRIDE';
 
 interface ApplicationTemplateValidationIssue {
-  code: ApplicationTemplateValidationIssueCode
-  message: string
-  fieldId?: string
+  code: ApplicationTemplateValidationIssueCode;
+  message: string;
+  fieldId?: string;
 }
 
 export interface ValidateApplicationTemplateFieldsOptions {
-  requiredSiteFields?: readonly TemplateFieldDefinition[]
-  requireSiteRequiredFields?: boolean
-  allowSiteRequiredFieldIds?: boolean
-  context?: string
+  requiredSiteFields?: readonly TemplateFieldDefinition[];
+  requireSiteRequiredFields?: boolean;
+  allowSiteRequiredFieldIds?: boolean;
+  context?: string;
 }
 
 export interface ComposeApplicationFieldsInput {
-  siteFields?: readonly TemplateFieldDefinition[] | null
-  chapterFields?: readonly TemplateFieldDefinition[] | null
-  eventFields?: readonly TemplateFieldDefinition[] | null
-  hideChapterDefaultQuestions?: boolean | null
+  siteFields: readonly TemplateFieldDefinition[];
+  chapterFields?: readonly TemplateFieldDefinition[] | null;
+  eventFields?: readonly TemplateFieldDefinition[] | null;
+  hideChapterDefaultQuestions?: boolean | null;
 }
 
 interface ApplicationTemplatePrismaRecord {
-  id: EntityId
-  scope?: ApplicationTemplateScope | string
-  chapterId?: EntityId | null
-  fieldsJson: unknown
-  isActive?: boolean | null
+  id: EntityId;
+  scope?: ApplicationTemplateScope | string;
+  chapterId?: EntityId | null;
+  fieldsJson: unknown;
+  isActive?: boolean | null;
 }
 
 interface EventApplicationQuestionPrismaRecord {
-  id: EntityId
-  chapterId?: EntityId | null
-  applicationQuestionsJson?: unknown
-  hideChapterDefaultQuestions?: boolean | null
+  id: EntityId;
+  chapterId?: EntityId | null;
+  applicationQuestionsJson?: unknown;
+  hideChapterDefaultQuestions?: boolean | null;
 }
 
 interface ApplicationTemplatePrismaClient {
   applicationTemplate: {
-    findFirst(args: unknown): Promise<ApplicationTemplatePrismaRecord | null>
-  }
+    findFirst(args: unknown): Promise<ApplicationTemplatePrismaRecord | null>;
+  };
   event: {
-    findUnique(args: unknown): Promise<EventApplicationQuestionPrismaRecord | null>
-  }
+    findUnique(
+      args: unknown
+    ): Promise<EventApplicationQuestionPrismaRecord | null>;
+  };
 }
 
 interface FetchApplicationTemplateInput {
-  scope: ApplicationTemplateScope
-  chapterId?: EntityId | null
-  prisma?: ApplicationTemplatePrismaClient
+  scope: ApplicationTemplateScope;
+  chapterId?: EntityId | null;
+  prisma?: ApplicationTemplatePrismaClient;
 }
 
 interface FetchMergedApplicationTemplateInput {
-  chapterId?: EntityId | null
-  eventId?: EntityId | null
-  prisma?: ApplicationTemplatePrismaClient
+  chapterId?: EntityId | null;
+  eventId?: EntityId | null;
+  prisma?: ApplicationTemplatePrismaClient;
 }
 
 export class ApplicationTemplateValidationError extends Error {
-  readonly issues: ApplicationTemplateValidationIssue[]
+  readonly issues: ApplicationTemplateValidationIssue[];
 
   constructor(
     issues: readonly ApplicationTemplateValidationIssue[],
     message = 'Invalid application template fields'
   ) {
-    super(message)
-    this.name = 'ApplicationTemplateValidationError'
-    this.issues = [...issues]
+    super(message);
+    this.name = 'ApplicationTemplateValidationError';
+    this.issues = [...issues];
   }
-}
-
-export function getDefaultSiteApplicationFields(): TemplateFieldDefinition[] {
-  return DEFAULT_SITE_APPLICATION_FIELDS.map(cloneTemplateField)
 }
 
 function validateApplicationTemplateFields(
   fields: readonly TemplateFieldDefinition[],
   options: ValidateApplicationTemplateFieldsOptions = {}
 ): ApplicationTemplateValidationIssue[] {
-  const issues: ApplicationTemplateValidationIssue[] = []
-  const seenIds = new Set<string>()
-  const context = options.context ?? 'fields'
+  const issues: ApplicationTemplateValidationIssue[] = [];
+  const seenIds = new Set<string>();
+  const context = options.context ?? 'fields';
 
   fields.forEach((field, index) => {
-    const fieldId = typeof field.id === 'string' ? field.id.trim() : ''
-    const fieldLabel = fieldId || `${index}`
+    const fieldId = typeof field.id === 'string' ? field.id.trim() : '';
+    const fieldLabel = fieldId || `${index}`;
 
     if (!fieldId) {
       issues.push({
         code: 'FIELD_ID_REQUIRED',
         message: `${context}[${index}] must include a non-empty id.`,
-      })
+      });
     } else if (seenIds.has(fieldId)) {
       issues.push({
         code: 'FIELD_ID_DUPLICATE',
         message: `${context} contains duplicate field id "${fieldId}".`,
         fieldId,
-      })
+      });
     } else {
-      seenIds.add(fieldId)
+      seenIds.add(fieldId);
     }
 
     if (typeof field.label !== 'string' || field.label.trim().length === 0) {
@@ -166,7 +164,7 @@ function validateApplicationTemplateFields(
         code: 'FIELD_LABEL_REQUIRED',
         message: `Field "${fieldLabel}" must include a non-empty label.`,
         fieldId: fieldId || undefined,
-      })
+      });
     }
 
     if (!isTemplateFieldType(field.type)) {
@@ -174,7 +172,7 @@ function validateApplicationTemplateFields(
         code: 'FIELD_TYPE_INVALID',
         message: `Field "${fieldLabel}" has an unsupported type.`,
         fieldId: fieldId || undefined,
-      })
+      });
     }
 
     if (typeof field.required !== 'boolean') {
@@ -182,7 +180,7 @@ function validateApplicationTemplateFields(
         code: 'FIELD_REQUIRED_INVALID',
         message: `Field "${fieldLabel}" must include a boolean required flag.`,
         fieldId: fieldId || undefined,
-      })
+      });
     }
 
     if (
@@ -193,7 +191,7 @@ function validateApplicationTemplateFields(
         code: 'FIELD_SITE_REQUIRED_INVALID',
         message: `Field "${fieldLabel}" must use a boolean siteRequired flag.`,
         fieldId: fieldId || undefined,
-      })
+      });
     }
 
     if (field.siteRequired === true && field.required !== true) {
@@ -201,7 +199,7 @@ function validateApplicationTemplateFields(
         code: 'SITE_REQUIRED_FIELD_WEAKENED',
         message: `Site-required field "${fieldLabel}" must remain required.`,
         fieldId: fieldId || undefined,
-      })
+      });
     }
 
     if (
@@ -212,62 +210,62 @@ function validateApplicationTemplateFields(
         code: 'FIELD_ORDER_INVALID',
         message: `Field "${fieldLabel}" must use a non-negative integer order.`,
         fieldId: fieldId || undefined,
-      })
+      });
     }
 
-    issues.push(...validateFieldOptions(field))
-    issues.push(...validateFieldValidation(field))
-  })
+    issues.push(...validateFieldOptions(field));
+    issues.push(...validateFieldValidation(field));
+  });
 
   if (options.requireSiteRequiredFields) {
     issues.push(
       ...validateSiteRequiredFields(
         fields,
-        options.requiredSiteFields ?? DEFAULT_SITE_APPLICATION_FIELDS
+        options.requiredSiteFields ?? SITE_REQUIRED_FIELD_CONSTRAINTS
       )
-    )
+    );
   }
 
   if (options.allowSiteRequiredFieldIds === false) {
     issues.push(
       ...validateNoSiteRequiredFieldOverrides(
         fields,
-        options.requiredSiteFields ?? DEFAULT_SITE_APPLICATION_FIELDS
+        options.requiredSiteFields ?? SITE_REQUIRED_FIELD_CONSTRAINTS
       )
-    )
+    );
   }
 
-  return issues
+  return issues;
 }
 
 export function assertValidApplicationTemplateFields(
   fields: readonly TemplateFieldDefinition[],
   options: ValidateApplicationTemplateFieldsOptions = {}
 ): void {
-  const issues = validateApplicationTemplateFields(fields, options)
+  const issues = validateApplicationTemplateFields(fields, options);
 
   if (issues.length > 0) {
-    throw new ApplicationTemplateValidationError(issues)
+    throw new ApplicationTemplateValidationError(issues);
   }
 }
 
 export function validateSiteRequiredFields(
   fields: readonly TemplateFieldDefinition[],
-  requiredSiteFields: readonly TemplateFieldDefinition[] = DEFAULT_SITE_APPLICATION_FIELDS
+  requiredSiteFields: readonly TemplateFieldDefinition[] = SITE_REQUIRED_FIELD_CONSTRAINTS
 ): ApplicationTemplateValidationIssue[] {
-  const issues: ApplicationTemplateValidationIssue[] = []
-  const fieldsById = new Map(fields.map((field) => [field.id, field]))
+  const issues: ApplicationTemplateValidationIssue[] = [];
+  const fieldsById = new Map(fields.map(field => [field.id, field]));
 
   for (const requiredField of requiredSiteFields) {
-    const field = fieldsById.get(requiredField.id)
+    const field = fieldsById.get(requiredField.id);
 
     if (!field) {
       issues.push({
         code: 'SITE_REQUIRED_FIELD_MISSING',
         message: `Site-required field "${requiredField.id}" cannot be removed.`,
         fieldId: requiredField.id,
-      })
-      continue
+      });
+      continue;
     }
 
     if (field.required !== true || field.siteRequired !== true) {
@@ -275,7 +273,7 @@ export function validateSiteRequiredFields(
         code: 'SITE_REQUIRED_FIELD_WEAKENED',
         message: `Site-required field "${requiredField.id}" must remain required and siteRequired.`,
         fieldId: requiredField.id,
-      })
+      });
     }
 
     if (field.type !== requiredField.type) {
@@ -283,65 +281,63 @@ export function validateSiteRequiredFields(
         code: 'SITE_REQUIRED_FIELD_TYPE_CHANGED',
         message: `Site-required field "${requiredField.id}" must keep type "${requiredField.type}".`,
         fieldId: requiredField.id,
-      })
+      });
     }
   }
 
-  return issues
+  return issues;
 }
 
 function validateNoSiteRequiredFieldOverrides(
   fields: readonly TemplateFieldDefinition[],
-  requiredSiteFields: readonly TemplateFieldDefinition[] = DEFAULT_SITE_APPLICATION_FIELDS
+  requiredSiteFields: readonly TemplateFieldDefinition[] = SITE_REQUIRED_FIELD_CONSTRAINTS
 ): ApplicationTemplateValidationIssue[] {
-  const siteRequiredIds = new Set(requiredSiteFields.map((field) => field.id))
+  const siteRequiredIds = new Set(requiredSiteFields.map(field => field.id));
 
   return fields
-    .filter((field) => siteRequiredIds.has(field.id))
-    .map((field) => ({
+    .filter(field => siteRequiredIds.has(field.id))
+    .map(field => ({
       code: 'SITE_REQUIRED_FIELD_OVERRIDE' as const,
       message: `Field "${field.id}" is site-required and cannot be overridden by chapter or event questions.`,
       fieldId: field.id,
-    }))
+    }));
 }
 
 export function composeApplicationFields(
   input: ComposeApplicationFieldsInput
 ): TemplateFieldDefinition[] {
-  const siteFields = normalizeTemplateFields(
-    input.siteFields ?? DEFAULT_SITE_APPLICATION_FIELDS
-  )
-  const chapterFields = normalizeTemplateFields(input.chapterFields ?? [])
-  const eventFields = normalizeTemplateFields(input.eventFields ?? [])
-  const siteRequiredFields = siteFields.filter((field) => field.siteRequired)
+  const siteFields = normalizeTemplateFields(input.siteFields);
+  const chapterFields = normalizeTemplateFields(input.chapterFields ?? []);
+  const eventFields = normalizeTemplateFields(input.eventFields ?? []);
+  const siteRequiredFields = siteFields.filter(field => field.siteRequired);
 
   assertValidApplicationTemplateFields(siteFields, {
     requireSiteRequiredFields: true,
     context: 'siteFields',
-  })
+  });
   assertValidApplicationTemplateFields(chapterFields, {
     requiredSiteFields: siteRequiredFields,
     allowSiteRequiredFieldIds: false,
     context: 'chapterFields',
-  })
+  });
   assertValidApplicationTemplateFields(eventFields, {
     requiredSiteFields: siteRequiredFields,
     allowSiteRequiredFieldIds: false,
     context: 'eventFields',
-  })
+  });
 
-  const fields = siteFields.map(cloneTemplateField)
+  const fields = siteFields.map(cloneTemplateField);
 
   if (input.hideChapterDefaultQuestions !== true) {
-    mergeFieldLayer(fields, chapterFields, siteRequiredFields)
+    mergeFieldLayer(fields, chapterFields, siteRequiredFields);
   }
 
-  mergeFieldLayer(fields, eventFields, siteRequiredFields)
+  mergeFieldLayer(fields, eventFields, siteRequiredFields);
 
   return fields.map((field, index) => ({
     ...cloneTemplateField(field),
     order: index,
-  }))
+  }));
 }
 
 export function parseTemplateFieldsJson(
@@ -358,22 +354,22 @@ export function parseTemplateFieldsJson(
         },
       ],
       `Invalid ${context}`
-    )
+    );
   }
 
-  const fields = value.map((field) => coerceTemplateField(field))
+  const fields = value.map(field => coerceTemplateField(field));
   assertValidApplicationTemplateFields(fields, {
     context,
     ...options,
-  })
+  });
 
-  return normalizeTemplateFields(fields)
+  return normalizeTemplateFields(fields);
 }
 
 async function fetchActiveApplicationTemplate(
   input: FetchApplicationTemplateInput
 ): Promise<ApplicationTemplatePrismaRecord | null> {
-  const client = input.prisma ?? getApplicationTemplatePrismaClient()
+  const client = input.prisma ?? getApplicationTemplatePrismaClient();
   const where =
     input.scope === 'SITE'
       ? { scope: 'SITE', isActive: true }
@@ -381,12 +377,12 @@ async function fetchActiveApplicationTemplate(
           scope: 'CHAPTER',
           chapterId: input.chapterId,
           isActive: true,
-        }
+        };
 
   return client.applicationTemplate.findFirst({
     where,
     orderBy: { updatedAt: 'desc' },
-  })
+  });
 }
 
 function fetchActiveSiteApplicationTemplate(
@@ -395,7 +391,7 @@ function fetchActiveSiteApplicationTemplate(
   return fetchActiveApplicationTemplate({
     scope: 'SITE',
     prisma: client,
-  })
+  });
 }
 
 function fetchActiveChapterApplicationTemplate(
@@ -406,14 +402,14 @@ function fetchActiveChapterApplicationTemplate(
     scope: 'CHAPTER',
     chapterId,
     prisma: client,
-  })
+  });
 }
 
 async function fetchEventApplicationQuestionConfig(
   eventId: EntityId,
   client?: ApplicationTemplatePrismaClient
 ): Promise<EventApplicationQuestionPrismaRecord | null> {
-  const prismaClient = client ?? getApplicationTemplatePrismaClient()
+  const prismaClient = client ?? getApplicationTemplatePrismaClient();
 
   return prismaClient.event.findUnique({
     where: { id: eventId },
@@ -423,18 +419,18 @@ async function fetchEventApplicationQuestionConfig(
       applicationQuestionsJson: true,
       hideChapterDefaultQuestions: true,
     },
-  })
+  });
 }
 
 export async function fetchMergedApplicationTemplate(
   input: FetchMergedApplicationTemplateInput = {}
 ): Promise<MergedApplicationTemplate> {
-  const client = input.prisma ?? getApplicationTemplatePrismaClient()
+  const client = input.prisma ?? getApplicationTemplatePrismaClient();
   const eventConfig = input.eventId
     ? await fetchEventApplicationQuestionConfig(input.eventId, client)
-    : null
-  const chapterId = input.chapterId ?? eventConfig?.chapterId ?? null
-  const siteTemplate = await fetchActiveSiteApplicationTemplate(client)
+    : null;
+  const chapterId = input.chapterId ?? eventConfig?.chapterId ?? null;
+  const siteTemplate = await fetchActiveSiteApplicationTemplate(client);
 
   if (!siteTemplate) {
     throw new ApplicationTemplateValidationError(
@@ -445,18 +441,18 @@ export async function fetchMergedApplicationTemplate(
         },
       ],
       'Active site application template not found'
-    )
+    );
   }
 
   const chapterTemplate = chapterId
     ? await fetchActiveChapterApplicationTemplate(chapterId, client)
-    : null
+    : null;
   const siteFields = parseTemplateFieldsJson(
     siteTemplate.fieldsJson,
     'siteTemplate.fieldsJson',
     { requireSiteRequiredFields: true }
-  )
-  const siteRequiredFields = siteFields.filter((field) => field.siteRequired)
+  );
+  const siteRequiredFields = siteFields.filter(field => field.siteRequired);
   const chapterFields = chapterTemplate
     ? parseTemplateFieldsJson(
         chapterTemplate.fieldsJson,
@@ -466,7 +462,7 @@ export async function fetchMergedApplicationTemplate(
           allowSiteRequiredFieldIds: false,
         }
       )
-    : []
+    : [];
   const eventFields = eventConfig?.applicationQuestionsJson
     ? parseTemplateFieldsJson(
         eventConfig.applicationQuestionsJson,
@@ -476,7 +472,7 @@ export async function fetchMergedApplicationTemplate(
           allowSiteRequiredFieldIds: false,
         }
       )
-    : []
+    : [];
 
   return {
     siteTemplateId: siteTemplate.id,
@@ -488,11 +484,11 @@ export async function fetchMergedApplicationTemplate(
       eventFields,
       hideChapterDefaultQuestions: eventConfig?.hideChapterDefaultQuestions,
     }),
-  }
+  };
 }
 
 function getApplicationTemplatePrismaClient(): ApplicationTemplatePrismaClient {
-  return prisma as unknown as ApplicationTemplatePrismaClient
+  return prisma as unknown as ApplicationTemplatePrismaClient;
 }
 
 function mergeFieldLayer(
@@ -500,7 +496,7 @@ function mergeFieldLayer(
   layer: readonly TemplateFieldDefinition[],
   siteRequiredFields: readonly TemplateFieldDefinition[]
 ): void {
-  const siteRequiredIds = new Set(siteRequiredFields.map((field) => field.id))
+  const siteRequiredIds = new Set(siteRequiredFields.map(field => field.id));
 
   for (const field of layer) {
     if (siteRequiredIds.has(field.id)) {
@@ -513,36 +509,34 @@ function mergeFieldLayer(
           },
         ],
         'Site-required application fields cannot be overridden'
-      )
+      );
     }
 
     const existingIndex = fields.findIndex(
-      (existingField) => existingField.id === field.id
-    )
+      existingField => existingField.id === field.id
+    );
 
     if (existingIndex >= 0) {
-      fields.splice(existingIndex, 1)
+      fields.splice(existingIndex, 1);
     }
 
-    fields.push(cloneTemplateField(field))
+    fields.push(cloneTemplateField(field));
   }
 }
 
 function normalizeTemplateFields(
   fields: readonly TemplateFieldDefinition[]
 ): TemplateFieldDefinition[] {
-  return fields
-    .map(cloneTemplateField)
-    .sort((left, right) => {
-      const leftOrder = left.order ?? Number.MAX_SAFE_INTEGER
-      const rightOrder = right.order ?? Number.MAX_SAFE_INTEGER
+  return fields.map(cloneTemplateField).sort((left, right) => {
+    const leftOrder = left.order ?? Number.MAX_SAFE_INTEGER;
+    const rightOrder = right.order ?? Number.MAX_SAFE_INTEGER;
 
-      if (leftOrder !== rightOrder) {
-        return leftOrder - rightOrder
-      }
+    if (leftOrder !== rightOrder) {
+      return leftOrder - rightOrder;
+    }
 
-      return 0
-    })
+    return 0;
+  });
 }
 
 function cloneTemplateField(
@@ -550,9 +544,9 @@ function cloneTemplateField(
 ): TemplateFieldDefinition {
   return {
     ...field,
-    options: field.options?.map((option) => ({ ...option })),
+    options: field.options?.map(option => ({ ...option })),
     validation: field.validation ? { ...field.validation } : undefined,
-  }
+  };
 }
 
 function coerceTemplateField(value: unknown): TemplateFieldDefinition {
@@ -562,7 +556,7 @@ function coerceTemplateField(value: unknown): TemplateFieldDefinition {
       label: '',
       type: '' as TemplateFieldType,
       required: undefined as unknown as boolean,
-    }
+    };
   }
 
   return {
@@ -590,18 +584,18 @@ function coerceTemplateField(value: unknown): TemplateFieldDefinition {
       typeof value.order === 'number' && Number.isFinite(value.order)
         ? value.order
         : undefined,
-  }
+  };
 }
 
 function coerceTemplateFieldOption(value: unknown): TemplateFieldOption {
   if (!isRecord(value)) {
-    return { label: '', value: '' }
+    return { label: '', value: '' };
   }
 
   return {
     label: typeof value.label === 'string' ? value.label : '',
     value: typeof value.value === 'string' ? value.value : '',
-  }
+  };
 }
 
 function coerceTemplateFieldValidation(
@@ -638,21 +632,22 @@ function coerceTemplateFieldValidation(
         : typeof value.pattern === 'string'
           ? value.pattern
           : (value.pattern as string),
-  }
+  };
 }
 
 function validateFieldOptions(
   field: TemplateFieldDefinition
 ): ApplicationTemplateValidationIssue[] {
-  const issues: ApplicationTemplateValidationIssue[] = []
-  const expectsOptions = field.type === 'SELECT' || field.type === 'MULTI_SELECT'
+  const issues: ApplicationTemplateValidationIssue[] = [];
+  const expectsOptions =
+    field.type === 'SELECT' || field.type === 'MULTI_SELECT';
 
   if (!expectsOptions && field.options && field.options.length > 0) {
     issues.push({
       code: 'FIELD_OPTIONS_UNSUPPORTED',
       message: `Field "${field.id}" cannot include options for type "${field.type}".`,
       fieldId: field.id,
-    })
+    });
   }
 
   if (expectsOptions && (!field.options || field.options.length === 0)) {
@@ -660,11 +655,11 @@ function validateFieldOptions(
       code: 'FIELD_OPTIONS_REQUIRED',
       message: `Field "${field.id}" must include at least one option.`,
       fieldId: field.id,
-    })
-    return issues
+    });
+    return issues;
   }
 
-  const seenValues = new Set<string>()
+  const seenValues = new Set<string>();
 
   field.options?.forEach((option, index) => {
     if (
@@ -677,8 +672,8 @@ function validateFieldOptions(
         code: 'FIELD_OPTION_INVALID',
         message: `Field "${field.id}" option ${index} must include non-empty label and value.`,
         fieldId: field.id,
-      })
-      return
+      });
+      return;
     }
 
     if (seenValues.has(option.value)) {
@@ -686,24 +681,24 @@ function validateFieldOptions(
         code: 'FIELD_OPTION_DUPLICATE',
         message: `Field "${field.id}" contains duplicate option value "${option.value}".`,
         fieldId: field.id,
-      })
-      return
+      });
+      return;
     }
 
-    seenValues.add(option.value)
-  })
+    seenValues.add(option.value);
+  });
 
-  return issues
+  return issues;
 }
 
 function validateFieldValidation(
   field: TemplateFieldDefinition
 ): ApplicationTemplateValidationIssue[] {
-  const issues: ApplicationTemplateValidationIssue[] = []
-  const validation = field.validation
+  const issues: ApplicationTemplateValidationIssue[] = [];
+  const validation = field.validation;
 
   if (!validation) {
-    return issues
+    return issues;
   }
 
   if (
@@ -714,7 +709,7 @@ function validateFieldValidation(
       code: 'FIELD_VALIDATION_INVALID',
       message: `Field "${field.id}" minLength must be a non-negative integer.`,
       fieldId: field.id,
-    })
+    });
   }
 
   if (
@@ -725,7 +720,7 @@ function validateFieldValidation(
       code: 'FIELD_VALIDATION_INVALID',
       message: `Field "${field.id}" maxLength must be a non-negative integer.`,
       fieldId: field.id,
-    })
+    });
   }
 
   if (
@@ -737,7 +732,7 @@ function validateFieldValidation(
       code: 'FIELD_VALIDATION_INVALID',
       message: `Field "${field.id}" minLength cannot exceed maxLength.`,
       fieldId: field.id,
-    })
+    });
   }
 
   if (
@@ -748,7 +743,7 @@ function validateFieldValidation(
       code: 'FIELD_VALIDATION_INVALID',
       message: `Field "${field.id}" min must be a finite number.`,
       fieldId: field.id,
-    })
+    });
   }
 
   if (
@@ -759,7 +754,7 @@ function validateFieldValidation(
       code: 'FIELD_VALIDATION_INVALID',
       message: `Field "${field.id}" max must be a finite number.`,
       fieldId: field.id,
-    })
+    });
   }
 
   if (
@@ -771,7 +766,7 @@ function validateFieldValidation(
       code: 'FIELD_VALIDATION_INVALID',
       message: `Field "${field.id}" min cannot exceed max.`,
       fieldId: field.id,
-    })
+    });
   }
 
   if (validation.pattern !== undefined) {
@@ -780,31 +775,31 @@ function validateFieldValidation(
         code: 'FIELD_VALIDATION_INVALID',
         message: `Field "${field.id}" pattern must be a string.`,
         fieldId: field.id,
-      })
-      return issues
+      });
+      return issues;
     }
 
     try {
-      new RegExp(validation.pattern)
+      new RegExp(validation.pattern);
     } catch {
       issues.push({
         code: 'FIELD_VALIDATION_INVALID',
         message: `Field "${field.id}" pattern must be a valid regular expression.`,
         fieldId: field.id,
-      })
+      });
     }
   }
 
-  return issues
+  return issues;
 }
 
 function isTemplateFieldType(value: unknown): value is TemplateFieldType {
   return (
     typeof value === 'string' &&
     TEMPLATE_FIELD_TYPES.includes(value as TemplateFieldType)
-  )
+  );
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

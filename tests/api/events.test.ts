@@ -71,6 +71,20 @@ describe('/api/events', () => {
     expect(prisma.event.findMany).not.toHaveBeenCalled();
   });
 
+  it('GET lists events newest first', async () => {
+    prisma.event.findMany.mockResolvedValue([]);
+
+    const request = new NextRequest('http://localhost:3000/api/events');
+    const res = await GET_EVENTS(request as any);
+
+    expect(res.status).toBe(200);
+    expect(prisma.event.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orderBy: { startTime: 'desc' },
+      })
+    );
+  });
+
   it('POST requires site admin or chapter admin', async () => {
     mockAuth.mockReturnValue({ userId: 'clerk-1' });
     prisma.hacker.findUnique.mockResolvedValue({ id: 'h1', role: 'HACKER' });

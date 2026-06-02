@@ -212,12 +212,11 @@ interface ApplicationTemplate {
 
 export type ApplicationTemplateListItem = Pick<
   ApplicationTemplate,
-  'id' | 'name' | 'scope' | 'isActive'
+  'id' | 'name' | 'scope' | 'chapterId' | 'isActive'
 > & {
-  fields?: Array<
-    Pick<TemplateFieldDefinition, 'label'> & { id?: string; key?: string }
-  >;
-  fieldsJson?: Array<Pick<TemplateFieldDefinition, 'label'>>;
+  fields?: Array<Partial<TemplateFieldDefinition> & { key?: string }>;
+  fieldsJson?: TemplateFieldDefinition[];
+  chapter?: Pick<Chapter, 'id' | 'name' | 'slug'> | null;
 };
 
 export interface MergedApplicationTemplate {

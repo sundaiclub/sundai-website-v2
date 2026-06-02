@@ -30,6 +30,7 @@ jest.mock('../../src/lib/prisma', () => ({
       create: jest.fn(),
       update: jest.fn(),
       updateMany: jest.fn(),
+      delete: jest.fn(),
     },
     event: {
       findUnique: jest.fn(),
@@ -57,6 +58,7 @@ const {
 } = require('../../src/app/api/application-templates/route');
 const {
   PATCH: PATCH_APPLICATION_TEMPLATE,
+  DELETE: DELETE_APPLICATION_TEMPLATE,
 } = require('../../src/app/api/application-templates/[templateId]/route');
 
 const siteRequiredFields: TemplateFieldDefinition[] = [
@@ -274,7 +276,9 @@ describe('/api/application-templates/[templateId]', () => {
 
     signInAs(siteAdmin);
     mockPrisma.hacker.findUnique.mockResolvedValue(siteAdmin);
-    mockPrisma.applicationTemplate.findUnique.mockResolvedValue(existingTemplate);
+    mockPrisma.applicationTemplate.findUnique.mockResolvedValue(
+      existingTemplate
+    );
     mockPrisma.applicationTemplate.update.mockResolvedValue(updatedTemplate);
 
     const response = await PATCH_APPLICATION_TEMPLATE(
@@ -340,7 +344,9 @@ describe('/api/application-templates/[templateId]', () => {
     signInAs(hacker);
     mockPrisma.hacker.findUnique.mockResolvedValue(hacker);
     mockPrisma.chapterMembership.findFirst.mockResolvedValue(membership);
-    mockPrisma.applicationTemplate.findUnique.mockResolvedValue(existingTemplate);
+    mockPrisma.applicationTemplate.findUnique.mockResolvedValue(
+      existingTemplate
+    );
     mockPrisma.applicationTemplate.update.mockResolvedValue(updatedTemplate);
 
     const response = await PATCH_APPLICATION_TEMPLATE(
@@ -399,7 +405,9 @@ describe('/api/application-templates/[templateId]', () => {
 
     signInAs(siteAdmin);
     mockPrisma.hacker.findUnique.mockResolvedValue(siteAdmin);
-    mockPrisma.applicationTemplate.findUnique.mockResolvedValue(existingTemplate);
+    mockPrisma.applicationTemplate.findUnique.mockResolvedValue(
+      existingTemplate
+    );
 
     const response = await PATCH_APPLICATION_TEMPLATE(
       createJsonRequest('/api/application-templates/template-site-active', {
@@ -441,7 +449,9 @@ describe('/api/application-templates/[templateId]', () => {
     signInAs(hacker);
     mockPrisma.hacker.findUnique.mockResolvedValue(hacker);
     mockPrisma.chapterMembership.findFirst.mockResolvedValue(membership);
-    mockPrisma.applicationTemplate.findUnique.mockResolvedValue(existingTemplate);
+    mockPrisma.applicationTemplate.findUnique.mockResolvedValue(
+      existingTemplate
+    );
 
     const response = await PATCH_APPLICATION_TEMPLATE(
       createJsonRequest('/api/application-templates/template-chapter-boston', {
@@ -471,6 +481,68 @@ describe('/api/application-templates/[templateId]', () => {
             fieldId: 'email',
           }),
         ]),
+      })
+    );
+  });
+
+  it('deletes a chapter template as that chapter admin', async () => {
+    const { chapter, hacker, membership } = buildChapterAdminFixture();
+    const existingTemplate = {
+      id: 'template-chapter-boston',
+      scope: 'CHAPTER',
+      chapterId: chapter.id,
+      isActive: true,
+    };
+
+    signInAs(hacker);
+    mockPrisma.hacker.findUnique.mockResolvedValue(hacker);
+    mockPrisma.chapterMembership.findFirst.mockResolvedValue(membership);
+    mockPrisma.applicationTemplate.findUnique.mockResolvedValue(
+      existingTemplate
+    );
+    mockPrisma.applicationTemplate.delete.mockResolvedValue(existingTemplate);
+
+    const response = await DELETE_APPLICATION_TEMPLATE(
+      createJsonRequest('/api/application-templates/template-chapter-boston', {
+        method: 'DELETE',
+      }),
+      createRouteContext({ templateId: existingTemplate.id })
+    );
+
+    expect(response.status).toBe(204);
+    expect(mockPrisma.applicationTemplate.delete).toHaveBeenCalledWith({
+      where: { id: existingTemplate.id },
+    });
+  });
+
+  it('rejects deletion of the active site template base', async () => {
+    const siteAdmin = buildSiteAdmin();
+    const existingTemplate = {
+      id: 'template-site-active',
+      scope: 'SITE',
+      chapterId: null,
+      isActive: true,
+    };
+
+    signInAs(siteAdmin);
+    mockPrisma.hacker.findUnique.mockResolvedValue(siteAdmin);
+    mockPrisma.applicationTemplate.findUnique.mockResolvedValue(
+      existingTemplate
+    );
+
+    const response = await DELETE_APPLICATION_TEMPLATE(
+      createJsonRequest('/api/application-templates/template-site-active', {
+        method: 'DELETE',
+      }),
+      createRouteContext({ templateId: existingTemplate.id })
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(mockPrisma.applicationTemplate.delete).not.toHaveBeenCalled();
+    expect(body).toEqual(
+      expect.objectContaining({
+        message: expect.stringMatching(/base for all chapters/i),
       })
     );
   });

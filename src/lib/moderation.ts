@@ -252,6 +252,9 @@ export async function createGlobalBan(
         input.publicSafeReason ?? BLOCKED_REGISTRATION_MESSAGE,
       internalNote: input.internalNote ?? null,
     },
+    include: {
+      hacker: { select: { id: true, name: true, email: true } },
+    },
   });
 }
 
