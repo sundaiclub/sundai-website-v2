@@ -24,7 +24,7 @@ export type ChapterMembershipStatus = 'INVITED' | 'ACTIVE' | 'REVOKED' | 'LEFT';
 export type EventStaffRole = 'MC' | 'CO_MC';
 type EventVisibility = 'PUBLIC' | 'PRIVATE' | 'UNLISTED';
 type EventApplicationMode = 'NONE' | 'INTERNAL' | 'PUBLIC_LATER';
-export type EventPhase = 'VOTING' | 'PITCHING' | 'FINISHED';
+export type PitchSessionPhase = 'VOTING' | 'PITCHING' | 'FINISHED';
 
 export type ApplicationTemplateScope = 'SITE' | 'CHAPTER';
 
@@ -45,14 +45,14 @@ export type BanFlagStatus =
   | 'RESOLVED_BANNED'
   | 'DISMISSED';
 
-export type EventProjectStatus =
+export type PitchProjectStatus =
   | 'QUEUED'
   | 'APPROVED'
   | 'CURRENT'
   | 'DONE'
   | 'SKIPPED';
 
-export type EventProjectVoteValue = 'LIKE' | 'DISLIKE';
+export type PitchProjectVoteValue = 'LIKE' | 'DISLIKE';
 
 export type PitchPhase = 'WAITING' | 'PRESENTING' | 'QUESTIONS' | 'COMPLETED';
 
@@ -64,6 +64,13 @@ interface EventManagementHackerSummary {
   role?: Role | null;
 }
 
+interface EventManagementImageSummary {
+  id: EntityId;
+  url: string;
+  alt?: string | null;
+  filename?: string | null;
+}
+
 export interface Chapter {
   id: EntityId;
   name: string;
@@ -73,9 +80,10 @@ export interface Chapter {
   country: string;
   timezone: string;
   description?: string | null;
+  heroImageId?: EntityId | null;
+  heroImage?: EventManagementImageSummary | null;
   status: ChapterStatus;
   accessMode: ChapterAccessMode;
-  defaultDeclineMessage?: string | null;
   mailingListName?: string | null;
   mailingListExternalId?: string | null;
   createdAt: ISODateTimeString | Date;
@@ -100,10 +108,20 @@ export type ChapterMembershipSummary = Pick<
 
 export type ChapterDirectoryItem = Pick<
   Chapter,
-  'id' | 'name' | 'slug' | 'city' | 'accessMode' | 'status'
+  | 'id'
+  | 'name'
+  | 'slug'
+  | 'city'
+  | 'region'
+  | 'country'
+  | 'timezone'
+  | 'description'
+  | 'heroImage'
+  | 'accessMode'
+  | 'status'
 > & {
-  viewerMembership?: Pick<ChapterMembership, 'status'> | null;
-  memberships?: Array<Pick<ChapterMembership, 'status'>>;
+  viewerMembership?: Pick<ChapterMembership, 'role' | 'status'> | null;
+  memberships?: Array<Pick<ChapterMembership, 'role' | 'status'>>;
 };
 
 type ChapterLandingEvent = {
@@ -114,7 +132,7 @@ type ChapterLandingEvent = {
 
 export type ChapterLanding = Pick<
   Chapter,
-  'id' | 'name' | 'slug' | 'city' | 'description' | 'accessMode'
+  'id' | 'name' | 'slug' | 'city' | 'description' | 'accessMode' | 'heroImage'
 > & {
   viewerMembership?: ChapterMembershipSummary | null;
   memberships?: ChapterMembershipSummary[];
@@ -123,8 +141,34 @@ export type ChapterLanding = Pick<
 
 export type SiteAdminChapterListItem = Pick<
   Chapter,
-  'id' | 'name' | 'slug' | 'city' | 'status' | 'accessMode'
+  | 'id'
+  | 'name'
+  | 'slug'
+  | 'city'
+  | 'region'
+  | 'country'
+  | 'timezone'
+  | 'status'
+  | 'accessMode'
+  | 'description'
+  | 'heroImage'
 >;
+
+export type ManageableChapterListItem = Pick<
+  Chapter,
+  | 'id'
+  | 'name'
+  | 'slug'
+  | 'city'
+  | 'region'
+  | 'timezone'
+  | 'status'
+  | 'accessMode'
+  | 'heroImage'
+> & {
+  viewerMembership?: Pick<ChapterMembership, 'role' | 'status'> | null;
+  memberships?: Array<Pick<ChapterMembership, 'role' | 'status'>>;
+};
 
 export interface ChapterMembership {
   id: EntityId;
@@ -263,7 +307,7 @@ export type OrganizerEventListItem = {
   startTime: ISODateTimeString | Date;
   endTime?: ISODateTimeString | Date | null;
   meetingUrl?: string | null;
-  phase: EventPhase;
+  pitchSessions?: Array<{ phase: PitchSessionPhase }>;
   chapter?: Pick<Chapter, 'id' | 'name' | 'slug'>;
 };
 
@@ -323,7 +367,7 @@ export type AdminBanFlagListItem = UserBanFlag & {
 
 export type OrganizerChapterSettings = Pick<
   Chapter,
-  'id' | 'name' | 'slug' | 'status' | 'accessMode' | 'defaultDeclineMessage'
+  'id' | 'name' | 'slug' | 'description' | 'status' | 'accessMode' | 'heroImage'
 >;
 
 export interface HackerOrganizerNote {

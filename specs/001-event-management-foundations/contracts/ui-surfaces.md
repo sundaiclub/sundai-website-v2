@@ -97,7 +97,7 @@ Chapter-admin control surface.
 - Revoke/remove memberships
 - View notification permission state
 - Edit active chapter application template
-- Edit default declined-user message
+- Edit chapter description and image
 - View ban flags created for the chapter
 
 ### `/organizer/events`
@@ -143,6 +143,7 @@ Keep the current pitch UX working.
 
 - Replace `EventMC` data access with `EventStaff`
 - Allow site admins, chapter admins for the event chapter, assigned MCs, and assigned co-MCs to manage pitch controls through shared helpers
+- Read and write pitch phase, timer configuration, and queue data through the event's linked `PitchSession`
 - Do not rebuild the pitch queue UI in Phase 1
 
 ## Existing Public Events

@@ -25,6 +25,9 @@ const normalizeSql = (sql: string) => sql.replace(/\s+/g, ' ').trim();
 const expectSql = (snippet: string) => {
   expect(normalizeSql(migration)).toContain(normalizeSql(snippet));
 };
+const expectSchemaLine = (block: string, fields: string[]) => {
+  expect(normalizeSql(block)).toContain(fields.join(' '));
+};
 
 describe('event management foundation migration', () => {
   it('cuts Role.ADMIN over to Role.SITE_ADMIN without keeping ADMIN in the Role schema enum', () => {
@@ -41,14 +44,18 @@ describe('event management foundation migration', () => {
     `);
   });
 
-  it('backfills the Boston chapter and attaches existing events to it', () => {
+  it('backfills the Boston chapter and attaches legacy pitch sessions to it', () => {
     const chapterModel = readBlock(schema, 'model', 'Chapter');
     const eventModel = readBlock(schema, 'model', 'Event');
+    const pitchSessionModel = readBlock(schema, 'model', 'PitchSession');
 
-    expect(chapterModel).toContain('slug                  String                @unique');
-    expect(chapterModel).toContain('timezone              String');
-    expect(eventModel).toContain('chapter          Chapter    @relation(fields: [chapterId], references: [id])');
-    expect(eventModel).toContain('chapterId        String');
+    expectSchemaLine(chapterModel, ['slug', 'String', '@unique']);
+    expectSchemaLine(chapterModel, ['timezone', 'String']);
+    expectSchemaLine(eventModel, ['chapter', 'Chapter', '@relation(fields:', '[chapterId],', 'references:', '[id])']);
+    expectSchemaLine(eventModel, ['chapterId', 'String']);
+    expectSchemaLine(pitchSessionModel, ['chapter', 'Chapter', '@relation(fields:', '[chapterId],', 'references:', '[id])']);
+    expectSchemaLine(pitchSessionModel, ['chapterId', 'String']);
+    expectSchemaLine(pitchSessionModel, ['legacyBackfill', 'Boolean', '@default(false)']);
 
     expectSql(`
       INSERT INTO "Chapter" (
@@ -61,50 +68,48 @@ describe('event management foundation migration', () => {
       );
     `);
     expectSql(`
-      UPDATE "Event"
-      SET
-        "chapterId" = 'boston',
-        "status" = 'PUBLISHED',
-        "publicLocation" = "location",
-        "virtualUrl" = "meetingUrl";
+      ALTER TABLE "Event" RENAME TO "PitchSession";
     `);
     expectSql(`
-      ALTER TABLE "Event"
+      UPDATE "PitchSession"
+      SET "chapterId" = 'boston',
+          "legacyBackfill" = true;
+    `);
+    expectSql(`
+      ALTER TABLE "PitchSession"
         ALTER COLUMN "chapterId" SET NOT NULL,
-        ALTER COLUMN "slug" SET NOT NULL;
+        ADD CONSTRAINT "PitchSession_event_or_legacy_check"
+          CHECK ("eventId" IS NOT NULL OR "legacyBackfill" = true);
     `);
   });
 
-  it('requires chapter-scoped unique event slugs and migration cleanup markers', () => {
+  it('requires chapter-scoped unique event slugs on the new native event table', () => {
     const eventModel = readBlock(schema, 'model', 'Event');
 
-    expect(eventModel).toContain('slug             String');
-    expect(eventModel).toContain('slugNeedsCleanup Boolean    @default(false)');
+    expectSchemaLine(eventModel, ['slug', 'String']);
+    expectSchemaLine(eventModel, ['slugNeedsCleanup', 'Boolean', '@default(false)']);
     expect(eventModel).toContain('@@unique([chapterId, slug])');
     expect(eventModel).toContain('@@index([chapterId, status, startTime])');
     expect(eventModel).toContain('@@index([visibility, status])');
 
-    expect(migration).toContain('WITH slug_base AS');
-    expect(migration).toContain('regexp_replace(coalesce(nullif("title", \'\'), "id"), \'[^a-zA-Z0-9]+\', \'-\', \'g\')');
-    expect(migration).toContain('row_number() OVER (PARTITION BY coalesce("baseSlug", \'event\') ORDER BY "id") AS "slugNumber"');
     expectSql(`
-      "slugNeedsCleanup" = n."slugCount" > 1
+      CREATE TABLE "Event" (
     `);
     expectSql(`
       CREATE UNIQUE INDEX "Event_chapterId_slug_key" ON "Event"("chapterId", "slug");
     `);
   });
 
-  it('migrates EventMC rows into EventStaff as MC assignments before dropping EventMC', () => {
+  it('creates EventStaff for native events without migrating legacy pitch MC assignments', () => {
     const eventStaffModel = readBlock(schema, 'model', 'EventStaff');
     const eventStaffRoleEnum = readBlock(schema, 'enum', 'EventStaffRole');
 
     expect(schema).not.toMatch(/\bmodel\s+EventMC\s*{/);
     expect(eventStaffRoleEnum).toMatch(/^\s*MC\s*$/m);
     expect(eventStaffRoleEnum).toMatch(/^\s*CO_MC\s*$/m);
-    expect(eventStaffModel).toContain('eventId   String');
-    expect(eventStaffModel).toContain('hackerId  String');
-    expect(eventStaffModel).toContain('role      EventStaffRole');
+    expectSchemaLine(eventStaffModel, ['eventId', 'String']);
+    expectSchemaLine(eventStaffModel, ['hackerId', 'String']);
+    expectSchemaLine(eventStaffModel, ['role', 'EventStaffRole']);
     expect(eventStaffModel).toContain('@@unique([eventId, hackerId, role])');
     expect(eventStaffModel).toContain('@@index([eventId, role])');
     expect(eventStaffModel).toContain('@@index([hackerId])');
@@ -123,11 +128,8 @@ describe('event management foundation migration', () => {
         CONSTRAINT "EventStaff_pkey" PRIMARY KEY ("id")
       );
     `);
-    expectSql(`
-      INSERT INTO "EventStaff" ("id", "eventId", "hackerId", "role", "createdAt", "updatedAt")
-      SELECT "id", "eventId", "hackerId", 'MC'::"EventStaffRole", CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
-      FROM "EventMC";
-    `);
+    expect(migration).not.toContain('INSERT INTO "EventStaff"');
+    expect(migration).not.toContain('FROM "EventMC"');
     expectSql(`
       DROP TABLE "EventMC";
     `);

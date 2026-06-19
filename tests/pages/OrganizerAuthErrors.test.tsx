@@ -83,7 +83,7 @@ describe('organizer auth error handling', () => {
           slug: 'boston',
           status: 'ACTIVE',
           accessMode: 'PUBLIC',
-          defaultDeclineMessage: 'Sensitive organizer-only decline message',
+          description: 'Sensitive organizer-only chapter description',
         })
       }
 
@@ -99,7 +99,7 @@ describe('organizer auth error handling', () => {
     ).toBeInTheDocument()
     await waitFor(() => {
       expect(
-        screen.queryByText(/sensitive organizer-only decline message/i),
+        screen.queryByText(/sensitive organizer-only chapter description/i),
       ).not.toBeInTheDocument()
     })
     expect(screen.queryByRole('button', { name: /invite admin/i })).not.toBeInTheDocument()

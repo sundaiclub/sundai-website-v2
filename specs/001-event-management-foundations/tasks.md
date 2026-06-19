@@ -34,7 +34,7 @@
 - [X] T005 Replace `ADMIN` with `SITE_ADMIN` in the `Role` enum and add chapter/event-management enums in `prisma/schema.prisma`
 - [X] T006 Add `Chapter`, `ChapterMembership`, `EventStaff`, `ApplicationTemplate`, `EventRegistration`, `EventRegistrationAudit`, `UserBan`, `UserBanFlag`, `HackerOrganizerNote`, and `HackerOrganizerNoteRevision` models in `prisma/schema.prisma`
 - [X] T007 Add event chapter, slug, visibility, application, capacity, location, approved-detail, and check-in metadata fields in `prisma/schema.prisma`
-- [X] T008 Create Prisma migration for site-admin cutover, new tables, event metadata, indexes, Boston chapter backfill, event slug cleanup markers, and `EventMC` to `EventStaff` migration in `prisma/migrations/20260525000000_event_management_foundations/migration.sql`
+- [X] T008 Create Prisma migration for site-admin cutover, new tables, event metadata, indexes, Boston chapter legacy pitch backfill, and pitch/session split in `prisma/migrations/20260525000000_event_management_foundations/migration.sql`
 - [X] T009 Update seed data to use `Role.SITE_ADMIN`, create the Boston chapter, create the active site application template, and seed `EventStaff` assignments in `prisma/seed.ts`
 - [X] T010 [P] Implement shared server-side permission helpers in `src/lib/eventManagementAuth.ts`
 - [X] T011 [P] Implement chapter visibility and membership helpers in `src/lib/chapters.ts`
@@ -93,7 +93,7 @@
 
 ## Phase 4: User Story 2 - Chapter Admin Runs Local Chapter Operations (Priority: P1)
 
-**Goal**: A chapter admin can manage only their chapter settings, members, invitations, local application questions, default declined-user messaging, chapter events, and ban flags.
+**Goal**: A chapter admin can manage only their chapter settings, chapter image, members, invitations, local application questions, chapter events, and ban flags.
 
 **Independent Test**: Assign a user as chapter admin, update only their chapter, invite a hacker to a private chapter, manage members and local application questions, create an event, and verify cross-chapter actions are denied.
 
@@ -107,7 +107,7 @@
 
 ### Implementation for User Story 2
 
-- [X] T049 [US2] Extend chapter settings updates with chapter-admin scoping and default declined-message fields in `src/app/api/chapters/[chapterId]/route.ts`
+- [X] T049 [US2] Extend chapter settings updates with chapter-admin scoping, chapter descriptions, and chapter images in `src/app/api/chapters/[chapterId]/route.ts`
 - [X] T050 [US2] Implement private chapter invitation creation and reactivation in `src/app/api/chapters/[chapterId]/invites/route.ts`
 - [X] T051 [US2] Implement membership revocation and role/status updates in `src/app/api/chapters/[chapterId]/members/[membershipId]/route.ts`
 - [X] T052 [US2] Implement chapter-admin ban flag creation in `src/app/api/chapters/[chapterId]/ban-flags/route.ts`
@@ -163,7 +163,7 @@
 
 - [X] T071 [US4] Replace `EventMC` includes and mutations with `EventStaff` in `src/app/api/events/route.ts` and `src/app/api/events/[eventId]/route.ts`
 - [X] T072 [US4] Implement event staff assignment and removal endpoints in `src/app/api/events/[eventId]/staff/route.ts` and `src/app/api/events/[eventId]/staff/[staffId]/route.ts`
-- [X] T073 [US4] Update pitch control authorization to use shared event staff helpers in `src/app/api/events/[eventId]/transition/route.ts`, `src/app/api/events/[eventId]/pitch-timer/route.ts`, `src/app/api/events/[eventId]/advance/route.ts`, `src/app/api/events/[eventId]/previous/route.ts`, `src/app/api/events/[eventId]/queue/route.ts`, `src/app/api/events/[eventId]/queue/[eventProjectId]/route.ts`, and `src/app/api/events/queue/[eventProjectId]/status/route.ts`
+- [X] T073 [US4] Update pitch control authorization to use shared event staff helpers in `src/app/api/events/[eventId]/pitch/transition/route.ts`, `src/app/api/events/[eventId]/pitch/timer/route.ts`, `src/app/api/events/[eventId]/pitch/advance/route.ts`, `src/app/api/events/[eventId]/pitch/previous/route.ts`, and `src/app/api/events/[eventId]/pitch/queue/`
 - [X] T074 [US4] Update the pitch page staff data model from `mcs` to MC and co-MC staff assignments in `src/app/pitch/[eventId]/page.tsx`
 - [X] T075 [US4] Implement permission-specific event settings editing in `src/app/organizer/events/[eventId]/settings/page.tsx`
 

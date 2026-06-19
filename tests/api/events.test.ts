@@ -23,7 +23,11 @@ jest.mock('../../src/lib/prisma', () => ({
       deleteMany: jest.fn(),
       createMany: jest.fn(),
     },
-    eventProject: {
+    pitchSession: {
+      findFirst: jest.fn(),
+      update: jest.fn(),
+    },
+    pitchProject: {
       updateMany: jest.fn(),
     },
     $transaction: jest.fn(),
@@ -192,29 +196,38 @@ describe('/api/events/[eventId]', () => {
         chapterId: 'chapter-boston',
       })
       .mockResolvedValueOnce({
-        phase: 'PITCHING',
         chapterId: 'chapter-boston',
-        topPresentingSec: 120,
-        topQuestionsSec: 180,
-        defaultPresentingSec: 60,
-        defaultQuestionsSec: 120,
       })
       .mockResolvedValueOnce({
         id: 'evt-1',
         title: 'Updated Event',
-        phase: 'PITCHING',
-        topPresentingSec: 150,
-        topQuestionsSec: 180,
-        defaultPresentingSec: 75,
-        defaultQuestionsSec: 120,
-        projects: [
-          { id: 'ep-top', isTopProject: true, allottedPresentingSec: 150, allottedQuestionsSec: 180 },
-          { id: 'ep-regular', isTopProject: false, allottedPresentingSec: 75, allottedQuestionsSec: 120 },
+        pitchSessions: [
+          {
+            id: 'pitch-1',
+            phase: 'PITCHING',
+            topPresentingSec: 150,
+            topQuestionsSec: 180,
+            defaultPresentingSec: 75,
+            defaultQuestionsSec: 120,
+            projects: [
+              { id: 'ep-top', isTopProject: true, allottedPresentingSec: 150, allottedQuestionsSec: 180 },
+              { id: 'ep-regular', isTopProject: false, allottedPresentingSec: 75, allottedQuestionsSec: 120 },
+            ],
+          },
         ],
         staff: [],
       });
     prisma.event.update.mockResolvedValue({ id: 'evt-1' });
-    prisma.eventProject.updateMany.mockResolvedValue({ count: 1 });
+    prisma.pitchSession.findFirst.mockResolvedValue({
+      id: 'pitch-1',
+      phase: 'PITCHING',
+      topPresentingSec: 120,
+      topQuestionsSec: 180,
+      defaultPresentingSec: 60,
+      defaultQuestionsSec: 120,
+    });
+    prisma.pitchSession.update.mockResolvedValue({ id: 'pitch-1' });
+    prisma.pitchProject.updateMany.mockResolvedValue({ count: 1 });
     prisma.$transaction.mockImplementation(async (ops: Array<Promise<unknown>>) => Promise.all(ops));
 
     const request = new NextRequest('http://localhost:3000/api/events/evt-1', { method: 'PATCH' });
@@ -228,9 +241,9 @@ describe('/api/events/[eventId]', () => {
 
     expect(res.status).toBe(200);
     expect(prisma.$transaction).toHaveBeenCalled();
-    expect(prisma.eventProject.updateMany).toHaveBeenNthCalledWith(1, {
+    expect(prisma.pitchProject.updateMany).toHaveBeenNthCalledWith(1, {
       where: {
-        eventId: 'evt-1',
+        pitchSessionId: 'pitch-1',
         isTopProject: true,
         status: { in: ['CURRENT', 'APPROVED'] },
       },
@@ -239,9 +252,9 @@ describe('/api/events/[eventId]', () => {
         allottedQuestionsSec: 180,
       },
     });
-    expect(prisma.eventProject.updateMany).toHaveBeenNthCalledWith(2, {
+    expect(prisma.pitchProject.updateMany).toHaveBeenNthCalledWith(2, {
       where: {
-        eventId: 'evt-1',
+        pitchSessionId: 'pitch-1',
         isTopProject: false,
         status: { in: ['CURRENT', 'APPROVED'] },
       },
@@ -252,7 +265,7 @@ describe('/api/events/[eventId]', () => {
     });
 
     const body = await res.json();
-    expect(body.projects[0].allottedPresentingSec).toBe(150);
-    expect(body.projects[1].allottedPresentingSec).toBe(75);
+    expect(body.pitchSessions[0].projects[0].allottedPresentingSec).toBe(150);
+    expect(body.pitchSessions[0].projects[1].allottedPresentingSec).toBe(75);
   });
 });

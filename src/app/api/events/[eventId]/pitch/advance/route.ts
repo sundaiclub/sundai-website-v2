@@ -8,16 +8,17 @@ export async function POST(
   { params }: { params: { eventId: string } }
 ) {
   try {
-    const { event, response } = await requireEventPitchManager(params.eventId);
+    const { pitchSession, response } = await requireEventPitchManager(params.eventId);
     if (response) return response;
+    if (!pitchSession) return new NextResponse("Pitch session not found", { status: 404 });
 
-    if (event.phase !== "PITCHING") {
+    if (pitchSession.phase !== "PITCHING") {
       return NextResponse.json({ message: "Can only advance during PITCHING phase" }, { status: 400 });
     }
 
     // Find current and next queued/approved
-    const ordered = await prisma.eventProject.findMany({
-      where: { eventId: params.eventId },
+    const ordered = await prisma.pitchProject.findMany({
+      where: { pitchSessionId: pitchSession.id },
       orderBy: { position: 'asc' },
     });
     const currentIdx = ordered.findIndex(p => p.status === 'CURRENT');
@@ -32,7 +33,7 @@ export async function POST(
     if (currentIdx !== -1) {
       // If still presenting/questions, mark as completed with timestamp
       const current = ordered[currentIdx];
-      const completedData: Prisma.EventProjectUpdateInput = { status: 'DONE' };
+      const completedData: Prisma.PitchProjectUpdateInput = { status: 'DONE' };
       if (current.pitchPhase === 'PRESENTING' || current.pitchPhase === 'QUESTIONS') {
         completedData.pitchPhase = 'COMPLETED';
         completedData.completedAt = new Date();
@@ -40,17 +41,17 @@ export async function POST(
           completedData.questionsStartedAt = new Date();
         }
       }
-      await prisma.eventProject.update({ where: { id: current.id }, data: completedData });
+      await prisma.pitchProject.update({ where: { id: current.id }, data: completedData });
     }
     if (nextIdx !== -1) {
-      await prisma.eventProject.update({ where: { id: ordered[nextIdx].id }, data: { status: 'CURRENT', approved: true, pitchPhase: 'WAITING' } });
+      await prisma.pitchProject.update({ where: { id: ordered[nextIdx].id }, data: { status: 'CURRENT', approved: true, pitchPhase: 'WAITING' } });
     } else {
-      await prisma.event.update({
-        where: { id: params.eventId },
+      await prisma.pitchSession.update({
+        where: { id: pitchSession.id },
         data: { phase: 'FINISHED' },
       });
     }
-    const updated = await prisma.event.findUnique({ where: { id: params.eventId }, include: { projects: { orderBy: { position: 'asc' } } } });
+    const updated = await prisma.pitchSession.findUnique({ where: { id: pitchSession.id }, include: { projects: { orderBy: { position: 'asc' } } } });
     return NextResponse.json(updated);
   } catch (error) {
     console.error("[EVENT_ADVANCE_POST]", error);

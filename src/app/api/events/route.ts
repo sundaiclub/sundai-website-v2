@@ -70,21 +70,24 @@ export async function GET(req: Request) {
       include: {
         chapter: { select: { id: true, name: true, slug: true } },
         staff: { include: { hacker: { include: { avatar: true } } } },
-        projects: {
-          orderBy: { position: "asc" },
+        pitchSessions: {
           include: {
-            pitchVotes: { select: { hackerId: true, value: true, createdAt: true } },
-            project: {
+            projects: {
+              orderBy: { position: "asc" },
               include: {
-                thumbnail: true,
-                launchLead: { include: { avatar: true } },
-                participants: { include: { hacker: { include: { avatar: true } } } },
-                techTags: true,
-                domainTags: true,
-                likes: { select: { hackerId: true, createdAt: true } },
+                pitchVotes: { select: { hackerId: true, value: true, createdAt: true } },
+                project: {
+                  include: {
+                    thumbnail: true,
+                    launchLead: { include: { avatar: true } },
+                    participants: { include: { hacker: { include: { avatar: true } } } },
+                    techTags: true,
+                    domainTags: true,
+                    likes: { select: { hackerId: true, createdAt: true } },
+                  },
+                },
               },
             },
-            // include scalar fields like addedById by default
           },
         },
       },
@@ -135,6 +138,7 @@ export async function POST(req: Request) {
       checkInOpensAt,
       checkInClosesAt,
       mcIds = [],
+      createPitchSession = false,
       audienceCanReorder = true,
       votingEndTime,
       topProjectCount,
@@ -187,19 +191,37 @@ export async function POST(req: Request) {
         ...(applicationsCloseReason !== undefined && { applicationsCloseReason: applicationsCloseReason || null }),
         ...(checkInOpensAt !== undefined && { checkInOpensAt: checkInOpensAt ? new Date(checkInOpensAt) : null }),
         ...(checkInClosesAt !== undefined && { checkInClosesAt: checkInClosesAt ? new Date(checkInClosesAt) : null }),
-        audienceCanReorder,
-        votingEndTime: votingEndTime ? new Date(votingEndTime) : new Date(new Date(startTime).getTime() + 15 * 60 * 1000),
-        ...(topProjectCount !== undefined && { topProjectCount }),
-        ...(topPresentingSec !== undefined && { topPresentingSec }),
-        ...(topQuestionsSec !== undefined && { topQuestionsSec }),
-        ...(defaultPresentingSec !== undefined && { defaultPresentingSec }),
-        ...(defaultQuestionsSec !== undefined && { defaultQuestionsSec }),
         staff: {
           create: mcIds.map((hackerId: string) => ({
             hackerId,
             role: "MC" as const,
           })),
         },
+        ...(createPitchSession && {
+          pitchSessions: {
+            create: {
+              chapterId,
+              title,
+              description: description || null,
+              startTime: new Date(startTime),
+              meetingUrl: meetingUrl || null,
+              location: location || null,
+              createdById: user.id,
+              legacyBackfill: false,
+              audienceCanReorder,
+              votingEndTime: votingEndTime ? new Date(votingEndTime) : new Date(new Date(startTime).getTime() + 15 * 60 * 1000),
+              ...(topProjectCount !== undefined && { topProjectCount }),
+              ...(topPresentingSec !== undefined && { topPresentingSec }),
+              ...(topQuestionsSec !== undefined && { topQuestionsSec }),
+              ...(defaultPresentingSec !== undefined && { defaultPresentingSec }),
+              ...(defaultQuestionsSec !== undefined && { defaultQuestionsSec }),
+            },
+          },
+        }),
+      },
+      include: {
+        pitchSessions: true,
+        staff: true,
       },
     });
 

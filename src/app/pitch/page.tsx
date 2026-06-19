@@ -11,7 +11,7 @@ import {
   serializeDateTimeLocalValue,
 } from '@/lib/datetimeLocal';
 import type {
-  EventPhase,
+  PitchSessionPhase,
   OrganizerEventListItem,
 } from '@/types/event-management';
 
@@ -21,7 +21,11 @@ type EventListItem = Pick<
 > & {
   startTime: string;
   endTime?: string | null;
-  phase: EventPhase;
+  phase: PitchSessionPhase;
+};
+
+type PitchEventResponse = Omit<EventListItem, 'phase'> & {
+  pitchSessions?: Array<{ phase: PitchSessionPhase }>;
 };
 
 type EventCreateRequest = {
@@ -30,6 +34,7 @@ type EventCreateRequest = {
   startTime: string | null;
   endTime: string | null;
   mcIds: string[];
+  createPitchSession: true;
   votingEndTime: string | null;
   topProjectCount: number;
   topPresentingSec: number;
@@ -119,15 +124,17 @@ export default function PitchPage() {
     const load = async () => {
       try {
         const res = await fetch('/api/events');
-        const data = (await res.json()) as EventListItem[];
-        const mapped: EventListItem[] = data.map((e) => ({
+        const data = (await res.json()) as PitchEventResponse[];
+        const mapped: EventListItem[] = data
+          .filter((e) => e.pitchSessions?.[0])
+          .map((e) => ({
           id: e.id,
           title: e.title,
           description: e.description,
           startTime: e.startTime,
           endTime: e.endTime,
           meetingUrl: e.meetingUrl,
-          phase: e.phase,
+          phase: e.pitchSessions![0].phase,
         }));
         setEvents(mapped);
       } finally {
@@ -179,6 +186,7 @@ export default function PitchPage() {
         startTime: serializeDateTimeLocalValue(startTime),
         endTime: endTime || null,
         mcIds: selectedMCs,
+        createPitchSession: true,
         votingEndTime: serializeDateTimeLocalValue(votingEndTime),
         topProjectCount,
         topPresentingSec,

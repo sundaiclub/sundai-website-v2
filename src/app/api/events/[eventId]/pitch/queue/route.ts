@@ -18,9 +18,11 @@ export async function POST(
     const { projectId } = body || {};
     if (!projectId) return NextResponse.json({ message: "projectId required" }, { status: 400 });
 
-    const event = await prisma.event.findUnique({ where: { id: params.eventId } });
-    if (!event) return new NextResponse("Event not found", { status: 404 });
-    if (event.phase === "FINISHED") {
+    const pitchSession = await prisma.pitchSession.findFirst({
+      where: { eventId: params.eventId },
+    });
+    if (!pitchSession) return new NextResponse("Pitch session not found", { status: 404 });
+    if (pitchSession.phase === "FINISHED") {
       return NextResponse.json({ message: "Cannot add projects to a finished event" }, { status: 400 });
     }
 
@@ -42,31 +44,31 @@ export async function POST(
     }
 
     // Prevent duplicates
-    const existing = await prisma.eventProject.findUnique({
-      where: { eventId_projectId: { eventId: params.eventId, projectId } },
+    const existing = await prisma.pitchProject.findUnique({
+      where: { pitchSessionId_projectId: { pitchSessionId: pitchSession.id, projectId } },
       select: { id: true },
     });
     if (existing) {
       return NextResponse.json({ message: "Project already in queue" }, { status: 409 });
     }
 
-    const last = await prisma.eventProject.findFirst({
-      where: { eventId: params.eventId },
+    const last = await prisma.pitchProject.findFirst({
+      where: { pitchSessionId: pitchSession.id },
       orderBy: { position: "desc" },
       select: { position: true },
     });
     const nextPos = (last?.position || 0) + 1;
 
-    const item = await prisma.eventProject.create({
+    const item = await prisma.pitchProject.create({
       data: {
-        eventId: params.eventId,
+        pitchSessionId: pitchSession.id,
         projectId,
         addedById: user.id,
         position: nextPos,
         isTopProject: false,
-        ...(event.phase === "PITCHING" && {
-          allottedPresentingSec: event.defaultPresentingSec,
-          allottedQuestionsSec: event.defaultQuestionsSec,
+        ...(pitchSession.phase === "PITCHING" && {
+          allottedPresentingSec: pitchSession.defaultPresentingSec,
+          allottedQuestionsSec: pitchSession.defaultQuestionsSec,
         }),
       },
     });
@@ -95,19 +97,23 @@ export async function PATCH(
       include: { staff: { select: { hackerId: true, role: true } } },
     });
     if (!event) return new NextResponse("Event not found", { status: 404 });
+    const pitchSession = await prisma.pitchSession.findFirst({
+      where: { eventId: params.eventId },
+    });
+    if (!pitchSession) return new NextResponse("Pitch session not found", { status: 404 });
 
     const isAdmin = hacker.role === "SITE_ADMIN";
     const eventStaff = event.staff ?? [];
     const isStaff = eventStaff.some((staff) => staff.hackerId === hacker.id);
-    const allowAll = event.audienceCanReorder || isAdmin || isStaff;
+    const allowAll = pitchSession.audienceCanReorder || isAdmin || isStaff;
 
     const { items } = await req.json();
     if (!Array.isArray(items)) return NextResponse.json({ message: "items array required" }, { status: 400 });
 
     // Top-group protection during PITCHING phase
-    if (event.phase === "PITCHING") {
-      const allProjects = await prisma.eventProject.findMany({
-        where: { eventId: params.eventId },
+    if (pitchSession.phase === "PITCHING") {
+      const allProjects = await prisma.pitchProject.findMany({
+        where: { pitchSessionId: pitchSession.id },
         orderBy: { position: "asc" },
       });
 
@@ -141,15 +147,15 @@ export async function PATCH(
       }
       // Owners can only move their own items and not before the CURRENT item
       const ids = items.map((it: { id: string }) => it.id);
-      const eps = await prisma.eventProject.findMany({
+      const eps = await prisma.pitchProject.findMany({
         where: { id: { in: ids } },
-        select: { id: true, addedById: true, eventId: true },
+        select: { id: true, addedById: true, pitchSessionId: true },
       });
       if (eps.length !== ids.length) return new NextResponse("Not found", { status: 404 });
-      if (eps.some((ep) => ep.eventId !== params.eventId)) return new NextResponse("Bad Request", { status: 400 });
+      if (eps.some((ep) => ep.pitchSessionId !== pitchSession.id)) return new NextResponse("Bad Request", { status: 400 });
       if (eps.some((ep) => ep.addedById !== hacker.id)) return new NextResponse("Unauthorized", { status: 401 });
 
-      const current = await prisma.eventProject.findFirst({ where: { eventId: params.eventId, status: 'CURRENT' }, select: { position: true } });
+      const current = await prisma.pitchProject.findFirst({ where: { pitchSessionId: pitchSession.id, status: 'CURRENT' }, select: { position: true } });
       if (current) {
         const invalid = items.some((it: { position: number }) => it.position <= current.position);
         if (invalid) return new NextResponse("Cannot move before current", { status: 400 });
@@ -157,7 +163,7 @@ export async function PATCH(
     }
 
     const ops = items.map((it: { id: string; position: number }) =>
-      prisma.eventProject.update({ where: { id: it.id }, data: { position: it.position } })
+      prisma.pitchProject.update({ where: { id: it.id }, data: { position: it.position } })
     );
     await prisma.$transaction(ops);
 

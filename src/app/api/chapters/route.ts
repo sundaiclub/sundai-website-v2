@@ -17,21 +17,61 @@ const chapterSelect = {
   country: true,
   timezone: true,
   description: true,
+  heroImageId: true,
+  heroImage: { select: { id: true, url: true, alt: true, filename: true } },
   status: true,
   accessMode: true,
-  defaultDeclineMessage: true,
   mailingListName: true,
   mailingListExternalId: true,
   createdAt: true,
   updatedAt: true,
 } as const;
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
+    const url = new URL(req.url);
+    const manageableOnly = url.searchParams.get('manageable') === 'true';
     const hacker = await getCurrentHacker();
+
+    if (manageableOnly && !hacker) {
+      return new NextResponse('Unauthorized', { status: 401 });
+    }
+
+    if (manageableOnly) {
+      const chapters = await prisma.chapter.findMany({
+        where: isSiteAdmin(hacker!)
+          ? {}
+          : {
+              memberships: {
+                some: {
+                  hackerId: hacker!.id,
+                  role: 'ADMIN',
+                  status: 'ACTIVE',
+                },
+              },
+            },
+        include: {
+          heroImage: {
+            select: { id: true, url: true, alt: true, filename: true },
+          },
+          memberships: {
+            where: { hackerId: hacker!.id },
+            take: 1,
+          },
+        },
+        orderBy: { name: 'asc' },
+      });
+
+      if (!isSiteAdmin(hacker!) && chapters.length === 0) {
+        return new NextResponse('Forbidden', { status: 403 });
+      }
+
+      return NextResponse.json(chapters);
+    }
+
     const chapters = await listVisibleChapters({
       viewer: hacker ? { id: hacker.id, role: hacker.role } : null,
-      includeViewerMembership: Boolean(hacker && !isSiteAdmin(hacker)),
+      includeViewerMembership: Boolean(hacker),
     });
 
     return NextResponse.json(chapters);
@@ -67,7 +107,6 @@ export async function POST(req: Request) {
         description: body?.description || null,
         accessMode: body?.accessMode ?? 'PUBLIC',
         status: body?.status ?? 'ACTIVE',
-        defaultDeclineMessage: body?.defaultDeclineMessage || null,
         mailingListName: body?.mailingListName || null,
         mailingListExternalId: body?.mailingListExternalId || null,
         memberships: body?.assignCreatorAsAdmin

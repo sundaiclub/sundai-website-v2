@@ -7,18 +7,19 @@ export async function POST(
   { params }: { params: { eventId: string } }
 ) {
   try {
-    const { event, response } = await requireEventPitchManager(params.eventId);
+    const { pitchSession, response } = await requireEventPitchManager(params.eventId);
     if (response) return response;
+    if (!pitchSession) return new NextResponse("Pitch session not found", { status: 404 });
 
-    if (event.phase !== "PITCHING") {
+    if (pitchSession.phase !== "PITCHING") {
       return NextResponse.json({ message: "Timer only available during PITCHING phase" }, { status: 400 });
     }
 
-    const { action, eventProjectId } = await req.json();
+    const { action, pitchProjectId } = await req.json();
 
-    const ep = await prisma.eventProject.findUnique({ where: { id: eventProjectId } });
-    if (!ep || ep.eventId !== params.eventId) {
-      return new NextResponse("EventProject not found", { status: 404 });
+    const ep = await prisma.pitchProject.findUnique({ where: { id: pitchProjectId } });
+    if (!ep || ep.pitchSessionId !== pitchSession.id) {
+      return new NextResponse("PitchProject not found", { status: 404 });
     }
     if (ep.status !== "CURRENT") {
       return NextResponse.json({ message: "Can only control timer for the CURRENT project" }, { status: 400 });
@@ -36,12 +37,12 @@ export async function POST(
         if (ep.allottedPresentingSec == null || ep.allottedQuestionsSec == null) {
           const isTopProject = ep.isTopProject;
           allottedData = {
-            allottedPresentingSec: isTopProject ? event.topPresentingSec : event.defaultPresentingSec,
-            allottedQuestionsSec: isTopProject ? event.topQuestionsSec : event.defaultQuestionsSec,
+            allottedPresentingSec: isTopProject ? pitchSession.topPresentingSec : pitchSession.defaultPresentingSec,
+            allottedQuestionsSec: isTopProject ? pitchSession.topQuestionsSec : pitchSession.defaultQuestionsSec,
           };
         }
-        await prisma.eventProject.update({
-          where: { id: eventProjectId },
+        await prisma.pitchProject.update({
+          where: { id: pitchProjectId },
           data: { pitchPhase: "PRESENTING", presentingStartedAt: now, ...allottedData },
         });
         break;
@@ -53,8 +54,8 @@ export async function POST(
         if (ep.pausedAt) {
           return NextResponse.json({ message: "Resume the timer before starting Q&A" }, { status: 400 });
         }
-        await prisma.eventProject.update({
-          where: { id: eventProjectId },
+        await prisma.pitchProject.update({
+          where: { id: pitchProjectId },
           data: { pitchPhase: "QUESTIONS", questionsStartedAt: now },
         });
         break;
@@ -66,8 +67,8 @@ export async function POST(
         if (ep.pausedAt) {
           return NextResponse.json({ message: "Resume the timer before finishing" }, { status: 400 });
         }
-        await prisma.eventProject.update({
-          where: { id: eventProjectId },
+        await prisma.pitchProject.update({
+          where: { id: pitchProjectId },
           data: { pitchPhase: "COMPLETED", completedAt: now },
         });
         break;
@@ -79,8 +80,8 @@ export async function POST(
         if (ep.pausedAt) {
           return NextResponse.json({ message: "Timer is already paused" }, { status: 400 });
         }
-        await prisma.eventProject.update({
-          where: { id: eventProjectId },
+        await prisma.pitchProject.update({
+          where: { id: pitchProjectId },
           data: { pausedAt: now },
         });
         break;
@@ -97,8 +98,8 @@ export async function POST(
         if (ep.questionsStartedAt) {
           shifted.questionsStartedAt = new Date(ep.questionsStartedAt.getTime() + pausedMs);
         }
-        await prisma.eventProject.update({
-          where: { id: eventProjectId },
+        await prisma.pitchProject.update({
+          where: { id: pitchProjectId },
           data: { pausedAt: null, ...shifted },
         });
         break;

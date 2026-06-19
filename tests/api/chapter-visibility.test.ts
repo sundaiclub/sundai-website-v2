@@ -194,12 +194,12 @@ describe('chapter visibility API', () => {
             }),
           ]),
         }),
-        include: {
+        include: expect.objectContaining({
           memberships: {
             where: { hackerId: hacker.id },
             take: 1,
           },
-        },
+        }),
       })
     );
   });

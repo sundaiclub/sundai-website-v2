@@ -1,31 +1,31 @@
 const TOP_PROJECT_COUNT = 5;
 
-type RankableEventProject = {
+type RankablePitchProject = {
   id: string;
   createdAt: string | Date;
   pitchVotes: Array<{ value?: string }>;
 };
 
-function getEventProjectLikeCount(project: RankableEventProject) {
+function getPitchProjectLikeCount(project: RankablePitchProject) {
   return project.pitchVotes.filter((vote) => vote.value === "LIKE").length;
 }
 
-function compareEventProjectsByVotingResult(
-  a: RankableEventProject,
-  b: RankableEventProject
+function comparePitchProjectsByVotingResult(
+  a: RankablePitchProject,
+  b: RankablePitchProject
 ) {
-  const likeDiff = getEventProjectLikeCount(b) - getEventProjectLikeCount(a);
+  const likeDiff = getPitchProjectLikeCount(b) - getPitchProjectLikeCount(a);
   if (likeDiff !== 0) return likeDiff;
   return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
 }
 
-export function rankEventProjectsForPitching<T extends RankableEventProject>(
-  eventProjects: T[]
+export function rankPitchProjectsForPitching<T extends RankablePitchProject>(
+  pitchProjects: T[]
 ) {
-  return [...eventProjects].sort(compareEventProjectsByVotingResult);
+  return [...pitchProjects].sort(comparePitchProjectsByVotingResult);
 }
 
-export function getFrozenTopProjectIds<T extends RankableEventProject>(
+export function getFrozenTopProjectIds<T extends RankablePitchProject>(
   sortedProjects: T[],
   topCount: number = TOP_PROJECT_COUNT
 ) {
@@ -37,9 +37,9 @@ export function getFrozenTopProjectIds<T extends RankableEventProject>(
     return new Set<string>();
   }
 
-  const cutoffLikes = getEventProjectLikeCount(sortedProjects[topCount - 1]);
+  const cutoffLikes = getPitchProjectLikeCount(sortedProjects[topCount - 1]);
   const tiedTopProjects = sortedProjects.filter(
-    (project) => getEventProjectLikeCount(project) >= cutoffLikes
+    (project) => getPitchProjectLikeCount(project) >= cutoffLikes
   );
 
   return new Set(tiedTopProjects.map(project => project.id));

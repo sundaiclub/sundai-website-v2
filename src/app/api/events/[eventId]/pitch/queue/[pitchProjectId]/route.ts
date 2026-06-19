@@ -5,7 +5,7 @@ import prisma from "@/lib/prisma";
 // Delist (remove) an item from the queue
 export async function DELETE(
   req: Request,
-  { params }: { params: { eventId: string; eventProjectId: string } }
+  { params }: { params: { eventId: string; pitchProjectId: string } }
 ) {
   try {
     const { userId } = auth();
@@ -14,8 +14,11 @@ export async function DELETE(
     const me = await prisma.hacker.findUnique({ where: { clerkId: userId }, select: { id: true, role: true } });
     if (!me) return new NextResponse("User not found", { status: 404 });
 
-    const ep = await prisma.eventProject.findUnique({ where: { id: params.eventProjectId } });
-    if (!ep || ep.eventId !== params.eventId) return new NextResponse("Not found", { status: 404 });
+    const ep = await prisma.pitchProject.findUnique({
+      where: { id: params.pitchProjectId },
+      include: { pitchSession: { select: { eventId: true } } },
+    });
+    if (!ep || ep.pitchSession.eventId !== params.eventId) return new NextResponse("Not found", { status: 404 });
 
     // Permissions: MC/Admin can delist any; owner (addedBy) can delist their own item unless it's CURRENT
     const event = await prisma.event.findUnique({ where: { id: params.eventId }, include: { staff: true } });
@@ -27,12 +30,11 @@ export async function DELETE(
       return new NextResponse("Unauthorized", { status: 401 });
     }
 
-    await prisma.eventProject.delete({ where: { id: params.eventProjectId } });
+    await prisma.pitchProject.delete({ where: { id: params.pitchProjectId } });
     return new NextResponse(null, { status: 204 });
   } catch (error) {
     console.error("[QUEUE_ITEM_DELETE]", error);
     return new NextResponse("Internal Error", { status: 500 });
   }
 }
-
 

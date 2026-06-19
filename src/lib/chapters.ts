@@ -200,16 +200,19 @@ export async function listVisibleChapters(options: ListVisibleChaptersOptions = 
   const chapters = await client.chapter.findMany({
     where,
     orderBy: options.orderBy ?? { name: "asc" },
-    ...(options.includeViewerMembership && viewerId
-      ? {
-          include: {
+    include: {
+      heroImage: {
+        select: { id: true, url: true, alt: true, filename: true },
+      },
+      ...(options.includeViewerMembership && viewerId
+        ? {
             memberships: {
               where: { hackerId: viewerId },
               take: 1,
             },
-          },
-        }
-      : {}),
+          }
+        : {}),
+    },
   });
 
   return chapters as Chapter[];

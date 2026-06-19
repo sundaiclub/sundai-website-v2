@@ -1,5 +1,5 @@
 import React from 'react'
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 
 const mockUseTheme = jest.fn()
 const mockUseUserContext = jest.fn()
@@ -65,9 +65,14 @@ const chapter = {
   country: 'US',
   timezone: 'America/New_York',
   description: 'Boston chapter operations',
+  heroImage: {
+    id: 'image-boston',
+    url: 'https://storage.googleapis.com/test-bucket/chapters/boston.jpg',
+    alt: 'Sundai Boston chapter image',
+    filename: 'boston.jpg',
+  },
   status: 'ACTIVE',
   accessMode: 'PRIVATE',
-  defaultDeclineMessage: 'Thanks for applying. Please try another Sundai Boston meetup.',
   mailingListName: 'boston-organizers',
   memberships: [
     {
@@ -353,16 +358,74 @@ describe('/organizer/chapters/[chapterSlug]/settings', () => {
       /what are you hoping to build/i,
       /application template/i,
     )
-    await expectSomeText(
-      /declined-user message/i,
-      /default decline/i,
-      /thanks for applying/i,
+    await expectSomeText(/chapter profile/i, /chapter description/i)
+    expect(screen.getByLabelText(/chapter image/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/chapter description/i)).toHaveValue(
+      'Boston chapter operations',
     )
 
     expect(
       screen.getAllByRole('button', { name: /save|update|invite|remove|revoke|add/i })
         .length,
     ).toBeGreaterThan(0)
+  })
+
+  it('creates a ban flag from the selected hacker search result', async () => {
+    mockChapterAdmin()
+    const createdFlag = {
+      id: 'flag-active-member',
+      chapterId: chapter.id,
+      hackerId: 'hacker-active-member',
+      reason: 'Repeated no-show pattern',
+      status: 'OPEN',
+      hacker: {
+        id: 'hacker-active-member',
+        name: 'Active Member',
+        email: 'member@example.com',
+      },
+    }
+
+    global.fetch = jest.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = requestUrl(input)
+
+      if (url.includes('/members')) return jsonResponse(members)
+      if (url.includes('/invites')) {
+        return jsonResponse(members.filter((member) => member.status === 'INVITED'))
+      }
+      if (url.includes('/ban-flags') && init?.method === 'POST') {
+        return jsonResponse(createdFlag, 201)
+      }
+      if (url.includes('/ban-flags')) return jsonResponse([])
+      if (url.includes('/application-templates')) return jsonResponse(templates)
+      if (/\/api\/chapters\/[^/?]+/.test(url)) return jsonResponse(chapter)
+      return jsonResponse({})
+    }) as jest.Mock
+
+    renderSettingsPage()
+
+    await expectSomeText(/no ban flags are open/i)
+    fireEvent.change(screen.getByRole('textbox', { name: /search hacker to flag/i }), {
+      target: { value: 'Active' },
+    })
+    await expectSomeText(/member@example.com/i)
+    fireEvent.click(screen.getByRole('option', { name: /active member/i }))
+    fireEvent.change(screen.getByRole('textbox', { name: /flag reason/i }), {
+      target: { value: 'Repeated no-show pattern' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /create flag/i }))
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        `/api/chapters/${chapter.id}/ban-flags`,
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({
+            hackerId: 'hacker-active-member',
+            reason: 'Repeated no-show pattern',
+          }),
+        }),
+      )
+    })
   })
 
   it('denies the organizer settings surface to users who do not manage the chapter', async () => {
@@ -375,7 +438,7 @@ describe('/organizer/chapters/[chapterSlug]/settings', () => {
     expect(screen.queryByText(/active member/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/invited hacker/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/repeated no-show pattern/i)).not.toBeInTheDocument()
-    expect(screen.queryByText(/thanks for applying/i)).not.toBeInTheDocument()
+    expect(screen.queryByLabelText(/chapter description/i)).not.toBeInTheDocument()
     expect(
       screen.queryByRole('button', { name: /save|update|invite|remove|revoke|add/i }),
     ).not.toBeInTheDocument()

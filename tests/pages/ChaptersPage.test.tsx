@@ -70,6 +70,24 @@ const activeMemberUser = {
   ],
 }
 
+const chapterAdminUser = {
+  ...regularUser,
+  id: 'hacker-chapter-admin',
+  clerkId: 'clerk-chapter-admin',
+  chapterMemberships: [
+    {
+      id: 'membership-boston-admin',
+      chapterId: 'chapter-boston',
+      chapterSlug: 'boston',
+      role: 'ADMIN',
+      status: 'ACTIVE',
+      notificationsAllowed: true,
+      emailNotificationsEnabled: true,
+      smsNotificationsEnabled: false,
+    },
+  ],
+}
+
 const invitedUser = {
   ...regularUser,
   id: 'hacker-invited',
@@ -136,6 +154,29 @@ const bostonMemberChapter = {
       id: 'membership-boston-active',
       hackerId: 'hacker-member',
       role: 'MEMBER',
+      status: 'ACTIVE',
+      notificationsAllowed: true,
+      emailNotificationsEnabled: true,
+      smsNotificationsEnabled: false,
+    },
+  ],
+}
+
+const bostonAdminChapter = {
+  ...bostonChapter,
+  viewerMembership: {
+    id: 'membership-boston-admin',
+    role: 'ADMIN',
+    status: 'ACTIVE',
+    notificationsAllowed: true,
+    emailNotificationsEnabled: true,
+    smsNotificationsEnabled: false,
+  },
+  memberships: [
+    {
+      id: 'membership-boston-admin',
+      hackerId: 'hacker-chapter-admin',
+      role: 'ADMIN',
       status: 'ACTIVE',
       notificationsAllowed: true,
       emailNotificationsEnabled: true,
@@ -279,12 +320,14 @@ function visibleChaptersForCurrentUser() {
   }
   if (userInfo.id === 'hacker-invited') return [bostonChapter, cambridgePrivateChapter]
   if (userInfo.id === 'hacker-member') return [bostonMemberChapter]
+  if (userInfo.id === 'hacker-chapter-admin') return [bostonAdminChapter]
   return [bostonChapter]
 }
 
 function chapterForSlug(slug: string) {
   if (slug === 'boston' || slug === 'chapter-boston') {
     const userInfo = mockUseUserContext().userInfo
+    if (userInfo?.id === 'hacker-chapter-admin') return bostonAdminChapter
     return userInfo?.id === 'hacker-member' ? bostonMemberChapter : bostonChapter
   }
   if (slug === 'cambridge-private' || slug === 'chapter-cambridge') {
@@ -418,6 +461,7 @@ describe('chapter public directory and landing pages', () => {
         'href',
         expect.stringContaining('/chapters/boston'),
       )
+      expect(screen.getByAltText(/sundai club logo/i)).toBeInTheDocument()
       expect(screen.queryByText(/sundai cambridge private/i)).not.toBeInTheDocument()
       expect(screen.queryByText(/sundai austin private/i)).not.toBeInTheDocument()
     })
@@ -544,6 +588,30 @@ describe('chapter public directory and landing pages', () => {
           emailNotificationsEnabled: expect.any(Boolean),
           smsNotificationsEnabled: expect.any(Boolean),
         }),
+      )
+    })
+
+    it('shows a manage link to chapter admins', async () => {
+      mockSignedIn(chapterAdminUser)
+
+      renderLandingPage('boston')
+
+      const manageLink = await screen.findByRole('link', { name: /manage/i })
+      expect(manageLink).toHaveAttribute(
+        'href',
+        '/organizer/chapters/boston/settings',
+      )
+    })
+
+    it('shows a manage link to site admins', async () => {
+      mockSignedIn(siteAdminUser)
+
+      renderLandingPage('boston')
+
+      const manageLink = await screen.findByRole('link', { name: /manage/i })
+      expect(manageLink).toHaveAttribute(
+        'href',
+        '/organizer/chapters/boston/settings',
       )
     })
 

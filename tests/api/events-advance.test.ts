@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { POST as POST_ADVANCE } from '../../src/app/api/events/[eventId]/advance/route';
+import { POST as POST_ADVANCE } from '../../src/app/api/events/[eventId]/pitch/advance/route';
 
 jest.mock('../../src/lib/prisma', () => ({
   __esModule: true,
@@ -7,7 +7,8 @@ jest.mock('../../src/lib/prisma', () => ({
     hacker: { findUnique: jest.fn() },
     chapterMembership: { findFirst: jest.fn() },
     event: { findUnique: jest.fn(), update: jest.fn() },
-    eventProject: { findMany: jest.fn(), update: jest.fn() },
+    pitchSession: { findFirst: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
+    pitchProject: { findMany: jest.fn(), update: jest.fn() },
   },
 }));
 
@@ -18,8 +19,11 @@ const mockAuth = require('@clerk/nextjs/server').auth as jest.Mock;
 
 describe('/api/events/[eventId]/advance', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    jest.resetAllMocks();
     prisma.chapterMembership.findFirst.mockResolvedValue(null);
+    prisma.pitchSession.findFirst.mockResolvedValue({ id: 'ps1', eventId: 'e1', phase: 'PITCHING' });
+    prisma.pitchSession.findUnique.mockResolvedValue({ id: 'ps1', phase: 'PITCHING', projects: [] });
+    prisma.pitchSession.update.mockResolvedValue({});
   });
 
   it('rejects when phase is VOTING', async () => {
@@ -27,12 +31,12 @@ describe('/api/events/[eventId]/advance', () => {
     prisma.hacker.findUnique.mockResolvedValue({ id: 'h-admin', role: 'SITE_ADMIN' });
     prisma.event.findUnique.mockResolvedValue({
       id: 'e1',
-      phase: 'VOTING',
       staff: [],
       projects: [],
     });
+    prisma.pitchSession.findFirst.mockResolvedValue({ id: 'ps1', eventId: 'e1', phase: 'VOTING' });
 
-    const request = new NextRequest('http://localhost:3000/api/events/e1/advance', { method: 'POST' });
+    const request = new NextRequest('http://localhost:3000/api/events/e1/pitch/advance', { method: 'POST' });
     const res = await POST_ADVANCE(request as any, { params: { eventId: 'e1' } } as any);
     expect(res.status).toBe(400);
     const body = await res.json();
@@ -59,12 +63,12 @@ describe('/api/events/[eventId]/advance', () => {
         ],
       });
 
-    prisma.eventProject.findMany.mockResolvedValue([
+    prisma.pitchProject.findMany.mockResolvedValue([
       { id: 'ep1', position: 1, status: 'QUEUED', pitchPhase: 'WAITING' },
     ]);
-    prisma.eventProject.update.mockResolvedValue({});
+    prisma.pitchProject.update.mockResolvedValue({});
 
-    const request = new NextRequest('http://localhost:3000/api/events/e1/advance', { method: 'POST' });
+    const request = new NextRequest('http://localhost:3000/api/events/e1/pitch/advance', { method: 'POST' });
     const res = await POST_ADVANCE(request as any, { params: { eventId: 'e1' } } as any);
     expect(res.status).toBe(200);
   });
@@ -85,12 +89,12 @@ describe('/api/events/[eventId]/advance', () => {
         projects: [{ id: 'ep1', position: 1, status: 'CURRENT' }],
       });
 
-    prisma.eventProject.findMany.mockResolvedValue([
+    prisma.pitchProject.findMany.mockResolvedValue([
       { id: 'ep1', position: 1, status: 'QUEUED', pitchPhase: 'WAITING' },
     ]);
-    prisma.eventProject.update.mockResolvedValue({});
+    prisma.pitchProject.update.mockResolvedValue({});
 
-    const request = new NextRequest('http://localhost:3000/api/events/e1/advance', { method: 'POST' });
+    const request = new NextRequest('http://localhost:3000/api/events/e1/pitch/advance', { method: 'POST' });
     const res = await POST_ADVANCE(request as any, { params: { eventId: 'e1' } } as any);
     expect(res.status).toBe(200);
   });
@@ -111,12 +115,12 @@ describe('/api/events/[eventId]/advance', () => {
         projects: [{ id: 'ep1', position: 1, status: 'CURRENT' }],
       });
 
-    prisma.eventProject.findMany.mockResolvedValue([
+    prisma.pitchProject.findMany.mockResolvedValue([
       { id: 'ep1', position: 1, status: 'QUEUED', pitchPhase: 'WAITING' },
     ]);
-    prisma.eventProject.update.mockResolvedValue({});
+    prisma.pitchProject.update.mockResolvedValue({});
 
-    const request = new NextRequest('http://localhost:3000/api/events/e1/advance', { method: 'POST' });
+    const request = new NextRequest('http://localhost:3000/api/events/e1/pitch/advance', { method: 'POST' });
     const res = await POST_ADVANCE(request as any, { params: { eventId: 'e1' } } as any);
     expect(res.status).toBe(200);
   });
@@ -139,17 +143,17 @@ describe('/api/events/[eventId]/advance', () => {
         ],
       });
 
-    prisma.eventProject.findMany.mockResolvedValue([
+    prisma.pitchProject.findMany.mockResolvedValue([
       { id: 'ep1', position: 1, status: 'CURRENT', pitchPhase: 'COMPLETED' },
     ]);
-    prisma.eventProject.update.mockResolvedValue({});
-    prisma.event.update.mockResolvedValue({});
+    prisma.pitchProject.update.mockResolvedValue({});
+    prisma.pitchSession.update.mockResolvedValue({});
 
-    const request = new NextRequest('http://localhost:3000/api/events/e1/advance', { method: 'POST' });
+    const request = new NextRequest('http://localhost:3000/api/events/e1/pitch/advance', { method: 'POST' });
     const res = await POST_ADVANCE(request as any, { params: { eventId: 'e1' } } as any);
     expect(res.status).toBe(200);
-    expect(prisma.event.update).toHaveBeenCalledWith({
-      where: { id: 'e1' },
+    expect(prisma.pitchSession.update).toHaveBeenCalledWith({
+      where: { id: 'ps1' },
       data: { phase: 'FINISHED' },
     });
   });
@@ -170,25 +174,25 @@ describe('/api/events/[eventId]/advance', () => {
         projects: [],
       });
 
-    prisma.eventProject.findMany.mockResolvedValue([
+    prisma.pitchProject.findMany.mockResolvedValue([
       { id: 'ep1', position: 1, status: 'CURRENT', pitchPhase: 'PRESENTING', presentingStartedAt: new Date() },
       { id: 'ep2', position: 2, status: 'QUEUED', pitchPhase: 'WAITING' },
     ]);
-    prisma.eventProject.update.mockResolvedValue({});
+    prisma.pitchProject.update.mockResolvedValue({});
 
-    const request = new NextRequest('http://localhost:3000/api/events/e1/advance', { method: 'POST' });
+    const request = new NextRequest('http://localhost:3000/api/events/e1/pitch/advance', { method: 'POST' });
     const res = await POST_ADVANCE(request as any, { params: { eventId: 'e1' } } as any);
     expect(res.status).toBe(200);
 
     // Current project should be marked DONE with COMPLETED pitchPhase
-    const doneCall = prisma.eventProject.update.mock.calls[0];
+    const doneCall = prisma.pitchProject.update.mock.calls[0];
     expect(doneCall[0].data.status).toBe('DONE');
     expect(doneCall[0].data.pitchPhase).toBe('COMPLETED');
     expect(doneCall[0].data.completedAt).toBeDefined();
     expect(doneCall[0].data.questionsStartedAt).toBeDefined();
 
     // Next project should be set to CURRENT with WAITING pitchPhase
-    const nextCall = prisma.eventProject.update.mock.calls[1];
+    const nextCall = prisma.pitchProject.update.mock.calls[1];
     expect(nextCall[0].data.status).toBe('CURRENT');
     expect(nextCall[0].data.pitchPhase).toBe('WAITING');
   });
@@ -209,17 +213,17 @@ describe('/api/events/[eventId]/advance', () => {
         projects: [],
       });
 
-    prisma.eventProject.findMany.mockResolvedValue([
+    prisma.pitchProject.findMany.mockResolvedValue([
       { id: 'ep1', position: 1, status: 'CURRENT', pitchPhase: 'QUESTIONS', questionsStartedAt: new Date() },
       { id: 'ep2', position: 2, status: 'QUEUED', pitchPhase: 'WAITING' },
     ]);
-    prisma.eventProject.update.mockResolvedValue({});
+    prisma.pitchProject.update.mockResolvedValue({});
 
-    const request = new NextRequest('http://localhost:3000/api/events/e1/advance', { method: 'POST' });
+    const request = new NextRequest('http://localhost:3000/api/events/e1/pitch/advance', { method: 'POST' });
     const res = await POST_ADVANCE(request as any, { params: { eventId: 'e1' } } as any);
     expect(res.status).toBe(200);
 
-    const doneCall = prisma.eventProject.update.mock.calls[0];
+    const doneCall = prisma.pitchProject.update.mock.calls[0];
     expect(doneCall[0].data.status).toBe('DONE');
     expect(doneCall[0].data.pitchPhase).toBe('COMPLETED');
     expect(doneCall[0].data.completedAt).toBeDefined();

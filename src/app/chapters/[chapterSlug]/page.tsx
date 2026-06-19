@@ -1,15 +1,18 @@
 'use client';
 
+import Image from 'next/image';
 import { useEffect, useState } from 'react';
 import {
   ManagementAlert,
   ManagementBadge,
   ManagementEmptyState,
   ManagementHeader,
+  ManagementLinkButton,
   ManagementPage,
   ManagementSection,
   useManagementClasses,
 } from '../../components/ManagementSurface';
+import { useUserContext } from '../../contexts/UserContext';
 import type {
   ChapterLanding,
   ChapterMembershipSummary,
@@ -27,10 +30,18 @@ export default function ChapterLandingPage({
   params: { chapterSlug: string };
 }) {
   const classes = useManagementClasses();
+  const { isAdmin, userInfo } = useUserContext();
   const [chapter, setChapter] = useState<ChapterLanding | null>(null);
   const [denied, setDenied] = useState(false);
   const [loadError, setLoadError] = useState('');
+  const [actionMessage, setActionMessage] = useState('');
+  const [actionError, setActionError] = useState('');
+  const [isActing, setIsActing] = useState(false);
   const membership = firstMembership(chapter);
+  const canManageChapter =
+    Boolean(chapter) &&
+    (isAdmin ||
+      (membership?.role === 'ADMIN' && membership.status === 'ACTIVE'));
   const [notificationsAllowed, setNotificationsAllowed] = useState(false);
   const [emailNotificationsEnabled, setEmailNotificationsEnabled] =
     useState(false);
@@ -67,52 +78,134 @@ export default function ChapterLandingPage({
 
   async function join() {
     if (!chapter) return;
-    const response = await fetch(`/api/chapters/${chapter.id}/join`, {
-      method: 'POST',
-    });
-    if (response.ok) {
+    if (!userInfo) {
+      setActionMessage('');
+      setActionError('Please sign in to join this chapter.');
+      return;
+    }
+
+    setIsActing(true);
+    setActionMessage('');
+    setActionError('');
+    try {
+      const response = await fetch(`/api/chapters/${chapter.id}/join`, {
+        method: 'POST',
+      });
+      if (!response.ok) {
+        throw new Error(
+          response.status === 401
+            ? 'Please sign in to join this chapter.'
+            : 'Unable to join this chapter.'
+        );
+      }
       const membership = await response.json();
       setChapter({
         ...chapter,
         viewerMembership: membership,
         memberships: [membership],
       });
+      setActionMessage('Chapter membership is active.');
+    } catch (error) {
+      setActionError(
+        error instanceof Error ? error.message : 'Unable to join this chapter.'
+      );
+    } finally {
+      setIsActing(false);
     }
   }
 
   async function acceptInvite() {
     if (!chapter) return;
-    const response = await fetch(`/api/chapters/${chapter.id}/invites/accept`, {
-      method: 'POST',
-    });
-    if (response.ok) {
+    setIsActing(true);
+    setActionMessage('');
+    setActionError('');
+    try {
+      const response = await fetch(`/api/chapters/${chapter.id}/invites/accept`, {
+        method: 'POST',
+      });
+      if (!response.ok) {
+        throw new Error('Unable to accept this invitation.');
+      }
       const membership = await response.json();
       setChapter({
         ...chapter,
         viewerMembership: membership,
         memberships: [membership],
       });
+      setActionMessage('Chapter membership is active.');
+    } catch (error) {
+      setActionError(
+        error instanceof Error
+          ? error.message
+          : 'Unable to accept this invitation.'
+      );
+    } finally {
+      setIsActing(false);
+    }
+  }
+
+  async function leaveChapter() {
+    if (!chapter) return;
+    setIsActing(true);
+    setActionMessage('');
+    setActionError('');
+    try {
+      const response = await fetch(`/api/chapters/${chapter.id}/leave`, {
+        method: 'POST',
+      });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        throw new Error(payload?.message || 'Unable to leave this chapter.');
+      }
+      const membership = await response.json();
+      setChapter({
+        ...chapter,
+        viewerMembership: membership,
+        memberships: [membership],
+      });
+      setActionMessage('You left this chapter.');
+    } catch (error) {
+      setActionError(
+        error instanceof Error ? error.message : 'Unable to leave this chapter.'
+      );
+    } finally {
+      setIsActing(false);
     }
   }
 
   async function updateNotifications() {
     if (!chapter) return;
-    const response = await fetch(`/api/chapters/${chapter.id}/notifications`, {
-      method: 'PATCH',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        notificationsAllowed,
-        emailNotificationsEnabled,
-        smsNotificationsEnabled,
-      }),
-    });
-    if (response.ok) {
+    setIsActing(true);
+    setActionMessage('');
+    setActionError('');
+    try {
+      const response = await fetch(`/api/chapters/${chapter.id}/notifications`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          notificationsAllowed,
+          emailNotificationsEnabled,
+          smsNotificationsEnabled,
+        }),
+      });
+      if (!response.ok) {
+        throw new Error('Unable to save notification preferences.');
+      }
       const membership = await response.json();
       setChapter({
         ...chapter,
         viewerMembership: membership,
         memberships: [membership],
       });
+      setActionMessage('Notification preferences saved.');
+    } catch (error) {
+      setActionError(
+        error instanceof Error
+          ? error.message
+          : 'Unable to save notification preferences.'
+      );
+    } finally {
+      setIsActing(false);
     }
   }
 
@@ -133,11 +226,31 @@ export default function ChapterLandingPage({
           <ManagementAlert tone="danger">{loadError}</ManagementAlert>
         </div>
       )}
+      {chapter?.heroImage?.url && (
+        <div className="relative mb-6 aspect-[16/7] overflow-hidden rounded-lg">
+          <Image
+            alt={chapter.heroImage.alt || `${chapter.name} chapter`}
+            className="object-cover"
+            fill
+            src={chapter.heroImage.url}
+            sizes="(min-width: 1024px) 896px, 100vw"
+            unoptimized
+          />
+        </div>
+      )}
       <ManagementHeader
         title={chapter?.name || 'Chapter'}
         description={chapter?.description || chapter?.city}
         actions={
           <>
+            {canManageChapter && chapter && (
+              <ManagementLinkButton
+                href={`/organizer/chapters/${chapter.slug}/settings`}
+                variant="primary"
+              >
+                Manage
+              </ManagementLinkButton>
+            )}
             {chapter?.accessMode && (
               <ManagementBadge>{chapter.accessMode}</ManagementBadge>
             )}
@@ -178,11 +291,18 @@ export default function ChapterLandingPage({
           </div>
         </ManagementSection>
 
+        {(actionMessage || actionError) && (
+          <ManagementAlert tone={actionError ? 'danger' : 'success'}>
+            {actionError || actionMessage}
+          </ManagementAlert>
+        )}
+
         <div className="flex flex-wrap gap-3">
           {chapter?.accessMode === 'PUBLIC' &&
             membership?.status !== 'ACTIVE' && (
               <button
                 className={classes.primaryButton}
+                disabled={isActing}
                 onClick={join}
                 type="button"
               >
@@ -192,10 +312,21 @@ export default function ChapterLandingPage({
           {membership?.status === 'INVITED' && (
             <button
               className={classes.primaryButton}
+              disabled={isActing}
               onClick={acceptInvite}
               type="button"
             >
               Accept invitation
+            </button>
+          )}
+          {membership?.status === 'ACTIVE' && membership.role !== 'ADMIN' && (
+            <button
+              className={classes.secondaryButton}
+              disabled={isActing}
+              onClick={leaveChapter}
+              type="button"
+            >
+              Leave chapter
             </button>
           )}
         </div>
@@ -244,6 +375,7 @@ export default function ChapterLandingPage({
               </label>
               <button
                 className={classes.primaryButton}
+                disabled={isActing}
                 onClick={updateNotifications}
                 type="button"
               >

@@ -8,6 +8,7 @@ import {
 import { canViewChapter as canViewChapterWithAuth } from '@/lib/eventManagementAuth';
 
 const chapterInclude = {
+  heroImage: { select: { id: true, url: true, alt: true, filename: true } },
   memberships: {
     where: { status: 'ACTIVE' as const, role: 'ADMIN' as const },
     include: { hacker: { select: { id: true, name: true, email: true } } },
@@ -108,7 +109,6 @@ export async function PATCH(
       'description',
       'status',
       'accessMode',
-      'defaultDeclineMessage',
       'mailingListName',
       'mailingListExternalId',
     ] as const;

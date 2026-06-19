@@ -48,9 +48,9 @@ export type ChapterFixture = {
   country: string;
   timezone: string;
   description: string | null;
+  heroImageId: string | null;
   status: ChapterStatus;
   accessMode: ChapterAccessMode;
-  defaultDeclineMessage: string | null;
   mailingListName: string | null;
   mailingListExternalId: string | null;
   createdAt: Date;
@@ -192,9 +192,9 @@ export const buildChapter = (
   country: 'US',
   timezone: 'America/New_York',
   description: 'Boston chapter',
+  heroImageId: null,
   status: 'ACTIVE',
   accessMode: 'PUBLIC',
-  defaultDeclineMessage: null,
   mailingListName: null,
   mailingListExternalId: null,
   createdAt: fixtureNow(),

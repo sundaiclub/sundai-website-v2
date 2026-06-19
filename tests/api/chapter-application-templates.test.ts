@@ -282,13 +282,13 @@ describe('chapter-admin application template operations', () => {
     });
   });
 
-  it('lets a chapter admin edit the default declined message for their chapter', async () => {
+  it('lets a chapter admin edit the chapter description for their chapter', async () => {
     const { chapter, hacker, membership } = buildChapterAdminFixture();
-    const defaultDeclineMessage =
-      'Thanks for applying. We are prioritizing local waitlisted builders this week.';
+    const description =
+      'Local builders, demos, and application defaults for Sundai Boston.';
     const updatedChapter = buildChapter({
       ...chapter,
-      defaultDeclineMessage,
+      description,
     });
 
     mockActor(hacker);
@@ -299,7 +299,7 @@ describe('chapter-admin application template operations', () => {
     const response = await PATCH_CHAPTER(
       createJsonRequest('/api/chapters/chapter-boston', {
         method: 'PATCH',
-        body: { defaultDeclineMessage },
+        body: { description },
       }) as any,
       createRouteContext({ chapterId: chapter.id }) as any
     );
@@ -309,16 +309,16 @@ describe('chapter-admin application template operations', () => {
     expect(prisma.chapter.update).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: chapter.id },
-        data: { defaultDeclineMessage },
+        data: { description },
       })
     );
     expect(body).toMatchObject({
       id: chapter.id,
-      defaultDeclineMessage,
+      description,
     });
   });
 
-  it('denies chapter template and declined-message edits outside the admin chapter', async () => {
+  it('denies chapter template and description edits outside the admin chapter', async () => {
     const { hacker, membership: bostonAdminMembership } =
       buildChapterAdminFixture();
     const nycChapter = buildChapter({
@@ -357,17 +357,17 @@ describe('chapter-admin application template operations', () => {
       }) as any,
       createRouteContext({ templateId: nycTemplate.id }) as any
     );
-    const declineMessageResponse = await PATCH_CHAPTER(
+    const descriptionResponse = await PATCH_CHAPTER(
       createJsonRequest('/api/chapters/chapter-nyc', {
         method: 'PATCH',
-        body: { defaultDeclineMessage: 'Unauthorized NYC message edit.' },
+        body: { description: 'Unauthorized NYC description edit.' },
       }) as any,
       createRouteContext({ chapterId: nycChapter.id }) as any
     );
 
     expect(createResponse.status).toBe(403);
     expect(updateResponse.status).toBe(403);
-    expect(declineMessageResponse.status).toBe(403);
+    expect(descriptionResponse.status).toBe(403);
     expect(prisma.applicationTemplate.create).not.toHaveBeenCalled();
     expect(prisma.applicationTemplate.update).not.toHaveBeenCalled();
     expect(prisma.chapter.update).not.toHaveBeenCalled();

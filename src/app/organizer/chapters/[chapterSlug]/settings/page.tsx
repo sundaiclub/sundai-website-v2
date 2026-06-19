@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { useEffect, useState } from 'react';
 import {
   AuthStatusAlert,
@@ -17,6 +18,10 @@ import {
   useManagementClasses,
 } from '../../../../components/ManagementSurface';
 import { ApplicationTemplateEditor } from '../../../../components/ApplicationTemplateEditor';
+import {
+  HackerSearchSelect,
+  type HackerSearchOption,
+} from '../../../../components/HackerSearchSelect';
 import { useUserContext } from '../../../../contexts/UserContext';
 import type {
   AdminBanFlagListItem,
@@ -77,6 +82,29 @@ export default function OrganizerChapterSettingsPage({
   const [authStatus, setAuthStatus] = useState<AuthStatus | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
+  const [templateMessage, setTemplateMessage] = useState('');
+  const [templateError, setTemplateError] = useState('');
+  const [isCreatingTemplate, setIsCreatingTemplate] = useState(false);
+  const [descriptionDraft, setDescriptionDraft] = useState('');
+  const [settingsMessage, setSettingsMessage] = useState('');
+  const [settingsError, setSettingsError] = useState('');
+  const [isSavingDescription, setIsSavingDescription] = useState(false);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [flagHackerQuery, setFlagHackerQuery] = useState('');
+  const [selectedFlagHacker, setSelectedFlagHacker] =
+    useState<HackerSearchOption | null>(null);
+  const [flagReason, setFlagReason] = useState('');
+  const [flagMessage, setFlagMessage] = useState('');
+  const [flagError, setFlagError] = useState('');
+  const [isCreatingFlag, setIsCreatingFlag] = useState(false);
+
+  const memberHackerOptions: HackerSearchOption[] = members
+    .filter(member => member.hacker?.id && member.hacker?.name)
+    .map(member => ({
+      id: member.hacker!.id,
+      name: member.hacker!.name,
+      email: member.hacker?.email ?? null,
+    }));
 
   useEffect(() => {
     let isCurrent = true;
@@ -146,6 +174,7 @@ export default function OrganizerChapterSettingsPage({
         if (!isCurrent) return;
 
         setChapter(nextChapter);
+        setDescriptionDraft(nextChapter.description ?? '');
         setMembers(Array.isArray(membersPayload) ? membersPayload : []);
         setTemplates(templateList(templatesPayload));
         setBanFlags(Array.isArray(banFlagsPayload) ? banFlagsPayload : []);
@@ -162,6 +191,165 @@ export default function OrganizerChapterSettingsPage({
       isCurrent = false;
     };
   }, [params.chapterSlug]);
+
+  async function saveChapterDescription(event: React.FormEvent) {
+    event.preventDefault();
+    if (!chapter) return;
+
+    setIsSavingDescription(true);
+    setSettingsMessage('');
+    setSettingsError('');
+
+    try {
+      const response = await fetch(`/api/chapters/${chapter.id}`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          description: descriptionDraft.trim(),
+        }),
+      });
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        throw new Error(payload?.message || 'Unable to save description.');
+      }
+
+      const updatedChapter = firstChapter(await response.json());
+      if (updatedChapter) {
+        setChapter(updatedChapter);
+        setDescriptionDraft(updatedChapter.description ?? '');
+      }
+      setSettingsMessage('Chapter description saved.');
+    } catch (error) {
+      setSettingsError(
+        error instanceof Error ? error.message : 'Unable to save description.'
+      );
+    } finally {
+      setIsSavingDescription(false);
+    }
+  }
+
+  async function uploadChapterImage(event: React.ChangeEvent<HTMLInputElement>) {
+    if (!chapter) return;
+    const file = event.currentTarget.files?.[0];
+    if (!file) return;
+
+    setIsUploadingImage(true);
+    setSettingsMessage('');
+    setSettingsError('');
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch(`/api/chapters/${chapter.id}/image`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        throw new Error(payload?.error || 'Unable to upload chapter image.');
+      }
+
+      const updatedChapter = firstChapter(await response.json());
+      if (updatedChapter) setChapter(updatedChapter);
+      setSettingsMessage('Chapter image uploaded.');
+    } catch (error) {
+      setSettingsError(
+        error instanceof Error
+          ? error.message
+          : 'Unable to upload chapter image.'
+      );
+    } finally {
+      event.currentTarget.value = '';
+      setIsUploadingImage(false);
+    }
+  }
+
+  async function createChapterTemplate() {
+    if (!chapter) return;
+
+    setIsCreatingTemplate(true);
+    setTemplateMessage('');
+    setTemplateError('');
+
+    try {
+      const response = await fetch('/api/application-templates', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          scope: 'CHAPTER',
+          chapterId: chapter.id,
+          name: `${chapter.name} application`,
+          isActive: true,
+          fieldsJson: [],
+        }),
+      });
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        throw new Error(payload?.message || 'Unable to create template.');
+      }
+
+      const template = await response.json();
+      setTemplates(current => [...current, templateList([template])[0]]);
+      setTemplateMessage('Chapter template created.');
+    } catch (error) {
+      setTemplateError(
+        error instanceof Error ? error.message : 'Unable to create template.'
+      );
+    } finally {
+      setIsCreatingTemplate(false);
+    }
+  }
+
+  async function createFlag(event: React.FormEvent) {
+    event.preventDefault();
+    if (!chapter) return;
+    if (!selectedFlagHacker) {
+      setFlagError('Choose a hacker from the list.');
+      return;
+    }
+
+    setIsCreatingFlag(true);
+    setFlagMessage('');
+    setFlagError('');
+
+    try {
+      const response = await fetch(`/api/chapters/${chapter.id}/ban-flags`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          hackerId: selectedFlagHacker.id,
+          reason: flagReason.trim(),
+        }),
+      });
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        throw new Error(payload?.message || 'Unable to create ban flag.');
+      }
+
+      const flag = await response.json();
+      setBanFlags(current => [flag, ...current]);
+      setFlagHackerQuery('');
+      setSelectedFlagHacker(null);
+      setFlagReason('');
+      setFlagMessage('Ban flag created.');
+    } catch (error) {
+      setFlagError(
+        error instanceof Error ? error.message : 'Unable to create ban flag.'
+      );
+    } finally {
+      setIsCreatingFlag(false);
+    }
+  }
+
+  function handleSelectedFlagHackerChange(hacker: HackerSearchOption | null) {
+    setSelectedFlagHacker(hacker);
+    setFlagError('');
+  }
 
   if (isLoading || (authStatus && loading)) {
     return (
@@ -211,25 +399,98 @@ export default function OrganizerChapterSettingsPage({
       />
       <div className="grid gap-5">
         <ManagementSection
-          title="Settings"
-          description="Operational defaults used by this chapter."
+          title="Chapter profile"
+          description="Public chapter details shown on chapter pages."
         >
-          <label className="block">
-            <span className="text-sm font-semibold">
-              Default declined-user message
-            </span>
-            <textarea
-              className={`${classes.textarea} mt-2 block w-full`}
-              defaultValue={chapter?.defaultDeclineMessage ?? ''}
-            />
-          </label>
+          <form className="grid gap-4" onSubmit={saveChapterDescription}>
+            {settingsError && (
+              <ManagementAlert tone="danger">{settingsError}</ManagementAlert>
+            )}
+            {settingsMessage && (
+              <ManagementAlert tone="success">{settingsMessage}</ManagementAlert>
+            )}
+            <div className="grid gap-4 md:grid-cols-[180px_minmax(0,1fr)]">
+              <div className="min-w-0">
+                {chapter.heroImage?.url ? (
+                  <div className="relative aspect-[4/3] w-full overflow-hidden rounded-md">
+                    <Image
+                      alt={chapter.heroImage.alt || `${chapter.name} chapter`}
+                      className="object-cover"
+                      fill
+                      sizes="180px"
+                      src={chapter.heroImage.url}
+                      unoptimized
+                    />
+                  </div>
+                ) : (
+                  <div
+                    className={`${classes.subtlePanel} flex aspect-[4/3] items-center justify-center px-4 text-center text-sm ${classes.mutedText}`}
+                  >
+                    No chapter image
+                  </div>
+                )}
+              </div>
+              <div className="grid gap-3">
+                <label className="grid gap-2">
+                  <span className="text-sm font-semibold">Chapter image</span>
+                  <input
+                    aria-label="Chapter image"
+                    accept="image/*"
+                    className={classes.input}
+                    disabled={isUploadingImage}
+                    onChange={uploadChapterImage}
+                    type="file"
+                  />
+                </label>
+                <label className="grid gap-2">
+                  <span className="text-sm font-semibold">
+                    Chapter description
+                  </span>
+                  <textarea
+                    aria-label="Chapter description"
+                    className={`${classes.textarea} block w-full`}
+                    value={descriptionDraft}
+                    onChange={event => setDescriptionDraft(event.target.value)}
+                    placeholder="Public chapter description"
+                  />
+                </label>
+                <div>
+                  <button
+                    className={classes.primaryButton}
+                    disabled={isSavingDescription || isUploadingImage}
+                    type="submit"
+                  >
+                    {isSavingDescription ? 'Saving...' : 'Save description'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </form>
         </ManagementSection>
 
         <ManagementSection
           title="Application template"
           description="The active site template is the base. Chapter templates add local questions without changing site-required fields."
+          actions={
+            !templates.some(template => template.scope === 'CHAPTER') ? (
+              <button
+                className={classes.primaryButton}
+                disabled={isCreatingTemplate}
+                onClick={createChapterTemplate}
+                type="button"
+              >
+                {isCreatingTemplate ? 'Creating...' : 'Create chapter template'}
+              </button>
+            ) : null
+          }
         >
           <div className="grid gap-3">
+            {templateError && (
+              <ManagementAlert tone="danger">{templateError}</ManagementAlert>
+            )}
+            {templateMessage && (
+              <ManagementAlert tone="success">{templateMessage}</ManagementAlert>
+            )}
             {templates.map(template => (
               <ApplicationTemplateEditor
                 key={template.id}
@@ -348,12 +609,55 @@ export default function OrganizerChapterSettingsPage({
         <ManagementSection
           title="Ban flags"
           description="Chapter-level moderation flags that need review."
-          actions={
-            <button className={classes.secondaryButton} type="button">
-              Create flag
-            </button>
-          }
         >
+          <form
+            onSubmit={createFlag}
+            className={`${classes.subtlePanel} mb-4 grid gap-3 p-4 md:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)_auto] md:items-end`}
+          >
+            <div className="grid gap-2">
+              <span className="text-sm font-semibold">Hacker</span>
+              <HackerSearchSelect
+                ariaLabel="Search hacker to flag"
+                disabled={isCreatingFlag}
+                hackers={memberHackerOptions}
+                query={flagHackerQuery}
+                selectedHacker={selectedFlagHacker}
+                onQueryChange={setFlagHackerQuery}
+                onSelectedHackerChange={handleSelectedFlagHackerChange}
+                placeholder="Hacker name"
+                noResultsText="No chapter members found."
+              />
+            </div>
+            <label className="grid gap-2">
+              <span className="text-sm font-semibold">Reason</span>
+              <input
+                aria-label="Flag reason"
+                className={classes.input}
+                placeholder="What needs site-admin review?"
+                value={flagReason}
+                onChange={event => setFlagReason(event.target.value)}
+              />
+            </label>
+            <button
+              className={classes.secondaryButton}
+              disabled={
+                isCreatingFlag || !selectedFlagHacker || !flagReason.trim()
+              }
+              type="submit"
+            >
+              {isCreatingFlag ? 'Creating...' : 'Create flag'}
+            </button>
+          </form>
+          {flagError && (
+            <div className="mb-4">
+              <ManagementAlert tone="danger">{flagError}</ManagementAlert>
+            </div>
+          )}
+          {flagMessage && (
+            <div className="mb-4">
+              <ManagementAlert tone="success">{flagMessage}</ManagementAlert>
+            </div>
+          )}
           <div className={`divide-y ${classes.divider}`}>
             {banFlags.map(flag => (
               <div

@@ -4,14 +4,14 @@ import prisma from "@/lib/prisma";
 import { requireEventPitchManager } from "@/lib/eventManagementApi";
 import {
   getFrozenTopProjectIds,
-  rankEventProjectsForPitching,
+  rankPitchProjectsForPitching,
 } from "@/lib/eventTopProjects";
 
 const EVENT_PHASES = ["VOTING", "PITCHING", "FINISHED"] as const;
-type EventPhaseTransition = (typeof EVENT_PHASES)[number];
+type PitchSessionPhaseTransition = (typeof EVENT_PHASES)[number];
 
-function isEventPhaseTransition(value: unknown): value is EventPhaseTransition {
-  return typeof value === "string" && EVENT_PHASES.includes(value as EventPhaseTransition);
+function isPitchSessionPhaseTransition(value: unknown): value is PitchSessionPhaseTransition {
+  return typeof value === "string" && EVENT_PHASES.includes(value as PitchSessionPhaseTransition);
 }
 
 export async function POST(
@@ -19,23 +19,24 @@ export async function POST(
   { params }: { params: { eventId: string } }
 ) {
   try {
-    const { event, response } = await requireEventPitchManager(params.eventId);
+    const { pitchSession, response } = await requireEventPitchManager(params.eventId);
     if (response) return response;
+    if (!pitchSession) return new NextResponse("Pitch session not found", { status: 404 });
 
     const body = (await req.json().catch(() => ({}))) as { targetPhase?: unknown };
     const targetPhase = body?.targetPhase;
 
-    if (!isEventPhaseTransition(targetPhase)) {
+    if (!isPitchSessionPhaseTransition(targetPhase)) {
       return NextResponse.json({ message: "Valid targetPhase is required" }, { status: 400 });
     }
 
-    if (targetPhase === event.phase) {
-      return NextResponse.json({ message: `Event is already ${event.phase}` }, { status: 400 });
+    if (targetPhase === pitchSession.phase) {
+      return NextResponse.json({ message: `Pitch session is already ${pitchSession.phase}` }, { status: 400 });
     }
 
     if (targetPhase === "FINISHED") {
-      const updated = await prisma.event.update({
-        where: { id: params.eventId },
+      const updated = await prisma.pitchSession.update({
+        where: { id: pitchSession.id },
         data: { phase: targetPhase },
       });
 
@@ -44,18 +45,18 @@ export async function POST(
 
     if (targetPhase === "VOTING") {
       await prisma.$transaction([
-        prisma.eventProject.updateMany({
-          where: { eventId: params.eventId },
+        prisma.pitchProject.updateMany({
+          where: { pitchSessionId: pitchSession.id },
           data: { isTopProject: false },
         }),
-        prisma.event.update({
-          where: { id: params.eventId },
+        prisma.pitchSession.update({
+          where: { id: pitchSession.id },
           data: { phase: targetPhase },
         }),
       ]);
 
-      const updated = await prisma.event.findUnique({
-        where: { id: params.eventId },
+      const updated = await prisma.pitchSession.findUnique({
+        where: { id: pitchSession.id },
         include: {
           projects: { orderBy: { position: "asc" } },
         },
@@ -66,14 +67,14 @@ export async function POST(
 
     let ops: Prisma.PrismaPromise<unknown>[];
 
-    if (event.phase === "FINISHED") {
-      const ordered = await prisma.eventProject.findMany({
-        where: { eventId: params.eventId },
+    if (pitchSession.phase === "FINISHED") {
+      const ordered = await prisma.pitchProject.findMany({
+        where: { pitchSessionId: pitchSession.id },
         orderBy: { position: "asc" },
       });
 
       ops = ordered.map((ep, idx) =>
-        prisma.eventProject.update({
+        prisma.pitchProject.update({
           where: { id: ep.id },
           data: {
             status: idx === 0 ? "CURRENT" : "APPROVED",
@@ -88,20 +89,20 @@ export async function POST(
       );
     } else {
       // Freshly entering pitching: rank by pitch likes, assign positions/times, and start on the first project.
-      const eventProjects = await prisma.eventProject.findMany({
-        where: { eventId: params.eventId },
+      const pitchProjects = await prisma.pitchProject.findMany({
+        where: { pitchSessionId: pitchSession.id },
         include: {
           pitchVotes: { select: { id: true, value: true } },
         },
         orderBy: { createdAt: "asc" },
       });
 
-      const sorted = rankEventProjectsForPitching(eventProjects);
-      const topProjectIds = getFrozenTopProjectIds(sorted, event.topProjectCount);
+      const sorted = rankPitchProjectsForPitching(pitchProjects);
+      const topProjectIds = getFrozenTopProjectIds(sorted, pitchSession.topProjectCount);
 
       ops = sorted.map((ep, idx) => {
         const isTopProject = topProjectIds.has(ep.id);
-        return prisma.eventProject.update({
+        return prisma.pitchProject.update({
           where: { id: ep.id },
           data: {
             position: idx + 1,
@@ -114,27 +115,27 @@ export async function POST(
             completedAt: null,
             pausedAt: null,
             allottedPresentingSec: isTopProject
-              ? event.topPresentingSec
-              : event.defaultPresentingSec,
+              ? pitchSession.topPresentingSec
+              : pitchSession.defaultPresentingSec,
             allottedQuestionsSec: isTopProject
-              ? event.topQuestionsSec
-              : event.defaultQuestionsSec,
+              ? pitchSession.topQuestionsSec
+              : pitchSession.defaultQuestionsSec,
           },
         });
       });
     }
 
     ops.push(
-      prisma.event.update({
-        where: { id: params.eventId },
+      prisma.pitchSession.update({
+        where: { id: pitchSession.id },
         data: { phase: targetPhase },
       })
     );
 
     await prisma.$transaction(ops);
 
-    const updated = await prisma.event.findUnique({
-      where: { id: params.eventId },
+    const updated = await prisma.pitchSession.findUnique({
+      where: { id: pitchSession.id },
       include: {
         projects: { orderBy: { position: "asc" } },
       },

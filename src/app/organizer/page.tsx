@@ -6,10 +6,9 @@ import {
   AuthStatusAlert,
   authStatusFromResponse,
   type AuthStatus,
-} from '../../components/AuthStatusAlert';
+} from '../components/AuthStatusAlert';
 import {
   ManagementAlert,
-  ManagementBackButton,
   ManagementBadge,
   ManagementEmptyState,
   ManagementHeader,
@@ -17,16 +16,16 @@ import {
   ManagementPage,
   ManagementSection,
   useManagementClasses,
-} from '../../components/ManagementSurface';
-import type { OrganizerEventListItem } from '@/types/event-management';
+} from '../components/ManagementSurface';
+import type { ManageableChapterListItem } from '@/types/event-management';
 
-function list(payload: unknown): OrganizerEventListItem[] {
-  return Array.isArray(payload) ? (payload as OrganizerEventListItem[]) : [];
+function chapterList(payload: unknown): ManageableChapterListItem[] {
+  return Array.isArray(payload) ? (payload as ManageableChapterListItem[]) : [];
 }
 
-export default function OrganizerEventsPage() {
+export default function OrganizerPage() {
   const classes = useManagementClasses();
-  const [events, setEvents] = useState<OrganizerEventListItem[]>([]);
+  const [chapters, setChapters] = useState<ManageableChapterListItem[]>([]);
   const [authStatus, setAuthStatus] = useState<AuthStatus | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
@@ -37,7 +36,8 @@ export default function OrganizerEventsPage() {
     setIsLoading(true);
     setAuthStatus(null);
     setLoadError('');
-    fetch('/api/events?organizer=true')
+
+    fetch('/api/chapters?manageable=true')
       .then(response => {
         const nextAuthStatus = authStatusFromResponse(response);
         if (nextAuthStatus) {
@@ -50,10 +50,10 @@ export default function OrganizerEventsPage() {
         return response.json() as Promise<unknown>;
       })
       .then(payload => {
-        if (isCurrent && payload) setEvents(list(payload));
+        if (isCurrent && payload) setChapters(chapterList(payload));
       })
       .catch(() => {
-        if (isCurrent) setLoadError('Unable to load organizer events.');
+        if (isCurrent) setLoadError('Unable to load organizer access.');
       })
       .finally(() => {
         if (isCurrent) setIsLoading(false);
@@ -82,16 +82,13 @@ export default function OrganizerEventsPage() {
 
   return (
     <ManagementPage>
-      <div className="mb-4">
-        <ManagementBackButton />
-      </div>
       <ManagementHeader
         eyebrow="Organizer"
-        title="Organizer events"
-        description="Review events you can manage and open their operational settings."
+        title="Organizer console"
+        description="Manage chapters, member access, local application templates, moderation flags, and chapter events."
         actions={
-          <ManagementLinkButton href="/organizer/events/new" variant="primary">
-            New event
+          <ManagementLinkButton href="/organizer/events" variant="primary">
+            Events
           </ManagementLinkButton>
         }
       />
@@ -100,32 +97,40 @@ export default function OrganizerEventsPage() {
           <ManagementAlert tone="danger">{loadError}</ManagementAlert>
         </div>
       )}
-      <ManagementSection title="Events">
+      <ManagementSection title="Managed chapters">
         <div className={`divide-y ${classes.divider}`}>
-          {events.map(event => (
-            <Link
-              key={event.id}
-              href={`/organizer/events/${event.id}/settings`}
-              className="grid gap-2 rounded-md py-4 transition hover:px-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
+          {chapters.map(chapter => (
+            <div
+              key={chapter.id}
+              className="grid gap-3 py-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
             >
-              <div className="min-w-0">
-                <div className="truncate font-semibold">{event.title}</div>
+              <Link
+                href={`/organizer/chapters/${chapter.slug}/settings`}
+                className="block min-w-0 rounded-md py-1 underline-offset-4 hover:underline"
+              >
+                <div className="truncate font-semibold">{chapter.name}</div>
                 <div className={`mt-1 text-sm ${classes.mutedText}`}>
-                  {event.chapter?.name || 'Chapter event'}
+                  {[chapter.city, chapter.region].filter(Boolean).join(', ')}
                 </div>
+              </Link>
+              <div className="flex flex-wrap gap-2">
+                <ManagementBadge
+                  tone={chapter.status === 'ACTIVE' ? 'success' : 'warning'}
+                >
+                  {chapter.status}
+                </ManagementBadge>
+                <ManagementBadge>{chapter.accessMode}</ManagementBadge>
+                <ManagementLinkButton
+                  href={`/organizer/chapters/${chapter.slug}/settings`}
+                >
+                  Settings
+                </ManagementLinkButton>
               </div>
-              <ManagementBadge>
-                {new Date(event.startTime).toLocaleDateString(undefined, {
-                  month: 'short',
-                  day: 'numeric',
-                  year: 'numeric',
-                })}
-              </ManagementBadge>
-            </Link>
+            </div>
           ))}
-          {events.length === 0 && (
+          {chapters.length === 0 && (
             <ManagementEmptyState>
-              No organizer events are available.
+              No managed chapters are available.
             </ManagementEmptyState>
           )}
         </div>

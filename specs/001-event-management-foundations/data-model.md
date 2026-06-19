@@ -18,7 +18,7 @@ Existing user/profile record keyed by Clerk identity.
 
 ### Event
 
-Chapter-owned gathering with existing pitch fields plus future RSVP/review metadata.
+Chapter-owned gathering for native site event metadata, staff, and future RSVP/review records.
 
 **New fields**
 
@@ -47,15 +47,24 @@ Chapter-owned gathering with existing pitch fields plus future RSVP/review metad
 **Relationships**
 
 - Belongs to one `Chapter`.
-- Has many `EventStaff`, `EventRegistration`, and `EventRegistrationAudit` records.
-- Keeps existing `EventProject` pitch queue relations.
+- Has many `EventStaff`, `EventRegistration`, `EventRegistrationAudit`, and linked `PitchSession` records.
 
 **Validation rules**
 
 - `(chapterId, slug)` must be unique.
 - `slug` must be readable and URL-safe; migration generates unique fallback slugs for invalid/duplicate existing events.
-- Existing events are backfilled to the Boston chapter.
+- Existing pitch-oriented events are backfilled to legacy `PitchSession` records in the Boston chapter; they are not promoted to native `Event` rows.
 - Public RSVP/application/check-in UI remains disabled in Phase 1 even when metadata exists.
+
+### PitchSession
+
+Operational pitch state and queue configuration for an event.
+
+**Validation rules**
+
+- New pitch sessions must link to an `Event`.
+- Legacy backfilled pitch sessions may have no `eventId` and are marked `legacyBackfill = true`.
+- Event staff on the linked event controls pitch access.
 
 ## New Entities
 
@@ -73,9 +82,9 @@ Local Sundai community and operational unit.
 - `country`
 - `timezone`
 - `description`
+- `heroImageId`
 - `status`
 - `accessMode`
-- `defaultDeclineMessage`
 - `mailingListName`
 - `mailingListExternalId`
 - `createdAt`
@@ -154,7 +163,7 @@ Event-scoped staff assignment replacing `EventMC`.
 **Validation rules**
 
 - Unique assignment per `(eventId, hackerId, role)`.
-- Existing `EventMC` rows migrate to `EventStaff` with `role = MC`.
+- Existing `EventMC` rows from legacy pitch sessions are not migrated because those sessions do not have native event rows.
 - MCs can manage assigned-event metadata, pitch, and registration review workflows when present.
 - Co-MCs can manage pitch and operational resources but cannot approve, waitlist, or decline applicants.
 

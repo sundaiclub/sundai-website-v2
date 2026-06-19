@@ -23,28 +23,29 @@ async function getAuthorizedHacker() {
   return { hacker };
 }
 
-async function getActiveEventProject(eventId: string, eventProjectId: string) {
-  const eventProject = await prisma.eventProject.findUnique({
-    where: { id: eventProjectId },
+async function getActivePitchProject(eventId: string, pitchProjectId: string) {
+  const pitchProject = await prisma.pitchProject.findUnique({
+    where: { id: pitchProjectId },
     select: {
       id: true,
-      eventId: true,
+      pitchSessionId: true,
       projectId: true,
-      event: {
+      pitchSession: {
         select: {
+          eventId: true,
           phase: true,
         },
       },
     },
   });
 
-  if (!eventProject || eventProject.eventId !== eventId) {
+  if (!pitchProject || pitchProject.pitchSession.eventId !== eventId) {
     return {
       error: NextResponse.json({ message: "Event project not found" }, { status: 404 }),
     };
   }
 
-  if (eventProject.event.phase === "FINISHED") {
+  if (pitchProject.pitchSession.phase === "FINISHED") {
     return {
       error: NextResponse.json(
         { message: "Pitch votes can only be changed while the event is active" },
@@ -53,22 +54,22 @@ async function getActiveEventProject(eventId: string, eventProjectId: string) {
     };
   }
 
-  return { eventProject };
+  return { pitchProject };
 }
 
 export async function PUT(
   req: Request,
-  { params }: { params: { eventId: string; eventProjectId: string } }
+  { params }: { params: { eventId: string; pitchProjectId: string } }
 ) {
   try {
     const authResult = await getAuthorizedHacker();
     if (authResult.error) return authResult.error;
 
-    const eventProjectResult = await getActiveEventProject(
+    const pitchProjectResult = await getActivePitchProject(
       params.eventId,
-      params.eventProjectId
+      params.pitchProjectId
     );
-    if (eventProjectResult.error) return eventProjectResult.error;
+    if (pitchProjectResult.error) return pitchProjectResult.error;
 
     const body = await req.json().catch(() => ({}));
     const value = body?.value;
@@ -77,7 +78,7 @@ export async function PUT(
     }
 
     const { hacker } = authResult;
-    const { eventProject } = eventProjectResult;
+    const { pitchProject } = pitchProjectResult;
 
     const operations: Prisma.PrismaPromise<unknown>[] = [];
 
@@ -86,12 +87,12 @@ export async function PUT(
         prisma.projectLike.upsert({
           where: {
             projectId_hackerId: {
-              projectId: eventProject.projectId,
+              projectId: pitchProject.projectId,
               hackerId: hacker.id,
             },
           },
           create: {
-            projectId: eventProject.projectId,
+            projectId: pitchProject.projectId,
             hackerId: hacker.id,
           },
           update: {},
@@ -100,15 +101,15 @@ export async function PUT(
     }
 
     operations.push(
-      prisma.eventProjectVote.upsert({
+      prisma.pitchProjectVote.upsert({
         where: {
-          eventProjectId_hackerId: {
-            eventProjectId: eventProject.id,
+          pitchProjectId_hackerId: {
+            pitchProjectId: pitchProject.id,
             hackerId: hacker.id,
           },
         },
         create: {
-          eventProjectId: eventProject.id,
+          pitchProjectId: pitchProject.id,
           hackerId: hacker.id,
           value,
         },
@@ -130,24 +131,24 @@ export async function PUT(
 
 export async function DELETE(
   req: Request,
-  { params }: { params: { eventId: string; eventProjectId: string } }
+  { params }: { params: { eventId: string; pitchProjectId: string } }
 ) {
   try {
     const authResult = await getAuthorizedHacker();
     if (authResult.error) return authResult.error;
 
-    const eventProjectResult = await getActiveEventProject(
+    const pitchProjectResult = await getActivePitchProject(
       params.eventId,
-      params.eventProjectId
+      params.pitchProjectId
     );
-    if (eventProjectResult.error) return eventProjectResult.error;
+    if (pitchProjectResult.error) return pitchProjectResult.error;
 
     const { hacker } = authResult;
-    const { eventProject } = eventProjectResult;
+    const { pitchProject } = pitchProjectResult;
 
-    await prisma.eventProjectVote.deleteMany({
+    await prisma.pitchProjectVote.deleteMany({
       where: {
-        eventProjectId: eventProject.id,
+        pitchProjectId: pitchProject.id,
         hackerId: hacker.id,
       },
     });

@@ -12,17 +12,15 @@ import {
   ManagementSection,
   useManagementClasses,
 } from '../../components/ManagementSurface';
+import {
+  HackerSearchSelect,
+  type HackerSearchOption,
+} from '../../components/HackerSearchSelect';
 import { useUserContext } from '../../contexts/UserContext';
 import type {
   AdminBanFlagListItem,
   AdminBanListItem,
 } from '@/types/event-management';
-
-type HackerOption = {
-  id: string;
-  name: string;
-  email?: string | null;
-};
 
 function banList(payload: unknown): AdminBanListItem[] {
   if (Array.isArray(payload)) return payload as AdminBanListItem[];
@@ -54,29 +52,12 @@ export default function AdminBansPage() {
   const { isAdmin, loading, userInfo } = useUserContext();
   const [bans, setBans] = useState<AdminBanListItem[]>([]);
   const [flags, setFlags] = useState<AdminBanFlagListItem[]>([]);
-  const [hackers, setHackers] = useState<HackerOption[]>([]);
+  const [hackers, setHackers] = useState<HackerSearchOption[]>([]);
   const [loadError, setLoadError] = useState('');
   const [createError, setCreateError] = useState('');
   const [hackerQuery, setHackerQuery] = useState('');
-  const [selectedHacker, setSelectedHacker] = useState<HackerOption | null>(
-    null
-  );
-  const [showHackerOptions, setShowHackerOptions] = useState(false);
-
-  const normalizedHackerQuery = hackerQuery.trim().toLowerCase();
-  const filteredHackers =
-    normalizedHackerQuery.length === 0 || selectedHacker
-      ? []
-      : hackers
-          .filter(hacker => {
-            const name = hacker.name.toLowerCase();
-            const email = hacker.email?.toLowerCase() ?? '';
-            return (
-              name.includes(normalizedHackerQuery) ||
-              email.includes(normalizedHackerQuery)
-            );
-          })
-          .slice(0, 8);
+  const [selectedHacker, setSelectedHacker] =
+    useState<HackerSearchOption | null>(null);
 
   useEffect(() => {
     if (!isAdmin) return;
@@ -98,7 +79,7 @@ export default function AdminBansPage() {
         if (!response.ok) {
           throw new Error(`Request failed with status ${response.status}`);
         }
-        return response.json() as Promise<HackerOption[]>;
+        return response.json() as Promise<HackerSearchOption[]>;
       }),
     ])
       .then(([bansPayload, flagsPayload, hackersPayload]) => {
@@ -127,7 +108,6 @@ export default function AdminBansPage() {
       setBans(current => [created, ...current]);
       setHackerQuery('');
       setSelectedHacker(null);
-      setShowHackerOptions(false);
       return;
     }
 
@@ -135,17 +115,8 @@ export default function AdminBansPage() {
     setCreateError(body?.message ?? 'Unable to create ban.');
   }
 
-  function updateHackerQuery(value: string) {
-    setHackerQuery(value);
-    setSelectedHacker(null);
-    setShowHackerOptions(true);
-    setCreateError('');
-  }
-
-  function chooseHacker(hacker: HackerOption) {
+  function handleSelectedHackerChange(hacker: HackerSearchOption | null) {
     setSelectedHacker(hacker);
-    setHackerQuery(hacker.name);
-    setShowHackerOptions(false);
     setCreateError('');
   }
 
@@ -173,55 +144,16 @@ export default function AdminBansPage() {
           <ManagementSection title="Create ban">
             <div className="mb-8">
               <form onSubmit={createBan} className="flex gap-3">
-                <div className="relative min-w-0 flex-1">
-                  <input
-                    aria-label="Search hacker by name"
-                    aria-controls="global-ban-hacker-options"
-                    autoComplete="off"
-                    className={`${classes.input} w-full`}
-                    value={hackerQuery}
-                    onChange={event => updateHackerQuery(event.target.value)}
-                    onFocus={() => setShowHackerOptions(true)}
+                <div className="min-w-0 flex-1">
+                  <HackerSearchSelect
+                    ariaLabel="Search hacker by name"
+                    hackers={hackers}
+                    query={hackerQuery}
+                    selectedHacker={selectedHacker}
+                    onQueryChange={setHackerQuery}
+                    onSelectedHackerChange={handleSelectedHackerChange}
                     placeholder="Hacker name"
                   />
-                  {showHackerOptions && normalizedHackerQuery && (
-                    <div
-                      id="global-ban-hacker-options"
-                      role="listbox"
-                      className={`absolute left-0 right-0 top-full z-20 mt-2 max-h-72 overflow-y-auto rounded-md border shadow-lg ${
-                        classes.panel
-                      }`}
-                    >
-                      {filteredHackers.map(hacker => (
-                        <button
-                          key={hacker.id}
-                          role="option"
-                          aria-selected={false}
-                          type="button"
-                          className={`block w-full px-4 py-3 text-left text-sm transition ${
-                            classes.isDarkMode
-                              ? 'hover:bg-gray-800'
-                              : 'hover:bg-gray-100'
-                          }`}
-                          onClick={() => chooseHacker(hacker)}
-                        >
-                          <span className="block font-semibold">
-                            {hacker.name}
-                          </span>
-                          {hacker.email && (
-                            <span className={`block ${classes.mutedText}`}>
-                              {hacker.email}
-                            </span>
-                          )}
-                        </button>
-                      ))}
-                      {filteredHackers.length === 0 && (
-                        <div className={`px-4 py-3 text-sm ${classes.mutedText}`}>
-                          No hackers found.
-                        </div>
-                      )}
-                    </div>
-                  )}
                 </div>
                 <button className={classes.primaryButton} type="submit">
                   Create ban

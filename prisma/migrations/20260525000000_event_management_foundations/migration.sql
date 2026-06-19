@@ -38,6 +38,10 @@ CREATE TYPE "EventRegistrationStatus" AS ENUM ('PENDING', 'APPROVED', 'WAITLISTE
 CREATE TYPE "EventRegistrationSource" AS ENUM ('INTERNAL', 'PUBLIC_LATER', 'IMPORT');
 CREATE TYPE "BanFlagStatus" AS ENUM ('OPEN', 'REVIEWING', 'RESOLVED_NO_ACTION', 'RESOLVED_BANNED', 'DISMISSED');
 
+ALTER TYPE "EventPhase" RENAME TO "PitchSessionPhase";
+ALTER TYPE "EventProjectStatus" RENAME TO "PitchProjectStatus";
+ALTER TYPE "EventProjectVoteValue" RENAME TO "PitchProjectVoteValue";
+
 CREATE TABLE "Chapter" (
   "id" TEXT NOT NULL,
   "name" TEXT NOT NULL,
@@ -66,67 +70,78 @@ INSERT INTO "Chapter" (
   'ACTIVE', 'PUBLIC'
 );
 
-ALTER TABLE "Event"
-  ADD COLUMN "endTime" TIMESTAMP(3),
-  ADD COLUMN "venueName" TEXT,
-  ADD COLUMN "publicLocation" TEXT,
-  ADD COLUMN "address" TEXT,
-  ADD COLUMN "virtualUrl" TEXT,
+ALTER TABLE "Event" RENAME TO "PitchSession";
+ALTER TABLE "EventProject" RENAME TO "PitchProject";
+ALTER TABLE "EventProjectVote" RENAME TO "PitchProjectVote";
+ALTER TABLE "PitchProject" RENAME COLUMN "eventId" TO "pitchSessionId";
+ALTER TABLE "PitchProjectVote" RENAME COLUMN "eventProjectId" TO "pitchProjectId";
+
+ALTER TABLE "PitchSession" RENAME CONSTRAINT "Event_pkey" TO "PitchSession_pkey";
+ALTER TABLE "PitchSession" RENAME CONSTRAINT "Event_createdById_fkey" TO "PitchSession_createdById_fkey";
+ALTER TABLE "PitchProject" RENAME CONSTRAINT "EventProject_pkey" TO "PitchProject_pkey";
+ALTER TABLE "PitchProject" RENAME CONSTRAINT "EventProject_eventId_fkey" TO "PitchProject_pitchSessionId_fkey";
+ALTER TABLE "PitchProject" RENAME CONSTRAINT "EventProject_projectId_fkey" TO "PitchProject_projectId_fkey";
+ALTER TABLE "PitchProject" RENAME CONSTRAINT "EventProject_addedById_fkey" TO "PitchProject_addedById_fkey";
+ALTER TABLE "PitchProjectVote" RENAME CONSTRAINT "EventProjectVote_pkey" TO "PitchProjectVote_pkey";
+ALTER TABLE "PitchProjectVote" RENAME CONSTRAINT "EventProjectVote_eventProjectId_fkey" TO "PitchProjectVote_pitchProjectId_fkey";
+ALTER TABLE "PitchProjectVote" RENAME CONSTRAINT "EventProjectVote_hackerId_fkey" TO "PitchProjectVote_hackerId_fkey";
+
+ALTER INDEX IF EXISTS "Event_startTime_idx" RENAME TO "PitchSession_startTime_idx";
+ALTER INDEX IF EXISTS "EventProject_eventId_projectId_key" RENAME TO "PitchProject_pitchSessionId_projectId_key";
+ALTER INDEX IF EXISTS "EventProject_eventId_position_idx" RENAME TO "PitchProject_pitchSessionId_position_idx";
+ALTER INDEX IF EXISTS "EventProject_status_idx" RENAME TO "PitchProject_status_idx";
+ALTER INDEX IF EXISTS "EventProjectVote_eventProjectId_hackerId_key" RENAME TO "PitchProjectVote_pitchProjectId_hackerId_key";
+ALTER INDEX IF EXISTS "EventProjectVote_eventProjectId_idx" RENAME TO "PitchProjectVote_pitchProjectId_idx";
+ALTER INDEX IF EXISTS "EventProjectVote_hackerId_idx" RENAME TO "PitchProjectVote_hackerId_idx";
+
+ALTER TABLE "PitchSession"
+  ADD COLUMN "eventId" TEXT,
   ADD COLUMN "chapterId" TEXT,
-  ADD COLUMN "slug" TEXT,
-  ADD COLUMN "slugNeedsCleanup" BOOLEAN NOT NULL DEFAULT false,
-  ADD COLUMN "status" "EventStatus" NOT NULL DEFAULT 'DRAFT',
-  ADD COLUMN "visibility" "EventVisibility" NOT NULL DEFAULT 'PUBLIC',
-  ADD COLUMN "programType" TEXT,
-  ADD COLUMN "publicProgramLabel" TEXT,
-  ADD COLUMN "capacity" INTEGER,
-  ADD COLUMN "applicationMode" "EventApplicationMode" NOT NULL DEFAULT 'NONE',
-  ADD COLUMN "autoPromoteWaitlist" BOOLEAN NOT NULL DEFAULT false,
-  ADD COLUMN "approvedDetailsJson" JSONB,
-  ADD COLUMN "applicationQuestionsJson" JSONB,
-  ADD COLUMN "hideChapterDefaultQuestions" BOOLEAN NOT NULL DEFAULT false,
-  ADD COLUMN "applicationsOpen" TIMESTAMP(3),
-  ADD COLUMN "applicationsCloseReason" TEXT,
-  ADD COLUMN "checkInOpensAt" TIMESTAMP(3),
-  ADD COLUMN "checkInClosesAt" TIMESTAMP(3);
+  ADD COLUMN "legacyBackfill" BOOLEAN NOT NULL DEFAULT true;
 
-UPDATE "Event"
-SET
-  "chapterId" = 'boston',
-  "status" = 'PUBLISHED',
-  "publicLocation" = "location",
-  "virtualUrl" = "meetingUrl";
+UPDATE "PitchSession"
+SET "chapterId" = 'boston',
+    "legacyBackfill" = true;
 
-WITH slug_base AS (
-  SELECT
-    "id",
-    NULLIF(
-      trim(both '-' from lower(regexp_replace(coalesce(nullif("title", ''), "id"), '[^a-zA-Z0-9]+', '-', 'g'))),
-      ''
-    ) AS "baseSlug"
-  FROM "Event"
-),
-numbered AS (
-  SELECT
-    "id",
-    coalesce("baseSlug", 'event') AS "baseSlug",
-    count(*) OVER (PARTITION BY coalesce("baseSlug", 'event')) AS "slugCount",
-    row_number() OVER (PARTITION BY coalesce("baseSlug", 'event') ORDER BY "id") AS "slugNumber"
-  FROM slug_base
-)
-UPDATE "Event" e
-SET
-  "slug" = CASE
-    WHEN n."slugCount" = 1 THEN n."baseSlug"
-    ELSE n."baseSlug" || '-' || substr(e."id", 1, 8)
-  END,
-  "slugNeedsCleanup" = n."slugCount" > 1
-FROM numbered n
-WHERE e."id" = n."id";
-
-ALTER TABLE "Event"
+ALTER TABLE "PitchSession"
   ALTER COLUMN "chapterId" SET NOT NULL,
-  ALTER COLUMN "slug" SET NOT NULL;
+  ADD CONSTRAINT "PitchSession_event_or_legacy_check"
+    CHECK ("eventId" IS NOT NULL OR "legacyBackfill" = true);
+
+CREATE TABLE "Event" (
+  "id" TEXT NOT NULL,
+  "title" TEXT NOT NULL,
+  "description" TEXT,
+  "startTime" TIMESTAMP(3) NOT NULL,
+  "endTime" TIMESTAMP(3),
+  "meetingUrl" TEXT,
+  "location" TEXT,
+  "venueName" TEXT,
+  "publicLocation" TEXT,
+  "address" TEXT,
+  "virtualUrl" TEXT,
+  "createdById" TEXT NOT NULL,
+  "chapterId" TEXT NOT NULL,
+  "slug" TEXT NOT NULL,
+  "slugNeedsCleanup" BOOLEAN NOT NULL DEFAULT false,
+  "status" "EventStatus" NOT NULL DEFAULT 'DRAFT',
+  "visibility" "EventVisibility" NOT NULL DEFAULT 'PUBLIC',
+  "programType" TEXT,
+  "publicProgramLabel" TEXT,
+  "capacity" INTEGER,
+  "applicationMode" "EventApplicationMode" NOT NULL DEFAULT 'NONE',
+  "autoPromoteWaitlist" BOOLEAN NOT NULL DEFAULT false,
+  "approvedDetailsJson" JSONB,
+  "applicationQuestionsJson" JSONB,
+  "hideChapterDefaultQuestions" BOOLEAN NOT NULL DEFAULT false,
+  "applicationsOpen" TIMESTAMP(3),
+  "applicationsCloseReason" TEXT,
+  "checkInOpensAt" TIMESTAMP(3),
+  "checkInClosesAt" TIMESTAMP(3),
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "Event_pkey" PRIMARY KEY ("id")
+);
 
 CREATE TABLE "ChapterMembership" (
   "id" TEXT NOT NULL,
@@ -157,10 +172,6 @@ CREATE TABLE "EventStaff" (
   "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT "EventStaff_pkey" PRIMARY KEY ("id")
 );
-
-INSERT INTO "EventStaff" ("id", "eventId", "hackerId", "role", "createdAt", "updatedAt")
-SELECT "id", "eventId", "hackerId", 'MC'::"EventStaffRole", CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
-FROM "EventMC";
 
 CREATE TABLE "ApplicationTemplate" (
   "id" TEXT NOT NULL,
@@ -258,7 +269,10 @@ CREATE INDEX "Chapter_slug_idx" ON "Chapter"("slug");
 CREATE UNIQUE INDEX "ChapterMembership_chapterId_hackerId_key" ON "ChapterMembership"("chapterId", "hackerId");
 CREATE INDEX "ChapterMembership_hackerId_status_idx" ON "ChapterMembership"("hackerId", "status");
 CREATE INDEX "ChapterMembership_chapterId_role_status_idx" ON "ChapterMembership"("chapterId", "role", "status");
+CREATE INDEX "PitchSession_eventId_idx" ON "PitchSession"("eventId");
+CREATE INDEX "PitchSession_chapterId_startTime_idx" ON "PitchSession"("chapterId", "startTime");
 CREATE UNIQUE INDEX "Event_chapterId_slug_key" ON "Event"("chapterId", "slug");
+CREATE INDEX "Event_startTime_idx" ON "Event"("startTime");
 CREATE INDEX "Event_chapterId_status_startTime_idx" ON "Event"("chapterId", "status", "startTime");
 CREATE INDEX "Event_visibility_status_idx" ON "Event"("visibility", "status");
 CREATE UNIQUE INDEX "EventStaff_eventId_hackerId_role_key" ON "EventStaff"("eventId", "hackerId", "role");
@@ -286,6 +300,9 @@ CREATE INDEX "HackerOrganizerNoteRevision_noteId_createdAt_idx" ON "HackerOrgani
 CREATE INDEX "HackerOrganizerNoteRevision_hackerId_createdAt_idx" ON "HackerOrganizerNoteRevision"("hackerId", "createdAt");
 CREATE INDEX "HackerOrganizerNoteRevision_editedById_idx" ON "HackerOrganizerNoteRevision"("editedById");
 
+ALTER TABLE "PitchSession" ADD CONSTRAINT "PitchSession_chapterId_fkey" FOREIGN KEY ("chapterId") REFERENCES "Chapter"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "PitchSession" ADD CONSTRAINT "PitchSession_eventId_fkey" FOREIGN KEY ("eventId") REFERENCES "Event"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "Event" ADD CONSTRAINT "Event_createdById_fkey" FOREIGN KEY ("createdById") REFERENCES "Hacker"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 ALTER TABLE "Event" ADD CONSTRAINT "Event_chapterId_fkey" FOREIGN KEY ("chapterId") REFERENCES "Chapter"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 ALTER TABLE "ChapterMembership" ADD CONSTRAINT "ChapterMembership_chapterId_fkey" FOREIGN KEY ("chapterId") REFERENCES "Chapter"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 ALTER TABLE "ChapterMembership" ADD CONSTRAINT "ChapterMembership_hackerId_fkey" FOREIGN KEY ("hackerId") REFERENCES "Hacker"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

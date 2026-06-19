@@ -155,7 +155,7 @@ describe('AdminPage', () => {
     render(<AdminPage />);
 
     expect(
-      screen.getByText('You do not have permission to view this page.')
+      screen.getByText('Please sign in to view this page.')
     ).toBeInTheDocument();
   });
 

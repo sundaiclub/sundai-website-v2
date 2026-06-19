@@ -75,7 +75,13 @@ export async function afterAuthHandler(auth: MiddlewareAuth, req: NextRequest) {
 }
 
 export default authMiddleware({
-  publicRoutes: ["/", "/api/projects(.*)"], // Adjust public routes as needed
+  publicRoutes: [
+    "/",
+    "/events",
+    "/chapters(.*)",
+    "/api/chapters(.*)",
+    "/api/projects(.*)",
+  ],
   async afterAuth(auth, req) {
     return afterAuthHandler(auth, req);
   }

@@ -290,13 +290,19 @@ describe('event-management site-admin pages', () => {
       ).toBeGreaterThan(0);
       await expectSomeText(/public/i);
       await expectSomeText(/private/i);
-      await expectSomeText(/manage/i);
+      await expectSomeText(/settings/i);
       expect(
         screen.getByRole('link', { name: /sundai boston/i })
       ).toHaveAttribute('href', '/chapters/boston');
       expect(
-        screen.getAllByRole('link', { name: /^manage$/i })[0]
-      ).toHaveAttribute('href', '/organizer/chapters/boston/settings#admins');
+        screen.getAllByRole('link', { name: /public page/i })[0]
+      ).toHaveAttribute('href', '/chapters/boston');
+      expect(
+        screen.getAllByRole('link', { name: /settings/i })[0]
+      ).toHaveAttribute('href', '/organizer/chapters/boston/settings');
+      expect(
+        screen.getAllByRole('link', { name: /^events$/i })[0]
+      ).toHaveAttribute('href', '/organizer/events');
     });
 
     it('denies chapter management to non-site-admin users', async () => {
@@ -429,6 +435,7 @@ describe('event-management site-admin pages', () => {
       });
       fireEvent.change(input, { target: { value: 'Alice' } });
       await expectSomeText(/alice@example.com/i);
+      expect(screen.getByRole('listbox')).toHaveClass('bg-gray-100');
       fireEvent.click(screen.getByRole('option', { name: /alice hacker/i }));
       fireEvent.click(screen.getByRole('button', { name: /create ban/i }));
 

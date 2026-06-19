@@ -14,12 +14,18 @@ import {
   ManagementSection,
   useManagementClasses,
 } from '../../../components/ManagementSurface';
+import type { ManageableChapterListItem } from '@/types/event-management';
+
+function chapterList(payload: unknown): ManageableChapterListItem[] {
+  return Array.isArray(payload) ? (payload as ManageableChapterListItem[]) : [];
+}
 
 export default function OrganizerNewEventPage() {
   const classes = useManagementClasses();
   const [title, setTitle] = useState('');
   const [chapterId, setChapterId] = useState('');
   const [startTime, setStartTime] = useState('');
+  const [chapters, setChapters] = useState<ManageableChapterListItem[]>([]);
   const [message, setMessage] = useState('');
   const [authStatus, setAuthStatus] = useState<AuthStatus | null>(null);
   const [isCheckingAccess, setIsCheckingAccess] = useState(true);
@@ -29,8 +35,10 @@ export default function OrganizerNewEventPage() {
 
     setIsCheckingAccess(true);
     setAuthStatus(null);
-    fetch('/api/events?organizer=true')
-      .then(response => {
+
+    async function loadChapters() {
+      try {
+        const response = await fetch('/api/chapters?manageable=true');
         const nextAuthStatus = authStatusFromResponse(response);
         if (nextAuthStatus) {
           if (isCurrent) setAuthStatus(nextAuthStatus);
@@ -40,13 +48,20 @@ export default function OrganizerNewEventPage() {
         if (!response.ok) {
           throw new Error(`Request failed with status ${response.status}`);
         }
-      })
-      .catch(() => {
+
+        const payload = await response.json();
+        const nextChapters = chapterList(payload);
+        if (!isCurrent) return;
+        setChapters(nextChapters);
+        setChapterId(current => current || nextChapters[0]?.id || '');
+      } catch {
         if (isCurrent) setMessage('Unable to verify event permissions.');
-      })
-      .finally(() => {
+      } finally {
         if (isCurrent) setIsCheckingAccess(false);
-      });
+      }
+    }
+
+    loadChapters();
 
     return () => {
       isCurrent = false;
@@ -55,6 +70,7 @@ export default function OrganizerNewEventPage() {
 
   async function createEvent(event: React.FormEvent) {
     event.preventDefault();
+    setMessage('');
     const response = await fetch('/api/events', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -72,7 +88,17 @@ export default function OrganizerNewEventPage() {
       return;
     }
 
-    setMessage(response.ok ? 'Event saved' : 'Unable to save event');
+    if (!response.ok) {
+      setMessage('Unable to save event');
+      return;
+    }
+
+    const savedEvent = await response.json().catch(() => null);
+    setMessage(
+      savedEvent?.id
+        ? `Event saved. Open settings at /organizer/events/${savedEvent.id}/settings.`
+        : 'Event saved'
+    );
   }
 
   if (isCheckingAccess) {
@@ -114,14 +140,19 @@ export default function OrganizerNewEventPage() {
             />
           </label>
           <label className="grid gap-2">
-            <span className="text-sm font-semibold">Chapter ID</span>
-            <input
-              aria-label="Chapter ID"
+            <span className="text-sm font-semibold">Chapter</span>
+            <select
+              aria-label="Chapter"
               className={classes.input}
               value={chapterId}
               onChange={event => setChapterId(event.target.value)}
-              placeholder="chapter-boston"
-            />
+            >
+              {chapters.map(chapter => (
+                <option key={chapter.id} value={chapter.id}>
+                  {chapter.name}
+                </option>
+              ))}
+            </select>
           </label>
           <label className="grid gap-2">
             <span className="text-sm font-semibold">Start time</span>
@@ -130,10 +161,14 @@ export default function OrganizerNewEventPage() {
               className={classes.input}
               value={startTime}
               onChange={event => setStartTime(event.target.value)}
-              placeholder="2026-05-25T18:00:00.000Z"
+              type="datetime-local"
             />
           </label>
-          <button className={classes.primaryButton} type="submit">
+          <button
+            className={classes.primaryButton}
+            disabled={!title.trim() || !chapterId || !startTime}
+            type="submit"
+          >
             Save draft
           </button>
           {message && (

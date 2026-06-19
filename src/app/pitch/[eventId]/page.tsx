@@ -1,4 +1,5 @@
 'use client';
+import Image from 'next/image';
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { useUser, SignInButton } from '@clerk/nextjs';
@@ -15,17 +16,17 @@ import {
 } from '@/lib/datetimeLocal';
 import { reconcileVoteDeckIds } from '@/lib/votingDeck';
 import type {
-  EventPhase,
-  EventProjectStatus,
-  EventProjectVoteValue,
+  PitchSessionPhase,
+  PitchProjectStatus,
+  PitchProjectVoteValue,
   EventStaffRole,
   PitchPhase,
 } from '@/types/event-management';
 
-type EventProjectEntry = {
+type PitchProjectEntry = {
   id: string;
   position: number;
-  status: EventProjectStatus;
+  status: PitchProjectStatus;
   approved: boolean;
   isTopProject: boolean;
   addedById: string;
@@ -39,7 +40,7 @@ type EventProjectEntry = {
   allottedQuestionsSec: number | null;
   pitchVotes: Array<{
     hackerId: string;
-    value: EventProjectVoteValue;
+    value: PitchProjectVoteValue;
     createdAt: string;
   }>;
 };
@@ -53,7 +54,7 @@ type EventDetail = {
   meetingUrl?: string | null;
   audienceCanReorder: boolean;
   votingEndTime?: string | null;
-  phase: EventPhase;
+  phase: PitchSessionPhase;
   topProjectCount: number;
   topPresentingSec: number;
   topQuestionsSec: number;
@@ -64,27 +65,70 @@ type EventDetail = {
     role: EventStaffRole;
     hacker: { id: string; name: string };
   }>;
-  projects: EventProjectEntry[];
+  projects: PitchProjectEntry[];
 };
 
-function getPitchLikeCount(ep: EventProjectEntry) {
+type EventPitchResponse = Omit<EventDetail, 'audienceCanReorder' | 'votingEndTime' | 'phase' | 'topProjectCount' | 'topPresentingSec' | 'topQuestionsSec' | 'defaultPresentingSec' | 'defaultQuestionsSec' | 'projects'> & {
+  pitchSessions?: Array<Pick<EventDetail,
+    | 'audienceCanReorder'
+    | 'votingEndTime'
+    | 'phase'
+    | 'topProjectCount'
+    | 'topPresentingSec'
+    | 'topQuestionsSec'
+    | 'defaultPresentingSec'
+    | 'defaultQuestionsSec'
+    | 'projects'
+  >>;
+};
+
+function toEventDetail(data: EventPitchResponse): EventDetail {
+  const pitchSession = data.pitchSessions?.[0];
+  if (!pitchSession) {
+    throw new Error('Pitch session not found');
+  }
+
+  return {
+    ...data,
+    audienceCanReorder: pitchSession.audienceCanReorder,
+    votingEndTime: pitchSession.votingEndTime,
+    phase: pitchSession.phase,
+    topProjectCount: pitchSession.topProjectCount,
+    topPresentingSec: pitchSession.topPresentingSec,
+    topQuestionsSec: pitchSession.topQuestionsSec,
+    defaultPresentingSec: pitchSession.defaultPresentingSec,
+    defaultQuestionsSec: pitchSession.defaultQuestionsSec,
+    projects: pitchSession.projects,
+  };
+}
+
+async function fetchEventDetail(eventId: string): Promise<EventDetail> {
+  const res = await fetch(`/api/events/${eventId}`);
+  if (!res.ok) {
+    throw new Error('Event not found');
+  }
+
+  return toEventDetail((await res.json()) as EventPitchResponse);
+}
+
+function getPitchLikeCount(ep: PitchProjectEntry) {
   return ep.pitchVotes.filter(vote => vote.value === 'LIKE').length;
 }
 
-function getViewerPitchVote(ep: EventProjectEntry, hackerId?: string | null) {
+function getViewerPitchVote(ep: PitchProjectEntry, hackerId?: string | null) {
   return ep.pitchVotes.find(vote => vote.hackerId === hackerId) ?? null;
 }
 
 function applyPitchVoteToEvent(
   event: EventDetail,
-  eventProjectId: string,
+  pitchProjectId: string,
   hackerId: string,
-  value: EventProjectVoteValue | null
+  value: PitchProjectVoteValue | null
 ): EventDetail {
   return {
     ...event,
     projects: event.projects.map(ep => {
-      if (ep.id !== eventProjectId) return ep;
+      if (ep.id !== pitchProjectId) return ep;
 
       const nextVote = {
         hackerId,
@@ -132,21 +176,21 @@ function shuffleProjectIds(projectIds: string[]) {
   return shuffled;
 }
 
-function getStageBadgeStyles(phase: EventPhase) {
+function getStageBadgeStyles(phase: PitchSessionPhase) {
   if (phase === 'VOTING') return 'bg-indigo-100 text-indigo-700';
   if (phase === 'PITCHING') return 'bg-purple-100 text-purple-700';
   return 'bg-gray-200 text-gray-700';
 }
 
-function getStageBadgeLabel(phase: EventPhase) {
+function getStageBadgeLabel(phase: PitchSessionPhase) {
   if (phase === 'VOTING') return 'Voting Open';
   if (phase === 'PITCHING') return 'Pitching';
   return 'Finished';
 }
 
 function getPhaseActionLabel(
-  targetPhase: EventPhase,
-  currentPhase: EventPhase
+  targetPhase: PitchSessionPhase,
+  currentPhase: PitchSessionPhase
 ) {
   if (targetPhase === 'PITCHING' && currentPhase === 'FINISHED')
     return 'Back to Presenting';
@@ -156,7 +200,7 @@ function getPhaseActionLabel(
   return 'Move to Finished';
 }
 
-function StageBadge({ phase }: { phase: EventPhase }) {
+function StageBadge({ phase }: { phase: PitchSessionPhase }) {
   return (
     <span
       className={`px-2 py-1 rounded-full text-xs ${getStageBadgeStyles(phase)}`}
@@ -231,17 +275,22 @@ function SwipeCard({
       <div
         className={`${isDarkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl p-6 shadow-lg max-h-[70vh] overflow-y-auto`}
       >
-        <img
-          src={
-            project.thumbnail?.url ||
-            (isDarkMode
-              ? '/images/default_project_thumbnail_dark.svg'
-              : '/images/default_project_thumbnail_light.svg')
-          }
-          alt={project.title}
-          className="w-full max-h-[30vh] object-cover rounded-lg mb-4"
-          draggable={false}
-        />
+        <div className="relative mb-4 aspect-video max-h-[30vh] w-full overflow-hidden rounded-lg">
+          <Image
+            src={
+              project.thumbnail?.url ||
+              (isDarkMode
+                ? '/images/default_project_thumbnail_dark.svg'
+                : '/images/default_project_thumbnail_light.svg')
+            }
+            alt={project.title}
+            className="object-cover"
+            draggable={false}
+            fill
+            sizes="(min-width: 768px) 560px, 100vw"
+            unoptimized
+          />
+        </div>
         <h3 className="text-xl font-bold mb-2">{project.title}</h3>
         {project.preview && (
           <ProjectMarkdown
@@ -332,7 +381,7 @@ function VotingPhase({
       .map(ep => ep.project.id);
   }, [event.projects, userId, seenIds]);
 
-  const eventProjectByProjectId = useMemo(() => {
+  const pitchProjectByProjectId = useMemo(() => {
     return new Map(event.projects.map(ep => [ep.project.id, ep]));
   }, [event.projects]);
 
@@ -368,11 +417,11 @@ function VotingPhase({
 
   const currentCard = useMemo(() => {
     for (const projectId of deckIds) {
-      const eventProject = eventProjectByProjectId.get(projectId);
-      if (eventProject) return eventProject;
+      const pitchProject = pitchProjectByProjectId.get(projectId);
+      if (pitchProject) return pitchProject;
     }
     return null;
-  }, [deckIds, eventProjectByProjectId]);
+  }, [deckIds, pitchProjectByProjectId]);
 
   const handleSwipeRight = useCallback(async () => {
     if (!currentCard || !userId) return;
@@ -383,7 +432,7 @@ function VotingPhase({
     );
     try {
       const response = await fetch(
-        `/api/events/${event.id}/queue/${currentCard.id}/vote`,
+        `/api/events/${event.id}/pitch/queue/${currentCard.id}/vote`,
         {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
@@ -406,7 +455,7 @@ function VotingPhase({
     );
     try {
       const response = await fetch(
-        `/api/events/${event.id}/queue/${currentCard.id}/vote`,
+        `/api/events/${event.id}/pitch/queue/${currentCard.id}/vote`,
         {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
@@ -434,14 +483,13 @@ function VotingPhase({
   const endVoting = async () => {
     setTransitioning(true);
     try {
-      const res = await fetch(`/api/events/${event.id}/transition`, {
+      const res = await fetch(`/api/events/${event.id}/pitch/transition`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ targetPhase: 'PITCHING' }),
       });
       if (res.ok) {
-        const updated = await fetch(`/api/events/${event.id}`);
-        setEvent(await updated.json());
+        setEvent(await fetchEventDetail(event.id));
       }
     } finally {
       setTransitioning(false);
@@ -646,24 +694,23 @@ function VotingQueuePanel({
   const firstNonTopIndex = allOrdered.findIndex(ep => !topGroupIds.has(ep.id));
   const hasTopGroup = topGroupIds.size > 0;
 
-  const delistItem = async (eventProjectId: string) => {
-    const res = await fetch(`/api/events/${event.id}/queue/${eventProjectId}`, {
+  const delistItem = async (pitchProjectId: string) => {
+    const res = await fetch(`/api/events/${event.id}/pitch/queue/${pitchProjectId}`, {
       method: 'DELETE',
     });
     if (res.status === 204) {
-      const updated = await fetch(`/api/events/${event.id}`);
-      setEvent(await updated.json());
+      setEvent(await fetchEventDetail(event.id));
     }
   };
 
-  const togglePitchLike = async (eventProjectId: string, isLiked: boolean) => {
+  const togglePitchLike = async (pitchProjectId: string, isLiked: boolean) => {
     if (!userInfo?.id) {
       alert('Please sign in to like projects');
       return;
     }
 
     const response = await fetch(
-      `/api/events/${event.id}/queue/${eventProjectId}/vote`,
+      `/api/events/${event.id}/pitch/queue/${pitchProjectId}/vote`,
       isLiked
         ? { method: 'DELETE' }
         : {
@@ -677,7 +724,7 @@ function VotingQueuePanel({
     setEvent(
       applyPitchVoteToEvent(
         event,
-        eventProjectId,
+        pitchProjectId,
         userInfo.id,
         isLiked ? null : 'LIKE'
       )
@@ -900,7 +947,7 @@ function CompletedTimerSummary({
   ep,
   isDarkMode,
 }: {
-  ep: EventProjectEntry;
+  ep: PitchProjectEntry;
   isDarkMode: boolean;
 }) {
   if (!ep.presentingStartedAt) return null;
@@ -942,7 +989,7 @@ function PitchTimer({
   isDarkMode,
   onUpdate,
 }: {
-  currentItem: EventProjectEntry;
+  currentItem: PitchProjectEntry;
   eventId: string;
   isController: boolean;
   isDarkMode: boolean;
@@ -953,14 +1000,14 @@ function PitchTimer({
   const timerAction = async (action: string) => {
     setActing(true);
     try {
-      const res = await fetch(`/api/events/${eventId}/pitch-timer`, {
+      const res = await fetch(`/api/events/${eventId}/pitch/timer`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action, eventProjectId: currentItem.id }),
+        body: JSON.stringify({ action, pitchProjectId: currentItem.id }),
       });
       if (res.ok) {
         if (action === 'finish') {
-          await fetch(`/api/events/${eventId}/advance`, { method: 'POST' });
+          await fetch(`/api/events/${eventId}/pitch/advance`, { method: 'POST' });
         }
         onUpdate();
       }
@@ -1193,14 +1240,14 @@ function PitchingPhase({
     }
   };
 
-  const handlePitchLike = async (eventProjectId: string, isLiked: boolean) => {
+  const handlePitchLike = async (pitchProjectId: string, isLiked: boolean) => {
     if (!userInfo?.id) {
       alert('Please sign in to like projects');
       return;
     }
 
     const response = await fetch(
-      `/api/events/${event.id}/queue/${eventProjectId}/vote`,
+      `/api/events/${event.id}/pitch/queue/${pitchProjectId}/vote`,
       isLiked
         ? { method: 'DELETE' }
         : {
@@ -1214,7 +1261,7 @@ function PitchingPhase({
     setEvent(
       applyPitchVoteToEvent(
         event,
-        eventProjectId,
+        pitchProjectId,
         userInfo.id,
         isLiked ? null : 'LIKE'
       )
@@ -1222,51 +1269,47 @@ function PitchingPhase({
   };
 
   const advance = async () => {
-    const res = await fetch(`/api/events/${event.id}/advance`, {
+    const res = await fetch(`/api/events/${event.id}/pitch/advance`, {
       method: 'POST',
     });
     if (res.ok) {
-      const updated = await fetch(`/api/events/${event.id}`);
-      setEvent(await updated.json());
+      setEvent(await fetchEventDetail(event.id));
     }
   };
 
   const previousStep = async () => {
-    const res = await fetch(`/api/events/${event.id}/previous`, {
+    const res = await fetch(`/api/events/${event.id}/pitch/previous`, {
       method: 'POST',
     });
     if (res.ok) {
-      const updated = await fetch(`/api/events/${event.id}`);
-      setEvent(await updated.json());
+      setEvent(await fetchEventDetail(event.id));
     }
   };
 
   const finishEvent = async () => {
-    const res = await fetch(`/api/events/${event.id}/transition`, {
+    const res = await fetch(`/api/events/${event.id}/pitch/transition`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ targetPhase: 'FINISHED' }),
     });
     if (res.ok) {
-      const updated = await fetch(`/api/events/${event.id}`);
-      setEvent(await updated.json());
+      setEvent(await fetchEventDetail(event.id));
     }
   };
 
   const reorder = async (items: Array<{ id: string; position: number }>) => {
-    await fetch(`/api/events/${event.id}/queue`, {
+    await fetch(`/api/events/${event.id}/pitch/queue`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ items }),
     });
-    const updated = await fetch(`/api/events/${event.id}`);
-    setEvent(await updated.json());
+    setEvent(await fetchEventDetail(event.id));
   };
 
-  const moveItem = async (eventProjectId: string, direction: 'up' | 'down') => {
+  const moveItem = async (pitchProjectId: string, direction: 'up' | 'down') => {
     const ordered = allOrdered;
     const movableStatuses = new Set(['QUEUED', 'APPROVED']);
-    const index = ordered.findIndex(x => x.id === eventProjectId);
+    const index = ordered.findIndex(x => x.id === pitchProjectId);
     if (index === -1) return;
     const current = ordered[index];
     if (!movableStatuses.has(current.status)) return;
@@ -1303,13 +1346,12 @@ function PitchingPhase({
     ]);
   };
 
-  const delistItem = async (eventProjectId: string) => {
-    const res = await fetch(`/api/events/${event.id}/queue/${eventProjectId}`, {
+  const delistItem = async (pitchProjectId: string) => {
+    const res = await fetch(`/api/events/${event.id}/pitch/queue/${pitchProjectId}`, {
       method: 'DELETE',
     });
     if (res.status === 204) {
-      const updated = await fetch(`/api/events/${event.id}`);
-      setEvent(await updated.json());
+      setEvent(await fetchEventDetail(event.id));
     }
   };
 
@@ -1332,7 +1374,7 @@ function PitchingPhase({
               isDarkMode={isDarkMode}
               onUpdate={async () => {
                 const res = await fetch(`/api/events/${event.id}`);
-                if (res.ok) setEvent(await res.json());
+                if (res.ok) setEvent(toEventDetail((await res.json()) as EventPitchResponse));
               }}
             />
             <ProjectCard
@@ -1685,7 +1727,7 @@ export default function PitchEventPage() {
   const [mcSearch, setMcSearch] = useState('');
   const [saving, setSaving] = useState(false);
   const [phaseTransitioning, setPhaseTransitioning] =
-    useState<EventPhase | null>(null);
+    useState<PitchSessionPhase | null>(null);
   const [editTopProjectCount, setEditTopProjectCount] = useState(5);
   const [editTopPresentingSec, setEditTopPresentingSec] = useState(120);
   const [editTopQuestionsSec, setEditTopQuestionsSec] = useState(180);
@@ -1703,8 +1745,7 @@ export default function PitchEventPage() {
     async function load() {
       try {
         const res = await fetch(`/api/events/${eventId}`);
-        const data = await res.json();
-        setEvent(data);
+        setEvent(toEventDetail((await res.json()) as EventPitchResponse));
       } finally {
         setLoading(false);
       }
@@ -1722,18 +1763,17 @@ export default function PitchEventPage() {
     [isAdmin, event?.staff, userInfo?.id]
   );
 
-  const transitionEvent = async (targetPhase: EventPhase) => {
+  const transitionEvent = async (targetPhase: PitchSessionPhase) => {
     if (!event) return;
     setPhaseTransitioning(targetPhase);
     try {
-      const res = await fetch(`/api/events/${event.id}/transition`, {
+      const res = await fetch(`/api/events/${event.id}/pitch/transition`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ targetPhase }),
       });
       if (res.ok) {
-        const updated = await fetch(`/api/events/${event.id}`);
-        setEvent(await updated.json());
+        setEvent(await fetchEventDetail(event.id));
         return;
       }
 
@@ -1818,7 +1858,7 @@ export default function PitchEventPage() {
         }),
       });
       if (res.ok) {
-        setEvent(await res.json());
+        setEvent(toEventDetail((await res.json()) as EventPitchResponse));
         setShowEdit(false);
       }
     } finally {
@@ -1850,7 +1890,7 @@ export default function PitchEventPage() {
     if (!selectedProjectId) return;
     setConfirming(true);
     try {
-      const res = await fetch(`/api/events/${eventId}/queue`, {
+      const res = await fetch(`/api/events/${eventId}/pitch/queue`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ projectId: selectedProjectId }),
@@ -1865,8 +1905,7 @@ export default function PitchEventPage() {
         }
       }
       if (res.ok) {
-        const updated = await fetch(`/api/events/${eventId}`);
-        setEvent(await updated.json());
+        setEvent(await fetchEventDetail(eventId as string));
         setShowJoin(false);
       }
     } finally {
@@ -2171,7 +2210,7 @@ export default function PitchEventPage() {
                 <StageBadge phase={event.phase} />
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                {(['VOTING', 'PITCHING', 'FINISHED'] as EventPhase[])
+                {(['VOTING', 'PITCHING', 'FINISHED'] as PitchSessionPhase[])
                   .filter(phase => phase !== event.phase)
                   .map(phase => (
                     <button

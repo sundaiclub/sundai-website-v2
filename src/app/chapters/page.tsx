@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import {
@@ -28,6 +29,9 @@ export default function ChaptersPage() {
   const classes = useManagementClasses();
   const [chapters, setChapters] = useState<ChapterDirectoryItem[]>([]);
   const [loadError, setLoadError] = useState('');
+  const placeholderLogo = classes.isDarkMode
+    ? '/images/logos/sundai_logo_dark_horizontal.svg'
+    : '/images/logos/sundai_logo_light_horizontal.svg';
 
   useEffect(() => {
     setLoadError('');
@@ -60,6 +64,28 @@ export default function ChaptersPage() {
             href={`/chapters/${chapter.slug}`}
             className={`${classes.panel} block p-5 transition hover:-translate-y-0.5 hover:shadow-md`}
           >
+            <div
+              className={`${classes.subtlePanel} relative mb-4 flex aspect-[16/9] w-full items-center justify-center overflow-hidden rounded-md`}
+            >
+              {chapter.heroImage?.url ? (
+                <Image
+                  alt={chapter.heroImage.alt || `${chapter.name} chapter`}
+                  className="object-cover"
+                  fill
+                  src={chapter.heroImage.url}
+                  sizes="(min-width: 640px) 50vw, 100vw"
+                  unoptimized
+                />
+              ) : (
+                <Image
+                  alt="Sundai Club logo"
+                  className="object-contain p-8"
+                  fill
+                  src={placeholderLogo}
+                  sizes="(min-width: 640px) 320px, 60vw"
+                />
+              )}
+            </div>
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
                 <div className="truncate text-lg font-bold">{chapter.name}</div>

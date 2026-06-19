@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import NextImage from "next/image";
 import Link from "next/link";
 import { useUserContext } from "../../contexts/UserContext";
@@ -50,8 +50,8 @@ function normalizeParticipant(participant: RawProjectParticipant): Project["part
 export default function ProjectDetailClient() {
   const params = (useParams() || {}) as { projectId?: string };
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { userInfo } = useUserContext();
-  const searchParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
   const [project, setProject] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
   const [isLiked, setIsLiked] = useState(false);
@@ -214,7 +214,7 @@ export default function ProjectDetailClient() {
         })();
       }
     }
-  }, [loading, project, userInfo, isLiked]);
+  }, [loading, project, userInfo, isLiked, searchParams]);
 
   const handleSubmit = async () => {
     try {

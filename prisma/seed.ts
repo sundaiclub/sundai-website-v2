@@ -2,7 +2,7 @@ const {
   PrismaClient,
   Role,
   ProjectStatus,
-  EventProjectStatus,
+  PitchProjectStatus,
   ChapterMembershipRole,
   ChapterMembershipStatus,
   EventStaffRole,
@@ -18,7 +18,9 @@ async function main() {
   // Clean up existing data
   await prisma.eventRegistrationAudit.deleteMany({});
   await prisma.eventRegistration.deleteMany({});
-  await prisma.eventProject.deleteMany({});
+  await prisma.pitchProjectVote.deleteMany({});
+  await prisma.pitchProject.deleteMany({});
+  await prisma.pitchSession.deleteMany({});
   await prisma.eventStaff.deleteMany({});
   await prisma.event.deleteMany({});
   await prisma.applicationTemplate.deleteMany({});
@@ -334,7 +336,6 @@ async function main() {
       publicLocation: "Hybrid",
       virtualUrl: "https://zoom.us/j/1234567890",
       createdById: users[0].id,
-      audienceCanReorder: true,
       staff: {
         create: [
           { hackerId: users[0].id, role: EventStaffRole.MC },
@@ -343,17 +344,32 @@ async function main() {
       },
     },
   });
+  const samplePitchSession = await prisma.pitchSession.create({
+    data: {
+      eventId: sampleEvent.id,
+      chapterId: bostonChapter.id,
+      title: sampleEvent.title,
+      description: sampleEvent.description,
+      startTime: sampleEvent.startTime,
+      meetingUrl: sampleEvent.meetingUrl,
+      location: sampleEvent.location,
+      createdById: users[0].id,
+      legacyBackfill: false,
+      audienceCanReorder: true,
+      votingEndTime: new Date(sampleEvent.startTime.getTime() + 15 * 60 * 1000),
+    },
+  });
 
   const queueProjects = allProjects.slice(0, Math.min(3, allProjects.length));
   for (let i = 0; i < queueProjects.length; i++) {
     const p = queueProjects[i];
-    await prisma.eventProject.create({
+    await prisma.pitchProject.create({
       data: {
-        eventId: sampleEvent.id,
+        pitchSessionId: samplePitchSession.id,
         projectId: p.id,
         addedById: p.launchLeadId,
         position: i + 1,
-        status: EventProjectStatus.QUEUED,
+        status: PitchProjectStatus.QUEUED,
         approved: i === 0 ? true : false,
       },
     });

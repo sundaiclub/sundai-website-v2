@@ -28,7 +28,7 @@ A site admin can establish chapters, control their public or private access, ass
 
 ### User Story 2 - Chapter Admin Runs Local Chapter Operations (Priority: P1)
 
-A chapter admin can manage their chapter, members, invitations, chapter-specific application questions, default declined-user messaging, and chapter events so local organizers can operate without waiting for a site admin.
+A chapter admin can manage their chapter, chapter image, members, invitations, chapter-specific application questions, and chapter events so local organizers can operate without waiting for a site admin.
 
 **Why this priority**: Chapter admin delegation is the main operational unlock for multi-chapter event management.
 
@@ -123,7 +123,7 @@ Organizers can create and maintain richer event metadata, application templates,
 - **FR-002**: The system MUST support chapters as first-class operational units with name, public identifier, location details, timezone, description, status, and public or private access mode.
 - **FR-003**: The system MUST backfill an initial Boston chapter and associate existing events with that chapter.
 - **FR-004**: Site admins MUST be able to create, edit, pause, archive, view, and manage administrators for all chapters.
-- **FR-005**: Chapter admins MUST be able to manage settings, members, invitations, chapter-level application questions, default declined-user messaging, and events for their own chapters.
+- **FR-005**: Chapter admins MUST be able to manage settings, chapter image, members, invitations, chapter-level application questions, and events for their own chapters.
 - **FR-006**: The system MUST prevent chapter admins from managing chapters, members, events, templates, notes, and moderation records outside their authorized chapter scope.
 - **FR-007**: Active public chapters MUST be visible to public users and joinable by signed-in users.
 - **FR-008**: Private chapters MUST be visible only to invited users, active members, chapter admins for that chapter, and site admins.
@@ -164,7 +164,8 @@ Organizers can create and maintain richer event metadata, application templates,
 - **Chapter**: A local Sundai community with operating details, status, and public or private access rules.
 - **Chapter Membership**: The relationship between a hacker and a chapter, including role, status, invitation details, join state, and notification preferences.
 - **Chapter Admin**: A chapter-scoped administrator who can operate one or more authorized chapters without global site-admin powers.
-- **Event**: A chapter-owned gathering with operational metadata, visibility, capacity, timing, location summaries, approval-related details, application configuration, and pitch settings.
+- **Event**: A chapter-owned gathering with operational metadata, visibility, capacity, timing, location summaries, approval-related details, application configuration, and event-level staff.
+- **PitchSession**: Event-linked pitch operation state, queue settings, phase, timer configuration, and project queue. Legacy backfilled pitch sessions may exist without a linked event.
 - **Event Staff Assignment**: An event-scoped assignment for MC or co-MC responsibilities.
 - **Application Template**: A reusable set of application questions and required fields at the site or chapter level.
 - **Event Registration**: An internal record representing a user's event application or RSVP state for future public registration workflows.

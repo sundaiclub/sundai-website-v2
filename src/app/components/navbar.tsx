@@ -12,6 +12,7 @@ const Navbar = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const { isSignedIn, user } = useUser();
   const [hackerId, setHackerId] = useState<string | null>(null);
+  const [hasOrganizerAccess, setHasOrganizerAccess] = useState(false);
   const pathname = usePathname();
   const { isDarkMode } = useTheme();
   const isPWA =
@@ -49,6 +50,31 @@ const Navbar = () => {
 
     fetchHackerId();
   }, [user?.id]);
+
+  useEffect(() => {
+    let isCurrent = true;
+
+    const fetchOrganizerAccess = async () => {
+      if (!isSignedIn) {
+        setHasOrganizerAccess(false);
+        return;
+      }
+
+      try {
+        const response = await fetch('/api/chapters?manageable=true');
+        if (!isCurrent) return;
+        setHasOrganizerAccess(response.ok);
+      } catch {
+        if (isCurrent) setHasOrganizerAccess(false);
+      }
+    };
+
+    fetchOrganizerAccess();
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [isSignedIn]);
 
   return (
     <nav
@@ -108,6 +134,16 @@ const Navbar = () => {
             </Link>
 
             <Link
+              href="/chapters"
+              className={`${isPWA ? "px-4 py-3" : "px-3 py-2"
+                } mx-2 rounded-lg active:bg-indigo-100`}
+            >
+              <span className={`text-sm font-fira-code ${isDarkMode ? 'text-gray-200' : 'text-black'} hover:text-indigo-700 dark:hover:text-indigo-500 transition duration-300`}>
+                Chapters
+              </span>
+            </Link>
+
+            <Link
               href="/events"
               className={`${isPWA ? "px-4 py-3" : "px-3 py-2"
                 } mx-2 rounded-lg active:bg-indigo-100`}
@@ -138,6 +174,18 @@ const Navbar = () => {
                     Pitch
                   </span>
                 </Link>
+
+                {hasOrganizerAccess && (
+                  <Link
+                    href="/organizer"
+                    className={`${isPWA ? "px-4 py-3" : "px-3 py-2"
+                      } mx-2 rounded-lg active:bg-indigo-100`}
+                  >
+                    <span className={`text-sm font-fira-code ${isDarkMode ? 'text-gray-200' : 'text-black'} hover:text-indigo-700 dark:hover:text-indigo-500 transition duration-300`}>
+                      Manage
+                    </span>
+                  </Link>
+                )}
 
                 <Link
                   href={hackerId ? `/hacker/${hackerId}` : "/me"}
@@ -198,6 +246,16 @@ const Navbar = () => {
           </Link>
 
           <Link
+            href="/chapters"
+            className="block px-4 py-2 rounded-lg"
+            onClick={() => setIsMenuOpen(false)}
+          >
+            <span className={`text-sm font-fira-code ${isDarkMode ? 'text-gray-200' : 'text-black'} hover:text-indigo-700 dark:hover:text-indigo-500`}>
+              Chapters
+            </span>
+          </Link>
+
+          <Link
             href="/events"
             className="block px-4 py-2 rounded-lg"
             onClick={() => setIsMenuOpen(false)}
@@ -227,6 +285,17 @@ const Navbar = () => {
                   Pitch
                 </span>
               </Link>
+              {hasOrganizerAccess && (
+                <Link
+                  href="/organizer"
+                  className="block px-4 py-2 rounded-lg"
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  <span className={`text-sm font-fira-code ${isDarkMode ? 'text-gray-200' : 'text-black'} hover:text-indigo-700 dark:hover:text-indigo-500`}>
+                    Manage
+                  </span>
+                </Link>
+              )}
               <Link
                 href={hackerId ? `/hacker/${hackerId}` : "/me"}
                 className="block px-4 py-2 rounded-lg"

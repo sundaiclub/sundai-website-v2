@@ -28,18 +28,22 @@ export async function GET(
       where: { id: params.eventId },
       include: {
         staff: { include: { hacker: { include: { avatar: true } } } },
-        projects: {
-          orderBy: { position: "asc" },
+        pitchSessions: {
           include: {
-            pitchVotes: { select: { hackerId: true, value: true, createdAt: true } },
-            project: {
+            projects: {
+              orderBy: { position: "asc" },
               include: {
-                thumbnail: true,
-                launchLead: { include: { avatar: true } },
-                participants: { include: { hacker: { include: { avatar: true } } } },
-                techTags: true,
-                domainTags: true,
-                likes: { select: { hackerId: true, createdAt: true } },
+                pitchVotes: { select: { hackerId: true, value: true, createdAt: true } },
+                project: {
+                  include: {
+                    thumbnail: true,
+                    launchLead: { include: { avatar: true } },
+                    participants: { include: { hacker: { include: { avatar: true } } } },
+                    techTags: true,
+                    domainTags: true,
+                    likes: { select: { hackerId: true, createdAt: true } },
+                  },
+                },
               },
             },
           },
@@ -94,11 +98,6 @@ export async function PATCH(
     const existingEvent = await prisma.event.findUnique({
       where: { id: params.eventId },
       select: {
-        phase: true,
-        topPresentingSec: true,
-        topQuestionsSec: true,
-        defaultPresentingSec: true,
-        defaultQuestionsSec: true,
         chapterId: true,
       },
     });
@@ -146,11 +145,9 @@ export async function PATCH(
       });
     }
 
-    const nextTopPresentingSec = topPresentingSec ?? existingEvent.topPresentingSec;
-    const nextTopQuestionsSec = topQuestionsSec ?? existingEvent.topQuestionsSec;
-    const nextDefaultPresentingSec = defaultPresentingSec ?? existingEvent.defaultPresentingSec;
-    const nextDefaultQuestionsSec = defaultQuestionsSec ?? existingEvent.defaultQuestionsSec;
     const timingConfigChanged =
+      votingEndTime !== undefined ||
+      topProjectCount !== undefined ||
       topPresentingSec !== undefined ||
       topQuestionsSec !== undefined ||
       defaultPresentingSec !== undefined ||
@@ -184,41 +181,61 @@ export async function PATCH(
         ...(applicationsCloseReason !== undefined && { applicationsCloseReason: applicationsCloseReason || null }),
         ...(checkInOpensAt !== undefined && { checkInOpensAt: checkInOpensAt ? new Date(checkInOpensAt) : null }),
         ...(checkInClosesAt !== undefined && { checkInClosesAt: checkInClosesAt ? new Date(checkInClosesAt) : null }),
-        ...(votingEndTime !== undefined && { votingEndTime: votingEndTime ? new Date(votingEndTime) : null }),
-        ...(topProjectCount !== undefined && { topProjectCount }),
-        ...(topPresentingSec !== undefined && { topPresentingSec }),
-        ...(topQuestionsSec !== undefined && { topQuestionsSec }),
-        ...(defaultPresentingSec !== undefined && { defaultPresentingSec }),
-        ...(defaultQuestionsSec !== undefined && { defaultQuestionsSec }),
       },
     });
 
-    if (timingConfigChanged && existingEvent.phase === "PITCHING") {
-      await prisma.$transaction([
-        eventUpdate,
-        prisma.eventProject.updateMany({
-          where: {
-            eventId: params.eventId,
-            isTopProject: true,
-            status: { in: ["CURRENT", "APPROVED"] },
-          },
-          data: {
-            allottedPresentingSec: nextTopPresentingSec,
-            allottedQuestionsSec: nextTopQuestionsSec,
-          },
-        }),
-        prisma.eventProject.updateMany({
-          where: {
-            eventId: params.eventId,
-            isTopProject: false,
-            status: { in: ["CURRENT", "APPROVED"] },
-          },
-          data: {
-            allottedPresentingSec: nextDefaultPresentingSec,
-            allottedQuestionsSec: nextDefaultQuestionsSec,
-          },
-        }),
-      ]);
+    const pitchSession = timingConfigChanged
+      ? await prisma.pitchSession.findFirst({ where: { eventId: params.eventId } })
+      : null;
+
+    if (timingConfigChanged && pitchSession) {
+      const nextTopPresentingSec = topPresentingSec ?? pitchSession.topPresentingSec;
+      const nextTopQuestionsSec = topQuestionsSec ?? pitchSession.topQuestionsSec;
+      const nextDefaultPresentingSec = defaultPresentingSec ?? pitchSession.defaultPresentingSec;
+      const nextDefaultQuestionsSec = defaultQuestionsSec ?? pitchSession.defaultQuestionsSec;
+
+      const pitchSessionUpdate = prisma.pitchSession.update({
+        where: { id: pitchSession.id },
+        data: {
+          ...(votingEndTime !== undefined && { votingEndTime: votingEndTime ? new Date(votingEndTime) : null }),
+          ...(topProjectCount !== undefined && { topProjectCount }),
+          ...(topPresentingSec !== undefined && { topPresentingSec }),
+          ...(topQuestionsSec !== undefined && { topQuestionsSec }),
+          ...(defaultPresentingSec !== undefined && { defaultPresentingSec }),
+          ...(defaultQuestionsSec !== undefined && { defaultQuestionsSec }),
+        },
+      });
+
+      if (pitchSession.phase === "PITCHING") {
+        await prisma.$transaction([
+          eventUpdate,
+          pitchSessionUpdate,
+          prisma.pitchProject.updateMany({
+            where: {
+              pitchSessionId: pitchSession.id,
+              isTopProject: true,
+              status: { in: ["CURRENT", "APPROVED"] },
+            },
+            data: {
+              allottedPresentingSec: nextTopPresentingSec,
+              allottedQuestionsSec: nextTopQuestionsSec,
+            },
+          }),
+          prisma.pitchProject.updateMany({
+            where: {
+              pitchSessionId: pitchSession.id,
+              isTopProject: false,
+              status: { in: ["CURRENT", "APPROVED"] },
+            },
+            data: {
+              allottedPresentingSec: nextDefaultPresentingSec,
+              allottedQuestionsSec: nextDefaultQuestionsSec,
+            },
+          }),
+        ]);
+      } else {
+        await prisma.$transaction([eventUpdate, pitchSessionUpdate]);
+      }
     } else {
       await eventUpdate;
     }
@@ -242,18 +259,22 @@ export async function PATCH(
       where: { id: params.eventId },
       include: {
         staff: { include: { hacker: { include: { avatar: true } } } },
-        projects: {
-          orderBy: { position: "asc" },
+        pitchSessions: {
           include: {
-            pitchVotes: { select: { hackerId: true, value: true, createdAt: true } },
-            project: {
+            projects: {
+              orderBy: { position: "asc" },
               include: {
-                thumbnail: true,
-                launchLead: { include: { avatar: true } },
-                participants: { include: { hacker: { include: { avatar: true } } } },
-                techTags: true,
-                domainTags: true,
-                likes: { select: { hackerId: true, createdAt: true } },
+                pitchVotes: { select: { hackerId: true, value: true, createdAt: true } },
+                project: {
+                  include: {
+                    thumbnail: true,
+                    launchLead: { include: { avatar: true } },
+                    participants: { include: { hacker: { include: { avatar: true } } } },
+                    techTags: true,
+                    domainTags: true,
+                    likes: { select: { hackerId: true, createdAt: true } },
+                  },
+                },
               },
             },
           },

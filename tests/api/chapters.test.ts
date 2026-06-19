@@ -6,6 +6,7 @@ import {
   GET as GET_CHAPTER,
   PATCH as PATCH_CHAPTER,
 } from '../../src/app/api/chapters/[chapterId]/route';
+import { POST as POST_CHAPTER_IMAGE } from '../../src/app/api/chapters/[chapterId]/image/route';
 import {
   createJsonRequest,
   createRouteContext,
@@ -16,6 +17,7 @@ import {
 } from '../utils/api-auth';
 import {
   buildChapter,
+  buildChapterAdminFixture,
   buildHacker,
   buildSiteAdmin,
   type HackerFixture,
@@ -24,6 +26,10 @@ import {
 jest.mock('@clerk/nextjs/server', () =>
   require('../utils/api-auth').mockClerkServerModule()
 );
+
+jest.mock('../../src/lib/gcp-storage', () => ({
+  uploadToGCS: jest.fn(),
+}));
 
 jest.mock('../../src/lib/prisma', () => ({
   __esModule: true,
@@ -36,6 +42,10 @@ jest.mock('../../src/lib/prisma', () => ({
       findUnique: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
+    },
+    image: {
+      create: jest.fn(),
+      delete: jest.fn(),
     },
     chapterMembership: {
       findFirst: jest.fn(),
@@ -56,6 +66,7 @@ jest.mock('../../src/lib/prisma', () => ({
 }));
 
 const prisma = require('../../src/lib/prisma').default;
+const { uploadToGCS } = require('../../src/lib/gcp-storage');
 
 const mockHackerLookup = (...hackers: HackerFixture[]) => {
   prisma.hacker.findUnique.mockImplementation(async ({ where }: any) => {
@@ -210,7 +221,7 @@ describe('/api/chapters', () => {
     const updateBody = {
       name: 'Sundai Greater Boston',
       accessMode: 'PRIVATE',
-      defaultDeclineMessage: 'Please apply again for a future meetup.',
+      description: 'Greater Boston builders and demos.',
     };
     const updatedChapter = buildChapter({
       ...chapter,
@@ -235,7 +246,7 @@ describe('/api/chapters', () => {
       id: updatedChapter.id,
       name: updatedChapter.name,
       accessMode: updatedChapter.accessMode,
-      defaultDeclineMessage: updatedChapter.defaultDeclineMessage,
+      description: updatedChapter.description,
     });
     expect(prisma.chapter.update).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -301,5 +312,76 @@ describe('/api/chapters', () => {
     expect(patchResponse.status).toBe(403);
     expect(prisma.chapter.create).not.toHaveBeenCalled();
     expect(prisma.chapter.update).not.toHaveBeenCalled();
+  });
+
+  it('lets a chapter admin upload a chapter image', async () => {
+    const { chapter, hacker, membership } = buildChapterAdminFixture({
+      chapter: { heroImageId: 'image-old' },
+    });
+    const newImage = {
+      id: 'image-new',
+      url: 'https://storage.googleapis.com/test-bucket/chapters/boston.jpg',
+      alt: 'Sundai Boston chapter image',
+      filename: 'boston.jpg',
+    };
+    const updatedChapter = {
+      ...chapter,
+      heroImageId: newImage.id,
+      heroImage: newImage,
+    };
+    const formData = new FormData();
+    formData.append(
+      'file',
+      new File(['image-bytes'], 'boston.jpg', { type: 'image/jpeg' })
+    );
+
+    mockActor(hacker);
+    prisma.chapter.findUnique
+      .mockResolvedValueOnce({ id: chapter.id })
+      .mockResolvedValueOnce({
+        id: chapter.id,
+        name: chapter.name,
+        heroImageId: 'image-old',
+      });
+    prisma.chapterMembership.findFirst.mockResolvedValue(membership);
+    uploadToGCS.mockResolvedValue({
+      url: newImage.url,
+      filename: 'chapters/boston.jpg',
+    });
+    prisma.image.create.mockResolvedValue(newImage);
+    prisma.image.delete.mockResolvedValue({ id: 'image-old' });
+    prisma.chapter.update.mockResolvedValue(updatedChapter);
+
+    const response = await POST_CHAPTER_IMAGE(
+      { formData: jest.fn().mockResolvedValue(formData) } as any,
+      createRouteContext({ chapterId: chapter.id }) as any
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(uploadToGCS).toHaveBeenCalledWith(expect.any(File), 'chapters');
+    expect(prisma.image.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          key: 'chapters/boston.jpg',
+          url: newImage.url,
+          filename: 'boston.jpg',
+          mimeType: 'image/jpeg',
+        }),
+      })
+    );
+    expect(prisma.chapter.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: chapter.id },
+        data: { heroImage: { connect: { id: newImage.id } } },
+      })
+    );
+    expect(prisma.image.delete).toHaveBeenCalledWith({
+      where: { id: 'image-old' },
+    });
+    expect(body).toMatchObject({
+      id: chapter.id,
+      heroImage: expect.objectContaining({ url: newImage.url }),
+    });
   });
 });

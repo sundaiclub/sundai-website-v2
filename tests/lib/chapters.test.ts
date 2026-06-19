@@ -104,6 +104,9 @@ describe('chapter helper indexed query shapes', () => {
       where: visibleChapterWhere(hacker),
       orderBy: { name: 'asc' },
       include: {
+        heroImage: {
+          select: { id: true, url: true, alt: true, filename: true },
+        },
         memberships: {
           where: { hackerId: hacker.id },
           take: 1,

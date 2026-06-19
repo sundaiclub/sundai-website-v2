@@ -144,8 +144,7 @@ describe('chapter-admin scoped chapter operations', () => {
     const updatedChapter = buildChapter({
       ...chapter,
       name: 'Sundai Greater Boston',
-      defaultDeclineMessage:
-        'Thanks for applying. Please try a future Boston event.',
+      description: 'Sundai Greater Boston chapter operations.',
       mailingListName: 'boston-organizers',
     });
 
@@ -159,7 +158,7 @@ describe('chapter-admin scoped chapter operations', () => {
         method: 'PATCH',
         body: {
           name: updatedChapter.name,
-          defaultDeclineMessage: updatedChapter.defaultDeclineMessage,
+          description: updatedChapter.description,
           mailingListName: updatedChapter.mailingListName,
         },
       }) as any,
@@ -173,8 +172,7 @@ describe('chapter-admin scoped chapter operations', () => {
         where: { id: chapter.id },
         data: expect.objectContaining({
           name: 'Sundai Greater Boston',
-          defaultDeclineMessage:
-            'Thanks for applying. Please try a future Boston event.',
+          description: 'Sundai Greater Boston chapter operations.',
           mailingListName: 'boston-organizers',
         }),
       })
@@ -182,8 +180,7 @@ describe('chapter-admin scoped chapter operations', () => {
     expect(body).toMatchObject({
       id: chapter.id,
       name: 'Sundai Greater Boston',
-      defaultDeclineMessage:
-        'Thanks for applying. Please try a future Boston event.',
+      description: 'Sundai Greater Boston chapter operations.',
     });
   });
 

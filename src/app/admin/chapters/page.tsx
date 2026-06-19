@@ -35,7 +35,14 @@ export default function AdminChaptersPage() {
   const [chapters, setChapters] = useState<SiteAdminChapterListItem[]>([]);
   const [loadError, setLoadError] = useState('');
   const [name, setName] = useState('');
+  const [slug, setSlug] = useState('');
   const [city, setCity] = useState('');
+  const [region, setRegion] = useState('');
+  const [country, setCountry] = useState('US');
+  const [timezone, setTimezone] = useState('America/New_York');
+  const [accessMode, setAccessMode] = useState('PUBLIC');
+  const [status, setStatus] = useState('ACTIVE');
+  const [description, setDescription] = useState('');
 
   useEffect(() => {
     if (!isAdmin) return;
@@ -58,18 +65,28 @@ export default function AdminChaptersPage() {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         name,
+        slug: slug || undefined,
         city,
-        country: 'US',
-        timezone: 'America/New_York',
-        accessMode: 'PUBLIC',
-        status: 'ACTIVE',
+        region,
+        country,
+        timezone,
+        description,
+        accessMode,
+        status,
       }),
     });
     if (response.ok) {
       const created = await response.json();
       setChapters(current => [...current, created]);
       setName('');
+      setSlug('');
       setCity('');
+      setRegion('');
+      setCountry('US');
+      setTimezone('America/New_York');
+      setAccessMode('PUBLIC');
+      setStatus('ACTIVE');
+      setDescription('');
     }
   }
 
@@ -97,29 +114,92 @@ export default function AdminChaptersPage() {
           <ManagementSection title="Create chapter">
             <form
               onSubmit={createChapter}
-              className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]"
+              className="grid gap-3"
             >
-              <input
-                aria-label="Chapter name"
-                className={classes.input}
-                value={name}
-                onChange={event => setName(event.target.value)}
-                placeholder="Chapter name"
+              <div className="grid gap-3 md:grid-cols-2">
+                <input
+                  aria-label="Chapter name"
+                  className={classes.input}
+                  value={name}
+                  onChange={event => setName(event.target.value)}
+                  placeholder="Chapter name"
+                />
+                <input
+                  aria-label="Slug"
+                  className={classes.input}
+                  value={slug}
+                  onChange={event => setSlug(event.target.value)}
+                  placeholder="Slug, optional"
+                />
+                <input
+                  aria-label="City"
+                  className={classes.input}
+                  value={city}
+                  onChange={event => setCity(event.target.value)}
+                  placeholder="City"
+                />
+                <input
+                  aria-label="Region"
+                  className={classes.input}
+                  value={region}
+                  onChange={event => setRegion(event.target.value)}
+                  placeholder="Region or state"
+                />
+                <input
+                  aria-label="Country"
+                  className={classes.input}
+                  value={country}
+                  onChange={event => setCountry(event.target.value)}
+                  placeholder="Country"
+                />
+                <input
+                  aria-label="Timezone"
+                  className={classes.input}
+                  value={timezone}
+                  onChange={event => setTimezone(event.target.value)}
+                  placeholder="Timezone"
+                />
+                <select
+                  aria-label="Access mode"
+                  className={classes.input}
+                  value={accessMode}
+                  onChange={event => setAccessMode(event.target.value)}
+                >
+                  <option value="PUBLIC">PUBLIC</option>
+                  <option value="PRIVATE">PRIVATE</option>
+                </select>
+                <select
+                  aria-label="Status"
+                  className={classes.input}
+                  value={status}
+                  onChange={event => setStatus(event.target.value)}
+                >
+                  <option value="ACTIVE">ACTIVE</option>
+                  <option value="PAUSED">PAUSED</option>
+                  <option value="ARCHIVED">ARCHIVED</option>
+                </select>
+              </div>
+              <textarea
+                aria-label="Description"
+                className={`${classes.textarea} min-h-24`}
+                value={description}
+                onChange={event => setDescription(event.target.value)}
+                placeholder="Public chapter description"
               />
-              <input
-                aria-label="City"
-                className={classes.input}
-                value={city}
-                onChange={event => setCity(event.target.value)}
-                placeholder="City"
-              />
-              <button
-                className={classes.primaryButton}
-                disabled={!name.trim() || !city.trim()}
-                type="submit"
-              >
-                Create chapter
-              </button>
+              <div>
+                <button
+                  className={classes.primaryButton}
+                  disabled={
+                    !name.trim() ||
+                    !city.trim() ||
+                    !country.trim() ||
+                    !timezone.trim()
+                  }
+                  type="submit"
+                >
+                  Create chapter
+                </button>
+              </div>
             </form>
           </ManagementSection>
 
@@ -129,7 +209,7 @@ export default function AdminChaptersPage() {
                 {chapters.map(chapter => (
                   <div
                     key={chapter.id}
-                    className="grid gap-3 py-4 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-center"
+                    className="grid gap-3 py-4 lg:grid-cols-[minmax(0,1fr)_auto_auto] lg:items-center"
                   >
                     <Link
                       className="block min-w-0 rounded-md py-1 underline-offset-4 hover:underline"
@@ -150,11 +230,19 @@ export default function AdminChaptersPage() {
                       </ManagementBadge>
                       <ManagementBadge>{chapter.accessMode}</ManagementBadge>
                     </div>
-                    <ManagementLinkButton
-                      href={`/organizer/chapters/${chapter.slug}/settings#admins`}
-                    >
-                      Manage
-                    </ManagementLinkButton>
+                    <div className="flex flex-wrap gap-2">
+                      <ManagementLinkButton href={`/chapters/${chapter.slug}`}>
+                        Public page
+                      </ManagementLinkButton>
+                      <ManagementLinkButton
+                        href={`/organizer/chapters/${chapter.slug}/settings`}
+                      >
+                        Settings
+                      </ManagementLinkButton>
+                      <ManagementLinkButton href="/organizer/events">
+                        Events
+                      </ManagementLinkButton>
+                    </div>
                   </div>
                 ))}
                 {chapters.length === 0 && (

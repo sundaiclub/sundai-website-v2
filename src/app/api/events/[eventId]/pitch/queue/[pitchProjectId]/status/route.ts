@@ -4,7 +4,7 @@ import prisma from "@/lib/prisma";
 
 export async function PATCH(
   req: Request,
-  { params }: { params: { eventProjectId: string } }
+  { params }: { params: { eventId: string; pitchProjectId: string } }
 ) {
   try {
     const { userId } = auth();
@@ -19,8 +19,8 @@ export async function PATCH(
     if (user.role === "SITE_ADMIN") {
       const { status, approved } = await req.json();
 
-      const updated = await prisma.eventProject.update({
-        where: { id: params.eventProjectId },
+      const updated = await prisma.pitchProject.update({
+        where: { id: params.pitchProjectId },
         data: {
           status: status ?? undefined,
           approved: typeof approved === "boolean" ? approved : undefined,
@@ -30,20 +30,27 @@ export async function PATCH(
       return NextResponse.json(updated);
     }
 
-    const eventProject = await prisma.eventProject.findUnique({
-      where: { id: params.eventProjectId },
+    const pitchProject = await prisma.pitchProject.findUnique({
+      where: { id: params.pitchProjectId },
       select: {
-        eventId: true,
-        event: {
+        pitchSession: {
           select: {
-            staff: { select: { hackerId: true, role: true } },
+            eventId: true,
+            event: {
+              select: {
+                staff: { select: { hackerId: true, role: true } },
+              },
+            },
           },
         },
       },
     });
-    if (!eventProject) return new NextResponse("Unauthorized", { status: 401 });
+    if (!pitchProject) return new NextResponse("Unauthorized", { status: 401 });
+    if (pitchProject.pitchSession.eventId !== params.eventId) {
+      return new NextResponse("Not found", { status: 404 });
+    }
 
-    const isStaff = (eventProject.event.staff ?? []).some(
+    const isStaff = (pitchProject.pitchSession.event?.staff ?? []).some(
       (staff) => staff.hackerId === user.id
     );
     if (!isStaff) {
@@ -52,8 +59,8 @@ export async function PATCH(
 
     const { status, approved } = await req.json();
 
-    const updated = await prisma.eventProject.update({
-      where: { id: params.eventProjectId },
+    const updated = await prisma.pitchProject.update({
+      where: { id: params.pitchProjectId },
       data: {
         status: status ?? undefined,
         approved: typeof approved === "boolean" ? approved : undefined,

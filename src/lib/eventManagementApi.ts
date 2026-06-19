@@ -13,6 +13,27 @@ type EventPitchManagerEvent = Prisma.EventGetPayload<{
   include: { staff: { select: { hackerId: true; role: true } } };
 }>;
 
+type EventPitchManagerPitchSession = Prisma.PitchSessionGetPayload<{
+  include: {
+    projects: {
+      orderBy: { position: 'asc' };
+      include: {
+        pitchVotes: { select: { hackerId: true; value: true; createdAt: true } };
+        project: {
+          include: {
+            thumbnail: true;
+            launchLead: { include: { avatar: true } };
+            participants: { include: { hacker: { include: { avatar: true } } } };
+            techTags: true;
+            domainTags: true;
+            likes: { select: { hackerId: true; createdAt: true } };
+          };
+        };
+      };
+    };
+  };
+}>;
+
 export async function getCurrentHacker() {
   const { userId } = auth();
   if (!userId) return null;
@@ -41,6 +62,10 @@ function userNotFound() {
 
 function eventNotFound() {
   return new NextResponse('Event not found', { status: 404 });
+}
+
+function pitchSessionNotFound() {
+  return new NextResponse('Pitch session not found', { status: 404 });
 }
 
 export function badRequest(message: string) {
@@ -121,5 +146,34 @@ export async function requireEventPitchManager(eventId: string) {
     return { hacker, event, response: unauthorized() };
   }
 
-  return { hacker, event, response: null };
+  const pitchSession = (await prisma.pitchSession.findFirst({
+    where: { eventId },
+    include: {
+      projects: {
+        orderBy: { position: 'asc' },
+        include: {
+          pitchVotes: {
+            select: { hackerId: true, value: true, createdAt: true },
+          },
+          project: {
+            include: {
+              thumbnail: true,
+              launchLead: { include: { avatar: true } },
+              participants: {
+                include: { hacker: { include: { avatar: true } } },
+              },
+              techTags: true,
+              domainTags: true,
+              likes: { select: { hackerId: true, createdAt: true } },
+            },
+          },
+        },
+      },
+    },
+  })) as EventPitchManagerPitchSession | null;
+  if (!pitchSession) {
+    return { hacker, event, pitchSession: null, response: pitchSessionNotFound() };
+  }
+
+  return { hacker, event, pitchSession, response: null };
 }
