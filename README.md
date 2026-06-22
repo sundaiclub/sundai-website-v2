@@ -178,7 +178,7 @@ Notes:
 npm run dev
 ```
 
-🎉 **Success!** Visit [http://localhost:3000](http://localhost:3000) to see the application!
+🎉 **Success!** Visit [http://localhost:3001](http://localhost:3001) to see the application!
 
 ### 6. Clerk Webhook Setup (Required for Auth)
 
@@ -190,7 +190,7 @@ Clerk uses a webhook to sync new users to the database. When someone signs up, C
 2. Start your dev server (`npm run dev`)
 3. In a separate terminal, expose your local server:
    ```bash
-   ngrok http 3000
+   ngrok http 3001
    ```
 4. Copy the generated forwarding URL (e.g. `https://abc123.ngrok-free.app`)
 5. In your [Clerk Dashboard](https://dashboard.clerk.com), go to **Webhooks** and add a new endpoint:

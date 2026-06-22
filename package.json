@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "node --no-deprecation node_modules/.bin/next dev",
+    "dev": "node --no-deprecation node_modules/.bin/next dev -p 3001",
     "build": "node --no-deprecation node_modules/.bin/next build",
     "postbuild": "next-sitemap",
     "start": "node --no-deprecation node_modules/.bin/next start",

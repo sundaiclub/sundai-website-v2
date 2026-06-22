@@ -8,6 +8,7 @@ jest.mock('../../src/lib/prisma', () => ({
   default: {
     project: {
       findMany: jest.fn(),
+      count: jest.fn(),
       create: jest.fn(),
     },
     hacker: {
@@ -74,6 +75,7 @@ describe('/api/projects', () => {
         title: 'Another Test Project',
       }
       mockPrisma.project.findMany.mockResolvedValue([mockProject, secondProject])
+      mockPrisma.project.count.mockResolvedValue(25)
 
       const request = new NextRequest('http://localhost:3000/api/projects?status=APPROVED&limit=1&offset=2')
       const response = await GET(request)
@@ -88,6 +90,7 @@ describe('/api/projects', () => {
       )
       expect(data).toMatchObject({
         hasMore: true,
+        totalCount: 25,
         projects: [
           expect.objectContaining({
             id: 'test-project-id',
