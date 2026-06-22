@@ -79,6 +79,7 @@ type ProjectsApiResponse =
   | {
       projects: Project[];
       hasMore: boolean;
+      totalCount?: number;
     };
 
 function sortProjectsByStartDate(projects: Project[]) {
@@ -94,12 +95,14 @@ function normalizeProjectsResponse(data: ProjectsApiResponse) {
     return {
       projects: sortProjectsByStartDate(data),
       hasMore: false,
+      totalCount: data.length,
     };
   }
 
   return {
     projects: sortProjectsByStartDate(data.projects),
     hasMore: data.hasMore,
+    totalCount: data.totalCount ?? data.projects.length,
   };
 }
 
@@ -497,6 +500,7 @@ export default function ProjectGrid({
   const [projects, setProjects] = useState<Project[]>([]);
   const [filteredProjects, setFilteredProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
+  const [totalProjectCount, setTotalProjectCount] = useState<number | null>(null);
   const [hasMoreProjects, setHasMoreProjects] = useState(false);
   const [isFetchingMore, setIsFetchingMore] = useState(false);
   const [requiresFullDataset, setRequiresFullDataset] = useState(false);
@@ -541,6 +545,7 @@ export default function ProjectGrid({
       setLoading(true);
       setProjects([]);
       setFilteredProjects([]);
+      setTotalProjectCount(null);
       setHasMoreProjects(false);
       setIsFetchingMore(false);
       setRequiresFullDataset(false);
@@ -559,6 +564,7 @@ export default function ProjectGrid({
 
         if (!isCancelled && requestSequence === requestSequenceRef.current) {
           setProjects(normalized.projects);
+          setTotalProjectCount(normalized.totalCount);
           setHasMoreProjects(enablePagination ? normalized.hasMore : false);
         }
       } catch (error) {
@@ -595,6 +601,7 @@ export default function ProjectGrid({
 
         if (!isCancelled && requestSequence === requestSequenceRef.current) {
           setProjects(normalized.projects);
+          setTotalProjectCount(normalized.totalCount);
           setHasMoreProjects(false);
           setLoadedFullDataset(true);
         }
@@ -638,6 +645,7 @@ export default function ProjectGrid({
         });
         return sortProjectsByStartDate(Array.from(projectMap.values()));
       });
+      setTotalProjectCount(normalized.totalCount);
       setHasMoreProjects(normalized.hasMore);
     } catch (error) {
       console.error("Error loading more projects:", error);
@@ -802,6 +810,7 @@ export default function ProjectGrid({
           projects={projects} 
           onFilteredProjectsChange={setFilteredProjects} 
           urlFilters={urlFilters}
+          totalProjectCount={totalProjectCount}
           onSearchStateChange={setRequiresFullDataset}
         />
       )}

@@ -1,4 +1,4 @@
-import { ProjectStatus } from "@prisma/client";
+import { HackType, Prisma, ProjectStatus } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { uploadToGCS } from "@/lib/gcp-storage";
@@ -24,7 +24,7 @@ export async function GET(req: Request) {
 
     // Determine hack_type based on environment
     const isResearchSite = process.env.IS_RESEARCH_SITE === 'true';
-    const hack_type = isResearchSite ? 'RESEARCH' : 'REGULAR';
+    const hack_type: HackType = isResearchSite ? HackType.RESEARCH : HackType.REGULAR;
     const ignoredDomainTagsFilter =
       ignoredDomainTags.length > 0
         ? [
@@ -37,17 +37,19 @@ export async function GET(req: Request) {
                 },
               },
             },
-          ]
+          ] satisfies Prisma.ProjectWhereInput[]
         : [];
 
+    const projectWhere: Prisma.ProjectWhereInput = {
+      AND: [
+        status ? { status: status as ProjectStatus } : {},
+        { hack_type },
+        ...ignoredDomainTagsFilter,
+      ],
+    };
+
     const projects = await prisma.project.findMany({
-      where: {
-        AND: [
-          status ? { status: status as ProjectStatus } : {},
-          { hack_type },
-          ...ignoredDomainTagsFilter,
-        ],
-      },
+      where: projectWhere,
       include: {
         thumbnail: {
           select: {
@@ -105,9 +107,14 @@ export async function GET(req: Request) {
     }));
 
     if (hasPagination) {
+      const totalCount = await prisma.project.count({
+        where: projectWhere,
+      });
+
       return NextResponse.json({
         projects: serializedProjects.slice(0, safeLimit),
         hasMore: serializedProjects.length > safeLimit!,
+        totalCount,
       });
     }
 
