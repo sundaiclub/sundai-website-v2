@@ -103,7 +103,7 @@ describe('/api/projects/[projectId]', () => {
       const mockHacker = {
         id: 'hacker-1',
         clerkId: 'clerk-123',
-        role: 'ADMIN',
+        role: 'SITE_ADMIN',
       };
 
       const mockProject = {
@@ -231,7 +231,7 @@ describe('/api/projects/[projectId]', () => {
       const mockHacker = {
         id: 'hacker-1',
         clerkId: 'clerk-123',
-        role: 'ADMIN',
+        role: 'SITE_ADMIN',
       };
 
       const mockProject = {

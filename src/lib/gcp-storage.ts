@@ -39,7 +39,6 @@ export async function uploadToGCS(
 }> {
   let serviceAccount: string | undefined;
   try {
-    console.log("Starting upload to GCS...");
     const { bucket, serviceAccount: email } = getBucket();
     serviceAccount = email;
     const fileBuffer = await file.arrayBuffer();
@@ -49,14 +48,12 @@ export async function uploadToGCS(
     )}`;
     const blob = bucket.file(filename);
 
-    console.log("Saving file to GCS...");
     await blob.save(Buffer.from(fileBuffer), {
       metadata: {
         contentType: file.type,
       },
     });
 
-    console.log("File saved successfully");
     const publicUrl = `https://storage.googleapis.com/${bucket.name}/${filename}`;
 
     return {
@@ -69,16 +66,6 @@ export async function uploadToGCS(
       bucket: process.env.GOOGLE_CLOUD_BUCKET,
       serviceAccount,
     });
-    throw error;
-  }
-}
-
-export async function deleteFromGCS(filename: string): Promise<void> {
-  try {
-    const { bucket } = getBucket();
-    await bucket.file(filename).delete();
-  } catch (error) {
-    console.error("Error deleting from GCS:", error);
     throw error;
   }
 }

@@ -75,7 +75,7 @@ describe('/api/projects/[projectId]/status', () => {
 
       const mockUser = {
         id: mockHackerId,
-        role: 'ADMIN',
+        role: 'SITE_ADMIN',
       };
 
       const mockUpdatedProject = {
@@ -106,7 +106,7 @@ describe('/api/projects/[projectId]/status', () => {
 
       const mockUser = {
         id: mockHackerId,
-        role: 'ADMIN',
+        role: 'SITE_ADMIN',
       };
 
       const mockUpdatedProject = {

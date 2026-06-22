@@ -86,7 +86,7 @@ export async function DELETE(
     }
 
     // Check if user is admin or launch lead
-    const isAdmin = hacker.role === "ADMIN";
+    const isAdmin = hacker.role === "SITE_ADMIN";
     const isLaunchLead = project.launchLeadId === hacker.id;
 
     if (!isAdmin && !isLaunchLead) {

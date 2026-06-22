@@ -11,6 +11,10 @@ const replicate = new Replicate({
 const PROMPT_MODEL = "gemini-3-flash-preview";
 const IMAGE_MODEL = "black-forest-labs/flux-2-klein-9b";
 
+type GenerateImagesRequest = {
+  prompt?: unknown;
+};
+
 function getReplicateOutputUrl(output: unknown): string | null {
   if (Array.isArray(output)) {
     const first = output[0];
@@ -54,10 +58,10 @@ export async function POST(
       return new NextResponse("Replicate API token not configured", { status: 500 });
     }
 
-    const body = await req.json();
+    const body = (await req.json()) as GenerateImagesRequest;
     const { prompt } = body;
 
-    if (!prompt) {
+    if (typeof prompt !== "string" || prompt.trim().length === 0) {
       return new NextResponse("Prompt is required", { status: 400 });
     }
 
@@ -81,8 +85,8 @@ export async function POST(
     const projectContext = `Project: ${project.title}
 Description: ${project.preview}
 Full Description: ${project.description || project.preview}
-Tech Stack: ${project.techTags.map((tag: any) => tag.name).join(', ')}
-Domain: ${project.domainTags.map((tag: any) => tag.name).join(', ')}
+Tech Stack: ${project.techTags.map((tag) => tag.name).join(', ')}
+Domain: ${project.domainTags.map((tag) => tag.name).join(', ')}
 
 User Request: ${prompt}`;
 
@@ -104,11 +108,11 @@ Requirements for variation ${variation}:
 Generate only the new prompt text, no explanations.`;
 
       const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY });
-      const resp: any = await ai.models.generateContent({
+      const resp = await ai.models.generateContent({
         model: PROMPT_MODEL,
         contents: variationPrompt
       });
-      const generatedVariation = (resp && (resp.text as any)) || '';
+      const generatedVariation = resp.text || '';
       
       if (!generatedVariation) {
         throw new Error('No prompt variation generated from Gemini API');
@@ -123,7 +127,7 @@ Generate only the new prompt text, no explanations.`;
       promptVariationPromises.push(
         generatePromptVariation(projectContext, i).catch(() => {
           // Fallback to a basic prompt if variation fails
-          return `Pixel art thumbnail, 16:9 aspect ratio, vibrant colors, professional and modern style. Depict ${project.title} with visual elements representing ${project.techTags.map((tag: any) => tag.name).join(', ')} and ${project.domainTags.map((tag: any) => tag.name).join(', ')}. Focus on visual metaphor rather than literal representation.`;
+          return `Pixel art thumbnail, 16:9 aspect ratio, vibrant colors, professional and modern style. Depict ${project.title} with visual elements representing ${project.techTags.map((tag) => tag.name).join(', ')} and ${project.domainTags.map((tag) => tag.name).join(', ')}. Focus on visual metaphor rather than literal representation.`;
         })
       );
     }

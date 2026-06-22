@@ -1,10 +1,23 @@
-import { Project } from "@/app/components/Project";
+import type { Project } from "@/types/project";
 import { GoogleGenAI } from "@google/genai";
+
+export type SharePlatform = 'twitter' | 'linkedin' | 'reddit';
+
+type ShareUserInfo = {
+  id: string;
+  name?: string | null;
+};
+
+type ShareTeamMember = {
+  name: string;
+  twitterUrl?: string | null;
+  linkedinUrl?: string | null;
+};
 
 export interface ShareContentRequest {
   project: Project;
-  userInfo: any;
-  platform: 'twitter' | 'linkedin' | 'reddit';
+  userInfo: ShareUserInfo;
+  platform: SharePlatform;
   isTeamMember: boolean;
 }
 
@@ -14,21 +27,21 @@ export interface ShareContentResponse {
   characterCount: number;
 }
 
-const PLATFORM_LIMITS = {
+const PLATFORM_LIMITS: Record<SharePlatform, number> = {
   twitter: 280,
   linkedin: 3000,
   reddit: 40000,
 };
 
-const PLATFORM_STYLES = {
+const PLATFORM_STYLES: Record<SharePlatform, string> = {
   twitter: "concise, engaging, with relevant emojis and hashtags",
   linkedin: "professional, detailed, focusing on technical achievements and team collaboration", 
   reddit: "informative, community-focused, with technical details that would interest developers",
 };
 
 // Platform-specific team tagging helper
-function formatTeamNames(teamMembers: any[], platform: string): string {
-  const getUsername = (person: any, platform: string) => {
+function formatTeamNames(teamMembers: ShareTeamMember[], platform: SharePlatform): string {
+  const getUsername = (person: ShareTeamMember, platform: SharePlatform) => {
     switch (platform) {
       case 'twitter':
         if (person.twitterUrl) {
@@ -113,12 +126,12 @@ Generate only the post content, no explanations.`;
 
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY });
-    const response: any = await ai.models.generateContent({
+    const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
       contents: prompt,
     });
 
-    const generatedContent: string = (response && (response.text as any)) || '';
+    const generatedContent = response.text || '';
 
     if (!generatedContent) {
       throw new Error('No content generated from Gemini API');
@@ -186,4 +199,4 @@ function generateFallbackContent({
     hashtags: platform === 'reddit' ? [] : hashtags,
     characterCount: content.length,
   };
-} 
+}

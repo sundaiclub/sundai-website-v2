@@ -2,40 +2,40 @@
 import React from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { Project as ProjectType, ProjectCard } from "./Project";
+import { ProjectCard } from "./Project";
+import type { Project as ProjectType } from "@/types/project";
 import { calculateProjectScore } from '@/lib/trending';
+import type { UserInfo } from "../contexts/UserContext";
 
 const HOT_PROJECT_LIKE_WINDOW_DAYS = 7;
 
 interface TrendingSectionsProps {
   projects: ProjectType[];
-  userInfo: any;
+  userInfo: UserInfo | null;
   handleLike: (e: React.MouseEvent, projectId: string, isLiked: boolean) => void;
   isDarkMode: boolean;
 }
 
 const TrendingProjectCard = ({ project, userInfo, handleLike, isDarkMode, showTrendingBadge = false }: {
   project: ProjectType;
-  userInfo: any;
+  userInfo: UserInfo | null;
   handleLike: (e: React.MouseEvent, projectId: string, isLiked: boolean) => void;
   isDarkMode: boolean;
   showTrendingBadge?: boolean;
 }) => {
   return (
-    <Link href={`/projects/${project.id}`} className="block h-full w-full focus:outline-none" aria-label={`View project ${project.title}`}>
-      <motion.div whileHover={{ y: -4 }}>
-        <ProjectCard
-          project={project}
-          userInfo={userInfo}
-          handleLike={handleLike}
-          isDarkMode={isDarkMode}
-          show_status={false}
-          show_team={true}
-          variant="trending"
-          showTrendingBadge={showTrendingBadge}
-        />
-      </motion.div>
-    </Link>
+    <motion.div whileHover={{ y: -4 }} className="h-full w-full">
+      <ProjectCard
+        project={project}
+        userInfo={userInfo}
+        handleLike={handleLike}
+        isDarkMode={isDarkMode}
+        show_status={false}
+        show_team={true}
+        variant="trending"
+        showTrendingBadge={showTrendingBadge}
+      />
+    </motion.div>
   );
 };
 

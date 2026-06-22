@@ -1,6 +1,29 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
+import type { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
+
+const REQUIRED_HACKER_UPDATE_FIELDS = ["name"] as const;
+
+const NULLABLE_HACKER_UPDATE_FIELDS = [
+  "bio",
+  "githubUrl",
+  "phoneNumber",
+  "linkedinUrl",
+  "twitterUrl",
+  "username",
+  "discordName",
+  "websiteUrl",
+] as const;
+
+const ALLOWED_HACKER_UPDATE_FIELDS = [
+  ...REQUIRED_HACKER_UPDATE_FIELDS,
+  ...NULLABLE_HACKER_UPDATE_FIELDS,
+] as const;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object";
+}
 
 export async function GET(
   request: Request,
@@ -58,17 +81,14 @@ export async function GET(
       return NextResponse.json({ error: "Builder not found" }, { status: 404 });
     }
 
+    const { likes, ...hackerWithoutLikes } = hacker;
     const transformedHacker = {
-      ...hacker,
-      likedProjects: hacker.likes.map((like) => ({
+      ...hackerWithoutLikes,
+      likedProjects: likes.map((like) => ({
         createdAt: like.createdAt,
         project: like.project,
       })),
     };
-
-    if (transformedHacker.likes) {
-      delete (transformedHacker as any).likes;
-    }
 
     return NextResponse.json(transformedHacker);
   } catch (error) {
@@ -104,26 +124,23 @@ export async function PATCH(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const data = await request.json();
-    const allowedFields = [
-      "name",
-      "bio",
-      "githubUrl",
-      "phoneNumber",
-      "linkedinUrl",
-      "twitterUrl",
-      "username",
-      "discordName",
-      "websiteUrl"
-    ];
+    const data: unknown = await request.json();
 
     // Filter out any fields that aren't allowed to be updated
-    const sanitizedData = Object.keys(data).reduce((acc, key) => {
-      if (allowedFields.includes(key)) {
-        acc[key] = data[key];
+    const sanitizedData: Prisma.HackerUpdateInput = {};
+
+    if (isRecord(data)) {
+      if (typeof data.name === "string") {
+        sanitizedData.name = data.name;
       }
-      return acc;
-    }, {} as Record<string, any>);
+
+      for (const key of NULLABLE_HACKER_UPDATE_FIELDS) {
+        const value = data[key];
+        if (typeof value === "string" || value === null) {
+          sanitizedData[key] = value;
+        }
+      }
+    }
 
     const updatedHacker = await prisma.hacker.update({
       where: { id: params.hackerId },

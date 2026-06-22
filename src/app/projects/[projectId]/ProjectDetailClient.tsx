@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import NextImage from "next/image";
 import Link from "next/link";
 import { useUserContext } from "../../contexts/UserContext";
@@ -10,16 +10,48 @@ import { useTheme } from "../../contexts/ThemeContext";
 import { useAutoLike } from "../../hooks/useAutoLike";
 import { CheckIcon, XMarkIcon } from "@heroicons/react/24/solid";
 import toast from 'react-hot-toast';
-import { Project } from "../../components/Project";
+import type { Project } from "@/types/project";
 import { swapFirstLetters } from "../../utils/nameUtils";
 import ShareModal from "../../components/ShareModal";
 import ProjectMarkdown from "../../components/ProjectMarkdown";
 
+type RawProjectTag = Project["techTags"][number] | string;
+type RawProjectParticipant =
+  | Project["participants"][number]
+  | {
+      id: string;
+      name: string;
+      role?: string | null;
+    };
+type RawProject = Omit<Project, "thumbnail" | "techTags" | "domainTags" | "participants"> & {
+  thumbnail?: Project["thumbnail"] | string;
+  techTags?: RawProjectTag[];
+  domainTags?: RawProjectTag[];
+  participants?: RawProjectParticipant[];
+};
+
+function normalizeTag(tag: RawProjectTag): Project["techTags"][number] {
+  return typeof tag === "string" ? { id: tag, name: tag } : tag;
+}
+
+function normalizeParticipant(participant: RawProjectParticipant): Project["participants"][number] {
+  if ("hacker" in participant) return participant;
+
+  return {
+    role: participant.role || "hacker",
+    hacker: {
+      id: participant.id,
+      name: participant.name,
+      avatar: null,
+    },
+  };
+}
+
 export default function ProjectDetailClient() {
   const params = (useParams() || {}) as { projectId?: string };
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { userInfo } = useUserContext();
-  const searchParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
   const [project, setProject] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
   const [isLiked, setIsLiked] = useState(false);
@@ -53,9 +85,8 @@ export default function ProjectDetailClient() {
       }
       if (isClerkAvatar(src)) {
         try {
-          const GlobalImage = (typeof globalThis !== 'undefined' ? (globalThis as any).Image : undefined);
-          if (GlobalImage) {
-            const preloader = new GlobalImage();
+          if (typeof window !== "undefined" && window.Image) {
+            const preloader = new window.Image();
             preloader.onload = () => setImgSrc(src);
             preloader.onerror = () => setImgSrc(defaultSrc);
             preloader.src = src;
@@ -90,7 +121,7 @@ export default function ProjectDetailClient() {
   const allowedEdit = !!project && (
     (Array.isArray(project.participants) && project.participants.some(
       (participant) => participant?.hacker?.id === userInfo?.id
-    )) || project?.launchLead?.id === userInfo?.id || userInfo?.role === 'ADMIN'
+    )) || project?.launchLead?.id === userInfo?.id || userInfo?.role === 'SITE_ADMIN'
   );
 
   useEffect(() => {
@@ -100,14 +131,19 @@ export default function ProjectDetailClient() {
         if (!response.ok) {
           throw new Error("Project not found");
         }
-        const data = await response.json();
-        const normalized = {
+        const data = (await response.json()) as RawProject;
+        const normalized: Project = {
           ...data,
-          thumbnail: (data as any).thumbnail?.url ? (data as any).thumbnail : (typeof (data as any).thumbnail === 'string' ? { url: (data as any).thumbnail } : (data as any).thumbnail),
-          techTags: Array.isArray((data as any).techTags) ? (data as any).techTags.map((t: any) => (typeof t === 'string' ? { id: t, name: t } : t)) : [],
-          domainTags: Array.isArray((data as any).domainTags) ? (data as any).domainTags.map((t: any) => (typeof t === 'string' ? { id: t, name: t } : t)) : [],
-          participants: Array.isArray((data as any).participants) ? (data as any).participants.map((p: any) => (p?.hacker ? p : { hacker: { id: p.id, name: p.name, avatar: null }, role: (p.role || 'hacker') })) : [],
-        } as any;
+          thumbnail:
+            typeof data.thumbnail === "string"
+              ? { url: data.thumbnail }
+              : data.thumbnail,
+          techTags: Array.isArray(data.techTags) ? data.techTags.map(normalizeTag) : [],
+          domainTags: Array.isArray(data.domainTags) ? data.domainTags.map(normalizeTag) : [],
+          participants: Array.isArray(data.participants)
+            ? data.participants.map(normalizeParticipant)
+            : [],
+        };
         setProject(normalized);
       } catch (error) {
         console.error("Error fetching project:", error);
@@ -124,10 +160,10 @@ export default function ProjectDetailClient() {
 
   useEffect(() => {
     if (project) {
-      const likesArray = Array.isArray((project as any).likes) ? (project as any).likes : [];
+      const likesArray = Array.isArray(project.likes) ? project.likes : [];
       setLikeCount(likesArray.length);
       if (userInfo) {
-        setIsLiked(likesArray.some((like: any) => like.hackerId === userInfo.id));
+        setIsLiked(likesArray.some((like) => like.hackerId === userInfo.id));
       } else {
         setIsLiked(false);
       }
@@ -178,7 +214,7 @@ export default function ProjectDetailClient() {
         })();
       }
     }
-  }, [loading, project, userInfo, isLiked]);
+  }, [loading, project, userInfo, isLiked, searchParams]);
 
   const handleSubmit = async () => {
     try {
@@ -539,9 +575,9 @@ export default function ProjectDetailClient() {
                                 </p>
                                 {participant.hacker.bio && (
                                   <p className={`text-sm mt-1 line-clamp-2 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
-                                    {(participant.hacker as any).bio?.length > 50 
-                                      ? `${(participant.hacker as any).bio.substring(0, 50)}...` 
-                                      : (participant.hacker as any).bio}
+                                    {participant.hacker.bio.length > 50
+                                      ? `${participant.hacker.bio.substring(0, 50)}...`
+                                      : participant.hacker.bio}
                                   </p>
                                 )}
                               </div>

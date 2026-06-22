@@ -1,12 +1,35 @@
-const { PrismaClient, Role, ProjectStatus, EventProjectStatus } = require("@prisma/client");
+const {
+  PrismaClient,
+  Role,
+  ProjectStatus,
+  PitchProjectStatus,
+  ChapterMembershipRole,
+  ChapterMembershipStatus,
+  EventStaffRole,
+  EventStatus,
+  EventVisibility,
+  EventApplicationMode,
+  ApplicationTemplateScope,
+} = require("@prisma/client");
 
 const prisma = new PrismaClient();
 
 async function main() {
   // Clean up existing data
-  await prisma.eventProject?.deleteMany?.({});
-  await prisma.eventMC?.deleteMany?.({});
-  await prisma.event?.deleteMany?.({});
+  await prisma.eventRegistrationAudit.deleteMany({});
+  await prisma.eventRegistration.deleteMany({});
+  await prisma.pitchProjectVote.deleteMany({});
+  await prisma.pitchProject.deleteMany({});
+  await prisma.pitchSession.deleteMany({});
+  await prisma.eventStaff.deleteMany({});
+  await prisma.event.deleteMany({});
+  await prisma.applicationTemplate.deleteMany({});
+  await prisma.userBanFlag.deleteMany({});
+  await prisma.userBan.deleteMany({});
+  await prisma.hackerOrganizerNoteRevision.deleteMany({});
+  await prisma.hackerOrganizerNote.deleteMany({});
+  await prisma.chapterMembership.deleteMany({});
+  await prisma.chapter.deleteMany({});
   await prisma.attendance.deleteMany({});
   await prisma.projectToParticipant.deleteMany({});
   await prisma.projectLike.deleteMany({});
@@ -33,7 +56,7 @@ async function main() {
       data: {
         name: "Connor Dirks",
         clerkId: "user_2ZFr1K9Xt5dxWE", // Example Clerk IDs - replace with real ones
-        role: Role.ADMIN,
+        role: Role.SITE_ADMIN,
         bio: "Founder of Sundai Club",
         email: "connor@sundai.club",
       },
@@ -42,7 +65,7 @@ async function main() {
       data: {
         name: "Sam Poder",
         clerkId: "user_2ZFr2L0Yt6exWF",
-        role: Role.ADMIN,
+        role: Role.SITE_ADMIN,
         bio: "Co-founder of Sundai Club",
         email: "sam@sundai.club",
       },
@@ -51,7 +74,7 @@ async function main() {
       data: {
         name: "Serge Vasylechko",
         clerkId: "user_2ZFr3M1Zu7fyWG",
-        role: Role.ADMIN,
+        role: Role.SITE_ADMIN,
         bio: "Co-founder of Sundai Club",
         email: "serge@sundai.club",
       },
@@ -69,7 +92,7 @@ async function main() {
       data: {
         name: "Artem Lukoianov",
         clerkId: "user_2ofxmoR332yWzg1GnquHX1h8Zpu",
-        role: Role.ADMIN,
+        role: Role.SITE_ADMIN,
         bio: "Co-founder of Sundai Club",
         email: "lukartoil@gmail.com",
       },
@@ -95,6 +118,57 @@ async function main() {
   ]);
 
   const [connor, sam, serge, artem, vlad] = users;
+
+  const bostonChapter = await prisma.chapter.create({
+    data: {
+      name: "Sundai Boston",
+      slug: "boston",
+      city: "Boston",
+      region: "MA",
+      country: "US",
+      timezone: "America/New_York",
+      description: "Initial Boston chapter for Sundai event operations.",
+      status: "ACTIVE",
+      accessMode: "PUBLIC",
+      memberships: {
+        create: [connor, sam, serge, artem].map((admin) => ({
+          hackerId: admin.id,
+          role: ChapterMembershipRole.ADMIN,
+          status: ChapterMembershipStatus.ACTIVE,
+          joinedAt: new Date(),
+          notificationsAllowed: true,
+          emailNotificationsEnabled: true,
+        })),
+      },
+    },
+  });
+
+  await prisma.applicationTemplate.create({
+    data: {
+      scope: ApplicationTemplateScope.SITE,
+      name: "Default site application",
+      fieldsJson: [
+        {
+          id: "name",
+          label: "Name",
+          type: "TEXT",
+          required: true,
+          siteRequired: true,
+          order: 1,
+        },
+        {
+          id: "email",
+          label: "Email",
+          type: "EMAIL",
+          required: true,
+          siteRequired: true,
+          order: 2,
+        },
+      ],
+      isActive: true,
+      createdById: connor.id,
+    },
+  });
 
   // Projects data with titles, descriptions, and tags
   const projectsData = [
@@ -252,29 +326,50 @@ async function main() {
       title: "Sundai Weekly Pitch Night",
       description: "Weekly demos and lightning pitches from the Sundai community.",
       startTime: start,
+      chapterId: bostonChapter.id,
+      slug: "weekly-pitch-night",
+      status: EventStatus.PUBLISHED,
+      visibility: EventVisibility.PUBLIC,
+      applicationMode: EventApplicationMode.NONE,
       meetingUrl: "https://zoom.us/j/1234567890",
       location: "Hybrid",
+      publicLocation: "Hybrid",
+      virtualUrl: "https://zoom.us/j/1234567890",
       createdById: users[0].id,
-      audienceCanReorder: true,
-      mcs: {
+      staff: {
         create: [
-          { hackerId: users[0].id, role: "Host" },
-          { hackerId: users[1].id, role: "Co-Host" },
+          { hackerId: users[0].id, role: EventStaffRole.MC },
+          { hackerId: users[1].id, role: EventStaffRole.MC },
         ],
       },
+    },
+  });
+  const samplePitchSession = await prisma.pitchSession.create({
+    data: {
+      eventId: sampleEvent.id,
+      chapterId: bostonChapter.id,
+      title: sampleEvent.title,
+      description: sampleEvent.description,
+      startTime: sampleEvent.startTime,
+      meetingUrl: sampleEvent.meetingUrl,
+      location: sampleEvent.location,
+      createdById: users[0].id,
+      legacyBackfill: false,
+      audienceCanReorder: true,
+      votingEndTime: new Date(sampleEvent.startTime.getTime() + 15 * 60 * 1000),
     },
   });
 
   const queueProjects = allProjects.slice(0, Math.min(3, allProjects.length));
   for (let i = 0; i < queueProjects.length; i++) {
     const p = queueProjects[i];
-    await prisma.eventProject.create({
+    await prisma.pitchProject.create({
       data: {
-        eventId: sampleEvent.id,
+        pitchSessionId: samplePitchSession.id,
         projectId: p.id,
         addedById: p.launchLeadId,
         position: i + 1,
-        status: EventProjectStatus.QUEUED,
+        status: PitchProjectStatus.QUEUED,
         approved: i === 0 ? true : false,
       },
     });

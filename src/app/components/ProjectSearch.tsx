@@ -3,7 +3,7 @@ import { calculateProjectScore } from '@/lib/trending';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Listbox, ListboxButton, ListboxOption, ListboxOptions, Transition } from '@headlessui/react';
 import { MagnifyingGlassIcon, FunnelIcon, ChevronUpDownIcon, XMarkIcon, CalendarIcon } from '@heroicons/react/24/outline';
-import { Project } from './Project';
+import type { Project } from '@/types/project';
 import TagSelector from './TagSelector';
 
 const HOT_PROJECT_LIKE_WINDOW_DAYS = 7;
@@ -19,8 +19,8 @@ const SORT_OPTIONS: SortOption[] = [
     label: "Trending",
     value: "trending",
     sortFn: (a: Project, b: Project) => {
-      const scoreA = calculateProjectScore(a as any, { recentLikeWindowDays: HOT_PROJECT_LIKE_WINDOW_DAYS });
-      const scoreB = calculateProjectScore(b as any, { recentLikeWindowDays: HOT_PROJECT_LIKE_WINDOW_DAYS });
+      const scoreA = calculateProjectScore(a, { recentLikeWindowDays: HOT_PROJECT_LIKE_WINDOW_DAYS });
+      const scoreB = calculateProjectScore(b, { recentLikeWindowDays: HOT_PROJECT_LIKE_WINDOW_DAYS });
       return scoreB - scoreA;
     }
   },
@@ -91,7 +91,15 @@ const getTagCount = (tagName: string, projects: Project[]) => {
   ).length;
 };
 
-// calculateProjectScore is now imported from '@/lib/trending' for reuse across client and server
+type ProjectSearchFilters = {
+  searchTerm?: string;
+  selectedTechTags?: string[];
+  selectedDomainTags?: string[];
+  selectedStatus?: string[];
+  fromDate?: string;
+  toDate?: string;
+  sortBy?: SortOption;
+};
 
 export default function ProjectSearch({ 
   projects,
@@ -143,7 +151,7 @@ export default function ProjectSearch({
   }, [urlFilters]);
 
   // Function to update URL parameters
-  const updateURL = useCallback((newFilters: any) => {
+  const updateURL = useCallback((newFilters: ProjectSearchFilters) => {
     const params = new URLSearchParams();
     
     // Add search term
@@ -253,19 +261,6 @@ export default function ProjectSearch({
         // Filter by date range - convert to local timezone first to avoid UTC offset issues
         const projectDate = new Date(project.startDate);
         const projectDateStr = `${projectDate.getFullYear()}-${String(projectDate.getMonth() + 1).padStart(2, '0')}-${String(projectDate.getDate()).padStart(2, '0')}`;
-        
-        // Debug logging if needed
-        // if (fromDate || toDate) {
-        //   console.log('DEBUG Filter:', {
-        //     projectTitle: project.title,
-        //     projectStartDate: project.startDate,
-        //     projectDateStr,
-        //     fromDate,
-        //     toDate,
-        //     fromMatch: !fromDate || projectDateStr >= fromDate,
-        //     toMatch: !toDate || projectDateStr <= toDate
-        //   });
-        // }
         
         const dateMatch = (!fromDate || projectDateStr >= fromDate) &&
                          (!toDate || projectDateStr <= toDate);

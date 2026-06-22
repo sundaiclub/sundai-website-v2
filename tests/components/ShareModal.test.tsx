@@ -245,6 +245,7 @@ describe('ShareModal', () => {
   });
 
   it('should show success message after copying', async () => {
+    const toast = require('react-hot-toast').default;
     const mockWriteText = jest.fn().mockResolvedValue(undefined);
     Object.assign(navigator, {
       clipboard: {
@@ -277,8 +278,10 @@ describe('ShareModal', () => {
     const copyButton = screen.getByText('Copy to Clipboard');
     fireEvent.click(copyButton);
     
-    // The component shows an alert instead of a message in the DOM
     expect(mockWriteText).toHaveBeenCalledWith('Generated content for sharing');
+    await waitFor(() => {
+      expect(toast.success).toHaveBeenCalledWith('Content copied to clipboard.');
+    });
   });
 
   it('should handle copy error', async () => {
@@ -299,6 +302,7 @@ describe('ShareModal', () => {
 
     (global.fetch as jest.Mock).mockResolvedValueOnce({
       ok: true,
+      headers: { get: () => 'application/json' },
       json: () => Promise.resolve(mockResponse),
     });
 

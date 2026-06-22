@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { PUT, DELETE } from '../../src/app/api/events/[eventId]/queue/[eventProjectId]/vote/route'
+import { PUT, DELETE } from '../../src/app/api/events/[eventId]/pitch/queue/[pitchProjectId]/vote/route'
 
 jest.mock('../../src/lib/prisma', () => ({
   __esModule: true,
@@ -7,13 +7,13 @@ jest.mock('../../src/lib/prisma', () => ({
     hacker: {
       findUnique: jest.fn(),
     },
-    eventProject: {
+    pitchProject: {
       findUnique: jest.fn(),
     },
     projectLike: {
       upsert: jest.fn(),
     },
-    eventProjectVote: {
+    pitchProjectVote: {
       upsert: jest.fn(),
       deleteMany: jest.fn(),
     },
@@ -28,52 +28,52 @@ jest.mock('@clerk/nextjs/server', () => ({
 const prisma = require('../../src/lib/prisma').default
 const mockAuth = require('@clerk/nextjs/server').auth as jest.Mock
 
-describe('/api/events/[eventId]/queue/[eventProjectId]/vote', () => {
+describe('/api/events/[eventId]/queue/[pitchProjectId]/vote', () => {
   beforeEach(() => {
-    jest.clearAllMocks()
+    jest.resetAllMocks()
   })
 
   it('creates a LIKE vote and upserts the global project like', async () => {
     mockAuth.mockReturnValue({ userId: 'clerk-1' })
     prisma.hacker.findUnique.mockResolvedValue({ id: 'h1' })
-    prisma.eventProject.findUnique.mockResolvedValue({
+    prisma.pitchProject.findUnique.mockResolvedValue({
       id: 'ep1',
-      eventId: 'e1',
+      pitchSessionId: 'ps1',
       projectId: 'p1',
-      event: { phase: 'VOTING' },
+      pitchSession: { eventId: 'e1', phase: '' },
     })
     prisma.projectLike.upsert.mockResolvedValue({ id: 'pl1' })
-    prisma.eventProjectVote.upsert.mockResolvedValue({
+    prisma.pitchProjectVote.upsert.mockResolvedValue({
       id: 'epv1',
-      eventProjectId: 'ep1',
+      pitchProjectId: 'ep1',
       hackerId: 'h1',
       value: 'LIKE',
     })
     prisma.$transaction.mockResolvedValue([
       { id: 'pl1' },
-      { id: 'epv1', eventProjectId: 'ep1', hackerId: 'h1', value: 'LIKE' },
+      { id: 'epv1', pitchProjectId: 'ep1', hackerId: 'h1', value: 'LIKE' },
     ])
 
-    const request = new NextRequest('http://localhost:3000/api/events/e1/queue/ep1/vote', {
+    const request = new NextRequest('http://localhost:3000/api/events/e1/pitch/queue/ep1/vote', {
       method: 'PUT',
     })
     request.json = jest.fn().mockResolvedValue({ value: 'LIKE' })
 
     const response = await PUT(request, {
-      params: { eventId: 'e1', eventProjectId: 'ep1' },
+      params: { eventId: 'e1', pitchProjectId: 'ep1' },
     } as any)
     const body = await response.json()
 
     expect(response.status).toBe(200)
-    expect(body).toMatchObject({ id: 'epv1', eventProjectId: 'ep1', hackerId: 'h1', value: 'LIKE' })
+    expect(body).toMatchObject({ id: 'epv1', pitchProjectId: 'ep1', hackerId: 'h1', value: 'LIKE' })
     expect(prisma.projectLike.upsert).toHaveBeenCalledWith({
       where: { projectId_hackerId: { projectId: 'p1', hackerId: 'h1' } },
       create: { projectId: 'p1', hackerId: 'h1' },
       update: {},
     })
-    expect(prisma.eventProjectVote.upsert).toHaveBeenCalledWith({
-      where: { eventProjectId_hackerId: { eventProjectId: 'ep1', hackerId: 'h1' } },
-      create: { eventProjectId: 'ep1', hackerId: 'h1', value: 'LIKE' },
+    expect(prisma.pitchProjectVote.upsert).toHaveBeenCalledWith({
+      where: { pitchProjectId_hackerId: { pitchProjectId: 'ep1', hackerId: 'h1' } },
+      create: { pitchProjectId: 'ep1', hackerId: 'h1', value: 'LIKE' },
       update: { value: 'LIKE' },
     })
   })
@@ -81,36 +81,36 @@ describe('/api/events/[eventId]/queue/[eventProjectId]/vote', () => {
   it('creates a DISLIKE vote without creating a global project like', async () => {
     mockAuth.mockReturnValue({ userId: 'clerk-1' })
     prisma.hacker.findUnique.mockResolvedValue({ id: 'h1' })
-    prisma.eventProject.findUnique.mockResolvedValue({
+    prisma.pitchProject.findUnique.mockResolvedValue({
       id: 'ep1',
-      eventId: 'e1',
+      pitchSessionId: 'ps1',
       projectId: 'p1',
-      event: { phase: 'VOTING' },
+      pitchSession: { eventId: 'e1', phase: '' },
     })
-    prisma.eventProjectVote.upsert.mockResolvedValue({
+    prisma.pitchProjectVote.upsert.mockResolvedValue({
       id: 'epv1',
-      eventProjectId: 'ep1',
+      pitchProjectId: 'ep1',
       hackerId: 'h1',
       value: 'DISLIKE',
     })
     prisma.$transaction.mockResolvedValue([
-      { id: 'epv1', eventProjectId: 'ep1', hackerId: 'h1', value: 'DISLIKE' },
+      { id: 'epv1', pitchProjectId: 'ep1', hackerId: 'h1', value: 'DISLIKE' },
     ])
 
-    const request = new NextRequest('http://localhost:3000/api/events/e1/queue/ep1/vote', {
+    const request = new NextRequest('http://localhost:3000/api/events/e1/pitch/queue/ep1/vote', {
       method: 'PUT',
     })
     request.json = jest.fn().mockResolvedValue({ value: 'DISLIKE' })
 
     const response = await PUT(request, {
-      params: { eventId: 'e1', eventProjectId: 'ep1' },
+      params: { eventId: 'e1', pitchProjectId: 'ep1' },
     } as any)
 
     expect(response.status).toBe(200)
     expect(prisma.projectLike.upsert).not.toHaveBeenCalled()
-    expect(prisma.eventProjectVote.upsert).toHaveBeenCalledWith({
-      where: { eventProjectId_hackerId: { eventProjectId: 'ep1', hackerId: 'h1' } },
-      create: { eventProjectId: 'ep1', hackerId: 'h1', value: 'DISLIKE' },
+    expect(prisma.pitchProjectVote.upsert).toHaveBeenCalledWith({
+      where: { pitchProjectId_hackerId: { pitchProjectId: 'ep1', hackerId: 'h1' } },
+      create: { pitchProjectId: 'ep1', hackerId: 'h1', value: 'DISLIKE' },
       update: { value: 'DISLIKE' },
     })
   })
@@ -118,84 +118,84 @@ describe('/api/events/[eventId]/queue/[eventProjectId]/vote', () => {
   it('allows pitch-vote changes during pitching', async () => {
     mockAuth.mockReturnValue({ userId: 'clerk-1' })
     prisma.hacker.findUnique.mockResolvedValue({ id: 'h1' })
-    prisma.eventProject.findUnique.mockResolvedValue({
+    prisma.pitchProject.findUnique.mockResolvedValue({
       id: 'ep1',
-      eventId: 'e1',
+      pitchSessionId: 'ps1',
       projectId: 'p1',
-      event: { phase: 'PITCHING' },
+      pitchSession: { eventId: 'e1', phase: 'PITCHING' },
     })
     prisma.projectLike.upsert.mockResolvedValue({ id: 'pl1' })
-    prisma.eventProjectVote.upsert.mockResolvedValue({
+    prisma.pitchProjectVote.upsert.mockResolvedValue({
       id: 'epv1',
-      eventProjectId: 'ep1',
+      pitchProjectId: 'ep1',
       hackerId: 'h1',
       value: 'LIKE',
     })
     prisma.$transaction.mockResolvedValue([
       { id: 'pl1' },
-      { id: 'epv1', eventProjectId: 'ep1', hackerId: 'h1', value: 'LIKE' },
+      { id: 'epv1', pitchProjectId: 'ep1', hackerId: 'h1', value: 'LIKE' },
     ])
 
-    const request = new NextRequest('http://localhost:3000/api/events/e1/queue/ep1/vote', {
+    const request = new NextRequest('http://localhost:3000/api/events/e1/pitch/queue/ep1/vote', {
       method: 'PUT',
     })
     request.json = jest.fn().mockResolvedValue({ value: 'LIKE' })
 
     const response = await PUT(request, {
-      params: { eventId: 'e1', eventProjectId: 'ep1' },
+      params: { eventId: 'e1', pitchProjectId: 'ep1' },
     } as any)
 
     expect(response.status).toBe(200)
     expect(prisma.projectLike.upsert).toHaveBeenCalled()
-    expect(prisma.eventProjectVote.upsert).toHaveBeenCalled()
+    expect(prisma.pitchProjectVote.upsert).toHaveBeenCalled()
   })
 
   it('rejects pitch-vote changes after the event is finished', async () => {
     mockAuth.mockReturnValue({ userId: 'clerk-1' })
     prisma.hacker.findUnique.mockResolvedValue({ id: 'h1' })
-    prisma.eventProject.findUnique.mockResolvedValue({
+    prisma.pitchProject.findUnique.mockResolvedValue({
       id: 'ep1',
-      eventId: 'e1',
+      pitchSessionId: 'ps1',
       projectId: 'p1',
-      event: { phase: 'FINISHED' },
+      pitchSession: { eventId: 'e1', phase: 'FINISHED' },
     })
 
-    const request = new NextRequest('http://localhost:3000/api/events/e1/queue/ep1/vote', {
+    const request = new NextRequest('http://localhost:3000/api/events/e1/pitch/queue/ep1/vote', {
       method: 'PUT',
     })
     request.json = jest.fn().mockResolvedValue({ value: 'LIKE' })
 
     const response = await PUT(request, {
-      params: { eventId: 'e1', eventProjectId: 'ep1' },
+      params: { eventId: 'e1', pitchProjectId: 'ep1' },
     } as any)
 
     expect(response.status).toBe(400)
     expect(prisma.projectLike.upsert).not.toHaveBeenCalled()
-    expect(prisma.eventProjectVote.upsert).not.toHaveBeenCalled()
+    expect(prisma.pitchProjectVote.upsert).not.toHaveBeenCalled()
   })
 
   it('deletes only the pitch vote', async () => {
     mockAuth.mockReturnValue({ userId: 'clerk-1' })
     prisma.hacker.findUnique.mockResolvedValue({ id: 'h1' })
-    prisma.eventProject.findUnique.mockResolvedValue({
+    prisma.pitchProject.findUnique.mockResolvedValue({
       id: 'ep1',
-      eventId: 'e1',
+      pitchSessionId: 'ps1',
       projectId: 'p1',
-      event: { phase: 'VOTING' },
+      pitchSession: { eventId: 'e1', phase: '' },
     })
-    prisma.eventProjectVote.deleteMany.mockResolvedValue({ count: 1 })
+    prisma.pitchProjectVote.deleteMany.mockResolvedValue({ count: 1 })
 
-    const request = new NextRequest('http://localhost:3000/api/events/e1/queue/ep1/vote', {
+    const request = new NextRequest('http://localhost:3000/api/events/e1/pitch/queue/ep1/vote', {
       method: 'DELETE',
     })
 
     const response = await DELETE(request, {
-      params: { eventId: 'e1', eventProjectId: 'ep1' },
+      params: { eventId: 'e1', pitchProjectId: 'ep1' },
     } as any)
 
     expect(response.status).toBe(204)
-    expect(prisma.eventProjectVote.deleteMany).toHaveBeenCalledWith({
-      where: { eventProjectId: 'ep1', hackerId: 'h1' },
+    expect(prisma.pitchProjectVote.deleteMany).toHaveBeenCalledWith({
+      where: { pitchProjectId: 'ep1', hackerId: 'h1' },
     })
     expect(prisma.projectLike.upsert).not.toHaveBeenCalled()
   })

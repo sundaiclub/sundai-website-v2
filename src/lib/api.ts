@@ -76,92 +76,67 @@ export interface UpdateProjectData {
 
 // Hacker API functions
 export async function getHacker(hackerId: string): Promise<Hacker | null> {
-  try {
-    const response = await fetch(`/api/hackers/${hackerId}`);
-    if (!response.ok) {
-      if (response.status === 404) {
-        return null;
-      }
-      throw new Error('Failed to fetch hacker');
+  const response = await fetch(`/api/hackers/${hackerId}`);
+  if (!response.ok) {
+    if (response.status === 404) {
+      return null;
     }
-    return await response.json();
-  } catch (error) {
-    console.error('Error fetching hacker:', error);
-    throw error;
+    throw new Error('Failed to fetch hacker');
   }
+  return await response.json();
 }
 
 export async function getHackerByClerkId(clerkId: string): Promise<Hacker | null> {
-  try {
-    const response = await fetch(`/api/hackers?clerkId=${encodeURIComponent(clerkId)}`);
-    if (!response.ok) {
-      if (response.status === 404) {
-        return null;
-      }
-      throw new Error('Failed to fetch hacker by Clerk ID');
+  const response = await fetch(`/api/hackers?clerkId=${encodeURIComponent(clerkId)}`);
+  if (!response.ok) {
+    if (response.status === 404) {
+      return null;
     }
-    return await response.json();
-  } catch (error) {
-    console.error('Error fetching hacker by Clerk ID:', error);
-    throw error;
+    throw new Error('Failed to fetch hacker by Clerk ID');
   }
+  return await response.json();
 }
 
 // Project API functions
 export async function getProject(projectId: string): Promise<Project | null> {
-  try {
-    const response = await fetch(`/api/projects/${projectId}`);
-    if (!response.ok) {
-      if (response.status === 404) {
-        return null;
-      }
-      throw new Error('Failed to fetch project');
+  const response = await fetch(`/api/projects/${projectId}`);
+  if (!response.ok) {
+    if (response.status === 404) {
+      return null;
     }
-    return await response.json();
-  } catch (error) {
-    console.error('Error fetching project:', error);
-    throw error;
+    throw new Error('Failed to fetch project');
   }
+  return await response.json();
 }
 
 export async function createProject(data: CreateProjectData): Promise<Project> {
-  try {
-    const response = await fetch('/api/projects', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(data),
-    });
+  const response = await fetch('/api/projects', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(data),
+  });
 
-    if (!response.ok) {
-      throw new Error('Failed to create project');
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.error('Error creating project:', error);
-    throw error;
+  if (!response.ok) {
+    throw new Error('Failed to create project');
   }
+
+  return await response.json();
 }
 
 export async function updateProject(projectId: string, data: UpdateProjectData): Promise<Project> {
-  try {
-    const response = await fetch(`/api/projects/${projectId}/edit`, {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(data),
-    });
+  const response = await fetch(`/api/projects/${projectId}/edit`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(data),
+  });
 
-    if (!response.ok) {
-      throw new Error('Failed to update project');
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.error('Error updating project:', error);
-    throw error;
+  if (!response.ok) {
+    throw new Error('Failed to update project');
   }
+
+  return await response.json();
 }

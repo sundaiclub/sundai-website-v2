@@ -10,7 +10,7 @@ import { usePullToRefresh } from "./hooks/usePullToRefresh";
 import { useTheme } from "./contexts/ThemeContext";
 import { useUser } from "@clerk/nextjs";
 import { useUserContext } from "./contexts/UserContext";
-import { Project } from "./components/Project";
+import type { Project } from "@/types/project";
 
 export default function Home() {
   const [isTypingDone, setIsTypingDone] = useState(false);

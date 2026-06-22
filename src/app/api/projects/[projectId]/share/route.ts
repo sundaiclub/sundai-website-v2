@@ -4,7 +4,27 @@ export const maxDuration = 300;
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import prisma from "@/lib/prisma";
-import { generateShareContent } from "@/lib/shareContent";
+import {
+  generateShareContent,
+  type SharePlatform,
+} from "@/lib/shareContent";
+import type { Project } from "@/types/project";
+
+type ShareRequestBody = {
+  platform?: unknown;
+};
+
+type ShareTeamMember = {
+  name: string;
+  twitterUrl?: string | null;
+  linkedinUrl?: string | null;
+};
+
+const SHARE_PLATFORMS = new Set<SharePlatform>(['twitter', 'linkedin', 'reddit']);
+
+function isSharePlatform(value: unknown): value is SharePlatform {
+  return typeof value === 'string' && SHARE_PLATFORMS.has(value as SharePlatform);
+}
 
 export async function POST(
   req: Request,
@@ -16,10 +36,10 @@ export async function POST(
       return new NextResponse("Unauthorized", { status: 401 });
     }
 
-    const body = await req.json();
+    const body = (await req.json()) as ShareRequestBody;
     const { platform } = body;
 
-    if (!platform || !['twitter', 'linkedin', 'reddit'].includes(platform)) {
+    if (!isSharePlatform(platform)) {
       return new NextResponse("Invalid platform", { status: 400 });
     }
 
@@ -104,7 +124,7 @@ export async function POST(
                         project.launchLeadId === currentUser.id;
 
     // Generate content using Gemini API
-    const projectData = {
+    const projectData: Project = {
       id: project.id,
       title: project.title,
       preview: project.preview || project.title,
@@ -155,9 +175,12 @@ export async function POST(
         return new NextResponse("Gemini API key not configured", { status: 500 });
       }
 
-      const teamMembers = [projectData.launchLead, ...projectData.participants.map((p: any) => p.hacker)];
-      const formatTeamNames = (members: any[], plat: string) => {
-        const mapOne = (person: any) => {
+      const teamMembers: ShareTeamMember[] = [
+        projectData.launchLead,
+        ...projectData.participants.map((p) => p.hacker),
+      ];
+      const formatTeamNames = (members: ShareTeamMember[], plat: SharePlatform) => {
+        const mapOne = (person: ShareTeamMember) => {
           switch (plat) {
             case 'twitter': {
               if (person.twitterUrl) {
@@ -192,7 +215,7 @@ export async function POST(
 Project: ${projectData.title}
 Description: ${projectData.preview}
 Full Description: ${projectData.description}
-Team: ${teamMembers.map((p: any) => p.name).join(', ')}
+Team: ${teamMembers.map((p) => p.name).join(', ')}
 Launch Lead: ${projectData.launchLead.name}
 
 Platform-specific tagging for ${platform}:
@@ -229,12 +252,12 @@ Generate only the post content, no explanations.`;
       const stream = new ReadableStream({
         async start(controller) {
           try {
-            const response: any = await ai.models.generateContentStream({
+            const response = await ai.models.generateContentStream({
               model: "gemini-2.5-flash",
               contents: prompt,
             });
-            for await (const chunk of response as any) {
-              const text = (chunk && (chunk.text as any)) || '';
+            for await (const chunk of response) {
+              const text = chunk.text || '';
               if (text) controller.enqueue(encoder.encode(text));
             }
             controller.close();
@@ -254,9 +277,9 @@ Generate only the post content, no explanations.`;
     }
 
     const shareContent = await generateShareContent({
-      project: projectData as any, // Type assertion to bypass strict typing
+      project: projectData,
       userInfo: currentUser,
-      platform: platform as 'twitter' | 'linkedin' | 'reddit',
+      platform,
       isTeamMember,
     });
 
@@ -265,4 +288,4 @@ Generate only the post content, no explanations.`;
     console.error("[SHARE_CONTENT_GENERATION]", error);
     return new NextResponse("Internal Error", { status: 500 });
   }
-} 
+}
