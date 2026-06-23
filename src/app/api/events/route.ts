@@ -6,62 +6,14 @@ import {
   ApplicationTemplateValidationError,
   parseTemplateFieldsJson,
 } from '@/lib/applicationTemplates';
+import {
+  parseApplicationsOpen,
+  parseEventApplicationMode,
+  parseEventStaffAssignments,
+  parseOptionalDateInput,
+  slugifyEventValue,
+} from '@/lib/eventRequestParsing';
 import { listPublicEvents } from '@/lib/publicEvents';
-
-const PHASE_2_APPLICATION_MODES = ['REQUIRES_APPROVAL', 'OPEN_RSVP'] as const;
-type Phase2ApplicationMode = (typeof PHASE_2_APPLICATION_MODES)[number];
-
-function slugify(value: string) {
-  return (
-    value
-      .trim()
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '') || 'event'
-  );
-}
-
-function parseApplicationMode(value: unknown): Phase2ApplicationMode | null {
-  if (value === undefined) return 'REQUIRES_APPROVAL';
-  if (
-    typeof value === 'string' &&
-    PHASE_2_APPLICATION_MODES.includes(value as Phase2ApplicationMode)
-  ) {
-    return value as Phase2ApplicationMode;
-  }
-
-  return null;
-}
-
-function parseApplicationsOpen(value: unknown): boolean | null {
-  if (value === undefined) return true;
-  return typeof value === 'boolean' ? value : null;
-}
-
-function parseOptionalDate(value: unknown, field: string) {
-  if (value === undefined || value === null || value === '')
-    return { date: null };
-  if (typeof value !== 'string' && !(value instanceof Date)) {
-    return {
-      error: NextResponse.json(
-        { message: `${field} must be a valid date` },
-        { status: 400 }
-      ),
-    };
-  }
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return {
-      error: NextResponse.json(
-        { message: `${field} must be a valid date` },
-        { status: 400 }
-      ),
-    };
-  }
-
-  return { date };
-}
 
 export async function GET(req: Request) {
   try {
@@ -233,7 +185,10 @@ export async function POST(req: Request) {
       );
     }
 
-    const parsedApplicationMode = parseApplicationMode(applicationMode);
+    const parsedApplicationMode = parseEventApplicationMode(
+      applicationMode,
+      'REQUIRES_APPROVAL'
+    );
     if (!parsedApplicationMode) {
       return NextResponse.json(
         { message: 'applicationMode must be REQUIRES_APPROVAL or OPEN_RSVP' },
@@ -241,7 +196,10 @@ export async function POST(req: Request) {
       );
     }
 
-    const parsedApplicationsOpen = parseApplicationsOpen(applicationsOpen);
+    const parsedApplicationsOpen = parseApplicationsOpen(
+      applicationsOpen,
+      true
+    );
     if (parsedApplicationsOpen === null) {
       return NextResponse.json(
         { message: 'applicationsOpen must be a boolean' },
@@ -249,12 +207,15 @@ export async function POST(req: Request) {
       );
     }
 
-    const parsedApplicationsClosedAt = parseOptionalDate(
+    const parsedApplicationsClosedAt = parseOptionalDateInput(
       applicationsClosedAt,
       'applicationsClosedAt'
     );
     if ('error' in parsedApplicationsClosedAt) {
-      return parsedApplicationsClosedAt.error;
+      return NextResponse.json(
+        { message: parsedApplicationsClosedAt.error },
+        { status: 400 }
+      );
     }
 
     if (applicationQuestionsJson !== undefined) {
@@ -267,6 +228,14 @@ export async function POST(req: Request) {
       );
     }
 
+    const parsedStaff = parseEventStaffAssignments(staff);
+    if (!parsedStaff) {
+      return NextResponse.json(
+        { message: 'staff must contain MC or CO_MC assignments' },
+        { status: 400 }
+      );
+    }
+
     const event = await prisma.event.create({
       data: {
         title,
@@ -276,7 +245,7 @@ export async function POST(req: Request) {
           endTime: endTime ? new Date(endTime) : null,
         }),
         chapterId,
-        slug: slugify(slug || title),
+        slug: slugifyEventValue(slug || title),
         meetingUrl: meetingUrl || null,
         location: location || null,
         venueName: venueName || null,
@@ -329,11 +298,8 @@ export async function POST(req: Request) {
         }),
         staff: {
           create:
-            Array.isArray(staff) && staff.length > 0
-              ? staff.map((assignment: { hackerId: string; role: string }) => ({
-                  hackerId: assignment.hackerId,
-                  role: assignment.role === 'CO_MC' ? 'CO_MC' : 'MC',
-                }))
+            parsedStaff.length > 0
+              ? parsedStaff
               : mcIds.map((hackerId: string) => ({
                   hackerId,
                   role: 'MC' as const,
@@ -349,7 +315,6 @@ export async function POST(req: Request) {
               meetingUrl: meetingUrl || null,
               location: location || null,
               createdById: user.id,
-              legacyBackfill: false,
               audienceCanReorder,
               votingEndTime: votingEndTime
                 ? new Date(votingEndTime)

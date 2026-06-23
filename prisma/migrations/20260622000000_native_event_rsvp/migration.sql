@@ -1,7 +1,15 @@
 -- Native event RSVP cutover: public application semantics, explicit
 -- application open/closed state, and registration lifecycle metadata.
 
--- Replace Phase 1 placeholder application-mode values with Phase 2 values.
+-- Preserve Phase 1 values long enough to derive explicit Phase 2 state.
+ALTER TABLE "Event" ADD COLUMN "legacyApplicationMode" TEXT;
+
+UPDATE "Event"
+SET "legacyApplicationMode" = "applicationMode"::text;
+
+ALTER TABLE "Event" RENAME COLUMN "applicationsOpen" TO "legacyApplicationsOpenAt";
+
+-- Cut application-mode values over to Phase 2 values.
 ALTER TABLE "Event" ALTER COLUMN "applicationMode" DROP DEFAULT;
 
 CREATE TYPE "EventApplicationMode_new" AS ENUM ('REQUIRES_APPROVAL', 'OPEN_RSVP');
@@ -9,7 +17,7 @@ CREATE TYPE "EventApplicationMode_new" AS ENUM ('REQUIRES_APPROVAL', 'OPEN_RSVP'
 ALTER TABLE "Event"
   ALTER COLUMN "applicationMode" TYPE "EventApplicationMode_new"
   USING (
-    CASE "applicationMode"::text
+    CASE "legacyApplicationMode"
       WHEN 'OPEN_RSVP' THEN 'OPEN_RSVP'
       ELSE 'REQUIRES_APPROVAL'
     END
@@ -22,8 +30,7 @@ DROP TYPE "EventApplicationMode_old";
 ALTER TABLE "Event"
   ALTER COLUMN "applicationMode" SET DEFAULT 'REQUIRES_APPROVAL';
 
--- Replace PUBLIC_LATER registration source with WEBSITE while preserving
--- INTERNAL and IMPORT registrations.
+-- Cut public registration source to WEBSITE while preserving internal and import registrations.
 ALTER TABLE "EventRegistration" ALTER COLUMN "source" DROP DEFAULT;
 
 CREATE TYPE "EventRegistrationSource_new" AS ENUM ('INTERNAL', 'WEBSITE', 'IMPORT');
@@ -44,19 +51,24 @@ DROP TYPE "EventRegistrationSource_old";
 ALTER TABLE "EventRegistration"
   ALTER COLUMN "source" SET DEFAULT 'INTERNAL';
 
--- Convert ambiguous nullable timestamp-style applicationsOpen into explicit
--- open/closed state. Existing timestamps are preserved as applicationsClosedAt.
-ALTER TABLE "Event" RENAME COLUMN "applicationsOpen" TO "applicationsClosedAt";
-
+-- Convert ambiguous nullable timestamp-style applicationsOpen into explicit open/closed state.
 ALTER TABLE "Event"
   ADD COLUMN "applicationsOpen" BOOLEAN NOT NULL DEFAULT true,
+  ADD COLUMN "applicationsClosedAt" TIMESTAMP(3),
   ADD COLUMN "applicationsClosedById" TEXT,
   ADD COLUMN "confirmationMessage" TEXT,
   ADD COLUMN "waitlistMessage" TEXT,
   ADD COLUMN "declineMessage" TEXT;
 
 UPDATE "Event"
-SET "applicationsOpen" = "applicationsClosedAt" IS NULL;
+SET "applicationsOpen" = (
+  "legacyApplicationMode" = 'PUBLIC_LATER'
+  OR "legacyApplicationsOpenAt" IS NOT NULL
+);
+
+ALTER TABLE "Event"
+  DROP COLUMN "legacyApplicationMode",
+  DROP COLUMN "legacyApplicationsOpenAt";
 
 ALTER TABLE "Event"
   ADD CONSTRAINT "Event_applicationsClosedById_fkey"

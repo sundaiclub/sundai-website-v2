@@ -10,7 +10,7 @@ import type {
 
 type BadgeTone = 'default' | 'danger' | 'success' | 'warning';
 
-export type PublicEventStatusDisplay = {
+type PublicEventStatusDisplay = {
   label: string;
   tone: BadgeTone;
 };
@@ -36,13 +36,13 @@ const registrationStatusDisplay: Record<
   CANCELLED: { label: 'Registration cancelled', tone: 'default' },
 };
 
-export function getPublicEventStatusDisplay(
+function getPublicEventStatusDisplay(
   status: PublicEventStatus
 ): PublicEventStatusDisplay {
   return publicStatusDisplay[status];
 }
 
-export function getViewerRegistrationStatusDisplay(
+function getViewerRegistrationStatusDisplay(
   status: RegistrationStatus
 ): PublicEventStatusDisplay {
   return registrationStatusDisplay[status];
@@ -111,7 +111,7 @@ function formatEventDateTime(
   return `${startDate}, ${startTimeLabel} - ${endDate}, ${endTimeLabel}`;
 }
 
-export function PublicEventCard({ event }: { event: PublicEventCardData }) {
+function PublicEventCard({ event }: { event: PublicEventCardData }) {
   const classes = useManagementClasses();
   const href = `/events/${event.chapterSlug}/${event.slug}`;
   const timeLabel = formatEventDateTime(

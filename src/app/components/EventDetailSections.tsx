@@ -3,23 +3,13 @@
 import type {
   AddToCalendarPayload,
   JsonObject,
+  ProfilePrefillSource,
   PublicEventDetail,
   PublicViewerRegistrationState,
-  RegistrationStatus,
 } from '@/types/event-management';
-import {
-  ManagementBadge,
-  ManagementSection,
-  useManagementClasses,
-} from './ManagementSurface';
+import { ManagementSection, useManagementClasses } from './ManagementSurface';
 import { EventApplicationForm } from './EventApplicationForm';
-
-type ViewerProfile = {
-  name?: string | null;
-  email?: string | null;
-  username?: string | null;
-  phoneNumber?: string | null;
-};
+import { ViewerRegistrationStatusBadge } from './PublicEventCard';
 
 function formatDateTime(value: string | Date, timezone?: string) {
   return new Intl.DateTimeFormat('en-US', {
@@ -27,11 +17,6 @@ function formatDateTime(value: string | Date, timezone?: string) {
     timeStyle: 'short',
     timeZone: timezone,
   }).format(new Date(value));
-}
-
-function formatStatus(status?: RegistrationStatus | null) {
-  if (!status) return null;
-  return status.replace(/_/g, ' ').toLowerCase();
 }
 
 function encodeCalendarDate(value: string | Date) {
@@ -71,7 +56,7 @@ function detailEntries(details: JsonObject) {
   );
 }
 
-export function EventScheduleSummary({ event }: { event: PublicEventDetail }) {
+function EventScheduleSummary({ event }: { event: PublicEventDetail }) {
   const classes = useManagementClasses();
 
   return (
@@ -114,7 +99,7 @@ export function EventScheduleSummary({ event }: { event: PublicEventDetail }) {
   );
 }
 
-export function ApprovedOnlyDetails({
+function ApprovedOnlyDetails({
   event,
 }: {
   event: Pick<
@@ -147,7 +132,7 @@ export function ApprovedOnlyDetails({
   );
 }
 
-export function ViewerRegistrationPanel({
+function ViewerRegistrationPanel({
   registration,
   message,
 }: {
@@ -155,7 +140,6 @@ export function ViewerRegistrationPanel({
   message?: string | null;
 }) {
   const classes = useManagementClasses();
-  const status = formatStatus(registration?.status);
 
   if (!registration && !message) return null;
 
@@ -163,12 +147,8 @@ export function ViewerRegistrationPanel({
     <ManagementSection
       title="Your status"
       actions={
-        status ? (
-          <ManagementBadge
-            tone={registration?.status === 'APPROVED' ? 'success' : 'warning'}
-          >
-            {status}
-          </ManagementBadge>
+        registration ? (
+          <ViewerRegistrationStatusBadge status={registration.status} />
         ) : null
       }
     >
@@ -186,11 +166,7 @@ export function ViewerRegistrationPanel({
   );
 }
 
-export function AddToCalendarAction({
-  payload,
-}: {
-  payload: AddToCalendarPayload;
-}) {
+function AddToCalendarAction({ payload }: { payload: AddToCalendarPayload }) {
   const classes = useManagementClasses();
 
   return (
@@ -205,7 +181,7 @@ export function EventDetailSections({
   viewerProfile,
 }: {
   event: PublicEventDetail;
-  viewerProfile?: ViewerProfile | null;
+  viewerProfile?: ProfilePrefillSource | null;
 }) {
   return (
     <div className="grid gap-5">

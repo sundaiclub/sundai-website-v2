@@ -6,6 +6,7 @@ import {
   canManagePitchWithContext,
   canManageChapterMembers,
   canManageChapterSettings,
+  canManageEventSettings,
   getChapterMembershipForPermissions,
 } from '@/lib/eventManagementAuth';
 
@@ -18,12 +19,16 @@ type EventPitchManagerPitchSession = Prisma.PitchSessionGetPayload<{
     projects: {
       orderBy: { position: 'asc' };
       include: {
-        pitchVotes: { select: { hackerId: true; value: true; createdAt: true } };
+        pitchVotes: {
+          select: { hackerId: true; value: true; createdAt: true };
+        };
         project: {
           include: {
             thumbnail: true;
             launchLead: { include: { avatar: true } };
-            participants: { include: { hacker: { include: { avatar: true } } } };
+            participants: {
+              include: { hacker: { include: { avatar: true } } };
+            };
             techTags: true;
             domainTags: true;
             likes: { select: { hackerId: true; createdAt: true } };
@@ -105,6 +110,21 @@ export async function requireChapterMemberManager(chapterId: string) {
   return { hacker, response: null };
 }
 
+export async function requireEventSettingsManager(eventId: string) {
+  const hacker = await getCurrentHacker();
+  if (!hacker) return { hacker: null, event: null, response: unauthorized() };
+
+  const event = await prisma.event.findUnique({
+    where: { id: eventId },
+  });
+  if (!event) return { hacker, event: null, response: notFound() };
+
+  const allowed = await canManageEventSettings(prisma, hacker.id, eventId);
+  if (!allowed) return { hacker, event, response: forbidden() };
+
+  return { hacker, event, response: null };
+}
+
 export async function requireEventPitchManager(eventId: string) {
   const { userId } = auth();
   if (!userId) {
@@ -133,8 +153,7 @@ export async function requireEventPitchManager(eventId: string) {
     event.chapterId
   );
   const staff =
-    event.staff.find((staffMember) => staffMember.hackerId === hacker.id) ??
-    null;
+    event.staff.find(staffMember => staffMember.hackerId === hacker.id) ?? null;
 
   const allowed = canManagePitchWithContext({
     actor: hacker,
@@ -172,7 +191,12 @@ export async function requireEventPitchManager(eventId: string) {
     },
   })) as EventPitchManagerPitchSession | null;
   if (!pitchSession) {
-    return { hacker, event, pitchSession: null, response: pitchSessionNotFound() };
+    return {
+      hacker,
+      event,
+      pitchSession: null,
+      response: pitchSessionNotFound(),
+    };
   }
 
   return { hacker, event, pitchSession, response: null };

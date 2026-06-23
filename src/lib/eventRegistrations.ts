@@ -1,4 +1,5 @@
 import prisma from './prisma';
+import { Prisma } from '@prisma/client';
 import { fetchMergedApplicationTemplate } from '@/lib/applicationTemplates';
 import { BLOCKED_REGISTRATION_MESSAGE } from '@/lib/moderation';
 import type {
@@ -178,7 +179,12 @@ type WaitlistCapacityEventRecord = {
   autoPromoteWaitlist: boolean;
 };
 
-type EventRegistrationRecord = EventRegistration & {
+type EventRegistrationRecord = Omit<
+  EventRegistration,
+  'answersJson' | 'templateSnapshotJson'
+> & {
+  answersJson?: JsonValue | null;
+  templateSnapshotJson?: JsonValue | null;
   event?: { chapterId?: EntityId | null } | null;
 };
 
@@ -192,47 +198,126 @@ type ApplicationTemplateRecord = {
   id: EntityId;
   scope?: string;
   chapterId?: EntityId | null;
-  fieldsJson: unknown;
+  fieldsJson: JsonValue;
   isActive?: boolean | null;
 };
 
-type Delegate<TRecord> = {
-  findUnique<TResult = TRecord>(
-    args: Record<string, unknown>
-  ): Promise<TResult | null>;
-  findFirst<TResult = TRecord>(
-    args: Record<string, unknown>
-  ): Promise<TResult | null>;
-  findMany<TResult = TRecord>(
-    args: Record<string, unknown>
-  ): Promise<TResult[]>;
-  create<TResult = TRecord>(args: Record<string, unknown>): Promise<TResult>;
-  update<TResult = TRecord>(args: Record<string, unknown>): Promise<TResult>;
-  count?(args: Record<string, unknown>): Promise<number>;
+type MutationData = Prisma.EventRegistrationUncheckedUpdateInput;
+
+type EventDelegate = {
+  findUnique(
+    args: Prisma.EventFindUniqueArgs
+  ): Promise<WaitlistCapacityEventRecord | null>;
+  findFirst(
+    args: Prisma.EventFindFirstArgs
+  ): Promise<PublicRegistrableEventRecord | null>;
+};
+
+type EventRegistrationDelegate = {
+  findFirst(
+    args: Prisma.EventRegistrationFindFirstArgs
+  ): Promise<EventRegistrationRecord | null>;
+  findMany(
+    args: Prisma.EventRegistrationFindManyArgs
+  ): Promise<EventRegistrationRecord[]>;
+  create(
+    args: Prisma.EventRegistrationCreateArgs
+  ): Promise<EventRegistrationRecord>;
+  update(
+    args: Prisma.EventRegistrationUpdateArgs
+  ): Promise<EventRegistrationRecord>;
+  count(args: Prisma.EventRegistrationCountArgs): Promise<number>;
+};
+
+type EventRegistrationAuditDelegate = {
+  create(
+    args: Prisma.EventRegistrationAuditCreateArgs
+  ): Promise<EventRegistrationAuditRecord>;
+};
+
+type ApplicationTemplateDelegate = {
+  findFirst(
+    args: Prisma.ApplicationTemplateFindFirstArgs
+  ): Promise<ApplicationTemplateRecord | null>;
+};
+
+type UserBanDelegate = {
+  findMany(args: Prisma.UserBanFindManyArgs): Promise<UserBanRecord[]>;
 };
 
 type EventManagementPrismaClient = {
-  event: Pick<
-    Delegate<PublicRegistrableEventRecord & WaitlistCapacityEventRecord>,
-    'findUnique' | 'findFirst'
-  >;
-  eventRegistration: Delegate<EventRegistrationRecord>;
-  eventRegistrationAudit: Pick<
-    Delegate<EventRegistrationAuditRecord>,
-    'create'
-  >;
-  applicationTemplate: Pick<Delegate<ApplicationTemplateRecord>, 'findFirst'>;
-  userBan: Pick<Delegate<UserBanRecord>, 'findMany'>;
+  event: Pick<EventDelegate, 'findUnique' | 'findFirst'>;
+  eventRegistration: EventRegistrationDelegate;
+  eventRegistrationAudit: Pick<EventRegistrationAuditDelegate, 'create'>;
+  applicationTemplate: Pick<ApplicationTemplateDelegate, 'findFirst'>;
+  userBan: Pick<UserBanDelegate, 'findMany'>;
   $transaction<T>(
     callback: (tx: EventManagementPrismaClient) => Promise<T>,
     options?: { isolationLevel?: 'Serializable' }
   ): Promise<T>;
 };
 
-const client = prisma as unknown as EventManagementPrismaClient;
 const SERIALIZABLE_TRANSACTION_OPTIONS = {
   isolationLevel: 'Serializable',
 } as const;
+
+type TransactionDb = Pick<
+  Prisma.TransactionClient,
+  | 'event'
+  | 'eventRegistration'
+  | 'eventRegistrationAudit'
+  | 'applicationTemplate'
+  | 'userBan'
+>;
+
+function createEventManagementClient(
+  db: TransactionDb
+): EventManagementPrismaClient {
+  const adapter: EventManagementPrismaClient = {
+    event: {
+      findUnique: args => db.event.findUnique(args),
+      findFirst: args => db.event.findFirst(args),
+    },
+    eventRegistration: {
+      findFirst: args => db.eventRegistration.findFirst(args),
+      findMany: args => db.eventRegistration.findMany(args),
+      create: args => db.eventRegistration.create(args),
+      update: args => db.eventRegistration.update(args),
+      count: args => db.eventRegistration.count(args),
+    },
+    eventRegistrationAudit: {
+      create: args => db.eventRegistrationAudit.create(args),
+    },
+    applicationTemplate: {
+      findFirst: args => db.applicationTemplate.findFirst(args),
+    },
+    userBan: {
+      findMany: args => db.userBan.findMany(args),
+    },
+    $transaction: callback => callback(adapter),
+  };
+
+  return adapter;
+}
+
+const client: EventManagementPrismaClient = {
+  ...createEventManagementClient(prisma),
+  $transaction: (callback, options) =>
+    prisma.$transaction(
+      tx => callback(createEventManagementClient(tx)),
+      options
+    ),
+};
+
+function toNullableJsonInput(
+  value: JsonValue | readonly TemplateFieldDefinition[] | null | undefined
+): Prisma.NullableJsonNullValueInput | Prisma.InputJsonValue {
+  if (value === null || value === undefined) {
+    return Prisma.DbNull;
+  }
+
+  return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
+}
 
 export function isApplicantDecisionStatus(
   status: RegistrationStatus
@@ -242,21 +327,17 @@ export function isApplicantDecisionStatus(
   );
 }
 
-export function isDuplicatePublicRegistrationStatus(
+function isDuplicatePublicRegistrationStatus(
   status: RegistrationStatus
 ): boolean {
   return PUBLIC_REGISTRATION_DUPLICATE_STATUSES.includes(status);
 }
 
-export function canEditPublicRegistrationAnswers(
-  status: RegistrationStatus
-): boolean {
+function canEditPublicRegistrationAnswers(status: RegistrationStatus): boolean {
   return status === 'PENDING';
 }
 
-export function canCancelPublicRegistration(
-  status: RegistrationStatus
-): boolean {
+function canCancelPublicRegistration(status: RegistrationStatus): boolean {
   return PUBLIC_REGISTRATION_CANCELABLE_STATUSES.includes(
     status as (typeof PUBLIC_REGISTRATION_CANCELABLE_STATUSES)[number]
   );
@@ -279,17 +360,6 @@ export function hasApprovedRegistrationCapacity(
   }
 
   return approvedCount < capacity;
-}
-
-export function canManuallyPromoteWaitlistedRegistration(input: {
-  registrationStatus: RegistrationStatus;
-  capacity?: number | null;
-  approvedCount: number;
-}): boolean {
-  return (
-    input.registrationStatus === 'WAITLISTED' &&
-    hasApprovedRegistrationCapacity(input.capacity, input.approvedCount)
-  );
 }
 
 export function canManageRegistrationStatus(
@@ -412,8 +482,8 @@ export async function createInternalEventRegistration(
         hackerId: input.hackerId,
         status: toStatus,
         source: input.source ?? 'INTERNAL',
-        answersJson: input.answersJson ?? null,
-        templateSnapshotJson: input.templateSnapshotJson ?? null,
+        answersJson: toNullableJsonInput(input.answersJson),
+        templateSnapshotJson: toNullableJsonInput(input.templateSnapshotJson),
         publicSafeMessage: input.publicSafeMessage ?? null,
         internalReviewNotes: input.internalReviewNotes ?? null,
         decidedById: isApplicantDecisionStatus(toStatus) ? input.actorId : null,
@@ -519,8 +589,10 @@ export async function submitPublicEventRegistration(
         hackerId: input.hackerId,
         status: toStatus,
         source: 'WEBSITE',
-        answersJson: answers,
-        templateSnapshotJson: cloneTemplateSnapshot(template.fields),
+        answersJson: toNullableJsonInput(answers),
+        templateSnapshotJson: toNullableJsonInput(
+          cloneTemplateSnapshot(template.fields)
+        ),
         publicSafeMessage: null,
         internalReviewNotes: null,
         decidedById: isApplicantDecisionStatus(toStatus)
@@ -599,8 +671,10 @@ export async function updatePendingPublicEventRegistration(
     const registration = await tx.eventRegistration.update({
       where: { id: existingRegistration.id },
       data: {
-        answersJson: answers,
-        templateSnapshotJson: cloneTemplateSnapshot(template.fields),
+        answersJson: toNullableJsonInput(answers),
+        templateSnapshotJson: toNullableJsonInput(
+          cloneTemplateSnapshot(template.fields)
+        ),
       },
     });
 
@@ -699,7 +773,7 @@ export async function countApprovedEventRegistrations(
   eventId: EntityId,
   db: EventManagementPrismaClient = client
 ): Promise<number> {
-  const where = {
+  const where: Prisma.EventRegistrationWhereInput = {
     eventId,
     status: 'APPROVED',
     cancelledAt: null,
@@ -795,7 +869,7 @@ export async function updateEventRegistrationStatus(
   });
 }
 
-export function validatePublicRegistrationSubmission(
+function validatePublicRegistrationSubmission(
   answersJson: unknown,
   fields: readonly TemplateFieldDefinition[]
 ): PublicRegistrationValidationIssue[] {
@@ -832,7 +906,7 @@ export function validatePublicRegistrationSubmission(
   return issues;
 }
 
-export function toPublicRegistrationResponse(
+function toPublicRegistrationResponse(
   registration: Pick<
     EventRegistrationRecord,
     'id' | 'status' | 'submittedAt' | 'createdAt' | 'publicSafeMessage'
@@ -867,7 +941,7 @@ async function writeEventRegistrationAudit(
       actorId: input.actorId,
       fromStatus: input.fromStatus ?? null,
       toStatus: input.toStatus,
-      changeJson: input.changeJson ?? null,
+      changeJson: toNullableJsonInput(input.changeJson),
     },
   });
 }
@@ -960,8 +1034,8 @@ async function createOrUpdateBlockedRegistration(
       hackerId: input.hackerId,
       status: 'BLOCKED',
       source: 'WEBSITE',
-      answersJson: null,
-      templateSnapshotJson: null,
+      answersJson: Prisma.DbNull,
+      templateSnapshotJson: Prisma.DbNull,
       publicSafeMessage: BLOCKED_REGISTRATION_MESSAGE,
       internalReviewNotes: null,
     },
@@ -997,8 +1071,8 @@ function getInitialPublicRegistrationStatus(
 
 function buildRegistrationStatusUpdateData(
   input: UpdateRegistrationStatusInput
-): Record<string, unknown> {
-  const updateData: Record<string, unknown> = {
+): MutationData {
+  const updateData: MutationData = {
     status: input.toStatus,
   };
 

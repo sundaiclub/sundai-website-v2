@@ -17,38 +17,8 @@ import {
   listEventRegistrations,
   submitPublicEventRegistration,
 } from '@/lib/eventRegistrations';
+import { publicRegistrationActionResponse } from '@/lib/publicRegistrationApi';
 import type { RegistrationStatus } from '@/types/event-management';
-import type { PublicRegistrationActionResult } from '@/lib/eventRegistrations';
-
-function publicRegistrationResponse(result: PublicRegistrationActionResult) {
-  if (result.ok) {
-    return NextResponse.json(result.registration, { status: 201 });
-  }
-
-  if (result.reason === 'VALIDATION_FAILED') {
-    return NextResponse.json(
-      { message: 'Application answers are invalid.', issues: result.issues },
-      { status: 400 }
-    );
-  }
-
-  if (result.reason === 'DUPLICATE_REGISTRATION' && result.registration) {
-    return NextResponse.json(result.registration, { status: 409 });
-  }
-
-  if (result.reason === 'EVENT_NOT_FOUND') {
-    return new NextResponse('Not Found', { status: 404 });
-  }
-
-  if (result.reason === 'APPLICATIONS_CLOSED') {
-    return NextResponse.json(
-      { message: 'Applications are closed for this event.' },
-      { status: 409 }
-    );
-  }
-
-  return NextResponse.json({ message: result.reason }, { status: 400 });
-}
 
 export async function GET(
   req: Request,
@@ -103,7 +73,7 @@ export async function POST(
         answersJson: body?.answersJson,
       });
 
-      return publicRegistrationResponse(result);
+      return publicRegistrationActionResponse(result, { successStatus: 201 });
     }
 
     const canManage = await canManageRegistrations(

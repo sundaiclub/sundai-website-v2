@@ -411,6 +411,56 @@ describe('T069 event application close/open controls API', () => {
     }
   );
 
+  it('rejects malformed close request JSON', async () => {
+    const { POST } = loadApplicationCloseRoute();
+    const fixture = buildNativeEventRsvpFixture();
+    mockApplicationControlDatabase({
+      actor: fixture.mc.hacker,
+      event: fixture.publishedEvent,
+      staff: fixture.mc.staff,
+    });
+
+    const response = await POST(
+      {
+        json: jest
+          .fn()
+          .mockRejectedValue(new SyntaxError('Unexpected end of JSON input')),
+      } as any,
+      createRouteContext({ eventId: fixture.publishedEvent.id })
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body).toEqual({ message: 'Request body must be valid JSON' });
+    expect(prisma.event.update).not.toHaveBeenCalled();
+  });
+
+  it('rejects non-string close reasons', async () => {
+    const { POST } = loadApplicationCloseRoute();
+    const fixture = buildNativeEventRsvpFixture();
+    mockApplicationControlDatabase({
+      actor: fixture.mc.hacker,
+      event: fixture.publishedEvent,
+      staff: fixture.mc.staff,
+    });
+
+    const response = await POST(
+      createJsonRequest(
+        `/api/events/${fixture.publishedEvent.id}/applications/close`,
+        {
+          method: 'POST',
+          body: { reason: false },
+        }
+      ) as any,
+      createRouteContext({ eventId: fixture.publishedEvent.id })
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body).toEqual({ message: 'reason must be a string' });
+    expect(prisma.event.update).not.toHaveBeenCalled();
+  });
+
   it('denies co-MCs from closing applications', async () => {
     const { POST } = loadApplicationCloseRoute();
     const fixture = buildNativeEventRsvpFixture();

@@ -2,6 +2,7 @@ import { GET as GET_EVENT } from '../../src/app/api/events/[eventId]/route';
 import { POST as POST_REGISTRATION } from '../../src/app/api/events/[eventId]/registrations/route';
 import { PATCH as PATCH_CURRENT_USER_REGISTRATION } from '../../src/app/api/events/[eventId]/registrations/me/route';
 import { fetchMergedApplicationTemplate } from '../../src/lib/applicationTemplates';
+import { Prisma } from '@prisma/client';
 import {
   createCurrentUserRegistrationCancelRequest,
   createCurrentUserRegistrationRequest,
@@ -400,8 +401,8 @@ describe('POST /api/events/[eventId]/registrations public submissions', () => {
         hackerId: fixture.bannedApplicant.id,
         status: 'BLOCKED',
         source: 'WEBSITE',
-        answersJson: null,
-        templateSnapshotJson: null,
+        answersJson: Prisma.DbNull,
+        templateSnapshotJson: Prisma.DbNull,
         publicSafeMessage: blockedRegistrationMessage,
         internalReviewNotes: null,
       }),

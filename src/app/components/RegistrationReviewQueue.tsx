@@ -60,7 +60,7 @@ export function RegistrationReviewTabs({
   );
 }
 
-export function RegistrationReviewRow({
+function RegistrationReviewRow({
   row,
   onDecision,
   onSaveNotes,
@@ -217,5 +217,3 @@ export function RegistrationReviewQueue({
     </div>
   );
 }
-
-export { REVIEW_STATUSES };

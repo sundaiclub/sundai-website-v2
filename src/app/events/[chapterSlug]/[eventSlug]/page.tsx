@@ -2,11 +2,14 @@ import { notFound } from 'next/navigation';
 import { currentUser } from '@clerk/nextjs/server';
 import { EventDetailSections } from '@/app/components/EventDetailSections';
 import {
-  ManagementBadge,
   ManagementHeader,
   ManagementPage,
   ManagementSection,
 } from '@/app/components/ManagementSurface';
+import {
+  PublicEventStatusBadge,
+  ViewerRegistrationStatusBadge,
+} from '@/app/components/PublicEventCard';
 import { getPublicEventBySlug } from '@/lib/publicEvents';
 
 export default async function PublicEventDetailPage({
@@ -39,11 +42,11 @@ export default async function PublicEventDetailPage({
         description={event.description}
         actions={
           <>
-            <ManagementBadge>{event.publicStatus}</ManagementBadge>
+            <PublicEventStatusBadge status={event.publicStatus} />
             {event.viewerRegistrationStatus && (
-              <ManagementBadge tone="warning">
-                {event.viewerRegistrationStatus}
-              </ManagementBadge>
+              <ViewerRegistrationStatusBadge
+                status={event.viewerRegistrationStatus}
+              />
             )}
           </>
         }

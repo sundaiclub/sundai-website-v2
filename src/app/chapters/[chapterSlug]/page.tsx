@@ -220,6 +220,8 @@ export default function ChapterLandingPage({
     );
   }
 
+  const eventChapterSlug = chapter?.slug ?? params.chapterSlug;
+
   return (
     <ManagementPage maxWidth="max-w-4xl">
       {loadError && (
@@ -280,7 +282,7 @@ export default function ChapterLandingPage({
               <div key={event.id} className="py-3">
                 <Link
                   className="font-semibold hover:underline"
-                  href={`/events/${chapter.slug}/${event.slug}`}
+                  href={`/events/${eventChapterSlug}/${event.slug}`}
                 >
                   {event.title}
                 </Link>

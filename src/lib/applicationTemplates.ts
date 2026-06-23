@@ -7,6 +7,7 @@ import type {
   JsonObject,
   JsonValue,
   MergedApplicationTemplate,
+  ProfilePrefillSource,
   PublicEventStatus,
   PublicViewerRegistrationState,
   RegistrationFormValidationError,
@@ -147,26 +148,13 @@ export interface ApplicationControlStateInput {
   includeCloseReason?: boolean;
 }
 
-export interface ProfilePrefillSource {
-  name?: string | null;
-  email?: string | null;
-  phoneNumber?: string | null;
-  username?: string | null;
-  bio?: string | null;
-  githubUrl?: string | null;
-  linkedinUrl?: string | null;
-  twitterUrl?: string | null;
-  websiteUrl?: string | null;
-  discordName?: string | null;
-}
-
 export interface ApplicationProfilePrefillInput {
   fields: readonly TemplateFieldDefinition[];
   profile?: ProfilePrefillSource | null;
   existingAnswers?: JsonObject | null;
 }
 
-export interface PublicSafeStatusMessageInput {
+interface PublicSafeStatusMessageInput {
   status?: RegistrationStatus | null;
   publicSafeMessage?: string | null;
   applicationControls?: Pick<
@@ -497,15 +485,6 @@ export function getApplicationPublicStatus(
   return 'OPEN';
 }
 
-export function isApplicationsOpenForSubmission(
-  input: Pick<
-    ApplicationControlStateInput,
-    'applicationsOpen' | 'startTime' | 'endTime' | 'now'
-  >
-): boolean {
-  return input.applicationsOpen === true && !hasEventEnded(input);
-}
-
 export function validateApplicationAnswersAgainstSnapshot(
   snapshot: unknown,
   answers: JsonObject | null | undefined
@@ -571,7 +550,7 @@ export function applyProfilePrefillToAnswers(
   };
 }
 
-export function getPublicSafeApplicationStatusMessage(
+function getPublicSafeApplicationStatusMessage(
   input: PublicSafeStatusMessageInput
 ): string | null {
   const configuredMessage = normalizePublicSafeMessage(input.publicSafeMessage);

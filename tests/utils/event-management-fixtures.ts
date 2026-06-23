@@ -4,9 +4,14 @@ import type {
   ChapterMembershipStatus,
   ChapterRole,
   ChapterStatus,
+  EventApplicationMode as SharedEventApplicationMode,
   EventStaffRole,
+  EventStatus as SharedEventStatus,
+  EventVisibility as SharedEventVisibility,
   JsonObject,
   JsonValue,
+  RegistrationSource,
+  RegistrationStatus,
   Role,
 } from '../../src/types/event-management';
 
@@ -15,17 +20,11 @@ export type FixtureOverrides<T> = Partial<T>;
 type EventManagementRole = Role;
 type ChapterMembershipRole = ChapterRole;
 type UserBanFlagStatus = BanFlagStatus;
-export type EventStatus = 'DRAFT' | 'PUBLISHED' | 'PAUSED' | 'ARCHIVED';
-export type EventVisibility = 'PUBLIC' | 'PRIVATE' | 'UNLISTED';
-export type EventApplicationMode = 'REQUIRES_APPROVAL' | 'OPEN_RSVP';
-export type EventRegistrationStatus =
-  | 'PENDING'
-  | 'APPROVED'
-  | 'WAITLISTED'
-  | 'DECLINED'
-  | 'BLOCKED'
-  | 'CANCELLED';
-export type EventRegistrationSource = 'INTERNAL' | 'WEBSITE' | 'IMPORT';
+export type EventStatus = SharedEventStatus;
+export type EventVisibility = SharedEventVisibility;
+export type EventApplicationMode = SharedEventApplicationMode;
+export type EventRegistrationStatus = RegistrationStatus;
+export type EventRegistrationSource = RegistrationSource;
 
 export type HackerFixture = {
   id: string;

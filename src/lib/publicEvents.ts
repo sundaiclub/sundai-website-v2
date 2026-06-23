@@ -1,4 +1,5 @@
 import prisma from '@/lib/prisma';
+import type { Prisma } from '@prisma/client';
 import { canViewApprovedOnlyEventDetailsWithContext } from '@/lib/eventManagementAuth';
 import {
   buildApplicationControlsState,
@@ -23,10 +24,9 @@ import type {
   TemplateFieldDefinition,
 } from '@/types/event-management';
 
-type LooseArgs = Record<string, unknown>;
-type PublicEventsDelegate<TRecord> = {
-  findMany(args?: LooseArgs): Promise<TRecord[]>;
-  findFirst(args?: LooseArgs): Promise<TRecord | null>;
+type PublicEventsDelegate<TRecord, TFindManyArgs, TFindFirstArgs> = {
+  findMany(args?: TFindManyArgs): Promise<TRecord[]>;
+  findFirst(args?: TFindFirstArgs): Promise<TRecord | null>;
 };
 
 type PublicEventsHackerRecord = {
@@ -53,6 +53,29 @@ type PublicEventsChapterRecord = {
   status?: string | null;
   accessMode?: string | null;
 };
+
+const PUBLIC_EVENT_INCLUDE = {
+  chapter: {
+    select: {
+      id: true,
+      slug: true,
+      name: true,
+      timezone: true,
+      status: true,
+      accessMode: true,
+    },
+  },
+  _count: {
+    select: {
+      registrations: {
+        where: {
+          status: 'APPROVED',
+          cancelledAt: null,
+        },
+      },
+    },
+  },
+} satisfies Prisma.EventInclude;
 
 type PublicEventsRegistrationRecord = {
   id: EntityId;
@@ -92,16 +115,45 @@ type PublicEventsEventRecord = {
     registrations?: number;
   };
 };
+type PublicEventsEventFindManyArgs = Omit<
+  Prisma.EventFindManyArgs,
+  'include'
+> & {
+  include: typeof PUBLIC_EVENT_INCLUDE;
+};
+type PublicEventsEventFindFirstArgs = Omit<
+  Prisma.EventFindFirstArgs,
+  'include'
+> & {
+  include: typeof PUBLIC_EVENT_INCLUDE;
+};
 
 export type PublicEventsPrismaClient = {
-  event: PublicEventsDelegate<PublicEventsEventRecord>;
-  eventRegistration: PublicEventsDelegate<PublicEventsRegistrationRecord>;
+  event: PublicEventsDelegate<
+    PublicEventsEventRecord,
+    PublicEventsEventFindManyArgs,
+    PublicEventsEventFindFirstArgs
+  >;
+  eventRegistration: PublicEventsDelegate<
+    PublicEventsRegistrationRecord,
+    Prisma.EventRegistrationFindManyArgs,
+    Prisma.EventRegistrationFindFirstArgs
+  >;
   hacker: {
-    findFirst(args?: LooseArgs): Promise<PublicEventsHackerRecord | null>;
-    findUnique?(args?: LooseArgs): Promise<PublicEventsHackerRecord | null>;
+    findUnique(
+      args: Prisma.HackerFindUniqueArgs
+    ): Promise<PublicEventsHackerRecord | null>;
   };
-  chapterMembership: PublicEventsDelegate<PublicEventsChapterMembershipRecord>;
-  eventStaff: PublicEventsDelegate<PublicEventsStaffRecord>;
+  chapterMembership: PublicEventsDelegate<
+    PublicEventsChapterMembershipRecord,
+    Prisma.ChapterMembershipFindManyArgs,
+    Prisma.ChapterMembershipFindFirstArgs
+  >;
+  eventStaff: PublicEventsDelegate<
+    PublicEventsStaffRecord,
+    Prisma.EventStaffFindManyArgs,
+    Prisma.EventStaffFindFirstArgs
+  >;
 };
 
 export type PublicEventViewer = {
@@ -136,7 +188,62 @@ export type RedactPublicEventOptions = {
   now?: Date;
 };
 
-const defaultPrisma = prisma as unknown as PublicEventsPrismaClient;
+const defaultPrisma: PublicEventsPrismaClient = {
+  event: {
+    findMany: args =>
+      prisma.event
+        .findMany(args)
+        .then(events => events as PublicEventsEventRecord[]),
+    findFirst: args =>
+      prisma.event
+        .findFirst(args)
+        .then(event => event as PublicEventsEventRecord | null),
+  },
+  eventRegistration: {
+    findMany: args =>
+      prisma.eventRegistration
+        .findMany(args)
+        .then(
+          registrations => registrations as PublicEventsRegistrationRecord[]
+        ),
+    findFirst: args =>
+      prisma.eventRegistration
+        .findFirst(args)
+        .then(
+          registration => registration as PublicEventsRegistrationRecord | null
+        ),
+  },
+  hacker: {
+    findUnique: args =>
+      prisma.hacker
+        .findUnique(args)
+        .then(hacker => hacker as PublicEventsHackerRecord | null),
+  },
+  chapterMembership: {
+    findMany: args =>
+      prisma.chapterMembership
+        .findMany(args)
+        .then(
+          memberships => memberships as PublicEventsChapterMembershipRecord[]
+        ),
+    findFirst: args =>
+      prisma.chapterMembership
+        .findFirst(args)
+        .then(
+          membership => membership as PublicEventsChapterMembershipRecord | null
+        ),
+  },
+  eventStaff: {
+    findMany: args =>
+      prisma.eventStaff
+        .findMany(args)
+        .then(staff => staff as PublicEventsStaffRecord[]),
+    findFirst: args =>
+      prisma.eventStaff
+        .findFirst(args)
+        .then(staff => staff as PublicEventsStaffRecord | null),
+  },
+};
 const CANCELLABLE_REGISTRATION_STATUSES: readonly RegistrationStatus[] = [
   'PENDING',
   'APPROVED',
@@ -145,7 +252,9 @@ const CANCELLABLE_REGISTRATION_STATUSES: readonly RegistrationStatus[] = [
 const GENERIC_BLOCKED_MESSAGE =
   'You are unable to register for this event at this time.';
 
-function publicEventVisibilityWhere(chapterSlug?: string | null): LooseArgs {
+function publicEventVisibilityWhere(
+  chapterSlug?: string | null
+): Prisma.EventWhereInput {
   return {
     status: 'PUBLISHED',
     visibility: 'PUBLIC',
@@ -160,36 +269,15 @@ function publicEventVisibilityWhere(chapterSlug?: string | null): LooseArgs {
 function publicEventListingWhere(
   now: Date,
   chapterSlug?: string | null
-): LooseArgs {
+): Prisma.EventWhereInput {
   return {
     ...publicEventVisibilityWhere(chapterSlug),
     startTime: { gte: now },
   };
 }
 
-function publicEventInclude(): LooseArgs {
-  return {
-    chapter: {
-      select: {
-        id: true,
-        slug: true,
-        name: true,
-        timezone: true,
-        status: true,
-        accessMode: true,
-      },
-    },
-    _count: {
-      select: {
-        registrations: {
-          where: {
-            status: 'APPROVED',
-            cancelledAt: null,
-          },
-        },
-      },
-    },
-  };
+function publicEventInclude(): typeof PUBLIC_EVENT_INCLUDE {
+  return PUBLIC_EVENT_INCLUDE;
 }
 
 export async function listPublicEvents(
@@ -313,7 +401,7 @@ export function redactPublicEventForViewer(
   };
 }
 
-export function canViewApprovedDetails(input: {
+function canViewApprovedDetails(input: {
   viewerRegistration?: Pick<PublicViewerRegistrationState, 'status'> | null;
   viewerCanViewApprovedDetails?: boolean;
   viewerCanManageRegistrations?: boolean;
@@ -353,7 +441,7 @@ export function buildAddToCalendarPayload(
   };
 }
 
-export function getPublicEventStatus(
+function getPublicEventStatus(
   event: Pick<
     PublicEventsEventRecord,
     'startTime' | 'endTime' | 'applicationsOpen' | 'capacity' | '_count'
@@ -512,7 +600,10 @@ async function getPublicEventReadPermissionContext(
   }
 
   const [actor, chapterMembership, staff] = await Promise.all([
-    getViewerActor(client, viewerHackerId),
+    client.hacker.findUnique({
+      where: { id: viewerHackerId },
+      select: { id: true, role: true },
+    }),
     client.chapterMembership.findFirst({
       where: {
         chapterId: event.chapterId,
@@ -540,23 +631,6 @@ async function getPublicEventReadPermissionContext(
     chapterMembership,
     staff,
   };
-}
-
-async function getViewerActor(
-  client: PublicEventsPrismaClient,
-  viewerHackerId: EntityId
-): Promise<PublicEventsHackerRecord | null> {
-  if (typeof client.hacker.findUnique === 'function') {
-    return client.hacker.findUnique({
-      where: { id: viewerHackerId },
-      select: { id: true, role: true },
-    });
-  }
-
-  return client.hacker.findFirst({
-    where: { id: viewerHackerId },
-    select: { id: true, role: true },
-  });
 }
 
 function asJsonObject(value: JsonValue | null | undefined): JsonObject | null {

@@ -1,38 +1,67 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import {
-  forbidden,
-  getCurrentHacker,
-  notFound,
-  unauthorized,
+  badRequest,
+  requireEventSettingsManager,
 } from '@/lib/eventManagementApi';
-import { canManageEventSettings } from '@/lib/eventManagementAuth';
+
+type CloseApplicationsBody = {
+  reason?: unknown;
+};
+
+type CloseApplicationsBodyResult =
+  | { ok: true; body: CloseApplicationsBody }
+  | { ok: false; response: Response };
+
+async function readCloseApplicationsBody(
+  req: Request
+): Promise<CloseApplicationsBodyResult> {
+  let body: unknown;
+  try {
+    body = await req.json();
+  } catch {
+    return {
+      ok: false,
+      response: badRequest('Request body must be valid JSON'),
+    };
+  }
+
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return {
+      ok: false,
+      response: badRequest('Request body must be a JSON object'),
+    };
+  }
+
+  return { ok: true, body: body as CloseApplicationsBody };
+}
 
 export async function POST(
   req: Request,
   { params }: { params: { eventId: string } }
 ) {
   try {
-    const hacker = await getCurrentHacker();
-    if (!hacker) return unauthorized();
-
-    const existingEvent = await prisma.event.findUnique({
-      where: { id: params.eventId },
-    });
-    if (!existingEvent) return notFound();
-
-    const allowed = await canManageEventSettings(
-      prisma,
-      hacker.id,
+    const { hacker, response } = await requireEventSettingsManager(
       params.eventId
     );
-    if (!allowed) return forbidden();
+    if (response) return response;
 
-    const body = await req.json().catch(() => ({}));
-    const reason =
-      typeof body?.reason === 'string' && body.reason.trim().length > 0
-        ? body.reason.trim()
-        : null;
+    const parsedBody = await readCloseApplicationsBody(req);
+    if (!parsedBody.ok) return parsedBody.response;
+
+    const { body } = parsedBody;
+
+    if (
+      body.reason !== undefined &&
+      body.reason !== null &&
+      typeof body.reason !== 'string'
+    ) {
+      return badRequest('reason must be a string');
+    }
+
+    const trimmedReason =
+      typeof body.reason === 'string' ? body.reason.trim() : '';
+    const reason = trimmedReason.length > 0 ? trimmedReason : null;
 
     const event = await prisma.event.update({
       where: { id: params.eventId },

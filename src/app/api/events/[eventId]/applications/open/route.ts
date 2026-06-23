@@ -1,32 +1,14 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import {
-  forbidden,
-  getCurrentHacker,
-  notFound,
-  unauthorized,
-} from '@/lib/eventManagementApi';
-import { canManageEventSettings } from '@/lib/eventManagementAuth';
+import { requireEventSettingsManager } from '@/lib/eventManagementApi';
 
 export async function POST(
   _req: Request,
   { params }: { params: { eventId: string } }
 ) {
   try {
-    const hacker = await getCurrentHacker();
-    if (!hacker) return unauthorized();
-
-    const existingEvent = await prisma.event.findUnique({
-      where: { id: params.eventId },
-    });
-    if (!existingEvent) return notFound();
-
-    const allowed = await canManageEventSettings(
-      prisma,
-      hacker.id,
-      params.eventId
-    );
-    if (!allowed) return forbidden();
+    const { response } = await requireEventSettingsManager(params.eventId);
+    if (response) return response;
 
     const event = await prisma.event.update({
       where: { id: params.eventId },

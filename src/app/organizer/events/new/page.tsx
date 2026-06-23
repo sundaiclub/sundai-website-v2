@@ -22,18 +22,23 @@ type StaffCandidate = {
   email?: string | null;
 };
 
-function chapterList(payload: unknown): ManageableChapterListItem[] {
-  return Array.isArray(payload) ? (payload as ManageableChapterListItem[]) : [];
-}
-
-function staffList(payload: unknown): StaffCandidate[] {
-  if (Array.isArray(payload)) return payload as StaffCandidate[];
-  if (payload && typeof payload === 'object') {
-    const value = payload as {
+type ChapterListPayload = ManageableChapterListItem[] | null;
+type StaffListPayload =
+  | StaffCandidate[]
+  | {
       hackers?: StaffCandidate[];
       items?: StaffCandidate[];
-    };
-    return value.hackers ?? value.items ?? [];
+    }
+  | null;
+
+function chapterList(payload: ChapterListPayload): ManageableChapterListItem[] {
+  return Array.isArray(payload) ? payload : [];
+}
+
+function staffList(payload: StaffListPayload): StaffCandidate[] {
+  if (Array.isArray(payload)) return payload;
+  if (payload && typeof payload === 'object') {
+    return payload.hackers ?? payload.items ?? [];
   }
   return [];
 }
@@ -99,9 +104,11 @@ export default function OrganizerNewEventPage() {
           );
         }
 
-        const nextChapters = chapterList(await chaptersResponse.json());
+        const nextChapters = chapterList(
+          (await chaptersResponse.json()) as ChapterListPayload
+        );
         const nextStaff = staffResponse.ok
-          ? staffList(await staffResponse.json())
+          ? staffList((await staffResponse.json()) as StaffListPayload)
           : [];
         if (!isCurrent) return;
         setChapters(nextChapters);

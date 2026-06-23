@@ -5,6 +5,7 @@ import {
   listEventRegistrations,
   updateEventRegistrationStatus,
 } from '../../src/lib/eventRegistrations';
+import { Prisma } from '@prisma/client';
 import type { EventRegistration } from '../../src/types/event-management';
 
 jest.mock('../../src/lib/prisma', () => ({
@@ -103,8 +104,8 @@ describe('/api/events/[eventId]/registrations internals', () => {
         hackerId: createdRegistration.hackerId,
         status: 'PENDING',
         source: 'INTERNAL',
-        answersJson: null,
-        templateSnapshotJson: null,
+        answersJson: Prisma.DbNull,
+        templateSnapshotJson: Prisma.DbNull,
         publicSafeMessage: null,
         internalReviewNotes: null,
         decidedById: null,

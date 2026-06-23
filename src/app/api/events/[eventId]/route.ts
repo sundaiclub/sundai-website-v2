@@ -10,66 +10,16 @@ import {
   canViewApprovedOnlyEventDetailsWithContext,
 } from '@/lib/eventManagementAuth';
 import {
+  parseApplicationsOpen,
+  parseEventApplicationMode,
+  parseEventStaffAssignments,
+  parseOptionalDateInput,
+  slugifyEventValue,
+} from '@/lib/eventRequestParsing';
+import {
   getViewerRegistrationState,
   redactPublicEventForViewer,
 } from '@/lib/publicEvents';
-
-const PHASE_2_APPLICATION_MODES = ['REQUIRES_APPROVAL', 'OPEN_RSVP'] as const;
-type Phase2ApplicationMode = (typeof PHASE_2_APPLICATION_MODES)[number];
-
-function slugify(value: string) {
-  return (
-    value
-      .trim()
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '') || 'event'
-  );
-}
-
-function parseApplicationMode(
-  value: unknown
-): Phase2ApplicationMode | undefined | null {
-  if (value === undefined) return undefined;
-  if (
-    typeof value === 'string' &&
-    PHASE_2_APPLICATION_MODES.includes(value as Phase2ApplicationMode)
-  ) {
-    return value as Phase2ApplicationMode;
-  }
-
-  return null;
-}
-
-function parseApplicationsOpen(value: unknown): boolean | undefined | null {
-  if (value === undefined) return undefined;
-  return typeof value === 'boolean' ? value : null;
-}
-
-function parseOptionalDate(value: unknown, field: string) {
-  if (value === undefined || value === null || value === '')
-    return { date: null };
-  if (typeof value !== 'string' && !(value instanceof Date)) {
-    return {
-      error: NextResponse.json(
-        { message: `${field} must be a valid date` },
-        { status: 400 }
-      ),
-    };
-  }
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return {
-      error: NextResponse.json(
-        { message: `${field} must be a valid date` },
-        { status: 400 }
-      ),
-    };
-  }
-
-  return { date };
-}
 
 export async function GET(
   req: Request,
@@ -317,7 +267,7 @@ export async function PATCH(
       defaultQuestionsSec,
     } = body;
 
-    const parsedApplicationMode = parseApplicationMode(applicationMode);
+    const parsedApplicationMode = parseEventApplicationMode(applicationMode);
     if (parsedApplicationMode === null) {
       return NextResponse.json(
         { message: 'applicationMode must be REQUIRES_APPROVAL or OPEN_RSVP' },
@@ -333,12 +283,15 @@ export async function PATCH(
       );
     }
 
-    const parsedApplicationsClosedAt = parseOptionalDate(
+    const parsedApplicationsClosedAt = parseOptionalDateInput(
       applicationsClosedAt,
       'applicationsClosedAt'
     );
     if ('error' in parsedApplicationsClosedAt) {
-      return parsedApplicationsClosedAt.error;
+      return NextResponse.json(
+        { message: parsedApplicationsClosedAt.error },
+        { status: 400 }
+      );
     }
 
     if (applicationQuestionsJson !== undefined) {
@@ -348,6 +301,15 @@ export async function PATCH(
         {
           allowSiteRequiredFieldIds: false,
         }
+      );
+    }
+
+    const parsedStaff =
+      staff !== undefined ? parseEventStaffAssignments(staff) : undefined;
+    if (parsedStaff === null) {
+      return NextResponse.json(
+        { message: 'staff must contain MC or CO_MC assignments' },
+        { status: 400 }
       );
     }
 
@@ -377,7 +339,7 @@ export async function PATCH(
         ...(address !== undefined && { address: address || null }),
         ...(virtualUrl !== undefined && { virtualUrl: virtualUrl || null }),
         ...(slug !== undefined && {
-          slug: slugify(slug || title || params.eventId),
+          slug: slugifyEventValue(slug || title || params.eventId),
         }),
         ...(status !== undefined && { status }),
         ...(visibility !== undefined && { visibility }),
@@ -511,12 +473,12 @@ export async function PATCH(
       await prisma.eventStaff.deleteMany({
         where: { eventId: params.eventId },
       });
-      if (Array.isArray(staff) && staff.length > 0) {
+      if (parsedStaff && parsedStaff.length > 0) {
         await prisma.eventStaff.createMany({
-          data: staff.map((assignment: { hackerId: string; role: string }) => ({
+          data: parsedStaff.map(assignment => ({
             eventId: params.eventId,
             hackerId: assignment.hackerId,
-            role: assignment.role === 'CO_MC' ? 'CO_MC' : 'MC',
+            role: assignment.role,
           })),
         });
       }

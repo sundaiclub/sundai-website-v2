@@ -17,6 +17,15 @@ const {
 const prisma = new PrismaClient();
 
 async function main() {
+  if (
+    process.env.NODE_ENV === "production" &&
+    process.env.ALLOW_PRODUCTION_SEED_RESET !== "true"
+  ) {
+    throw new Error(
+      "Refusing to run destructive seed cleanup in production. Set ALLOW_PRODUCTION_SEED_RESET=true only for an intentional reset."
+    );
+  }
+
   // Clean up existing data
   await prisma.eventRegistrationAudit.deleteMany({});
   await prisma.eventRegistration.deleteMany({});
@@ -622,7 +631,6 @@ async function main() {
       meetingUrl: sampleEvent.meetingUrl,
       location: sampleEvent.location,
       createdById: users[0].id,
-      legacyBackfill: false,
       audienceCanReorder: true,
       votingEndTime: new Date(sampleEvent.startTime.getTime() + 15 * 60 * 1000),
     },

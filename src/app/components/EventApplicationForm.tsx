@@ -9,7 +9,9 @@ import type {
   ApplicationControlsState,
   JsonObject,
   JsonValue,
+  ProfilePrefillSource,
   PublicEventDetail,
+  PublicRegistrationResponse,
   PublicViewerRegistrationState,
   TemplateFieldDefinition,
 } from '@/types/event-management';
@@ -18,20 +20,6 @@ import {
   ManagementSection,
   useManagementClasses,
 } from './ManagementSurface';
-
-type ViewerProfile = {
-  name?: string | null;
-  email?: string | null;
-  username?: string | null;
-  phoneNumber?: string | null;
-};
-
-type PublicRegistrationEndpointResponse = {
-  id: string;
-  status: string;
-  submittedAt: string | Date;
-  publicSafeMessage?: string | null;
-};
 
 function jsonObject(value: JsonValue | null | undefined): JsonObject {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
@@ -55,7 +43,7 @@ function formatSubmittedAt(value?: string | Date | null) {
 
 function initialAnswers(input: {
   fields: readonly TemplateFieldDefinition[];
-  profile?: ViewerProfile | null;
+  profile?: ProfilePrefillSource | null;
   registration?: PublicViewerRegistrationState | null;
 }) {
   return applyProfilePrefillToAnswers({
@@ -170,8 +158,8 @@ export function EventApplicationForm({
   onRegistrationChange,
 }: {
   event: PublicEventDetail;
-  viewerProfile?: ViewerProfile | null;
-  onRegistrationChange?: (registration: PublicRegistrationEndpointResponse) => void;
+  viewerProfile?: ProfilePrefillSource | null;
+  onRegistrationChange?: (registration: PublicRegistrationResponse) => void;
 }) {
   const classes = useManagementClasses();
   const fields = event.applicationQuestionSet.composedFields;

@@ -30,7 +30,6 @@ type MockPublicEventsPrisma = PublicEventsPrismaClient & {
     findFirst: jest.Mock;
   };
   hacker: {
-    findFirst: jest.Mock;
     findUnique: jest.Mock;
   };
   chapterMembership: {
@@ -104,7 +103,6 @@ function buildPrismaMock(): MockPublicEventsPrisma {
       findFirst: jest.fn(),
     },
     hacker: {
-      findFirst: jest.fn(),
       findUnique: jest.fn(),
     },
     chapterMembership: {

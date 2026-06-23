@@ -315,6 +315,30 @@ describe('/api/events organizer chapter-admin behavior', () => {
     );
   });
 
+  it('rejects invalid staff roles instead of coercing them to MC', async () => {
+    const { chapter, hacker, membership } = buildChapterAdminFixture();
+
+    mockActor(hacker);
+    mockMembershipLookup(membership);
+    prisma.chapter.findUnique.mockResolvedValue(chapter);
+
+    const response = await POST_EVENTS(
+      createJsonRequest('/api/events', {
+        method: 'POST',
+        body: createNativeEventBody({
+          chapterId: chapter.id,
+          staff: [{ hackerId: 'hacker-staff', role: 'ORGANIZER' }],
+        }),
+      }) as any
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      message: 'staff must contain MC or CO_MC assignments',
+    });
+    expect(prisma.event.create).not.toHaveBeenCalled();
+  });
+
   it('denies chapter admins creating events for another chapter', async () => {
     const { chapter, hacker, membership } = buildChapterAdminFixture();
     const otherChapter = buildChapter({

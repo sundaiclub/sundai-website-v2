@@ -1,9 +1,7 @@
-type JsonPrimitive = string | number | boolean | null;
-export type JsonValue = JsonPrimitive | JsonObject | JsonValue[];
+import type { Prisma } from '@prisma/client';
 
-export interface JsonObject {
-  [key: string]: JsonValue;
-}
+export type JsonValue = Prisma.JsonValue;
+export type JsonObject = Prisma.JsonObject;
 
 export type EntityId = string;
 type ISODateTimeString = string;
@@ -22,6 +20,7 @@ export type ChapterRole = 'MEMBER' | 'ADMIN';
 export type ChapterMembershipStatus = 'INVITED' | 'ACTIVE' | 'REVOKED' | 'LEFT';
 
 export type EventStaffRole = 'MC' | 'CO_MC';
+export type EventStatus = 'DRAFT' | 'PUBLISHED' | 'PAUSED' | 'ARCHIVED';
 export type EventVisibility = 'PUBLIC' | 'PRIVATE' | 'UNLISTED';
 export type EventApplicationMode = 'REQUIRES_APPROVAL' | 'OPEN_RSVP';
 export type PitchSessionPhase = 'VOTING' | 'PITCHING' | 'FINISHED';
@@ -262,6 +261,19 @@ export interface TemplateFieldDefinition {
   order?: number;
 }
 
+export interface ProfilePrefillSource {
+  name?: string | null;
+  email?: string | null;
+  phoneNumber?: string | null;
+  username?: string | null;
+  bio?: string | null;
+  githubUrl?: string | null;
+  linkedinUrl?: string | null;
+  twitterUrl?: string | null;
+  websiteUrl?: string | null;
+  discordName?: string | null;
+}
+
 interface ApplicationTemplate {
   id: EntityId;
   scope: ApplicationTemplateScope;
@@ -298,8 +310,8 @@ export interface EventRegistration {
   hackerId: EntityId;
   status: RegistrationStatus;
   source: RegistrationSource;
-  answersJson?: JsonObject | null;
-  templateSnapshotJson?: TemplateFieldDefinition[] | null;
+  answersJson?: JsonValue | null;
+  templateSnapshotJson?: JsonValue | null;
   publicSafeMessage?: string | null;
   internalReviewNotes?: string | null;
   decidedById?: EntityId | null;
@@ -322,7 +334,7 @@ export interface EventRegistrationAudit {
   actorId: EntityId;
   fromStatus?: RegistrationStatus | null;
   toStatus: RegistrationStatus;
-  changeJson?: JsonObject | null;
+  changeJson?: JsonValue | null;
   createdAt: ISODateTimeString | Date;
   actor?: EventManagementHackerSummary;
 }
@@ -333,7 +345,7 @@ export type OrganizerEventListItem = {
   description?: string | null;
   startTime: ISODateTimeString | Date;
   endTime?: ISODateTimeString | Date | null;
-  status?: string;
+  status?: EventStatus;
   visibility?: EventVisibility;
   publicStatus?: PublicEventStatus;
   applicationMode?: EventApplicationMode;
@@ -351,7 +363,7 @@ export type OrganizerEventSettings = {
   id: EntityId;
   title: string;
   slug?: string;
-  status?: string;
+  status?: EventStatus;
   description?: string | null;
   publicLocation?: string | null;
   visibility?: EventVisibility;

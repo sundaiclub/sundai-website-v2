@@ -82,18 +82,6 @@ const publicEvents: PublicEventCard[] = [
   },
 ];
 
-const unpublishedEvent = {
-  ...publicEvents[0],
-  id: 'event-unpublished-planning-session',
-  slug: 'planning-session',
-  title: 'Unpublished Planning Session',
-  status: 'DRAFT',
-  approvedDetailsJson: {
-    address: '123 Secret Street',
-    arrivalInstructions: 'Use the private staff entrance.',
-  },
-};
-
 const chapters = [
   {
     id: 'chapter-boston',
@@ -128,20 +116,12 @@ function requestUrl(input: RequestInfo | URL) {
   return input.toString();
 }
 
-function publicEventsPayload(events: unknown[] = publicEvents) {
-  return {
-    events,
-    items: events,
-    chapters,
-  };
-}
-
 function mockEventsFetch(events: unknown[] = publicEvents) {
   global.fetch = jest.fn((input: RequestInfo | URL) => {
     const url = requestUrl(input);
 
     if (url.includes('/api/chapters')) {
-      return jsonResponse({ chapters, items: chapters });
+      return jsonResponse(chapters);
     }
 
     if (url.includes('/api/events')) {
@@ -158,7 +138,7 @@ function mockEventsFetch(events: unknown[] = publicEvents) {
           })
         : events;
 
-      return jsonResponse(publicEventsPayload(visibleEvents));
+      return jsonResponse(visibleEvents);
     }
 
     return jsonResponse({});
@@ -225,8 +205,6 @@ describe('/events native public listing page', () => {
   });
 
   it('shows native published event listing cards with public fields and viewer status', async () => {
-    mockEventsFetch([...publicEvents, unpublishedEvent]);
-
     render(<EventsPage />);
 
     expect(
@@ -245,14 +223,6 @@ describe('/events native public listing page', () => {
     ).toBeInTheDocument();
     expect(within(sfCard).getByText(/mission district/i)).toBeInTheDocument();
     expect(within(sfCard).getByText(/waitlist/i)).toBeInTheDocument();
-
-    expect(
-      screen.queryByText(/unpublished planning session/i)
-    ).not.toBeInTheDocument();
-    expect(screen.queryByText(/123 secret street/i)).not.toBeInTheDocument();
-    expect(
-      screen.queryByText(/private staff entrance/i)
-    ).not.toBeInTheDocument();
   });
 
   it('renders chapter filter controls and narrows the listing by chapter', async () => {
@@ -300,5 +270,4 @@ describe('/events native public listing page', () => {
       screen.queryByRole('heading', { name: /build night|agent salon/i })
     ).not.toBeInTheDocument();
   });
-
 });

@@ -14,60 +14,8 @@ import type {
   PublicEventChapterSummary,
 } from '@/types/event-management';
 
-type EventsPayload =
-  | Array<
-      PublicEventCardData & { status?: string; approvedDetailsJson?: unknown }
-    >
-  | {
-      events?: Array<
-        PublicEventCardData & { status?: string; approvedDetailsJson?: unknown }
-      >;
-      items?: Array<
-        PublicEventCardData & { status?: string; approvedDetailsJson?: unknown }
-      >;
-      chapters?: PublicEventChapterSummary[];
-    };
-
-type ChaptersPayload =
-  | PublicEventChapterSummary[]
-  | {
-      chapters?: PublicEventChapterSummary[];
-      items?: PublicEventChapterSummary[];
-    };
-
-function eventsFromPayload(payload: EventsPayload): PublicEventCardData[] {
-  const events = Array.isArray(payload)
-    ? payload
-    : (payload.events ?? payload.items ?? []);
-
-  return events.filter(event => !event.status || event.status === 'PUBLISHED');
-}
-
-function chaptersFromPayload(
-  payload: ChaptersPayload,
-  fallbackEvents: PublicEventCardData[] = []
-): PublicEventChapterSummary[] {
-  const chapters = Array.isArray(payload)
-    ? payload
-    : (payload.chapters ?? payload.items ?? []);
-
-  if (chapters.length > 0) return chapters;
-
-  const bySlug = new Map<string, PublicEventChapterSummary>();
-  fallbackEvents.forEach(event => {
-    bySlug.set(event.chapterSlug, event.chapter);
-  });
-  return Array.from(bySlug.values()).sort((a, b) =>
-    a.name.localeCompare(b.name)
-  );
-}
-
-function chapterOptionsFromEvents(events: PublicEventCardData[]) {
-  const bySlug = new Map<string, PublicEventChapterSummary>();
-  events.forEach(event => bySlug.set(event.chapterSlug, event.chapter));
-  return Array.from(bySlug.values()).sort((a, b) =>
-    a.name.localeCompare(b.name)
-  );
+function sortChapters(chapters: PublicEventChapterSummary[]) {
+  return [...chapters].sort((a, b) => a.name.localeCompare(b.name));
 }
 
 export default function EventsPage() {
@@ -94,25 +42,20 @@ export default function EventsPage() {
           if (!response.ok) {
             throw new Error(`Events request failed with ${response.status}`);
           }
-          return response.json() as Promise<EventsPayload>;
+          return response.json() as Promise<PublicEventCardData[]>;
         }
       ),
-      fetch('/api/chapters')
-        .then(response => {
-          if (!response.ok) return null;
-          return response.json() as Promise<ChaptersPayload>;
-        })
-        .catch(() => null),
+      fetch('/api/chapters').then(response => {
+        if (!response.ok) {
+          throw new Error(`Chapters request failed with ${response.status}`);
+        }
+        return response.json() as Promise<PublicEventChapterSummary[]>;
+      }),
     ])
-      .then(([eventsPayload, chaptersPayload]) => {
+      .then(([nextEvents, chaptersPayload]) => {
         if (cancelled) return;
-        const nextEvents = eventsFromPayload(eventsPayload);
         setEvents(nextEvents);
-        setChapters(
-          chaptersPayload
-            ? chaptersFromPayload(chaptersPayload, nextEvents)
-            : chapterOptionsFromEvents(nextEvents)
-        );
+        setChapters(sortChapters(chaptersPayload));
       })
       .catch(() => {
         if (!cancelled) {

@@ -21,8 +21,13 @@ import type {
   RegistrationStatus,
 } from '@/types/event-management';
 
+type OrganizerRegistrationsPayload =
+  | OrganizerRegistrationReviewRow[]
+  | Partial<OrganizerRegistrationReviewState>
+  | null;
+
 function normalizeReviewState(
-  payload: unknown,
+  payload: OrganizerRegistrationsPayload,
   eventId: string,
   statusFilter: RegistrationStatus,
   includeBannedUsers: boolean,
@@ -82,7 +87,7 @@ export default function OrganizerEventRegistrationsPage({
         }
         const [eventPayload, registrationsPayload] = await Promise.all([
           eventResponse.json() as Promise<OrganizerEventSettings>,
-          registrationsResponse.json() as Promise<unknown>,
+          registrationsResponse.json() as Promise<OrganizerRegistrationsPayload>,
         ]);
         if (!isCurrent) return;
         setEvent(eventPayload);
