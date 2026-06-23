@@ -258,6 +258,10 @@ function requestUrl(input: RequestInfo | URL) {
   return input.toString()
 }
 
+function isApplicationTemplateListRequest(url: string) {
+  return url === `/api/application-templates?chapterId=${chapter.id}`
+}
+
 function mockOrganizerFetches() {
   global.fetch = jest.fn((input: RequestInfo | URL) => {
     const url = requestUrl(input)
@@ -274,16 +278,7 @@ function mockOrganizerFetches() {
       return jsonResponse(banFlags)
     }
 
-    if (url.includes('/application-templates/merged')) {
-      return jsonResponse({
-        fields: [
-          ...templates[0].fieldsJson,
-          ...templates[1].fieldsJson,
-        ],
-      })
-    }
-
-    if (url.includes('/application-templates')) {
+    if (isApplicationTemplateListRequest(url)) {
       return jsonResponse(templates)
     }
 
@@ -358,6 +353,9 @@ describe('/organizer/chapters/[chapterSlug]/settings', () => {
       /what are you hoping to build/i,
       /application template/i,
     )
+    expect(global.fetch).toHaveBeenCalledWith(
+      `/api/application-templates?chapterId=${chapter.id}`,
+    )
     await expectSomeText(/chapter profile/i, /chapter description/i)
     expect(screen.getByLabelText(/chapter image/i)).toBeInTheDocument()
     expect(screen.getByLabelText(/chapter description/i)).toHaveValue(
@@ -396,7 +394,7 @@ describe('/organizer/chapters/[chapterSlug]/settings', () => {
         return jsonResponse(createdFlag, 201)
       }
       if (url.includes('/ban-flags')) return jsonResponse([])
-      if (url.includes('/application-templates')) return jsonResponse(templates)
+      if (isApplicationTemplateListRequest(url)) return jsonResponse(templates)
       if (/\/api\/chapters\/[^/?]+/.test(url)) return jsonResponse(chapter)
       return jsonResponse({})
     }) as jest.Mock

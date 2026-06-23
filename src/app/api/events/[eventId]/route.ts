@@ -1,18 +1,74 @@
-import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
-import prisma from "@/lib/prisma";
+import { NextResponse } from 'next/server';
+import { auth } from '@clerk/nextjs/server';
+import prisma from '@/lib/prisma';
 import {
   ApplicationTemplateValidationError,
   parseTemplateFieldsJson,
-} from "@/lib/applicationTemplates";
-import { canManageEventSettings } from "@/lib/eventManagementAuth";
+} from '@/lib/applicationTemplates';
+import {
+  canManageEventSettings,
+  canViewApprovedOnlyEventDetailsWithContext,
+} from '@/lib/eventManagementAuth';
+import {
+  getViewerRegistrationState,
+  redactPublicEventForViewer,
+} from '@/lib/publicEvents';
+
+const PHASE_2_APPLICATION_MODES = ['REQUIRES_APPROVAL', 'OPEN_RSVP'] as const;
+type Phase2ApplicationMode = (typeof PHASE_2_APPLICATION_MODES)[number];
 
 function slugify(value: string) {
-  return value
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "") || "event";
+  return (
+    value
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '') || 'event'
+  );
+}
+
+function parseApplicationMode(
+  value: unknown
+): Phase2ApplicationMode | undefined | null {
+  if (value === undefined) return undefined;
+  if (
+    typeof value === 'string' &&
+    PHASE_2_APPLICATION_MODES.includes(value as Phase2ApplicationMode)
+  ) {
+    return value as Phase2ApplicationMode;
+  }
+
+  return null;
+}
+
+function parseApplicationsOpen(value: unknown): boolean | undefined | null {
+  if (value === undefined) return undefined;
+  return typeof value === 'boolean' ? value : null;
+}
+
+function parseOptionalDate(value: unknown, field: string) {
+  if (value === undefined || value === null || value === '')
+    return { date: null };
+  if (typeof value !== 'string' && !(value instanceof Date)) {
+    return {
+      error: NextResponse.json(
+        { message: `${field} must be a valid date` },
+        { status: 400 }
+      ),
+    };
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return {
+      error: NextResponse.json(
+        { message: `${field} must be a valid date` },
+        { status: 400 }
+      ),
+    };
+  }
+
+  return { date };
 }
 
 export async function GET(
@@ -22,28 +78,110 @@ export async function GET(
   try {
     const searchParams = new URL(req.url).searchParams;
     const managementRead =
-      searchParams.get("management") === "true" ||
-      searchParams.get("manageable") === "true";
-    const event = await prisma.event.findUnique({
-      where: { id: params.eventId },
-      include: {
-        staff: { include: { hacker: { include: { avatar: true } } } },
-        pitchSessions: {
-          include: {
-            projects: {
-              orderBy: { position: "asc" },
-              include: {
-                pitchVotes: { select: { hackerId: true, value: true, createdAt: true } },
-                project: {
-                  include: {
-                    thumbnail: true,
-                    launchLead: { include: { avatar: true } },
-                    participants: { include: { hacker: { include: { avatar: true } } } },
-                    techTags: true,
-                    domainTags: true,
-                    likes: { select: { hackerId: true, createdAt: true } },
+      searchParams.get('management') === 'true' ||
+      searchParams.get('manageable') === 'true';
+
+    if (managementRead) {
+      const event = await prisma.event.findUnique({
+        where: { id: params.eventId },
+        include: {
+          staff: { include: { hacker: { include: { avatar: true } } } },
+          pitchSessions: {
+            include: {
+              projects: {
+                orderBy: { position: 'asc' },
+                include: {
+                  pitchVotes: {
+                    select: { hackerId: true, value: true, createdAt: true },
+                  },
+                  project: {
+                    include: {
+                      thumbnail: true,
+                      launchLead: { include: { avatar: true } },
+                      participants: {
+                        include: { hacker: { include: { avatar: true } } },
+                      },
+                      techTags: true,
+                      domainTags: true,
+                      likes: { select: { hackerId: true, createdAt: true } },
+                    },
                   },
                 },
+              },
+            },
+          },
+        },
+      });
+
+      if (!event) return new NextResponse('Not Found', { status: 404 });
+
+      const { userId } = auth();
+      if (!userId) return new NextResponse('Unauthorized', { status: 401 });
+
+      const user = await prisma.hacker.findUnique({
+        where: { clerkId: userId },
+        select: { id: true, role: true },
+      });
+      if (!user) return new NextResponse('Unauthorized', { status: 401 });
+
+      const canManage = await canManageEventSettings(
+        prisma,
+        user.id,
+        params.eventId
+      );
+      if (!canManage) return new NextResponse('Forbidden', { status: 403 });
+
+      return NextResponse.json(event);
+    }
+
+    const event = await prisma.event.findFirst({
+      where: {
+        id: params.eventId,
+        status: 'PUBLISHED',
+        visibility: 'PUBLIC',
+        chapter: {
+          status: 'ACTIVE',
+          accessMode: 'PUBLIC',
+        },
+      },
+      select: {
+        id: true,
+        slug: true,
+        title: true,
+        description: true,
+        startTime: true,
+        endTime: true,
+        publicLocation: true,
+        status: true,
+        visibility: true,
+        publicProgramLabel: true,
+        programType: true,
+        capacity: true,
+        applicationMode: true,
+        applicationsOpen: true,
+        applicationsClosedAt: true,
+        applicationsCloseReason: true,
+        autoPromoteWaitlist: true,
+        approvedDetailsJson: true,
+        applicationQuestionsJson: true,
+        hideChapterDefaultQuestions: true,
+        chapterId: true,
+        chapter: {
+          select: {
+            id: true,
+            slug: true,
+            name: true,
+            timezone: true,
+            status: true,
+            accessMode: true,
+          },
+        },
+        _count: {
+          select: {
+            registrations: {
+              where: {
+                status: 'APPROVED',
+                cancelledAt: null,
               },
             },
           },
@@ -51,30 +189,60 @@ export async function GET(
       },
     });
 
-    if (!event) return new NextResponse("Not Found", { status: 404 });
+    if (!event) return new NextResponse('Not Found', { status: 404 });
 
-    if (managementRead) {
-      const { userId } = auth();
-      if (!userId) return new NextResponse("Unauthorized", { status: 401 });
+    const { userId } = auth();
+    const viewer = userId
+      ? await prisma.hacker.findUnique({
+          where: { clerkId: userId },
+          select: { id: true, role: true },
+        })
+      : null;
 
-      const user = await prisma.hacker.findUnique({
-        where: { clerkId: userId },
-        select: { id: true, role: true },
+    const [viewerRegistration, chapterMembership, staff] = viewer
+      ? await Promise.all([
+          getViewerRegistrationState(event.id, viewer.id),
+          prisma.chapterMembership.findFirst({
+            where: {
+              chapterId: event.chapterId,
+              hackerId: viewer.id,
+            },
+            select: {
+              role: true,
+              status: true,
+            },
+          }),
+          prisma.eventStaff.findFirst({
+            where: {
+              eventId: event.id,
+              hackerId: viewer.id,
+              role: { in: ['MC', 'CO_MC'] },
+            },
+            select: {
+              role: true,
+            },
+          }),
+        ])
+      : [null, null, null];
+
+    const viewerCanViewApprovedDetails =
+      canViewApprovedOnlyEventDetailsWithContext({
+        actor: viewer,
+        chapterMembership,
+        staff,
+        viewerRegistration,
       });
-      if (!user) return new NextResponse("Unauthorized", { status: 401 });
 
-      const canManage = await canManageEventSettings(
-        prisma,
-        user.id,
-        params.eventId
-      );
-      if (!canManage) return new NextResponse("Forbidden", { status: 403 });
-    }
-
-    return NextResponse.json(event);
+    return NextResponse.json(
+      redactPublicEventForViewer(event, {
+        viewerRegistration,
+        viewerCanViewApprovedDetails,
+        viewerIsSignedIn: Boolean(viewer),
+      })
+    );
   } catch (error) {
-    console.error("[EVENT_GET]", error);
-    return new NextResponse("Internal Error", { status: 500 });
+    console.error('[EVENT_GET]', error);
+    return new NextResponse('Internal Error', { status: 500 });
   }
 }
 
@@ -84,16 +252,20 @@ export async function PATCH(
 ) {
   try {
     const { userId } = auth();
-    if (!userId) return new NextResponse("Unauthorized", { status: 401 });
+    if (!userId) return new NextResponse('Unauthorized', { status: 401 });
 
     const user = await prisma.hacker.findUnique({
       where: { clerkId: userId },
       select: { id: true, role: true },
     });
-    if (!user) return new NextResponse("Unauthorized", { status: 401 });
+    if (!user) return new NextResponse('Unauthorized', { status: 401 });
 
-    const canManage = await canManageEventSettings(prisma, user.id, params.eventId);
-    if (!canManage) return new NextResponse("Forbidden", { status: 403 });
+    const canManage = await canManageEventSettings(
+      prisma,
+      user.id,
+      params.eventId
+    );
+    if (!canManage) return new NextResponse('Forbidden', { status: 403 });
 
     const existingEvent = await prisma.event.findUnique({
       where: { id: params.eventId },
@@ -101,7 +273,7 @@ export async function PATCH(
         chapterId: true,
       },
     });
-    if (!existingEvent) return new NextResponse("Not Found", { status: 404 });
+    if (!existingEvent) return new NextResponse('Not Found', { status: 404 });
 
     const body = await req.json();
     const {
@@ -126,10 +298,16 @@ export async function PATCH(
       approvedDetailsJson,
       applicationQuestionsJson,
       hideChapterDefaultQuestions,
+      confirmationMessage,
+      waitlistMessage,
+      declineMessage,
       applicationsOpen,
+      applicationsClosedAt,
+      applicationsClosedById,
       applicationsCloseReason,
       checkInOpensAt,
       checkInClosesAt,
+      staff,
       mcIds,
       votingEndTime,
       topProjectCount,
@@ -139,10 +317,38 @@ export async function PATCH(
       defaultQuestionsSec,
     } = body;
 
+    const parsedApplicationMode = parseApplicationMode(applicationMode);
+    if (parsedApplicationMode === null) {
+      return NextResponse.json(
+        { message: 'applicationMode must be REQUIRES_APPROVAL or OPEN_RSVP' },
+        { status: 400 }
+      );
+    }
+
+    const parsedApplicationsOpen = parseApplicationsOpen(applicationsOpen);
+    if (parsedApplicationsOpen === null) {
+      return NextResponse.json(
+        { message: 'applicationsOpen must be a boolean' },
+        { status: 400 }
+      );
+    }
+
+    const parsedApplicationsClosedAt = parseOptionalDate(
+      applicationsClosedAt,
+      'applicationsClosedAt'
+    );
+    if ('error' in parsedApplicationsClosedAt) {
+      return parsedApplicationsClosedAt.error;
+    }
+
     if (applicationQuestionsJson !== undefined) {
-      parseTemplateFieldsJson(applicationQuestionsJson, "applicationQuestionsJson", {
-        allowSiteRequiredFieldIds: false,
-      });
+      parseTemplateFieldsJson(
+        applicationQuestionsJson,
+        'applicationQuestionsJson',
+        {
+          allowSiteRequiredFieldIds: false,
+        }
+      );
     }
 
     const timingConfigChanged =
@@ -159,45 +365,106 @@ export async function PATCH(
         ...(title !== undefined && { title }),
         ...(description !== undefined && { description: description || null }),
         ...(startTime !== undefined && { startTime: new Date(startTime) }),
-        ...(endTime !== undefined && { endTime: endTime ? new Date(endTime) : null }),
+        ...(endTime !== undefined && {
+          endTime: endTime ? new Date(endTime) : null,
+        }),
         ...(meetingUrl !== undefined && { meetingUrl: meetingUrl || null }),
         ...(location !== undefined && { location: location || null }),
         ...(venueName !== undefined && { venueName: venueName || null }),
-        ...(publicLocation !== undefined && { publicLocation: publicLocation || null }),
+        ...(publicLocation !== undefined && {
+          publicLocation: publicLocation || null,
+        }),
         ...(address !== undefined && { address: address || null }),
         ...(virtualUrl !== undefined && { virtualUrl: virtualUrl || null }),
-        ...(slug !== undefined && { slug: slugify(slug || title || params.eventId) }),
+        ...(slug !== undefined && {
+          slug: slugify(slug || title || params.eventId),
+        }),
         ...(status !== undefined && { status }),
         ...(visibility !== undefined && { visibility }),
         ...(programType !== undefined && { programType: programType || null }),
-        ...(publicProgramLabel !== undefined && { publicProgramLabel: publicProgramLabel || null }),
-        ...(capacity !== undefined && { capacity: capacity === null ? null : Number(capacity) }),
-        ...(applicationMode !== undefined && { applicationMode }),
-        ...(autoPromoteWaitlist !== undefined && { autoPromoteWaitlist: Boolean(autoPromoteWaitlist) }),
+        ...(publicProgramLabel !== undefined && {
+          publicProgramLabel: publicProgramLabel || null,
+        }),
+        ...(capacity !== undefined && {
+          capacity: capacity === null ? null : Number(capacity),
+        }),
+        ...(parsedApplicationMode !== undefined && {
+          applicationMode: parsedApplicationMode,
+        }),
+        ...(autoPromoteWaitlist !== undefined && {
+          autoPromoteWaitlist: Boolean(autoPromoteWaitlist),
+        }),
         ...(approvedDetailsJson !== undefined && { approvedDetailsJson }),
-        ...(applicationQuestionsJson !== undefined && { applicationQuestionsJson }),
-        ...(hideChapterDefaultQuestions !== undefined && { hideChapterDefaultQuestions: Boolean(hideChapterDefaultQuestions) }),
-        ...(applicationsOpen !== undefined && { applicationsOpen: applicationsOpen ? new Date(applicationsOpen) : null }),
-        ...(applicationsCloseReason !== undefined && { applicationsCloseReason: applicationsCloseReason || null }),
-        ...(checkInOpensAt !== undefined && { checkInOpensAt: checkInOpensAt ? new Date(checkInOpensAt) : null }),
-        ...(checkInClosesAt !== undefined && { checkInClosesAt: checkInClosesAt ? new Date(checkInClosesAt) : null }),
+        ...(applicationQuestionsJson !== undefined && {
+          applicationQuestionsJson,
+        }),
+        ...(hideChapterDefaultQuestions !== undefined && {
+          hideChapterDefaultQuestions: Boolean(hideChapterDefaultQuestions),
+        }),
+        ...(confirmationMessage !== undefined && {
+          confirmationMessage: confirmationMessage || null,
+        }),
+        ...(waitlistMessage !== undefined && {
+          waitlistMessage: waitlistMessage || null,
+        }),
+        ...(declineMessage !== undefined && {
+          declineMessage: declineMessage || null,
+        }),
+        ...(parsedApplicationsOpen !== undefined && {
+          applicationsOpen: parsedApplicationsOpen,
+          applicationsClosedAt: parsedApplicationsOpen
+            ? null
+            : (parsedApplicationsClosedAt.date ?? new Date()),
+          applicationsClosedById: parsedApplicationsOpen
+            ? null
+            : applicationsClosedById || user.id,
+          applicationsCloseReason: parsedApplicationsOpen
+            ? null
+            : applicationsCloseReason || null,
+        }),
+        ...(parsedApplicationsOpen === undefined &&
+          applicationsClosedAt !== undefined && {
+            applicationsClosedAt: parsedApplicationsClosedAt.date,
+          }),
+        ...(parsedApplicationsOpen === undefined &&
+          applicationsClosedById !== undefined && {
+            applicationsClosedById: applicationsClosedById || null,
+          }),
+        ...(parsedApplicationsOpen === undefined &&
+          applicationsCloseReason !== undefined && {
+            applicationsCloseReason: applicationsCloseReason || null,
+          }),
+        ...(checkInOpensAt !== undefined && {
+          checkInOpensAt: checkInOpensAt ? new Date(checkInOpensAt) : null,
+        }),
+        ...(checkInClosesAt !== undefined && {
+          checkInClosesAt: checkInClosesAt ? new Date(checkInClosesAt) : null,
+        }),
       },
     });
 
     const pitchSession = timingConfigChanged
-      ? await prisma.pitchSession.findFirst({ where: { eventId: params.eventId } })
+      ? await prisma.pitchSession.findFirst({
+          where: { eventId: params.eventId },
+        })
       : null;
 
     if (timingConfigChanged && pitchSession) {
-      const nextTopPresentingSec = topPresentingSec ?? pitchSession.topPresentingSec;
-      const nextTopQuestionsSec = topQuestionsSec ?? pitchSession.topQuestionsSec;
-      const nextDefaultPresentingSec = defaultPresentingSec ?? pitchSession.defaultPresentingSec;
-      const nextDefaultQuestionsSec = defaultQuestionsSec ?? pitchSession.defaultQuestionsSec;
+      const nextTopPresentingSec =
+        topPresentingSec ?? pitchSession.topPresentingSec;
+      const nextTopQuestionsSec =
+        topQuestionsSec ?? pitchSession.topQuestionsSec;
+      const nextDefaultPresentingSec =
+        defaultPresentingSec ?? pitchSession.defaultPresentingSec;
+      const nextDefaultQuestionsSec =
+        defaultQuestionsSec ?? pitchSession.defaultQuestionsSec;
 
       const pitchSessionUpdate = prisma.pitchSession.update({
         where: { id: pitchSession.id },
         data: {
-          ...(votingEndTime !== undefined && { votingEndTime: votingEndTime ? new Date(votingEndTime) : null }),
+          ...(votingEndTime !== undefined && {
+            votingEndTime: votingEndTime ? new Date(votingEndTime) : null,
+          }),
           ...(topProjectCount !== undefined && { topProjectCount }),
           ...(topPresentingSec !== undefined && { topPresentingSec }),
           ...(topQuestionsSec !== undefined && { topQuestionsSec }),
@@ -206,7 +473,7 @@ export async function PATCH(
         },
       });
 
-      if (pitchSession.phase === "PITCHING") {
+      if (pitchSession.phase === 'PITCHING') {
         await prisma.$transaction([
           eventUpdate,
           pitchSessionUpdate,
@@ -214,7 +481,7 @@ export async function PATCH(
             where: {
               pitchSessionId: pitchSession.id,
               isTopProject: true,
-              status: { in: ["CURRENT", "APPROVED"] },
+              status: { in: ['CURRENT', 'APPROVED'] },
             },
             data: {
               allottedPresentingSec: nextTopPresentingSec,
@@ -225,7 +492,7 @@ export async function PATCH(
             where: {
               pitchSessionId: pitchSession.id,
               isTopProject: false,
-              status: { in: ["CURRENT", "APPROVED"] },
+              status: { in: ['CURRENT', 'APPROVED'] },
             },
             data: {
               allottedPresentingSec: nextDefaultPresentingSec,
@@ -240,16 +507,29 @@ export async function PATCH(
       await eventUpdate;
     }
 
-    if (mcIds !== undefined) {
+    if (staff !== undefined) {
       await prisma.eventStaff.deleteMany({
-        where: { eventId: params.eventId, role: "MC" },
+        where: { eventId: params.eventId },
+      });
+      if (Array.isArray(staff) && staff.length > 0) {
+        await prisma.eventStaff.createMany({
+          data: staff.map((assignment: { hackerId: string; role: string }) => ({
+            eventId: params.eventId,
+            hackerId: assignment.hackerId,
+            role: assignment.role === 'CO_MC' ? 'CO_MC' : 'MC',
+          })),
+        });
+      }
+    } else if (mcIds !== undefined) {
+      await prisma.eventStaff.deleteMany({
+        where: { eventId: params.eventId, role: 'MC' },
       });
       if (mcIds.length > 0) {
         await prisma.eventStaff.createMany({
           data: mcIds.map((hackerId: string) => ({
             eventId: params.eventId,
             hackerId,
-            role: "MC" as const,
+            role: 'MC' as const,
           })),
         });
       }
@@ -262,14 +542,18 @@ export async function PATCH(
         pitchSessions: {
           include: {
             projects: {
-              orderBy: { position: "asc" },
+              orderBy: { position: 'asc' },
               include: {
-                pitchVotes: { select: { hackerId: true, value: true, createdAt: true } },
+                pitchVotes: {
+                  select: { hackerId: true, value: true, createdAt: true },
+                },
                 project: {
                   include: {
                     thumbnail: true,
                     launchLead: { include: { avatar: true } },
-                    participants: { include: { hacker: { include: { avatar: true } } } },
+                    participants: {
+                      include: { hacker: { include: { avatar: true } } },
+                    },
                     techTags: true,
                     domainTags: true,
                     likes: { select: { hackerId: true, createdAt: true } },
@@ -290,7 +574,7 @@ export async function PATCH(
         { status: 400 }
       );
     }
-    console.error("[EVENT_PATCH]", error);
-    return new NextResponse("Internal Error", { status: 500 });
+    console.error('[EVENT_PATCH]', error);
+    return new NextResponse('Internal Error', { status: 500 });
   }
 }

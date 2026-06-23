@@ -15,8 +15,40 @@ import {
   createInternalEventRegistration,
   isApplicantDecisionStatus,
   listEventRegistrations,
+  submitPublicEventRegistration,
 } from '@/lib/eventRegistrations';
 import type { RegistrationStatus } from '@/types/event-management';
+import type { PublicRegistrationActionResult } from '@/lib/eventRegistrations';
+
+function publicRegistrationResponse(result: PublicRegistrationActionResult) {
+  if (result.ok) {
+    return NextResponse.json(result.registration, { status: 201 });
+  }
+
+  if (result.reason === 'VALIDATION_FAILED') {
+    return NextResponse.json(
+      { message: 'Application answers are invalid.', issues: result.issues },
+      { status: 400 }
+    );
+  }
+
+  if (result.reason === 'DUPLICATE_REGISTRATION' && result.registration) {
+    return NextResponse.json(result.registration, { status: 409 });
+  }
+
+  if (result.reason === 'EVENT_NOT_FOUND') {
+    return new NextResponse('Not Found', { status: 404 });
+  }
+
+  if (result.reason === 'APPLICATIONS_CLOSED') {
+    return NextResponse.json(
+      { message: 'Applications are closed for this event.' },
+      { status: 409 }
+    );
+  }
+
+  return NextResponse.json({ message: result.reason }, { status: 400 });
+}
 
 export async function GET(
   req: Request,
@@ -38,7 +70,11 @@ export async function GET(
       params.eventId,
       isSiteAdmin(hacker),
       {
-        includeBannedUsers: url.searchParams.get('includeBannedUsers') === 'true',
+        status:
+          (url.searchParams.get('status') as RegistrationStatus | null) ??
+          undefined,
+        includeBannedUsers:
+          url.searchParams.get('includeBannedUsers') === 'true',
         take: Number(url.searchParams.get('take') ?? 100),
         skip: Number(url.searchParams.get('skip') ?? 0),
       }
@@ -59,6 +95,17 @@ export async function POST(
     const hacker = await getCurrentHacker();
     if (!hacker) return unauthorized();
 
+    const body = await req.json();
+    if (!body?.hackerId) {
+      const result = await submitPublicEventRegistration({
+        eventId: params.eventId,
+        hackerId: hacker.id,
+        answersJson: body?.answersJson,
+      });
+
+      return publicRegistrationResponse(result);
+    }
+
     const canManage = await canManageRegistrations(
       prisma,
       hacker.id,
@@ -66,7 +113,6 @@ export async function POST(
     );
     if (!canManage) return forbidden();
 
-    const body = await req.json();
     if (!body?.hackerId) return badRequest('hackerId is required');
 
     const status = (body.status ?? 'PENDING') as RegistrationStatus;

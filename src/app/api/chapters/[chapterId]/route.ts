@@ -19,7 +19,7 @@ const chapterInclude = {
       visibility: 'PUBLIC' as const,
       startTime: { gte: new Date() },
     },
-    orderBy: { startTime: 'desc' as const },
+    orderBy: { startTime: 'asc' as const },
     select: {
       id: true,
       title: true,

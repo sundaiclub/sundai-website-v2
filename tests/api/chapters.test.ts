@@ -18,8 +18,13 @@ import {
 import {
   buildChapter,
   buildChapterAdminFixture,
+  buildChapterMembership,
+  buildPublishedEvent,
   buildHacker,
   buildSiteAdmin,
+  type ChapterFixture,
+  type ChapterMembershipFixture,
+  type EventFixture,
   type HackerFixture,
 } from '../utils/event-management-fixtures';
 
@@ -87,6 +92,60 @@ const mockActor = (actor: HackerFixture, ...extraHackers: HackerFixture[]) => {
       : null,
   });
   mockHackerLookup(actor, ...extraHackers);
+};
+
+const matchesMembershipStatus = (actual: unknown, expected: string) => {
+  if (!actual) return true;
+  if (typeof actual === 'string') return actual === expected;
+  if (typeof actual === 'object' && actual !== null && 'in' in actual) {
+    const statuses = (actual as { in?: unknown }).in;
+    return Array.isArray(statuses) ? statuses.includes(expected) : false;
+  }
+  return false;
+};
+
+const mockMembershipLookup = (...memberships: ChapterMembershipFixture[]) => {
+  prisma.chapterMembership.findFirst.mockImplementation(async ({ where }: any) => {
+    return (
+      memberships.find((membership) => {
+        if (where?.chapterId && membership.chapterId !== where.chapterId) {
+          return false;
+        }
+        if (where?.hackerId && membership.hackerId !== where.hackerId) {
+          return false;
+        }
+        if (where?.role && membership.role !== where.role) return false;
+        return matchesMembershipStatus(where?.status, membership.status);
+      }) ?? null
+    );
+  });
+};
+
+const mockChapterDetailLookup = ({
+  chapter,
+  upcomingEvents = [],
+  adminMemberships = [],
+}: {
+  chapter: ChapterFixture;
+  upcomingEvents?: EventFixture[];
+  adminMemberships?: ChapterMembershipFixture[];
+}) => {
+  prisma.chapter.findUnique.mockImplementation(async ({ where, include }: any) => {
+    if (where?.id === chapter.slug) return null;
+    if (where?.slug === chapter.slug) return { id: chapter.id };
+    if (where?.id !== chapter.id) return null;
+
+    if (include) {
+      return {
+        ...chapter,
+        heroImage: null,
+        memberships: adminMemberships,
+        events: upcomingEvents,
+      };
+    }
+
+    return chapter;
+  });
 };
 
 describe('/api/chapters', () => {
@@ -208,9 +267,196 @@ describe('/api/chapters', () => {
       expect.objectContaining({
         include: expect.objectContaining({
           events: expect.objectContaining({
-            orderBy: { startTime: 'desc' },
+            orderBy: { startTime: 'asc' },
           }),
         }),
+      })
+    );
+  });
+
+  it('returns public chapter detail by slug with public metadata, mailing-list CTA data, and upcoming published events', async () => {
+    const chapter = buildChapter({
+      id: 'chapter-boston',
+      slug: 'boston',
+      city: 'Boston',
+      region: 'MA',
+      country: 'US',
+      timezone: 'America/New_York',
+      description: 'Public builds and demos for Boston hackers.',
+      mailingListName: 'Boston builders',
+      mailingListExternalId: 'audience-boston-builders',
+    });
+    const upcomingEvents = [
+      buildPublishedEvent({
+        id: 'event-boston-demo-night',
+        title: 'Boston Demo Night',
+        slug: 'demo-night',
+        chapterId: chapter.id,
+        startTime: new Date('2026-07-18T22:00:00.000Z'),
+        publicLocation: 'Kendall Square',
+      }),
+      buildPublishedEvent({
+        id: 'event-boston-build-night',
+        title: 'Boston Build Night',
+        slug: 'build-night',
+        chapterId: chapter.id,
+        startTime: new Date('2026-08-01T22:00:00.000Z'),
+        publicLocation: 'Seaport',
+      }),
+    ];
+
+    mockSignedOutClerk();
+    mockChapterDetailLookup({ chapter, upcomingEvents });
+
+    const response = await GET_CHAPTER(
+      createJsonRequest('/api/chapters/boston') as any,
+      createRouteContext({ chapterId: chapter.slug }) as any
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body).toMatchObject({
+      id: chapter.id,
+      name: chapter.name,
+      slug: chapter.slug,
+      city: chapter.city,
+      region: chapter.region,
+      country: chapter.country,
+      timezone: chapter.timezone,
+      description: chapter.description,
+      accessMode: 'PUBLIC',
+      status: 'ACTIVE',
+      mailingListName: 'Boston builders',
+      mailingListExternalId: 'audience-boston-builders',
+      upcomingEvents: [
+        {
+          id: 'event-boston-demo-night',
+          title: 'Boston Demo Night',
+          slug: 'demo-night',
+          startTime: upcomingEvents[0].startTime.toISOString(),
+          publicLocation: 'Kendall Square',
+        },
+        {
+          id: 'event-boston-build-night',
+          title: 'Boston Build Night',
+          slug: 'build-night',
+          startTime: upcomingEvents[1].startTime.toISOString(),
+          publicLocation: 'Seaport',
+        },
+      ],
+      viewerMembership: null,
+    });
+    expect(prisma.chapter.findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { slug: chapter.slug },
+        select: { id: true },
+      })
+    );
+    expect(prisma.chapter.findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: chapter.id },
+        include: expect.objectContaining({
+          events: expect.objectContaining({
+            where: {
+              status: 'PUBLISHED',
+              visibility: 'PUBLIC',
+              startTime: { gte: expect.any(Date) },
+            },
+            select: {
+              id: true,
+              title: true,
+              slug: true,
+              startTime: true,
+              publicLocation: true,
+            },
+          }),
+        }),
+      })
+    );
+  });
+
+  it('returns private chapter detail by slug to invited hackers with viewer membership state', async () => {
+    const hacker = buildHacker({
+      id: 'hacker-invited',
+      clerkId: 'clerk-invited',
+    });
+    const chapter = buildChapter({
+      id: 'chapter-cambridge-private',
+      slug: 'cambridge-private',
+      name: 'Sundai Cambridge Private',
+      accessMode: 'PRIVATE',
+      mailingListName: 'Cambridge builders',
+      mailingListExternalId: 'audience-cambridge-builders',
+    });
+    const invitedMembership = buildChapterMembership({
+      id: 'membership-cambridge-invited',
+      chapterId: chapter.id,
+      hackerId: hacker.id,
+      status: 'INVITED',
+      joinedAt: null,
+    });
+
+    mockActor(hacker);
+    mockMembershipLookup(invitedMembership);
+    mockChapterDetailLookup({ chapter });
+
+    const response = await GET_CHAPTER(
+      createJsonRequest('/api/chapters/cambridge-private') as any,
+      createRouteContext({ chapterId: chapter.slug }) as any
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body).toMatchObject({
+      id: chapter.id,
+      slug: chapter.slug,
+      accessMode: 'PRIVATE',
+      mailingListName: 'Cambridge builders',
+      mailingListExternalId: 'audience-cambridge-builders',
+      viewerMembership: {
+        id: invitedMembership.id,
+        role: 'MEMBER',
+        status: 'INVITED',
+      },
+    });
+    expect(prisma.chapter.findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { slug: chapter.slug },
+        select: { id: true },
+      })
+    );
+  });
+
+  it('hides private chapter detail by slug from outsiders and does not load landing data', async () => {
+    const hacker = buildHacker({
+      id: 'hacker-outsider',
+      clerkId: 'clerk-outsider',
+    });
+    const chapter = buildChapter({
+      id: 'chapter-cambridge-private',
+      slug: 'cambridge-private',
+      accessMode: 'PRIVATE',
+    });
+
+    mockActor(hacker);
+    prisma.chapterMembership.findFirst.mockResolvedValue(null);
+    mockChapterDetailLookup({ chapter });
+
+    const response = await GET_CHAPTER(
+      createJsonRequest('/api/chapters/cambridge-private') as any,
+      createRouteContext({ chapterId: chapter.slug }) as any
+    );
+
+    expect(response.status).toBe(404);
+    expect(prisma.chapter.findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { slug: chapter.slug },
+        select: { id: true },
+      })
+    );
+    expect(prisma.chapter.findUnique).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        include: expect.any(Object),
       })
     );
   });

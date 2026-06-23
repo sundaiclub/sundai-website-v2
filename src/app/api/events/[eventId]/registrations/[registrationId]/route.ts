@@ -43,12 +43,21 @@ export async function PATCH(
       return forbidden();
     }
 
+    let publicSafeMessage = body.publicSafeMessage;
+    if (toStatus === 'DECLINED' && publicSafeMessage === undefined) {
+      const event = await prisma.event.findUnique({
+        where: { id: params.eventId },
+        select: { declineMessage: true },
+      });
+      publicSafeMessage = event?.declineMessage ?? undefined;
+    }
+
     const registration = await updateEventRegistrationStatus({
       registrationId: params.registrationId,
       eventId: params.eventId,
       actorId: hacker.id,
       toStatus,
-      publicSafeMessage: body.publicSafeMessage,
+      publicSafeMessage,
       internalReviewNotes: body.internalReviewNotes,
       changeJson: body.changeJson ?? undefined,
     });

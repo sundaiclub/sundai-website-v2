@@ -17,7 +17,26 @@ import {
   ManagementSection,
   useManagementClasses,
 } from '../../../../components/ManagementSurface';
-import type { OrganizerEventSettings } from '@/types/event-management';
+import type {
+  JsonObject,
+  OrganizerEventSettings,
+} from '@/types/event-management';
+
+function stringFromDetails(
+  details: JsonObject | null | undefined,
+  key: string
+) {
+  const value = details?.[key];
+  return typeof value === 'string' ? value : '';
+}
+
+function formatClosedAt(value?: string | Date | null) {
+  if (!value) return null;
+  return new Intl.DateTimeFormat('en-US', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(new Date(value));
+}
 
 export default function OrganizerEventSettingsPage({
   params,
@@ -27,6 +46,14 @@ export default function OrganizerEventSettingsPage({
   const classes = useManagementClasses();
   const [event, setEvent] = useState<OrganizerEventSettings | null>(null);
   const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [publicLocation, setPublicLocation] = useState('');
+  const [applicationMode, setApplicationMode] = useState('REQUIRES_APPROVAL');
+  const [applicationsOpen, setApplicationsOpen] = useState(true);
+  const [autoPromoteWaitlist, setAutoPromoteWaitlist] = useState(false);
+  const [approvedAddress, setApprovedAddress] = useState('');
+  const [doorCode, setDoorCode] = useState('');
+  const [toolkitUrl, setToolkitUrl] = useState('');
   const [message, setMessage] = useState('');
   const [authStatus, setAuthStatus] = useState<AuthStatus | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -54,6 +81,18 @@ export default function OrganizerEventSettingsPage({
         if (!isCurrent || !payload) return;
         setEvent(payload);
         setTitle(payload.title);
+        setDescription(payload.description ?? '');
+        setPublicLocation(payload.publicLocation ?? '');
+        setApplicationMode(payload.applicationMode ?? 'REQUIRES_APPROVAL');
+        setApplicationsOpen(payload.applicationsOpen !== false);
+        setAutoPromoteWaitlist(Boolean(payload.autoPromoteWaitlist));
+        setApprovedAddress(
+          stringFromDetails(payload.approvedDetailsJson, 'address')
+        );
+        setDoorCode(stringFromDetails(payload.approvedDetailsJson, 'doorCode'));
+        setToolkitUrl(
+          stringFromDetails(payload.approvedDetailsJson, 'toolkitUrl')
+        );
       })
       .catch(() => {
         if (isCurrent) setLoadError('Unable to load event settings.');
@@ -71,7 +110,19 @@ export default function OrganizerEventSettingsPage({
     const response = await fetch(`/api/events/${params.eventId}`, {
       method: 'PATCH',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ title }),
+      body: JSON.stringify({
+        title,
+        description,
+        publicLocation,
+        applicationMode,
+        applicationsOpen,
+        autoPromoteWaitlist,
+        approvedDetailsJson: {
+          address: approvedAddress,
+          doorCode,
+          toolkitUrl,
+        },
+      }),
     });
     const nextAuthStatus = authStatusFromResponse(response);
     if (nextAuthStatus) {
@@ -111,6 +162,7 @@ export default function OrganizerEventSettingsPage({
   }
 
   const staffMembers = event.staff ?? [];
+  const closedAt = formatClosedAt(event.applicationsClosedAt);
 
   return (
     <ManagementPage maxWidth="max-w-5xl">
@@ -123,25 +175,140 @@ export default function OrganizerEventSettingsPage({
         description="Update event details, staff assignments, application composition, and organizer notes."
         actions={
           <>
+            {event.status && <ManagementBadge>{event.status}</ManagementBadge>}
             {event.visibility && (
               <ManagementBadge>{event.visibility}</ManagementBadge>
             )}
-            {event.applicationMode && (
-              <ManagementBadge>{event.applicationMode}</ManagementBadge>
-            )}
+            <ManagementBadge>{applicationMode}</ManagementBadge>
           </>
         }
       />
       <div className="grid gap-5">
         <ManagementSection title="Basics">
-          <label className="grid gap-2">
-            <span className="text-sm font-semibold">Title</span>
-            <input
-              className={classes.input}
-              value={title}
-              onChange={event => setTitle(event.target.value)}
-            />
-          </label>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="grid gap-2">
+              <span className="text-sm font-semibold">Title</span>
+              <input
+                aria-label="Title"
+                className={classes.input}
+                onChange={event => setTitle(event.target.value)}
+                value={title}
+              />
+            </label>
+            <label className="grid gap-2">
+              <span className="text-sm font-semibold">Application mode</span>
+              <select
+                aria-label="Application mode"
+                className={classes.input}
+                onChange={event => setApplicationMode(event.target.value)}
+                value={applicationMode}
+              >
+                <option value="REQUIRES_APPROVAL">REQUIRES_APPROVAL</option>
+                <option value="OPEN_RSVP">OPEN_RSVP</option>
+              </select>
+              <span className={`text-xs ${classes.mutedText}`}>
+                {applicationMode === 'OPEN_RSVP'
+                  ? 'Open RSVP'
+                  : 'Requires approval'}
+              </span>
+            </label>
+            <label className="flex items-center gap-2">
+              <input
+                aria-label="Applications open"
+                checked={applicationsOpen}
+                className={classes.checkbox}
+                onChange={event => setApplicationsOpen(event.target.checked)}
+                type="checkbox"
+              />
+              <span className="text-sm font-semibold">
+                {applicationsOpen ? 'Applications open' : 'Applications closed'}
+              </span>
+            </label>
+            <label className="flex items-center gap-2">
+              <input
+                aria-label="Auto-promote waitlist"
+                checked={autoPromoteWaitlist}
+                className={classes.checkbox}
+                onChange={event => setAutoPromoteWaitlist(event.target.checked)}
+                type="checkbox"
+              />
+              <span className="text-sm font-semibold">
+                Auto-promote waitlist
+              </span>
+            </label>
+            <div className={`text-sm ${classes.mutedText}`}>
+              Capacity {event.capacity ?? 'unlimited'}
+              {event.approvedCount !== undefined
+                ? `, ${event.approvedCount} approved`
+                : ''}
+            </div>
+            {!applicationsOpen && (
+              <div className={`text-sm ${classes.mutedText}`}>
+                Applications closed
+                {closedAt ? ` ${closedAt}` : ''}
+                {event.applicationsCloseReason
+                  ? `: ${event.applicationsCloseReason}`
+                  : ''}
+              </div>
+            )}
+          </div>
+        </ManagementSection>
+
+        <ManagementSection title="Public details">
+          <div className="grid gap-4">
+            <label className="grid gap-2">
+              <span className="text-sm font-semibold">Public description</span>
+              <textarea
+                aria-label="Public description"
+                className={classes.textarea}
+                onChange={event => setDescription(event.target.value)}
+                value={description}
+              />
+            </label>
+            <label className="grid gap-2">
+              <span className="text-sm font-semibold">Public location</span>
+              <input
+                aria-label="Public location"
+                className={classes.input}
+                onChange={event => setPublicLocation(event.target.value)}
+                value={publicLocation}
+              />
+            </label>
+          </div>
+        </ManagementSection>
+
+        <ManagementSection title="Approved-only details">
+          <div className="grid gap-4">
+            <label className="grid gap-2">
+              <span className="text-sm font-semibold">
+                Approved-only address
+              </span>
+              <input
+                aria-label="Approved-only address"
+                className={classes.input}
+                onChange={event => setApprovedAddress(event.target.value)}
+                value={approvedAddress}
+              />
+            </label>
+            <label className="grid gap-2">
+              <span className="text-sm font-semibold">Door code</span>
+              <input
+                aria-label="Door code"
+                className={classes.input}
+                onChange={event => setDoorCode(event.target.value)}
+                value={doorCode}
+              />
+            </label>
+            <label className="grid gap-2">
+              <span className="text-sm font-semibold">Toolkit URL</span>
+              <input
+                aria-label="Toolkit"
+                className={classes.input}
+                onChange={event => setToolkitUrl(event.target.value)}
+                value={toolkitUrl}
+              />
+            </label>
+          </div>
         </ManagementSection>
 
         <ManagementSection

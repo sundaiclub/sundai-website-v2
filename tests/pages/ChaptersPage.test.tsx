@@ -1,5 +1,11 @@
 import React from 'react'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react'
 
 const mockUseTheme = jest.fn()
 const mockUseUserContext = jest.fn()
@@ -126,6 +132,13 @@ const bostonChapter = {
   accessMode: 'PUBLIC',
   viewerMembership: null,
   memberships: [],
+  nextEvent: {
+    id: 'event-boston-demo-night',
+    title: 'Boston Demo Night',
+    slug: 'demo-night',
+    startTime: '2026-07-18T22:00:00.000Z',
+    publicLocation: 'Kendall Square',
+  },
   upcomingEvents: [
     {
       id: 'event-boston-demo-night',
@@ -138,6 +151,41 @@ const bostonChapter = {
     },
   ],
 }
+
+const sanFranciscoChapter = {
+  id: 'chapter-san-francisco',
+  name: 'Sundai San Francisco',
+  slug: 'san-francisco',
+  city: 'San Francisco',
+  region: 'CA',
+  country: 'US',
+  timezone: 'America/Los_Angeles',
+  description: 'West Coast builders and demos.',
+  status: 'ACTIVE',
+  accessMode: 'PUBLIC',
+  viewerMembership: null,
+  memberships: [],
+  nextEvent: {
+    id: 'event-sf-agent-salon',
+    title: 'Agent Salon',
+    slug: 'agent-salon',
+    startTime: '2026-07-12T23:30:00.000Z',
+    publicLocation: 'Mission District',
+  },
+  upcomingEvents: [
+    {
+      id: 'event-sf-agent-salon',
+      title: 'Agent Salon',
+      slug: 'agent-salon',
+      status: 'PUBLISHED',
+      visibility: 'PUBLIC',
+      startsAt: '2026-07-12T23:30:00.000Z',
+      publicLocation: 'Mission District',
+    },
+  ],
+}
+
+const activeChapterDirectory = [bostonChapter, sanFranciscoChapter]
 
 const bostonMemberChapter = {
   ...bostonChapter,
@@ -409,6 +457,18 @@ function mockChapterFetches() {
   }) as jest.Mock
 }
 
+function mockDirectoryFetch(chapters: unknown[]) {
+  global.fetch = jest.fn((input: RequestInfo | URL) => {
+    const url = requestUrl(input)
+
+    if (url.includes('/api/chapters')) {
+      return jsonResponse({ chapters, items: chapters })
+    }
+
+    return jsonResponse({})
+  }) as jest.Mock
+}
+
 async function expectSomeText(...patterns: RegExp[]) {
   await waitFor(() => {
     expect(
@@ -451,6 +511,56 @@ describe('chapter public directory and landing pages', () => {
   })
 
   describe('/chapters', () => {
+    it('renders active chapter cards with city, timezone, and next event links', async () => {
+      mockDirectoryFetch(activeChapterDirectory)
+
+      renderDirectoryPage()
+
+      const bostonCardLink = await screen.findByRole('link', {
+        name: /sundai boston/i,
+      })
+      const bostonCard =
+        bostonCardLink.closest('article') ??
+        bostonCardLink.closest('li') ??
+        bostonCardLink
+      expect(within(bostonCard).getByText(/^Boston$/i)).toBeInTheDocument()
+      expect(bostonCard).toHaveTextContent(/America\/New_York|Eastern/i)
+
+      const sfCardLink = await screen.findByRole('link', {
+        name: /sundai san francisco/i,
+      })
+      const sfCard =
+        sfCardLink.closest('article') ?? sfCardLink.closest('li') ?? sfCardLink
+      expect(
+        within(sfCard).getByText(/^San Francisco$/i),
+      ).toBeInTheDocument()
+      expect(sfCard).toHaveTextContent(/America\/Los_Angeles|Pacific/i)
+
+      expect(
+        await screen.findByRole('link', { name: /boston demo night/i }),
+      ).toHaveAttribute('href', '/events/boston/demo-night')
+      expect(screen.getByRole('link', { name: /agent salon/i })).toHaveAttribute(
+        'href',
+        '/events/san-francisco/agent-salon',
+      )
+    })
+
+    it('shows the chapter directory empty state when no active chapters are available', async () => {
+      mockDirectoryFetch([])
+
+      renderDirectoryPage()
+
+      expect(
+        await screen.findByText(/no chapters are available/i),
+      ).toBeInTheDocument()
+      expect(
+        screen.queryByRole('link', { name: /sundai boston/i }),
+      ).not.toBeInTheDocument()
+      expect(
+        screen.queryByRole('link', { name: /sundai san francisco/i }),
+      ).not.toBeInTheDocument()
+    })
+
     it('shows active public chapters to signed-out visitors and hides unauthorized private chapters', async () => {
       mockSignedOut()
 

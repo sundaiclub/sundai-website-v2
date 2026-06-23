@@ -53,6 +53,8 @@ model Hacker {
   applicationTemplates      ApplicationTemplate[]         @relation("ApplicationTemplateCreator")
   eventRegistrations        EventRegistration[]           @relation("EventRegistrationHacker")
   decidedRegistrations      EventRegistration[]           @relation("EventRegistrationDecider")
+  cancelledRegistrations    EventRegistration[]           @relation("EventRegistrationCanceller")
+  applicationsClosedEvents  Event[]                       @relation("EventApplicationsClosedBy")
   registrationAudits        EventRegistrationAudit[]      @relation("RegistrationAuditActor")
   createdUserBans           UserBan[]                     @relation("UserBanCreator")
   revokedUserBans           UserBan[]                     @relation("UserBanRevoker")
@@ -264,9 +266,8 @@ enum EventVisibility {
 }
 
 enum EventApplicationMode {
-  NONE
-  INTERNAL
-  PUBLIC_LATER
+  REQUIRES_APPROVAL
+  OPEN_RSVP
 }
 
 enum EventStaffRole {
@@ -290,7 +291,7 @@ enum EventRegistrationStatus {
 
 enum EventRegistrationSource {
   INTERNAL
-  PUBLIC_LATER
+  WEBSITE
   IMPORT
 }
 
@@ -343,12 +344,18 @@ model Event {
   programType                 String?
   publicProgramLabel          String?
   capacity                    Int?
-  applicationMode             EventApplicationMode     @default(NONE)
+  applicationMode             EventApplicationMode     @default(REQUIRES_APPROVAL)
   autoPromoteWaitlist         Boolean                  @default(false)
   approvedDetailsJson         Json?
   applicationQuestionsJson    Json?
   hideChapterDefaultQuestions Boolean                  @default(false)
-  applicationsOpen            DateTime?
+  confirmationMessage         String?
+  waitlistMessage             String?
+  declineMessage              String?
+  applicationsOpen            Boolean                  @default(true)
+  applicationsClosedAt        DateTime?
+  applicationsClosedBy        Hacker?                  @relation("EventApplicationsClosedBy", fields: [applicationsClosedById], references: [id])
+  applicationsClosedById      String?
   applicationsCloseReason     String?
   checkInOpensAt              DateTime?
   checkInClosesAt             DateTime?
@@ -493,15 +500,22 @@ model EventRegistration {
   templateSnapshotJson Json?
   publicSafeMessage    String?
   internalReviewNotes  String?
+  submittedAt          DateTime                 @default(now())
   decidedBy            Hacker?                  @relation("EventRegistrationDecider", fields: [decidedById], references: [id])
   decidedById          String?
   decidedAt            DateTime?
+  cancelledBy          Hacker?                  @relation("EventRegistrationCanceller", fields: [cancelledById], references: [id])
+  cancelledById        String?
+  cancelledAt          DateTime?
+  waitlistedAt         DateTime?
   createdAt            DateTime                 @default(now())
   updatedAt            DateTime                 @updatedAt
   audits               EventRegistrationAudit[]
 
   @@unique([eventId, hackerId])
   @@index([eventId, status])
+  @@index([eventId, status, cancelledAt])
+  @@index([eventId, status, waitlistedAt])
   @@index([hackerId, status])
 }
 

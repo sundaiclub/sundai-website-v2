@@ -1,8 +1,16 @@
 import prisma from '@/lib/prisma';
 import type {
+  ApplicationControlsState,
   ApplicationTemplateScope,
   EntityId,
+  EventApplicationMode,
+  JsonObject,
+  JsonValue,
   MergedApplicationTemplate,
+  PublicEventStatus,
+  PublicViewerRegistrationState,
+  RegistrationFormValidationError,
+  RegistrationStatus,
   TemplateFieldDefinition,
   TemplateFieldOption,
   TemplateFieldType,
@@ -117,6 +125,54 @@ interface FetchMergedApplicationTemplateInput {
   chapterId?: EntityId | null;
   eventId?: EntityId | null;
   prisma?: ApplicationTemplatePrismaClient;
+}
+
+export interface ApplicationControlStateInput {
+  applicationMode: EventApplicationMode;
+  applicationsOpen?: boolean | null;
+  applicationsClosedAt?: Date | string | null;
+  applicationsCloseReason?: string | null;
+  capacity?: number | null;
+  approvedCount?: number | null;
+  autoPromoteWaitlist?: boolean | null;
+  startTime?: Date | string | null;
+  endTime?: Date | string | null;
+  now?: Date;
+  viewerSignedIn?: boolean;
+  viewerRegistration?: Pick<
+    PublicViewerRegistrationState,
+    'status' | 'publicSafeMessage'
+  > | null;
+  waitlistAvailable?: boolean;
+  includeCloseReason?: boolean;
+}
+
+export interface ProfilePrefillSource {
+  name?: string | null;
+  email?: string | null;
+  phoneNumber?: string | null;
+  username?: string | null;
+  bio?: string | null;
+  githubUrl?: string | null;
+  linkedinUrl?: string | null;
+  twitterUrl?: string | null;
+  websiteUrl?: string | null;
+  discordName?: string | null;
+}
+
+export interface ApplicationProfilePrefillInput {
+  fields: readonly TemplateFieldDefinition[];
+  profile?: ProfilePrefillSource | null;
+  existingAnswers?: JsonObject | null;
+}
+
+export interface PublicSafeStatusMessageInput {
+  status?: RegistrationStatus | null;
+  publicSafeMessage?: string | null;
+  applicationControls?: Pick<
+    ApplicationControlsState,
+    'publicStatus' | 'signInRequired' | 'disabledReason'
+  > | null;
 }
 
 export class ApplicationTemplateValidationError extends Error {
@@ -366,6 +422,194 @@ export function parseTemplateFieldsJson(
   return normalizeTemplateFields(fields);
 }
 
+export function buildApplicationControlsState(
+  input: ApplicationControlStateInput
+): ApplicationControlsState {
+  const applicationsOpen = input.applicationsOpen === true;
+  const publicStatus = getApplicationPublicStatus(input);
+  const registrationStatus = input.viewerRegistration?.status ?? null;
+  const canEditAnswers = registrationStatus === 'PENDING';
+  const canCancelRegistration =
+    registrationStatus === 'PENDING' ||
+    registrationStatus === 'APPROVED' ||
+    registrationStatus === 'WAITLISTED';
+  const signInRequired = input.viewerSignedIn !== true && !registrationStatus;
+  const disabledReason = getApplicationDisabledReason({
+    ...input,
+    publicStatus,
+    applicationsOpen,
+    registrationStatus,
+  });
+
+  return {
+    applicationMode: input.applicationMode,
+    applicationsOpen,
+    applicationsClosedAt: input.applicationsClosedAt ?? null,
+    applicationsCloseReason:
+      input.includeCloseReason === true
+        ? normalizePublicSafeMessage(input.applicationsCloseReason)
+        : null,
+    capacity: input.capacity ?? null,
+    approvedCount: input.approvedCount ?? 0,
+    autoPromoteWaitlist: input.autoPromoteWaitlist === true,
+    publicStatus,
+    canSubmit: disabledReason === null,
+    canEditAnswers,
+    canCancelRegistration,
+    signInRequired,
+    disabledReason,
+    publicMessage: getPublicSafeApplicationStatusMessage({
+      status: registrationStatus,
+      publicSafeMessage: input.viewerRegistration?.publicSafeMessage ?? null,
+      applicationControls: {
+        publicStatus,
+        signInRequired,
+        disabledReason,
+      },
+    }),
+  };
+}
+
+export function getApplicationPublicStatus(
+  input: Pick<
+    ApplicationControlStateInput,
+    | 'applicationsOpen'
+    | 'capacity'
+    | 'approvedCount'
+    | 'startTime'
+    | 'endTime'
+    | 'now'
+    | 'waitlistAvailable'
+  >
+): PublicEventStatus {
+  if (hasEventEnded(input)) {
+    return 'ENDED';
+  }
+
+  if (input.applicationsOpen !== true) {
+    return 'CLOSED';
+  }
+
+  if (isApplicationCapacityFull(input)) {
+    return input.waitlistAvailable === true ? 'WAITLIST_AVAILABLE' : 'FULL';
+  }
+
+  return 'OPEN';
+}
+
+export function isApplicationsOpenForSubmission(
+  input: Pick<
+    ApplicationControlStateInput,
+    'applicationsOpen' | 'startTime' | 'endTime' | 'now'
+  >
+): boolean {
+  return input.applicationsOpen === true && !hasEventEnded(input);
+}
+
+export function validateApplicationAnswersAgainstSnapshot(
+  snapshot: unknown,
+  answers: JsonObject | null | undefined
+): RegistrationFormValidationError[] {
+  const fields = parseTemplateFieldsJson(snapshot, 'templateSnapshotJson');
+
+  return validateRequiredApplicationAnswers(fields, answers);
+}
+
+export function validateRequiredApplicationAnswers(
+  fields: readonly TemplateFieldDefinition[],
+  answers: JsonObject | null | undefined
+): RegistrationFormValidationError[] {
+  const answerMap = answers ?? {};
+  const errors: RegistrationFormValidationError[] = [];
+
+  for (const field of fields) {
+    const value = answerMap[field.id];
+
+    if (field.required && isBlankApplicationAnswer(value, field.type)) {
+      errors.push({
+        fieldId: field.id,
+        message: `${field.label} is required.`,
+      });
+    }
+  }
+
+  return errors;
+}
+
+export function mapProfileToApplicationPrefill(
+  input: ApplicationProfilePrefillInput
+): JsonObject {
+  const profile = input.profile;
+  const existingAnswers = input.existingAnswers ?? {};
+  const prefill: JsonObject = {};
+
+  if (!profile) {
+    return prefill;
+  }
+
+  for (const field of input.fields) {
+    if (existingAnswers[field.id] !== undefined) {
+      continue;
+    }
+
+    const value = getProfilePrefillValue(field, profile);
+
+    if (value !== null) {
+      prefill[field.id] = value;
+    }
+  }
+
+  return prefill;
+}
+
+export function applyProfilePrefillToAnswers(
+  input: ApplicationProfilePrefillInput
+): JsonObject {
+  return {
+    ...mapProfileToApplicationPrefill(input),
+    ...(input.existingAnswers ?? {}),
+  };
+}
+
+export function getPublicSafeApplicationStatusMessage(
+  input: PublicSafeStatusMessageInput
+): string | null {
+  const configuredMessage = normalizePublicSafeMessage(input.publicSafeMessage);
+
+  if (input.status === 'BLOCKED') {
+    return 'You are unable to register for this event at this time.';
+  }
+
+  if (configuredMessage) {
+    return configuredMessage;
+  }
+
+  switch (input.status) {
+    case 'PENDING':
+      return 'Your application is pending review.';
+    case 'APPROVED':
+      return 'You are approved for this event.';
+    case 'WAITLISTED':
+      return 'You are on the waitlist for this event.';
+    case 'DECLINED':
+      return 'We cannot accommodate your application for this event.';
+    case 'CANCELLED':
+      return 'Your registration has been cancelled.';
+    default:
+      break;
+  }
+
+  if (input.applicationControls?.signInRequired) {
+    return 'Sign in to register for this event.';
+  }
+
+  if (input.applicationControls?.disabledReason) {
+    return input.applicationControls.disabledReason;
+  }
+
+  return null;
+}
+
 async function fetchActiveApplicationTemplate(
   input: FetchApplicationTemplateInput
 ): Promise<ApplicationTemplatePrismaRecord | null> {
@@ -547,6 +791,170 @@ function cloneTemplateField(
     options: field.options?.map(option => ({ ...option })),
     validation: field.validation ? { ...field.validation } : undefined,
   };
+}
+
+function getApplicationDisabledReason(
+  input: ApplicationControlStateInput & {
+    publicStatus: PublicEventStatus;
+    applicationsOpen: boolean;
+    registrationStatus: RegistrationStatus | null;
+  }
+): string | null {
+  if (input.registrationStatus) {
+    return 'You already have a registration for this event.';
+  }
+
+  if (input.viewerSignedIn !== true) {
+    return 'Sign in to register for this event.';
+  }
+
+  if (input.publicStatus === 'ENDED') {
+    return 'This event has ended.';
+  }
+
+  if (!input.applicationsOpen || input.publicStatus === 'CLOSED') {
+    return 'Applications are closed for this event.';
+  }
+
+  if (input.publicStatus === 'FULL') {
+    return 'This event is full.';
+  }
+
+  return null;
+}
+
+function isApplicationCapacityFull(
+  input: Pick<ApplicationControlStateInput, 'capacity' | 'approvedCount'>
+): boolean {
+  return (
+    typeof input.capacity === 'number' &&
+    Number.isFinite(input.capacity) &&
+    input.capacity > 0 &&
+    (input.approvedCount ?? 0) >= input.capacity
+  );
+}
+
+function hasEventEnded(
+  input: Pick<ApplicationControlStateInput, 'startTime' | 'endTime' | 'now'>
+): boolean {
+  const now = input.now ?? new Date();
+  const endTime = coerceDate(input.endTime);
+  const startTime = coerceDate(input.startTime);
+  const cutoff = endTime ?? startTime;
+
+  return cutoff !== null && cutoff.getTime() <= now.getTime();
+}
+
+function coerceDate(value: Date | string | null | undefined): Date | null {
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : value;
+  }
+
+  if (typeof value !== 'string' || value.trim().length === 0) {
+    return null;
+  }
+
+  const date = new Date(value);
+
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function isBlankApplicationAnswer(
+  value: JsonValue | undefined,
+  fieldType: TemplateFieldType
+): boolean {
+  if (value === undefined || value === null) {
+    return true;
+  }
+
+  if (typeof value === 'string') {
+    return value.trim().length === 0;
+  }
+
+  if (Array.isArray(value)) {
+    return value.length === 0;
+  }
+
+  if (fieldType === 'BOOLEAN') {
+    return typeof value !== 'boolean';
+  }
+
+  return false;
+}
+
+function getProfilePrefillValue(
+  field: TemplateFieldDefinition,
+  profile: ProfilePrefillSource
+): JsonValue | null {
+  const profileValue = getProfileFieldValue(field.id, profile);
+
+  if (profileValue === null) {
+    return null;
+  }
+
+  if (!canPrefillFieldType(field.type)) {
+    return null;
+  }
+
+  return profileValue;
+}
+
+function getProfileFieldValue(
+  fieldId: string,
+  profile: ProfilePrefillSource
+): string | null {
+  const normalizedFieldId = normalizeFieldId(fieldId);
+  const profileValues: Record<string, string | null | undefined> = {
+    name: profile.name,
+    fullname: profile.name,
+    email: profile.email,
+    phonenumber: profile.phoneNumber,
+    phone: profile.phoneNumber,
+    username: profile.username,
+    handle: profile.username,
+    bio: profile.bio,
+    githuburl: profile.githubUrl,
+    github: profile.githubUrl,
+    linkedinurl: profile.linkedinUrl,
+    linkedin: profile.linkedinUrl,
+    twitterurl: profile.twitterUrl,
+    twitter: profile.twitterUrl,
+    websiteurl: profile.websiteUrl,
+    website: profile.websiteUrl,
+    discordname: profile.discordName,
+    discord: profile.discordName,
+  };
+  const value = profileValues[normalizedFieldId];
+
+  return typeof value === 'string' && value.trim().length > 0
+    ? value.trim()
+    : null;
+}
+
+function normalizeFieldId(fieldId: string): string {
+  return fieldId.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+}
+
+function canPrefillFieldType(fieldType: TemplateFieldType): boolean {
+  return (
+    fieldType === 'TEXT' ||
+    fieldType === 'TEXTAREA' ||
+    fieldType === 'EMAIL' ||
+    fieldType === 'PHONE' ||
+    fieldType === 'URL'
+  );
+}
+
+function normalizePublicSafeMessage(
+  message: string | null | undefined
+): string | null {
+  if (typeof message !== 'string') {
+    return null;
+  }
+
+  const trimmedMessage = message.trim();
+
+  return trimmedMessage.length > 0 ? trimmedMessage : null;
 }
 
 function coerceTemplateField(value: unknown): TemplateFieldDefinition {

@@ -5,8 +5,12 @@ jest.mock('@/lib/prisma', () => ({
 
 import {
   ApplicationTemplateValidationError,
+  applyProfilePrefillToAnswers,
   composeApplicationFields,
+  mapProfileToApplicationPrefill,
   parseTemplateFieldsJson,
+  validateApplicationAnswersAgainstSnapshot,
+  validateRequiredApplicationAnswers,
   validateSiteRequiredFields,
 } from '../../src/lib/applicationTemplates';
 import type { TemplateFieldDefinition } from '../../src/types/event-management';
@@ -272,5 +276,223 @@ describe('application template composition', () => {
       'SITE_REQUIRED_FIELD_TYPE_CHANGED',
       'email'
     );
+  });
+
+  it('merges application schema layers in site, chapter, then event order', () => {
+    const fields = composeApplicationFields({
+      siteFields: [
+        siteRequiredFields[1],
+        siteRequiredFields[0],
+        field('siteOptIn', {
+          label: 'Site opt-in',
+          type: 'BOOLEAN',
+          order: 2,
+        }),
+      ],
+      chapterFields: [
+        field('chapterQuestion', {
+          label: 'Chapter question',
+          order: 1,
+        }),
+        field('sharedNonSiteQuestion', {
+          label: 'Chapter shared question',
+          order: 0,
+        }),
+      ],
+      eventFields: [
+        field('eventQuestion', {
+          label: 'Event question',
+          order: 0,
+        }),
+        field('sharedNonSiteQuestion', {
+          label: 'Event shared question',
+          type: 'TEXTAREA',
+          required: true,
+          order: 1,
+        }),
+      ],
+    });
+
+    expect(fields.map(item => item.id)).toEqual([
+      'name',
+      'email',
+      'siteOptIn',
+      'chapterQuestion',
+      'eventQuestion',
+      'sharedNonSiteQuestion',
+    ]);
+    expect(fields.map(item => item.order)).toEqual([0, 1, 2, 3, 4, 5]);
+    expect(fields.find(item => item.id === 'sharedNonSiteQuestion')).toEqual(
+      expect.objectContaining({
+        label: 'Event shared question',
+        type: 'TEXTAREA',
+        required: true,
+        order: 5,
+      })
+    );
+  });
+
+  it('validates required answers while accepting valid falsey answers', () => {
+    const errors = validateRequiredApplicationAnswers(
+      [
+        field('name', { label: 'Name', required: true }),
+        field('interestAreas', {
+          label: 'Interest areas',
+          type: 'MULTI_SELECT',
+          required: true,
+          options: [{ label: 'AI', value: 'ai' }],
+        }),
+        field('hasBuiltBefore', {
+          label: 'Has built before',
+          type: 'BOOLEAN',
+          required: true,
+        }),
+        field('teamSize', {
+          label: 'Team size',
+          type: 'NUMBER',
+          required: true,
+        }),
+      ],
+      {
+        name: '   ',
+        interestAreas: [],
+        hasBuiltBefore: false,
+        teamSize: 0,
+      }
+    );
+
+    expect(errors).toEqual([
+      {
+        fieldId: 'name',
+        message: 'Name is required.',
+      },
+      {
+        fieldId: 'interestAreas',
+        message: 'Interest areas is required.',
+      },
+    ]);
+  });
+
+  it('prefills profile-backed fields without overwriting existing answers', () => {
+    const fields = [
+      field('full_name', { label: 'Full name', required: true }),
+      field('email', {
+        label: 'Email',
+        type: 'EMAIL',
+        required: true,
+      }),
+      field('phone-number', {
+        label: 'Phone number',
+        type: 'PHONE',
+      }),
+      field('github', {
+        label: 'GitHub',
+        type: 'URL',
+      }),
+      field('bio', {
+        label: 'Bio',
+        type: 'TEXTAREA',
+      }),
+      field('yearsExperience', {
+        label: 'Years of experience',
+        type: 'NUMBER',
+      }),
+    ];
+    const profile = {
+      name: ' Ada Lovelace ',
+      email: 'ada@example.com',
+      phoneNumber: ' 555-0100 ',
+      githubUrl: 'https://github.com/ada',
+      bio: 'First programmer',
+    };
+    const existingAnswers = {
+      email: 'chosen@example.com',
+      customQuestion: 'keep me',
+    };
+
+    expect(
+      mapProfileToApplicationPrefill({
+        fields,
+        profile,
+        existingAnswers,
+      })
+    ).toEqual({
+      full_name: 'Ada Lovelace',
+      'phone-number': '555-0100',
+      github: 'https://github.com/ada',
+      bio: 'First programmer',
+    });
+    expect(
+      applyProfilePrefillToAnswers({
+        fields,
+        profile,
+        existingAnswers,
+      })
+    ).toEqual({
+      full_name: 'Ada Lovelace',
+      'phone-number': '555-0100',
+      github: 'https://github.com/ada',
+      bio: 'First programmer',
+      email: 'chosen@example.com',
+      customQuestion: 'keep me',
+    });
+  });
+
+  it('validates submitted answers against the preserved template snapshot', () => {
+    const originalSnapshot = composeApplicationFields({
+      siteFields: siteRequiredFields,
+      chapterFields: [
+        field('chapterNeed', {
+          label: 'Chapter need',
+          required: true,
+        }),
+      ],
+      eventFields: [
+        field('launchPlan', {
+          label: 'Launch plan',
+          type: 'TEXTAREA',
+          required: true,
+        }),
+      ],
+    });
+    const updatedCurrentFields = composeApplicationFields({
+      siteFields: siteRequiredFields,
+      chapterFields: [
+        field('chapterNeed', {
+          label: 'Chapter need',
+          required: false,
+        }),
+      ],
+      eventFields: [
+        field('newQuestion', {
+          label: 'New question',
+          required: true,
+        }),
+      ],
+    });
+
+    expect(updatedCurrentFields.map(item => item.id)).toEqual([
+      'name',
+      'email',
+      'chapterNeed',
+      'newQuestion',
+    ]);
+    expect(
+      validateApplicationAnswersAgainstSnapshot(originalSnapshot, {
+        name: 'Grace Hopper',
+        email: 'grace@example.com',
+        chapterNeed: '',
+        newQuestion: '',
+      })
+    ).toEqual([
+      {
+        fieldId: 'chapterNeed',
+        message: 'Chapter need is required.',
+      },
+      {
+        fieldId: 'launchPlan',
+        message: 'Launch plan is required.',
+      },
+    ]);
   });
 });

@@ -7,9 +7,14 @@ jest.mock('../../src/lib/prisma', () => ({
   default: {
     event: {
       findMany: jest.fn(),
+      findFirst: jest.fn(),
       create: jest.fn(),
       findUnique: jest.fn(),
       update: jest.fn(),
+    },
+    eventRegistration: {
+      findMany: jest.fn(),
+      findFirst: jest.fn(),
     },
     hacker: {
       findUnique: jest.fn(),
@@ -41,12 +46,53 @@ jest.mock('@clerk/nextjs/server', () => ({
 const prisma = require('../../src/lib/prisma').default;
 const mockAuth = require('@clerk/nextjs/server').auth as jest.Mock;
 
+function buildPublicEvent(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'evt-1',
+    slug: 'test',
+    title: 'Test',
+    description: 'Public test event',
+    startTime: new Date('2026-07-01T18:00:00.000Z'),
+    endTime: new Date('2026-07-01T20:00:00.000Z'),
+    publicLocation: 'Boston, MA',
+    status: 'PUBLISHED',
+    visibility: 'PUBLIC',
+    publicProgramLabel: null,
+    programType: 'HACK_NIGHT',
+    capacity: 40,
+    applicationMode: 'REQUIRES_APPROVAL',
+    applicationsOpen: true,
+    applicationsClosedAt: null,
+    applicationsCloseReason: null,
+    autoPromoteWaitlist: true,
+    approvedDetailsJson: null,
+    applicationQuestionsJson: null,
+    hideChapterDefaultQuestions: false,
+    chapterId: 'chapter-boston',
+    chapter: {
+      id: 'chapter-boston',
+      slug: 'boston',
+      name: 'Sundai Boston',
+      timezone: 'America/New_York',
+      status: 'ACTIVE',
+      accessMode: 'PUBLIC',
+    },
+    _count: {
+      registrations: 0,
+    },
+    ...overrides,
+  };
+}
+
 describe('/api/events', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockAuth.mockReturnValue({ userId: null });
     prisma.chapterMembership.findMany.mockResolvedValue([]);
     prisma.chapterMembership.findFirst.mockResolvedValue(null);
+    prisma.event.findFirst.mockResolvedValue(null);
+    prisma.eventRegistration.findMany.mockResolvedValue([]);
+    prisma.eventRegistration.findFirst.mockResolvedValue(null);
   });
 
   it('GET lists upcoming events', async () => {
@@ -75,7 +121,7 @@ describe('/api/events', () => {
     expect(prisma.event.findMany).not.toHaveBeenCalled();
   });
 
-  it('GET lists events newest first', async () => {
+  it('GET lists public upcoming events soonest first', async () => {
     prisma.event.findMany.mockResolvedValue([]);
 
     const request = new NextRequest('http://localhost:3000/api/events');
@@ -84,7 +130,7 @@ describe('/api/events', () => {
     expect(res.status).toBe(200);
     expect(prisma.event.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        orderBy: { startTime: 'desc' },
+        orderBy: [{ startTime: 'asc' }, { title: 'asc' }],
       })
     );
   });
@@ -119,29 +165,44 @@ describe('/api/events/[eventId]', () => {
     mockAuth.mockReturnValue({ userId: null });
     prisma.chapterMembership.findMany.mockResolvedValue([]);
     prisma.chapterMembership.findFirst.mockResolvedValue(null);
+    prisma.event.findFirst.mockResolvedValue(null);
+    prisma.eventRegistration.findMany.mockResolvedValue([]);
+    prisma.eventRegistration.findFirst.mockResolvedValue(null);
   });
 
   it('GET returns 404 when missing', async () => {
-    prisma.event.findUnique.mockResolvedValue(null);
+    prisma.event.findFirst.mockResolvedValue(null);
     const request = new NextRequest('http://localhost:3000/api/events/evt-1');
     const res = await GET_EVENT(request as any, { params: { eventId: 'evt-1' } } as any);
     expect(res.status).toBe(404);
   });
 
-  it('GET single event includes phase field', async () => {
-    prisma.event.findUnique.mockResolvedValue({
-      id: 'evt-1',
-      title: 'Test',
-      phase: 'VOTING',
-      startTime: new Date().toISOString(),
-      projects: [],
-      staff: [],
-    });
+  it('GET single event returns public event detail', async () => {
+    prisma.event.findFirst.mockResolvedValue(buildPublicEvent());
     const request = new NextRequest('http://localhost:3000/api/events/evt-1');
     const res = await GET_EVENT(request as any, { params: { eventId: 'evt-1' } } as any);
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.phase).toBe('VOTING');
+    expect(body).toEqual(
+      expect.objectContaining({
+        id: 'evt-1',
+        slug: 'test',
+        title: 'Test',
+        description: 'Public test event',
+        publicLocation: 'Boston, MA',
+        approvedDetailsVisible: false,
+        viewerRegistration: null,
+      })
+    );
+    expect(body.applicationControls).toEqual(
+      expect.objectContaining({
+        applicationMode: 'REQUIRES_APPROVAL',
+        applicationsOpen: true,
+        canSubmit: false,
+        signInRequired: true,
+      })
+    );
+    expect(body).not.toHaveProperty('phase');
   });
 
   it('GET management event details requires sign-in', async () => {

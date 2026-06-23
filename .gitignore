@@ -10,6 +10,7 @@
 /.pnp
 .pnp.js
 .yarn/install-state.gz
+dist/
 
 # testing
 /coverage
@@ -26,6 +27,7 @@
 *.pem
 
 # debug
+*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*

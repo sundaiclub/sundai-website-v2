@@ -1,6 +1,7 @@
 'use client';
 
 import Image from 'next/image';
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import {
   ManagementAlert,
@@ -277,7 +278,12 @@ export default function ChapterLandingPage({
           <div className={`divide-y ${classes.divider}`}>
             {(chapter?.upcomingEvents ?? []).map(event => (
               <div key={event.id} className="py-3">
-                <div className="font-semibold">{event.title}</div>
+                <Link
+                  className="font-semibold hover:underline"
+                  href={`/events/${chapter.slug}/${event.slug}`}
+                >
+                  {event.title}
+                </Link>
                 <div className={`mt-1 text-sm ${classes.mutedText}`}>
                   {event.publicLocation}
                 </div>
@@ -290,6 +296,17 @@ export default function ChapterLandingPage({
             )}
           </div>
         </ManagementSection>
+
+        {chapter?.mailingListName && (
+          <ManagementSection
+            title="Mailing list"
+            description={`${chapter.mailingListName} shares chapter updates and event announcements.`}
+          >
+            <button className={classes.secondaryButton} type="button">
+              Join mailing list
+            </button>
+          </ManagementSection>
+        )}
 
         {(actionMessage || actionError) && (
           <ManagementAlert tone={actionError ? 'danger' : 'success'}>

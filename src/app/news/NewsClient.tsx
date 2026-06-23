@@ -181,7 +181,7 @@ export default function NewsClient() {
           <li>We discuss AI tools and frameworks every week</li>
           <li>Meets virtually on <a href="https://discord.com/invite/EVbrS8aEC9">Discord</a> </li>
           <li>Community toolbox - <a href="http://www.tiny.cc/sundai-toolbox">tiny.cc/sundai-toolbox</a></li>
-          <li>Add it to your <a href="https://calendar.google.com/calendar/event?action=TEMPLATE&tmeid=N3U0bThmcTZjM2oxcjBiajU0djYxaG85bThfMjAyNTEwMTRUMjEwMDAwWiBiOTYwOGM1MWQ4Nzg0OGQzMGFhNmFiMzZkNjQ5MzJmOTIxNmZmZmM5NzZlMzQ4NzNkZjcxNWRjN2QyNDBiNjhiQGc&tmsrc=b9608c51d87848d30aa6ab36d64932f9216fffc976e34873df715dc7d240b68b%40group.calendar.google.com&scp=ALL">calendar </a></li>
+          <li>Find the next session on <a href="/events">Sundai events</a></li>
           <li>[YouTube channel is coming]</li>
 
         </ul>
@@ -194,8 +194,8 @@ export default function NewsClient() {
       <section id="community" style="padding:20px 16px;border-bottom:1px solid #e5e7eb">
         <h2 style="margin:0 0 8px;font-size:18px;line-height:26px;color:#111827;display:flex;align-items:center;gap:8px"> Community News</h2>
         <ul style="margin:8px 0 0 18px;color:#374151;padding:0">
-          <li>Subscribe to <a href="https://calendar.google.com/calendar/u/0?cid=Yjk2MDhjNTFkODc4NDhkMzBhYTZhYjM2ZDY0OTMyZjkyMTZmZmZjOTc2ZTM0ODczZGY3MTVkYzdkMjQwYjY4YkBncm91cC5jYWxlbmRhci5nb29nbGUuY29t">our calendar</a></li> to get all the events handy; </li>
-          <li>Weekly Community Meeting - Tuesdays @8:30 - <a href="https://calendar.google.com/calendar/u/0?cid=Yjk2MDhjNTFkODc4NDhkMzBhYTZhYjM2ZDY0OTMyZjkyMTZmZmZjOTc2ZTM0ODczZGY3MTVkYzdkMjQwYjY4YkBncm91cC5jYWxlbmRhci5nb29nbGUuY29t">calendar invite</a>  -- give us feedback, propose a new Sundai initiative;</li>
+          <li>Browse <a href="/events">Sundai events</a> to get all the events handy;</li>
+          <li>Weekly Community Meeting - Tuesdays @8:30 - give us feedback, propose a new Sundai initiative;</li>
           <li>Get promoted to <a href="https://partiful.com/e/GZfEKvYQlIrk21mzx6Qe">#hacker role</a> - attend at least 4+ sundais</li>
           <li>Organize a <a href="https://partiful.com/e/iROjbe4j0PiKtaGop8SD">Sundai Hack as an MC</a> - get featured on our website</li>
           <li>Start <a href="https://partiful.com/e/dEh518Skq6MZqcXVNa3d">a chapter in your city</a>. Read our <a href="https://github.com/sergeicu/sundai-global">Constitution & Guide</a>. </li>

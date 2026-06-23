@@ -9,6 +9,8 @@ const {
   EventStatus,
   EventVisibility,
   EventApplicationMode,
+  EventRegistrationStatus,
+  EventRegistrationSource,
   ApplicationTemplateScope,
 } = require("@prisma/client");
 
@@ -117,7 +119,7 @@ async function main() {
     }),
   ]);
 
-  const [connor, sam, serge, artem, vlad] = users;
+  const [connor, sam, serge, testHacker, artem, vlad, abhishek] = users;
 
   const bostonChapter = await prisma.chapter.create({
     data: {
@@ -127,9 +129,12 @@ async function main() {
       region: "MA",
       country: "US",
       timezone: "America/New_York",
-      description: "Initial Boston chapter for Sundai event operations.",
+      description:
+        "Boston hackers building and demoing AI projects every Sunday.",
       status: "ACTIVE",
       accessMode: "PUBLIC",
+      mailingListName: "Sundai Boston",
+      mailingListExternalId: "sundai-boston",
       memberships: {
         create: [connor, sam, serge, artem].map((admin) => ({
           hackerId: admin.id,
@@ -317,29 +322,292 @@ async function main() {
     });
   }
 
-  // Create a sample upcoming Event with MCs and a queue
+  // Create sample upcoming Events with MCs, RSVP state, and a queue
   const allProjects = await prisma.project.findMany({});
   const start = new Date();
   start.setMinutes(start.getMinutes() + 60); // starts in 60 minutes
+  const workshopStart = new Date(start.getTime() + 7 * 24 * 60 * 60 * 1000);
+  const closedEventStart = new Date(start.getTime() + 14 * 24 * 60 * 60 * 1000);
   const sampleEvent = await prisma.event.create({
     data: {
       title: "Sundai Weekly Pitch Night",
       description: "Weekly demos and lightning pitches from the Sundai community.",
       startTime: start,
+      endTime: new Date(start.getTime() + 2 * 60 * 60 * 1000),
       chapterId: bostonChapter.id,
       slug: "weekly-pitch-night",
       status: EventStatus.PUBLISHED,
       visibility: EventVisibility.PUBLIC,
-      applicationMode: EventApplicationMode.NONE,
+      applicationMode: EventApplicationMode.REQUIRES_APPROVAL,
+      applicationsOpen: true,
+      applicationsClosedAt: null,
+      applicationsClosedById: null,
+      applicationsCloseReason: null,
+      capacity: 40,
+      programType: "pitch-night",
+      publicProgramLabel: "Pitch Night",
       meetingUrl: "https://zoom.us/j/1234567890",
-      location: "Hybrid",
-      publicLocation: "Hybrid",
+      location: "Sundai Boston Studio",
+      venueName: "Sundai Boston Studio",
+      publicLocation: "Hybrid - Boston, MA",
+      address: "Approved attendees receive the studio address by email.",
       virtualUrl: "https://zoom.us/j/1234567890",
+      approvedDetailsJson: {
+        arrivalInstructions:
+          "Use the side entrance after 6:00 PM and check in with the MC.",
+        virtualJoinUrl: "https://zoom.us/j/1234567890",
+        wifi: "Network details are shared at check-in.",
+      },
+      applicationQuestionsJson: [
+        {
+          id: "project-summary",
+          label: "What are you building or interested in pitching?",
+          type: "TEXTAREA",
+          required: true,
+          order: 10,
+        },
+      ],
+      hideChapterDefaultQuestions: false,
+      autoPromoteWaitlist: false,
       createdById: users[0].id,
       staff: {
         create: [
           { hackerId: users[0].id, role: EventStaffRole.MC },
           { hackerId: users[1].id, role: EventStaffRole.MC },
+        ],
+      },
+    },
+  });
+  const publicWorkshopEvent = await prisma.event.create({
+    data: {
+      title: "AI Agent Build Workshop",
+      description:
+        "Hands-on build session for hackers shipping useful AI agents.",
+      startTime: workshopStart,
+      endTime: new Date(workshopStart.getTime() + 3 * 60 * 60 * 1000),
+      chapterId: bostonChapter.id,
+      slug: "ai-agent-build-workshop",
+      status: EventStatus.PUBLISHED,
+      visibility: EventVisibility.PUBLIC,
+      applicationMode: EventApplicationMode.OPEN_RSVP,
+      applicationsOpen: true,
+      applicationsClosedAt: null,
+      applicationsClosedById: null,
+      applicationsCloseReason: null,
+      capacity: 24,
+      programType: "workshop",
+      publicProgramLabel: "Workshop",
+      venueName: "Sundai Boston Studio",
+      publicLocation: "Boston, MA",
+      address: "Approved attendees receive the studio address by email.",
+      approvedDetailsJson: {
+        preparation:
+          "Bring a laptop with Node.js installed and API keys ready for local development.",
+        room: "Workshop Room A",
+      },
+      applicationQuestionsJson: [
+        {
+          id: "agent-idea",
+          label: "What agent workflow do you want to build?",
+          type: "TEXTAREA",
+          required: true,
+          order: 10,
+        },
+      ],
+      hideChapterDefaultQuestions: false,
+      autoPromoteWaitlist: false,
+      createdById: connor.id,
+      staff: {
+        create: [
+          { hackerId: connor.id, role: EventStaffRole.MC },
+          { hackerId: sam.id, role: EventStaffRole.CO_MC },
+        ],
+      },
+    },
+  });
+  const closedApplicationsEvent = await prisma.event.create({
+    data: {
+      title: "Sundai Founder Dinner",
+      description:
+        "Small-group dinner for builders comparing notes on early AI products.",
+      startTime: closedEventStart,
+      endTime: new Date(closedEventStart.getTime() + 2 * 60 * 60 * 1000),
+      chapterId: bostonChapter.id,
+      slug: "founder-dinner",
+      status: EventStatus.PUBLISHED,
+      visibility: EventVisibility.PUBLIC,
+      applicationMode: EventApplicationMode.REQUIRES_APPROVAL,
+      applicationsOpen: false,
+      applicationsClosedAt: new Date(),
+      applicationsClosedById: connor.id,
+      applicationsCloseReason: "Applications are full for this dinner.",
+      capacity: 12,
+      programType: "dinner",
+      publicProgramLabel: "Dinner",
+      venueName: "Sundai Boston Dinner Venue",
+      publicLocation: "Boston, MA",
+      address: "Approved attendees receive the restaurant reservation details.",
+      approvedDetailsJson: {
+        reservationName: "Sundai Boston",
+        arrivalInstructions:
+          "Ask the host for the Sundai reservation when you arrive.",
+      },
+      applicationQuestionsJson: [
+        {
+          id: "current-product",
+          label: "What product or company are you working on?",
+          type: "TEXTAREA",
+          required: true,
+          order: 10,
+        },
+      ],
+      hideChapterDefaultQuestions: false,
+      autoPromoteWaitlist: false,
+      createdById: connor.id,
+      staff: {
+        create: [{ hackerId: connor.id, role: EventStaffRole.MC }],
+      },
+    },
+  });
+
+  const submittedAt = new Date();
+  await prisma.eventRegistration.create({
+    data: {
+      eventId: sampleEvent.id,
+      hackerId: testHacker.id,
+      status: EventRegistrationStatus.PENDING,
+      source: EventRegistrationSource.WEBSITE,
+      submittedAt,
+      answersJson: {
+        name: testHacker.name,
+        email: testHacker.email,
+        "project-summary": "I want feedback on a retrieval agent demo.",
+      },
+      templateSnapshotJson: {
+        source: "seed",
+        fields: ["name", "email", "project-summary"],
+      },
+      audits: {
+        create: {
+          eventId: sampleEvent.id,
+          actorId: testHacker.id,
+          toStatus: EventRegistrationStatus.PENDING,
+          changeJson: {
+            action: "PUBLIC_APPLICATION_SUBMITTED",
+            source: EventRegistrationSource.WEBSITE,
+          },
+        },
+      },
+    },
+  });
+  await prisma.eventRegistration.create({
+    data: {
+      eventId: sampleEvent.id,
+      hackerId: vlad.id,
+      status: EventRegistrationStatus.APPROVED,
+      source: EventRegistrationSource.WEBSITE,
+      submittedAt,
+      decidedById: connor.id,
+      decidedAt: new Date(),
+      answersJson: {
+        name: vlad.name,
+        email: vlad.email,
+        "project-summary": "I am pitching a full-stack AI debugging tool.",
+      },
+      templateSnapshotJson: {
+        source: "seed",
+        fields: ["name", "email", "project-summary"],
+      },
+      audits: {
+        create: [
+          {
+            eventId: sampleEvent.id,
+            actorId: vlad.id,
+            toStatus: EventRegistrationStatus.PENDING,
+            changeJson: {
+              action: "PUBLIC_APPLICATION_SUBMITTED",
+              source: EventRegistrationSource.WEBSITE,
+            },
+          },
+          {
+            eventId: sampleEvent.id,
+            actorId: connor.id,
+            fromStatus: EventRegistrationStatus.PENDING,
+            toStatus: EventRegistrationStatus.APPROVED,
+            changeJson: { action: "APPLICATION_APPROVED" },
+          },
+        ],
+      },
+    },
+  });
+  await prisma.eventRegistration.create({
+    data: {
+      eventId: publicWorkshopEvent.id,
+      hackerId: abhishek.id,
+      status: EventRegistrationStatus.WAITLISTED,
+      source: EventRegistrationSource.WEBSITE,
+      submittedAt,
+      waitlistedAt: submittedAt,
+      publicSafeMessage:
+        "You are on the waitlist. We will email you if a spot opens.",
+      answersJson: {
+        name: abhishek.name,
+        email: abhishek.email,
+        "agent-idea": "A support triage agent for project teams.",
+      },
+      templateSnapshotJson: {
+        source: "seed",
+        fields: ["name", "email", "agent-idea"],
+      },
+      audits: {
+        create: {
+          eventId: publicWorkshopEvent.id,
+          actorId: abhishek.id,
+          toStatus: EventRegistrationStatus.WAITLISTED,
+          changeJson: {
+            action: "PUBLIC_RSVP_WAITLISTED",
+            source: EventRegistrationSource.WEBSITE,
+          },
+        },
+      },
+    },
+  });
+  await prisma.eventRegistration.create({
+    data: {
+      eventId: closedApplicationsEvent.id,
+      hackerId: vlad.id,
+      status: EventRegistrationStatus.CANCELLED,
+      source: EventRegistrationSource.WEBSITE,
+      submittedAt,
+      cancelledAt: new Date(),
+      cancelledById: vlad.id,
+      answersJson: {
+        name: vlad.name,
+        email: vlad.email,
+        "current-product": "A developer workflow assistant.",
+      },
+      templateSnapshotJson: {
+        source: "seed",
+        fields: ["name", "email", "current-product"],
+      },
+      audits: {
+        create: [
+          {
+            eventId: closedApplicationsEvent.id,
+            actorId: vlad.id,
+            toStatus: EventRegistrationStatus.PENDING,
+            changeJson: {
+              action: "PUBLIC_APPLICATION_SUBMITTED",
+              source: EventRegistrationSource.WEBSITE,
+            },
+          },
+          {
+            eventId: closedApplicationsEvent.id,
+            actorId: vlad.id,
+            fromStatus: EventRegistrationStatus.PENDING,
+            toStatus: EventRegistrationStatus.CANCELLED,
+            changeJson: { action: "REGISTRATION_CANCELLED_BY_USER" },
+          },
         ],
       },
     },

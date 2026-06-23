@@ -1,16 +1,23 @@
 import {
+  canDecideEventRegistrationWithContext,
   canDecideRegistrationsWithContext,
+  canEditRegistrationNotesWithContext,
   canEditOrganizerNoteWithContext,
+  canIncludeBannedUsersInReviewWithContext,
   canManageChapterSettingsWithContext,
   canManageEventSettingsWithContext,
   canManagePitchWithContext,
   canManageRegistrationsWithContext,
+  canPublishEventWithContext,
+  canReviewRegistrationsWithContext,
+  canViewBannedUserReviewContextWithContext,
   canViewChapterWithContext,
   canViewOrganizerNoteRevisionsWithContext,
   canViewOrganizerNoteWithContext,
   getEventStaffForPermissions,
   hasChapterOrganizerNoteRelevance,
   hasEventRegistrationForPermissions,
+  isCoMcNoteOnlyRegistrationReviewerWithContext,
   type ChapterPermissionContext,
   type EventPermissionContext,
   type OrganizerNotePermissionContext,
@@ -349,6 +356,86 @@ describe('event management permission contexts', () => {
         );
         expect(canDecideRegistrationsWithContext(eventContext)).toBe(
           expected.canDecideRegistrations
+        );
+      }
+    );
+
+    it.each([
+      {
+        label: 'chapter admin',
+        eventContext: permissionCases[1].eventContext,
+        expected: {
+          canPublishEvent: true,
+          canReviewRegistrations: true,
+          canDecideEventRegistration: true,
+          canEditRegistrationNotes: true,
+          isCoMcNoteOnlyRegistrationReviewer: false,
+          canViewBannedUserReviewContext: false,
+          canIncludeBannedUsersInReview: false,
+        },
+      },
+      {
+        label: 'event MC',
+        eventContext: permissionCases[3].eventContext,
+        expected: {
+          canPublishEvent: false,
+          canReviewRegistrations: true,
+          canDecideEventRegistration: true,
+          canEditRegistrationNotes: true,
+          isCoMcNoteOnlyRegistrationReviewer: false,
+          canViewBannedUserReviewContext: false,
+          canIncludeBannedUsersInReview: false,
+        },
+      },
+      {
+        label: 'event co-MC',
+        eventContext: permissionCases[4].eventContext,
+        expected: {
+          canPublishEvent: false,
+          canReviewRegistrations: true,
+          canDecideEventRegistration: false,
+          canEditRegistrationNotes: true,
+          isCoMcNoteOnlyRegistrationReviewer: true,
+          canViewBannedUserReviewContext: false,
+          canIncludeBannedUsersInReview: false,
+        },
+      },
+      {
+        label: 'site admin',
+        eventContext: permissionCases[0].eventContext,
+        expected: {
+          canPublishEvent: true,
+          canReviewRegistrations: true,
+          canDecideEventRegistration: true,
+          canEditRegistrationNotes: true,
+          isCoMcNoteOnlyRegistrationReviewer: false,
+          canViewBannedUserReviewContext: true,
+          canIncludeBannedUsersInReview: true,
+        },
+      },
+    ])(
+      'evaluates registration review matrix for $label',
+      ({ eventContext, expected }) => {
+        expect(canPublishEventWithContext(eventContext)).toBe(
+          expected.canPublishEvent
+        );
+        expect(canReviewRegistrationsWithContext(eventContext)).toBe(
+          expected.canReviewRegistrations
+        );
+        expect(canDecideEventRegistrationWithContext(eventContext)).toBe(
+          expected.canDecideEventRegistration
+        );
+        expect(canEditRegistrationNotesWithContext(eventContext)).toBe(
+          expected.canEditRegistrationNotes
+        );
+        expect(
+          isCoMcNoteOnlyRegistrationReviewerWithContext(eventContext)
+        ).toBe(expected.isCoMcNoteOnlyRegistrationReviewer);
+        expect(canViewBannedUserReviewContextWithContext(eventContext)).toBe(
+          expected.canViewBannedUserReviewContext
+        );
+        expect(canIncludeBannedUsersInReviewWithContext(eventContext)).toBe(
+          expected.canIncludeBannedUsersInReview
         );
       }
     );

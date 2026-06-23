@@ -59,10 +59,9 @@ export default function ChaptersPage() {
       )}
       <div className="grid gap-4 sm:grid-cols-2">
         {chapters.map(chapter => (
-          <Link
+          <article
             key={chapter.id}
-            href={`/chapters/${chapter.slug}`}
-            className={`${classes.panel} block p-5 transition hover:-translate-y-0.5 hover:shadow-md`}
+            className={`${classes.panel} p-5 transition hover:-translate-y-0.5 hover:shadow-md`}
           >
             <div
               className={`${classes.subtlePanel} relative mb-4 flex aspect-[16/9] w-full items-center justify-center overflow-hidden rounded-md`}
@@ -88,13 +87,37 @@ export default function ChaptersPage() {
             </div>
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
-                <div className="truncate text-lg font-bold">{chapter.name}</div>
+                <Link
+                  className="block truncate text-lg font-bold hover:underline"
+                  href={`/chapters/${chapter.slug}`}
+                >
+                  {chapter.name}
+                </Link>
                 <div className={`mt-1 text-sm ${classes.mutedText}`}>
                   {chapter.city}
+                </div>
+                <div className={`mt-1 text-xs ${classes.mutedText}`}>
+                  {chapter.timezone}
                 </div>
               </div>
               <ManagementBadge>{chapter.accessMode}</ManagementBadge>
             </div>
+            {chapter.nextEvent && (
+              <div className={`mt-4 border-t pt-4 ${classes.divider}`}>
+                <div className={`text-xs font-semibold ${classes.mutedText}`}>
+                  Next event
+                </div>
+                <Link
+                  className="mt-1 block font-semibold hover:underline"
+                  href={`/events/${chapter.slug}/${chapter.nextEvent.slug}`}
+                >
+                  {chapter.nextEvent.title}
+                </Link>
+                <div className={`mt-1 text-sm ${classes.mutedText}`}>
+                  {chapter.nextEvent.publicLocation}
+                </div>
+              </div>
+            )}
             {(chapter.viewerMembership?.status ||
               chapter.memberships?.[0]?.status) && (
               <div className="mt-4">
@@ -111,7 +134,7 @@ export default function ChaptersPage() {
                 </ManagementBadge>
               </div>
             )}
-          </Link>
+          </article>
         ))}
         {chapters.length === 0 && (
           <div className="sm:col-span-2">

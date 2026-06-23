@@ -44,6 +44,25 @@ export type JsonRequestOptions<TBody = unknown> = {
   origin?: string;
 };
 
+export type CurrentUserRegistrationAnswers = Record<string, unknown>;
+
+export type CurrentUserRegistrationRequestBody = {
+  answersJson: CurrentUserRegistrationAnswers;
+};
+
+export type CurrentUserRegistrationRequestOptions = Omit<
+  JsonRequestOptions<CurrentUserRegistrationRequestBody>,
+  'body' | 'method'
+> & {
+  answersJson?: CurrentUserRegistrationAnswers;
+  body?: CurrentUserRegistrationRequestBody;
+};
+
+export type OrganizerRegistrationReviewRequestOptions = Omit<
+  JsonRequestOptions,
+  'body' | 'method'
+>;
+
 const defaultUserId = 'test-clerk-user-id';
 
 const asMock = <TArgs extends unknown[], TResult>(fn: unknown) => {
@@ -88,6 +107,20 @@ const appendSearchParams = (
 
     url.searchParams.set(key, String(value));
   }
+};
+
+const searchParamsToRecord = (
+  searchParams?: JsonRequestOptions['searchParams']
+) => {
+  if (!searchParams) {
+    return {};
+  }
+
+  if (searchParams instanceof URLSearchParams) {
+    return Object.fromEntries(searchParams.entries());
+  }
+
+  return { ...searchParams };
 };
 
 export function mockClerkServerModule() {
@@ -213,6 +246,68 @@ export function createJsonRequest<TBody = unknown>(
   }
 
   return request;
+}
+
+export function createDefaultCurrentUserRegistrationAnswers(): CurrentUserRegistrationAnswers {
+  return {
+    name: 'Test User',
+    email: 'test@example.com',
+    why_this_event: 'I want to build with the chapter.',
+  };
+}
+
+export function createCurrentUserRegistrationRequest(
+  eventId: string,
+  options: CurrentUserRegistrationRequestOptions = {}
+) {
+  const { answersJson, body, ...requestOptions } = options;
+
+  return createJsonRequest(`/api/events/${eventId}/registrations`, {
+    ...requestOptions,
+    method: 'POST',
+    body: body ?? {
+      answersJson: answersJson ?? createDefaultCurrentUserRegistrationAnswers(),
+    },
+  });
+}
+
+export function createCurrentUserRegistrationEditRequest(
+  eventId: string,
+  options: CurrentUserRegistrationRequestOptions = {}
+) {
+  const { answersJson, body, ...requestOptions } = options;
+
+  return createJsonRequest(`/api/events/${eventId}/registrations/me`, {
+    ...requestOptions,
+    method: 'PATCH',
+    body: body ?? {
+      answersJson: answersJson ?? createDefaultCurrentUserRegistrationAnswers(),
+    },
+  });
+}
+
+export function createCurrentUserRegistrationCancelRequest(
+  eventId: string,
+  options: Omit<JsonRequestOptions, 'method' | 'body'> = {}
+) {
+  return createJsonRequest(`/api/events/${eventId}/registrations/me/cancel`, {
+    ...options,
+    method: 'POST',
+  });
+}
+
+export function createSiteAdminIncludeBannedRegistrationsRequest(
+  eventId: string,
+  options: OrganizerRegistrationReviewRequestOptions = {}
+) {
+  return createJsonRequest(`/api/events/${eventId}/registrations`, {
+    ...options,
+    method: 'GET',
+    searchParams: {
+      ...searchParamsToRecord(options.searchParams),
+      includeBannedUsers: true,
+    },
+  });
 }
 
 export function createRouteContext<TParams extends Record<string, string>>(
