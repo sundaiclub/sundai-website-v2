@@ -105,11 +105,13 @@ export default function ProjectSearch({
   projects,
   onFilteredProjectsChange,
   onSearchStateChange,
+  totalProjectCount,
   urlFilters = {}
 }: {
   projects: Project[];
   onFilteredProjectsChange: (projects: Project[]) => void;
   onSearchStateChange?: (hasActiveFilters: boolean) => void;
+  totalProjectCount?: number | null;
   urlFilters?: {
     techTags?: string[];
     domainTags?: string[];
@@ -293,6 +295,18 @@ export default function ProjectSearch({
     );
   }, [searchTerm, selectedStatus, selectedTechTags, selectedDomainTags, fromDate, toDate, sortBy.value, showBroken]);
 
+  const hasActiveMatchFilters = useMemo(() => {
+    return Boolean(
+      searchTerm.trim() ||
+      selectedStatus.length > 0 ||
+      selectedTechTags.length > 0 ||
+      selectedDomainTags.length > 0 ||
+      fromDate ||
+      toDate ||
+      !showBroken
+    );
+  }, [searchTerm, selectedStatus, selectedTechTags, selectedDomainTags, fromDate, toDate, showBroken]);
+
   // Update parent component with filtered projects
   useEffect(() => {
     onFilteredProjectsChange(filteredProjects);
@@ -471,9 +485,20 @@ export default function ProjectSearch({
       </div>
 
       {/* Results Count - Adjust text size */}
-      <div className="text-xs sm:text-sm text-gray-400 flex items-center gap-2">
-        <span className="font-medium text-gray-300">{filteredProjects.length}</span> 
-        projects found
+      <div className="text-xs sm:text-sm text-gray-400 flex flex-wrap items-center gap-2">
+        <span>
+          <span className="font-medium text-gray-300">{totalProjectCount ?? projects.length}</span>
+          {" "}projects found
+        </span>
+        {hasActiveMatchFilters && (
+          <>
+            <span aria-hidden="true">•</span>
+            <span>
+              <span className="font-medium text-gray-300">{filteredProjects.length}</span>
+              {" "}matching filters
+            </span>
+          </>
+        )}
       </div>
 
       {/* Tag Selectors */}
