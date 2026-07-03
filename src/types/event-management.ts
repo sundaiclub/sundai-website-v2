@@ -137,6 +137,8 @@ type ChapterLandingEvent = {
   slug: string;
   startTime?: Date | string;
   publicLocation?: string | null;
+  status?: EventStatus;
+  visibility?: EventVisibility;
 };
 
 export type ChapterLanding = Pick<
@@ -158,6 +160,7 @@ export type ChapterLanding = Pick<
   viewerMembership?: ChapterMembershipSummary | null;
   memberships?: ChapterMembershipSummary[];
   upcomingEvents?: ChapterLandingEvent[];
+  pendingEvents?: ChapterLandingEvent[];
 };
 
 export type SiteAdminChapterListItem = Pick<

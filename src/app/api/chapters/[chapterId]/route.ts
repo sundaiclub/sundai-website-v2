@@ -5,7 +5,10 @@ import {
   getCurrentHacker,
   requireChapterManager,
 } from '@/lib/eventManagementApi';
-import { canViewChapter as canViewChapterWithAuth } from '@/lib/eventManagementAuth';
+import {
+  canManageChapterSettingsWithContext,
+  canViewChapter as canViewChapterWithAuth,
+} from '@/lib/eventManagementAuth';
 
 const chapterInclude = {
   heroImage: { select: { id: true, url: true, alt: true, filename: true } },
@@ -28,6 +31,16 @@ const chapterInclude = {
       publicLocation: true,
     },
   },
+} as const;
+
+const eventSummarySelect = {
+  id: true,
+  title: true,
+  slug: true,
+  startTime: true,
+  publicLocation: true,
+  status: true,
+  visibility: true,
 } as const;
 
 async function resolveChapterIdentifier(chapterIdOrSlug: string) {
@@ -74,12 +87,32 @@ export async function GET(
           },
         })
       : null;
+    const canManageChapter = canManageChapterSettingsWithContext({
+      actor: hacker,
+      membership: viewerMembership,
+    });
+    const pendingEvents = canManageChapter
+      ? await prisma.event.findMany({
+          where: {
+            chapterId: resolvedChapter.id,
+            status: { not: 'ARCHIVED' },
+            startTime: { gte: new Date() },
+            OR: [
+              { status: { not: 'PUBLISHED' } },
+              { visibility: { not: 'PUBLIC' } },
+            ],
+          },
+          orderBy: { startTime: 'asc' },
+          select: eventSummarySelect,
+        })
+      : undefined;
 
     const { events, ...chapterDetails } = chapter;
 
     return NextResponse.json({
       ...chapterDetails,
       upcomingEvents: events,
+      ...(pendingEvents ? { pendingEvents } : {}),
       viewerMembership,
     });
   } catch (error) {

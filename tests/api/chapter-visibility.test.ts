@@ -41,6 +41,7 @@ jest.mock('../../src/lib/prisma', () => ({
     },
     event: {
       findUnique: jest.fn(),
+      findMany: jest.fn(),
     },
     eventStaff: {
       findFirst: jest.fn(),
@@ -253,6 +254,7 @@ describe('chapter visibility API', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     resetClerkMocks();
+    prisma.event.findMany.mockResolvedValue([]);
   });
 
   it('lists active public chapters for signed-out users', async () => {

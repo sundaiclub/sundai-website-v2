@@ -51,6 +51,7 @@ const bostonChapter = {
       publicLocation: 'The Foundry',
     },
   ],
+  pendingEvents: [],
 };
 
 function jsonResponse(data: unknown, status = 200) {
@@ -72,7 +73,7 @@ function requestUrl(input: RequestInfo | URL) {
   return input.toString();
 }
 
-function mockChapterFetch(chapter: typeof bostonChapter = bostonChapter) {
+function mockChapterFetch(chapter: unknown = bostonChapter) {
   global.fetch = jest.fn((input: RequestInfo | URL) => {
     const url = requestUrl(input);
 
@@ -144,5 +145,100 @@ describe('/chapters/[chapterSlug] public chapter page', () => {
 
     expect(demoNight).toHaveAttribute('href', '/events/boston/demo-night');
     expect(agentJam).toHaveAttribute('href', '/events/boston/agent-jam');
+  });
+
+  it('shows manage and new event actions to chapter admins', async () => {
+    mockUseUserContext.mockReturnValue({
+      isAdmin: false,
+      loading: false,
+      userInfo: { id: 'hacker-admin' },
+    });
+    mockChapterFetch({
+      ...bostonChapter,
+      viewerMembership: {
+        id: 'membership-admin',
+        chapterId: 'chapter-boston',
+        hackerId: 'hacker-admin',
+        role: 'ADMIN',
+        status: 'ACTIVE',
+      },
+      memberships: [
+        {
+          id: 'membership-admin',
+          chapterId: 'chapter-boston',
+          hackerId: 'hacker-admin',
+          role: 'ADMIN',
+          status: 'ACTIVE',
+        },
+      ],
+    });
+
+    renderChapterPage();
+
+    expect(
+      await screen.findByRole('link', { name: /^manage$/i })
+    ).toHaveAttribute('href', '/organizer/chapters/boston/settings');
+    expect(screen.getByRole('link', { name: /new event/i })).toHaveAttribute(
+      'href',
+      '/organizer/events/new?chapterId=chapter-boston'
+    );
+  });
+
+  it('shows pending chapter events to chapter admins above upcoming events', async () => {
+    mockUseUserContext.mockReturnValue({
+      isAdmin: false,
+      loading: false,
+      userInfo: { id: 'hacker-admin' },
+    });
+    mockChapterFetch({
+      ...bostonChapter,
+      viewerMembership: {
+        id: 'membership-admin',
+        chapterId: 'chapter-boston',
+        hackerId: 'hacker-admin',
+        role: 'ADMIN',
+        status: 'ACTIVE',
+      },
+      memberships: [
+        {
+          id: 'membership-admin',
+          chapterId: 'chapter-boston',
+          hackerId: 'hacker-admin',
+          role: 'ADMIN',
+          status: 'ACTIVE',
+        },
+      ],
+      pendingEvents: [
+        {
+          id: 'event-boston-draft-night',
+          title: 'Boston Draft Night',
+          slug: 'draft-night',
+          status: 'DRAFT',
+          visibility: 'PUBLIC',
+          startTime: '2026-07-03T22:00:00.000Z',
+          publicLocation: 'TBD',
+        },
+      ],
+    });
+
+    renderChapterPage();
+
+    const pendingHeading = await screen.findByRole('heading', {
+      name: /pending events/i,
+    });
+    const upcomingHeading = screen.getByRole('heading', {
+      name: /upcoming events/i,
+    });
+    expect(
+      pendingHeading.compareDocumentPosition(upcomingHeading) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+    expect(
+      screen.getByRole('link', { name: /boston draft night/i })
+    ).toHaveAttribute(
+      'href',
+      '/organizer/events/event-boston-draft-night/settings'
+    );
+    expect(screen.getByText('DRAFT')).toBeInTheDocument();
   });
 });

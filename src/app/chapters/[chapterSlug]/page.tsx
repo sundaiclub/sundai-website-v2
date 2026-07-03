@@ -221,6 +221,7 @@ export default function ChapterLandingPage({
   }
 
   const eventChapterSlug = chapter?.slug ?? params.chapterSlug;
+  const pendingEvents = chapter?.pendingEvents ?? [];
 
   return (
     <ManagementPage maxWidth="max-w-4xl">
@@ -247,12 +248,19 @@ export default function ChapterLandingPage({
         actions={
           <>
             {canManageChapter && chapter && (
-              <ManagementLinkButton
-                href={`/organizer/chapters/${chapter.slug}/settings`}
-                variant="primary"
-              >
-                Manage
-              </ManagementLinkButton>
+              <>
+                <ManagementLinkButton
+                  href={`/organizer/chapters/${chapter.slug}/settings`}
+                  variant="primary"
+                >
+                  Manage
+                </ManagementLinkButton>
+                <ManagementLinkButton
+                  href={`/organizer/events/new?chapterId=${encodeURIComponent(chapter.id)}`}
+                >
+                  New event
+                </ManagementLinkButton>
+              </>
             )}
             {chapter?.accessMode && (
               <ManagementBadge>{chapter.accessMode}</ManagementBadge>
@@ -276,6 +284,54 @@ export default function ChapterLandingPage({
         }
       />
       <div className="grid gap-5">
+        {canManageChapter && (
+          <ManagementSection
+            title="Pending events"
+            description="Draft, paused, private, and unlisted events for this chapter."
+          >
+            <div className={`divide-y ${classes.divider}`}>
+              {pendingEvents.map(event => (
+                <div
+                  key={event.id}
+                  className="grid gap-3 py-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
+                >
+                  <div className="min-w-0">
+                    <Link
+                      className="font-semibold hover:underline"
+                      href={`/organizer/events/${event.id}/settings`}
+                    >
+                      {event.title}
+                    </Link>
+                    <div className={`mt-1 text-sm ${classes.mutedText}`}>
+                      {[
+                        event.publicLocation,
+                        event.startTime
+                          ? new Date(event.startTime).toLocaleDateString()
+                          : null,
+                      ]
+                        .filter(Boolean)
+                        .join(' · ')}
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-2 sm:justify-end">
+                    {event.status && (
+                      <ManagementBadge>{event.status}</ManagementBadge>
+                    )}
+                    {event.visibility && (
+                      <ManagementBadge>{event.visibility}</ManagementBadge>
+                    )}
+                  </div>
+                </div>
+              ))}
+              {pendingEvents.length === 0 && (
+                <ManagementEmptyState>
+                  No pending events are listed.
+                </ManagementEmptyState>
+              )}
+            </div>
+          </ManagementSection>
+        )}
+
         <ManagementSection title="Upcoming events">
           <div className={`divide-y ${classes.divider}`}>
             {(chapter?.upcomingEvents ?? []).map(event => (

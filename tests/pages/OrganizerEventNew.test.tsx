@@ -50,6 +50,53 @@ const staffCandidates = [
   },
 ];
 
+const applicationTemplates = [
+  {
+    id: 'template-site',
+    name: 'Sundai site requirements',
+    scope: 'SITE',
+    chapterId: null,
+    isActive: true,
+    fieldsJson: [
+      {
+        id: 'full-name',
+        label: 'Full name',
+        type: 'TEXT',
+        required: true,
+        siteRequired: true,
+      },
+      {
+        id: 'email',
+        label: 'Email',
+        type: 'EMAIL',
+        required: true,
+        siteRequired: true,
+      },
+    ],
+  },
+  {
+    id: 'template-chapter-boston',
+    name: 'Boston builder application',
+    scope: 'CHAPTER',
+    chapterId: 'chapter-boston',
+    isActive: true,
+    fieldsJson: [
+      {
+        id: 'project-url',
+        label: 'Project URL',
+        type: 'URL',
+        required: false,
+      },
+      {
+        id: 'dietary-restrictions',
+        label: 'Dietary restrictions',
+        type: 'TEXT',
+        required: false,
+      },
+    ],
+  },
+];
+
 function jsonResponse(data: unknown, status = 200) {
   return Promise.resolve({
     ok: status >= 200 && status < 300,
@@ -94,6 +141,10 @@ function mockOrganizerFetches() {
       return jsonResponse(staffCandidates);
     }
 
+    if (url.includes('/api/application-templates')) {
+      return jsonResponse(applicationTemplates);
+    }
+
     if (url.includes('/api/events/event-created/publish')) {
       return jsonResponse({
         id: 'event-created',
@@ -129,35 +180,69 @@ function changeControl(label: RegExp, value: string) {
 
 function fillRequiredEventFields() {
   changeControl(/^title$/i, 'Boston AI Build Night');
-  changeControl(/slug/i, 'boston-ai-build-night');
   changeControl(/public description/i, 'A public build night for AI projects.');
   changeControl(/public location/i, 'Kendall Square, Cambridge');
-  changeControl(/start time/i, '2026-07-10T18:00');
-  changeControl(/end time/i, '2026-07-10T21:00');
-  changeControl(/capacity/i, '40');
+  changeControl(/event day/i, '2026-07-10');
+}
+
+function nextSundayInputValue(from = new Date()) {
+  const daysUntilSunday = (7 - from.getDay()) % 7 || 7;
+  const nextSunday = new Date(from);
+  nextSunday.setDate(from.getDate() + daysUntilSunday);
+  const year = nextSunday.getFullYear();
+  const month = String(nextSunday.getMonth() + 1).padStart(2, '0');
+  const day = String(nextSunday.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+async function selectStaff(buttonName: RegExp, hackerName: RegExp) {
+  fireEvent.click(screen.getByRole('button', { name: buttonName }));
+  fireEvent.change(screen.getByPlaceholderText(/search members/i), {
+    target: { value: '' },
+  });
+  fireEvent.click(await screen.findByText(hackerName));
+}
+
+function addCustomQuestion(
+  label: string,
+  type = 'TEXT',
+  required = false
+) {
+  changeControl(/custom question label/i, label);
+  changeControl(/custom question type/i, type);
+  if (required) {
+    fireEvent.click(screen.getByLabelText(/required custom question/i));
+  }
+  fireEvent.click(screen.getByRole('button', { name: /add custom question/i }));
 }
 
 describe('/organizer/events/new', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockUseTheme.mockReturnValue({ isDarkMode: false });
+    window.history.replaceState({}, '', '/organizer/events/new');
     mockOrganizerFetches();
   });
 
   it('renders required event fields and defaults timezone from the selected chapter', async () => {
     await renderNewEventPage();
 
-    expect(screen.getByLabelText(/chapter/i)).toHaveValue('chapter-boston');
+    expect(screen.getByLabelText(/^chapter$/i)).toHaveValue('chapter-boston');
     expect(screen.getByLabelText(/^title$/i)).toBeRequired();
-    expect(screen.getByLabelText(/slug/i)).toBeRequired();
+    expect(screen.queryByLabelText(/slug/i)).not.toBeInTheDocument();
     expect(screen.getByLabelText(/public description/i)).toBeRequired();
     expect(screen.getByLabelText(/public location/i)).toBeRequired();
-    expect(screen.getByLabelText(/start time/i)).toBeRequired();
-    expect(screen.getByLabelText(/end time/i)).toBeRequired();
+    expect(screen.getByLabelText(/event day/i)).toBeRequired();
+    expect(screen.getByLabelText(/event day/i)).toHaveValue(
+      nextSundayInputValue()
+    );
+    expect(screen.getByText(/10:00 AM to 10:00 PM/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/timezone/i)).toHaveValue('America/New_York');
-    expect(screen.getByLabelText(/capacity/i)).toBeRequired();
+    expect(screen.getByLabelText(/^capacity$/i)).toBeRequired();
+    expect(screen.getByLabelText(/^capacity$/i)).toHaveValue(100);
+    expect(screen.getByLabelText(/no capacity limit/i)).not.toBeChecked();
 
-    fireEvent.change(screen.getByLabelText(/chapter/i), {
+    fireEvent.change(screen.getByLabelText(/^chapter$/i), {
       target: { value: 'chapter-san-francisco' },
     });
 
@@ -168,12 +253,32 @@ describe('/organizer/events/new', () => {
     });
   });
 
+  it('preselects the requested chapter from the chapterId query parameter', async () => {
+    window.history.replaceState(
+      {},
+      '',
+      '/organizer/events/new?chapterId=chapter-san-francisco'
+    );
+
+    await renderNewEventPage();
+
+    expect(screen.getByLabelText(/^chapter$/i)).toHaveValue(
+      'chapter-san-francisco'
+    );
+    expect(screen.getByLabelText(/timezone/i)).toHaveValue(
+      'America/Los_Angeles'
+    );
+  });
+
   it('shows approved-only detail, staff assignment, application question, and message controls', async () => {
     await renderNewEventPage();
 
     expect(screen.getByLabelText(/approved-only address/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/approved-only details/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/program|template/i)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/program type/i)).not.toBeInTheDocument();
+    expect(
+      screen.getByLabelText(/chapter application template/i)
+    ).toBeInTheDocument();
     expect(screen.getByLabelText(/application mode/i)).toHaveValue(
       'REQUIRES_APPROVAL'
     );
@@ -181,11 +286,15 @@ describe('/organizer/events/new', () => {
 
     expect(screen.getByLabelText(/^mcs?$/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/co[-\s]?mcs?/i)).toBeInTheDocument();
+    expect(await screen.findByText(/full name/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/email/i).length).toBeGreaterThan(0);
     expect(
-      screen.getByRole('button', { name: /add application question/i })
+      screen.getByLabelText(/custom question label/i)
     ).toBeInTheDocument();
-    expect(screen.getByLabelText(/question label/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/question type/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/custom question type/i)).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /add custom question/i })
+    ).toBeDisabled();
 
     expect(screen.getByLabelText(/confirmation message/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/waitlist message/i)).toBeInTheDocument();
@@ -206,6 +315,43 @@ describe('/organizer/events/new', () => {
     expect(screen.getByRole('button', { name: /publish/i })).not.toBeDisabled();
   });
 
+  it('opens the change time dialog and submits the selected time window', async () => {
+    await renderNewEventPage();
+
+    fillRequiredEventFields();
+    fireEvent.click(screen.getByRole('button', { name: /change time/i }));
+    changeControl(/start time of day/i, '18:00');
+    changeControl(/end time of day/i, '21:00');
+    fireEvent.click(screen.getByRole('button', { name: /done/i }));
+
+    fireEvent.click(screen.getByRole('button', { name: /save draft/i }));
+
+    await waitFor(() => {
+      expect(latestFetchBody()).toEqual(
+        expect.objectContaining({
+          startTime: '2026-07-10T18:00',
+          endTime: '2026-07-10T21:00',
+        })
+      );
+    });
+  });
+
+  it('submits no capacity limit as an unlimited event', async () => {
+    await renderNewEventPage();
+
+    fillRequiredEventFields();
+    fireEvent.click(screen.getByLabelText(/no capacity limit/i));
+    fireEvent.click(screen.getByRole('button', { name: /save draft/i }));
+
+    await waitFor(() => {
+      expect(latestFetchBody()).toEqual(
+        expect.objectContaining({
+          capacity: null,
+        })
+      );
+    });
+  });
+
   it('submits full creation fields and publishes through the visible publish action', async () => {
     await renderNewEventPage();
 
@@ -215,12 +361,11 @@ describe('/organizer/events/new', () => {
       /approved-only details/i,
       'Use the side door and bring a laptop.'
     );
-    changeControl(/program|template/i, 'builder-sprint');
-    changeControl(/^mcs?$/i, 'hacker-mc');
-    changeControl(/co[-\s]?mcs?/i, 'hacker-comc');
-    changeControl(/question label/i, 'What do you want to build?');
-    changeControl(/question type/i, 'TEXTAREA');
-    fireEvent.click(screen.getByLabelText(/required question/i));
+    changeControl(/chapter application template/i, 'template-chapter-boston');
+    await selectStaff(/^mcs?$/i, /morgan mc/i);
+    await selectStaff(/co[-\s]?mcs?/i, /casey co-mc/i);
+    addCustomQuestion('What do you want to build?', 'TEXTAREA', true);
+    addCustomQuestion('Anything else we should know?');
     changeControl(/confirmation message/i, 'Thanks for applying.');
     changeControl(/waitlist message/i, 'You are on the waitlist.');
     changeControl(
@@ -252,10 +397,10 @@ describe('/organizer/events/new', () => {
         slug: 'boston-ai-build-night',
         description: 'A public build night for AI projects.',
         publicLocation: 'Kendall Square, Cambridge',
-        startTime: '2026-07-10T18:00',
-        endTime: '2026-07-10T21:00',
+        startTime: '2026-07-10T10:00',
+        endTime: '2026-07-10T22:00',
         timezone: 'America/New_York',
-        capacity: 40,
+        capacity: 100,
         applicationMode: 'REQUIRES_APPROVAL',
         autoPromoteWaitlist: false,
         approvedDetailsJson: expect.objectContaining({
@@ -268,15 +413,86 @@ describe('/organizer/events/new', () => {
         ]),
         applicationQuestionsJson: expect.arrayContaining([
           expect.objectContaining({
+            label: 'Project URL',
+            type: 'URL',
+          }),
+          expect.objectContaining({
+            label: 'Dietary restrictions',
+            type: 'TEXT',
+          }),
+          expect.objectContaining({
             label: 'What do you want to build?',
             type: 'TEXTAREA',
             required: true,
           }),
+          expect.objectContaining({
+            label: 'Anything else we should know?',
+            type: 'TEXT',
+          }),
         ]),
+        hideChapterDefaultQuestions: true,
         confirmationMessage: 'Thanks for applying.',
         waitlistMessage: 'You are on the waitlist.',
         declineMessage: 'We cannot accommodate your application.',
       })
     );
+  });
+
+  it('reorders selected application questions after site-required questions', async () => {
+    await renderNewEventPage();
+
+    fillRequiredEventFields();
+    changeControl(/chapter application template/i, 'template-chapter-boston');
+    addCustomQuestion('What do you want to build?');
+
+    const customQuestion = screen.getByLabelText(
+      /drag application question what do you want to build/i
+    );
+    const projectQuestion = screen.getByLabelText(
+      /drag application question project url/i
+    );
+
+    fireEvent.dragStart(customQuestion);
+    fireEvent.dragOver(projectQuestion);
+    fireEvent.drop(projectQuestion);
+    fireEvent.click(screen.getByRole('button', { name: /save draft/i }));
+
+    await waitFor(() => {
+      const labels = latestFetchBody().applicationQuestionsJson.map(
+        (field: { label: string }) => field.label
+      );
+
+      expect(labels).toEqual([
+        'What do you want to build?',
+        'Project URL',
+        'Dietary restrictions',
+      ]);
+    });
+  });
+
+  it('shows custom question required state and removes custom questions', async () => {
+    await renderNewEventPage();
+
+    fillRequiredEventFields();
+    addCustomQuestion('What do you want to build?', 'TEXTAREA', true);
+    addCustomQuestion('Anything else we should know?');
+
+    expect(screen.getByText('Required')).toBeInTheDocument();
+    expect(screen.getByText('Optional')).toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: /remove custom question anything else we should know/i,
+      })
+    );
+    fireEvent.click(screen.getByRole('button', { name: /save draft/i }));
+
+    await waitFor(() => {
+      const labels = latestFetchBody().applicationQuestionsJson.map(
+        (field: { label: string }) => field.label
+      );
+
+      expect(labels).toEqual(['What do you want to build?']);
+    });
   });
 });

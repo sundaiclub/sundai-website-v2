@@ -20,6 +20,7 @@ import {
   buildChapterAdminFixture,
   buildChapterMembership,
   buildPublishedEvent,
+  buildUnpublishedEvent,
   buildHacker,
   buildSiteAdmin,
   type ChapterFixture,
@@ -59,6 +60,7 @@ jest.mock('../../src/lib/prisma', () => ({
     },
     event: {
       findUnique: jest.fn(),
+      findMany: jest.fn(),
     },
     eventStaff: {
       findFirst: jest.fn(),
@@ -152,6 +154,7 @@ describe('/api/chapters', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     resetClerkMocks();
+    prisma.event.findMany.mockResolvedValue([]);
     prisma.$transaction.mockImplementation(async (operation: any) => {
       if (typeof operation === 'function') return operation(prisma);
       return Promise.all(operation);
@@ -370,6 +373,74 @@ describe('/api/chapters', () => {
               publicLocation: true,
             },
           }),
+        }),
+      })
+    );
+  });
+
+  it('returns manager-only pending events for chapter admins', async () => {
+    const chapter = buildChapter({
+      id: 'chapter-boston',
+      slug: 'boston',
+    });
+    const hacker = buildHacker({
+      id: 'hacker-boston-admin',
+      clerkId: 'clerk-boston-admin',
+    });
+    const membership = buildChapterMembership({
+      id: 'membership-boston-admin',
+      chapterId: chapter.id,
+      hackerId: hacker.id,
+      role: 'ADMIN',
+      status: 'ACTIVE',
+    });
+    const draftEvent = buildUnpublishedEvent({
+      id: 'event-boston-draft-night',
+      title: 'Boston Draft Night',
+      slug: 'draft-night',
+      chapterId: chapter.id,
+      startTime: new Date('2026-07-18T22:00:00.000Z'),
+      publicLocation: 'TBD',
+    });
+
+    mockActor(hacker);
+    mockMembershipLookup(membership);
+    mockChapterDetailLookup({ chapter, adminMemberships: [membership] });
+    prisma.event.findMany.mockResolvedValue([draftEvent]);
+
+    const response = await GET_CHAPTER(
+      createJsonRequest('/api/chapters/boston') as any,
+      createRouteContext({ chapterId: chapter.slug }) as any
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.pendingEvents).toEqual([
+      expect.objectContaining({
+        id: draftEvent.id,
+        title: draftEvent.title,
+        slug: draftEvent.slug,
+        status: 'DRAFT',
+      }),
+    ]);
+    expect(prisma.event.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          chapterId: chapter.id,
+          status: { not: 'ARCHIVED' },
+          startTime: { gte: expect.any(Date) },
+          OR: [
+            { status: { not: 'PUBLISHED' } },
+            { visibility: { not: 'PUBLIC' } },
+          ],
+        }),
+        orderBy: { startTime: 'asc' },
+        select: expect.objectContaining({
+          id: true,
+          title: true,
+          slug: true,
+          status: true,
+          visibility: true,
         }),
       })
     );

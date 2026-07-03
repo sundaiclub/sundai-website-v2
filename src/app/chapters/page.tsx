@@ -61,8 +61,17 @@ export default function ChaptersPage() {
         {chapters.map(chapter => (
           <article
             key={chapter.id}
-            className={`${classes.panel} p-5 transition hover:-translate-y-0.5 hover:shadow-md`}
+            className={`group relative ${classes.panel} p-5 transition hover:-translate-y-0.5 hover:shadow-md`}
           >
+            <Link
+              aria-label={`View ${chapter.name} chapter`}
+              className={`absolute inset-0 z-10 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-inset ${
+                classes.isDarkMode
+                  ? 'focus-visible:ring-gray-100'
+                  : 'focus-visible:ring-gray-900'
+              }`}
+              href={`/chapters/${chapter.slug}`}
+            />
             <div
               className={`${classes.subtlePanel} relative mb-4 flex aspect-[16/9] w-full items-center justify-center overflow-hidden rounded-md`}
             >
@@ -87,12 +96,9 @@ export default function ChaptersPage() {
             </div>
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
-                <Link
-                  className="block truncate text-lg font-bold hover:underline"
-                  href={`/chapters/${chapter.slug}`}
-                >
+                <div className="block truncate text-lg font-bold group-hover:underline">
                   {chapter.name}
-                </Link>
+                </div>
                 <div className={`mt-1 text-sm ${classes.mutedText}`}>
                   {chapter.city}
                 </div>
@@ -108,7 +114,7 @@ export default function ChaptersPage() {
                   Next event
                 </div>
                 <Link
-                  className="mt-1 block font-semibold hover:underline"
+                  className="relative z-20 mt-1 block font-semibold hover:underline"
                   href={`/events/${chapter.slug}/${chapter.nextEvent.slug}`}
                 >
                   {chapter.nextEvent.title}
