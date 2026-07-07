@@ -333,7 +333,7 @@ describe('chapter visibility API', () => {
       chapterId: fixture.publicChapter.id,
       title: 'Next Build Night',
       slug: 'next-build-night',
-      startTime: new Date('2026-07-01T22:00:00.000Z'),
+      startTime: new Date('2026-08-01T22:00:00.000Z'),
       publicLocation: 'Boston, MA',
     });
     const laterPublishedEvent = buildPublishedEvent({
@@ -341,7 +341,7 @@ describe('chapter visibility API', () => {
       chapterId: fixture.publicChapter.id,
       title: 'Later Build Night',
       slug: 'later-build-night',
-      startTime: new Date('2026-07-08T22:00:00.000Z'),
+      startTime: new Date('2026-08-08T22:00:00.000Z'),
       publicLocation: 'Boston, MA',
     });
     const unpublishedEvent = buildUnpublishedEvent({
@@ -349,7 +349,7 @@ describe('chapter visibility API', () => {
       chapterId: fixture.publicChapter.id,
       title: 'Secret Draft Night',
       slug: 'secret-draft-night',
-      startTime: new Date('2026-06-30T22:00:00.000Z'),
+      startTime: new Date('2026-07-30T22:00:00.000Z'),
       publicLocation: 'Boston, MA',
     });
     const privateEvent = buildPublishedEvent({
@@ -358,7 +358,7 @@ describe('chapter visibility API', () => {
       title: 'Private Salon',
       slug: 'private-salon',
       visibility: 'PRIVATE',
-      startTime: new Date('2026-06-29T22:00:00.000Z'),
+      startTime: new Date('2026-07-29T22:00:00.000Z'),
       publicLocation: 'Boston, MA',
     });
 
@@ -639,7 +639,7 @@ describe('chapter visibility API', () => {
       chapterId: publicChapter.id,
       title: 'Next Build Night',
       slug: 'next-build-night',
-      startTime: new Date('2026-07-01T22:00:00.000Z'),
+      startTime: new Date('2026-08-01T22:00:00.000Z'),
       publicLocation: 'Boston, MA',
     });
     const unpublishedFutureEvent = buildUnpublishedEvent({
@@ -647,7 +647,7 @@ describe('chapter visibility API', () => {
       chapterId: publicChapter.id,
       title: 'Secret Draft Night',
       slug: 'secret-draft-night',
-      startTime: new Date('2026-06-30T22:00:00.000Z'),
+      startTime: new Date('2026-07-30T22:00:00.000Z'),
       publicLocation: 'Boston, MA',
     });
     const privateFutureEvent = buildPublishedEvent({
@@ -656,7 +656,7 @@ describe('chapter visibility API', () => {
       title: 'Private Salon',
       slug: 'private-salon',
       visibility: 'PRIVATE',
-      startTime: new Date('2026-06-29T22:00:00.000Z'),
+      startTime: new Date('2026-07-29T22:00:00.000Z'),
       publicLocation: 'Boston, MA',
     });
     const pastPublishedEvent = buildPublishedEvent({
@@ -755,6 +755,57 @@ describe('chapter visibility API', () => {
         }),
       })
     );
+  });
+
+  it('does not include pending event summaries for regular chapter members', async () => {
+    const hacker = buildHacker({
+      id: 'hacker-member',
+      clerkId: 'clerk-member',
+    });
+    const publicChapter = buildChapter({
+      id: 'chapter-boston',
+      slug: 'boston',
+    });
+    const activeMembership = buildChapterMembership({
+      chapterId: publicChapter.id,
+      hackerId: hacker.id,
+      role: 'MEMBER',
+      status: 'ACTIVE',
+    });
+
+    mockActor(hacker);
+    mockMembershipLookup(activeMembership);
+    prisma.chapter.findUnique.mockImplementation(
+      async ({ where, include, select }: any) => {
+        const matchesChapter =
+          where?.id === publicChapter.id || where?.slug === publicChapter.slug;
+        if (!matchesChapter) return null;
+
+        if (select) {
+          return Object.fromEntries(
+            Object.entries(select)
+              .filter(([, enabled]) => enabled)
+              .map(([key]) => [key, publicChapter[key as keyof ChapterFixture]])
+          );
+        }
+
+        if (include) {
+          return { ...publicChapter, memberships: [], events: [] };
+        }
+
+        return publicChapter;
+      }
+    );
+
+    const response = await GET_CHAPTER(
+      createJsonRequest('/api/chapters/boston') as any,
+      createRouteContext({ chapterId: publicChapter.slug }) as any
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body).not.toHaveProperty('pendingEvents');
+    expect(prisma.event.findMany).not.toHaveBeenCalled();
   });
 
   it('returns private chapter details to invited hackers', async () => {

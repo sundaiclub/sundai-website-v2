@@ -241,4 +241,49 @@ describe('/chapters/[chapterSlug] public chapter page', () => {
     );
     expect(screen.getByText('DRAFT')).toBeInTheDocument();
   });
+
+  it('does not show pending chapter events to signed-out visitors even when public admin memberships are present', async () => {
+    mockChapterFetch({
+      ...bostonChapter,
+      viewerMembership: null,
+      memberships: [
+        {
+          id: 'membership-public-admin',
+          chapterId: 'chapter-boston',
+          hackerId: 'hacker-admin',
+          role: 'ADMIN',
+          status: 'ACTIVE',
+        },
+      ],
+      pendingEvents: [
+        {
+          id: 'event-boston-draft-night',
+          title: 'Boston Draft Night',
+          slug: 'draft-night',
+          status: 'DRAFT',
+          visibility: 'PUBLIC',
+          startTime: '2026-07-03T22:00:00.000Z',
+          publicLocation: 'TBD',
+        },
+      ],
+    });
+
+    renderChapterPage();
+
+    expect(
+      await screen.findByRole('heading', { name: /sundai boston/i })
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: /pending events/i })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: /boston draft night/i })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: /^manage$/i })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: /new event/i })
+    ).not.toBeInTheDocument();
+  });
 });

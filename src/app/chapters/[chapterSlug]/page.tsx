@@ -22,7 +22,7 @@ import type {
 function firstMembership(
   chapter: ChapterLanding | null
 ): ChapterMembershipSummary | null {
-  return chapter?.viewerMembership ?? chapter?.memberships?.[0] ?? null;
+  return chapter?.viewerMembership ?? null;
 }
 
 export default function ChapterLandingPage({
@@ -42,7 +42,9 @@ export default function ChapterLandingPage({
   const canManageChapter =
     Boolean(chapter) &&
     (isAdmin ||
-      (membership?.role === 'ADMIN' && membership.status === 'ACTIVE'));
+      (Boolean(userInfo) &&
+        membership?.role === 'ADMIN' &&
+        membership.status === 'ACTIVE'));
   const [notificationsAllowed, setNotificationsAllowed] = useState(false);
   const [emailNotificationsEnabled, setEmailNotificationsEnabled] =
     useState(false);
