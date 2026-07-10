@@ -321,5 +321,11 @@ Task: "T060 [P] [US4] Create reusable registration review row and action compone
 ### Cutover Notes
 
 - Do not keep compatibility branches for `NONE`, `INTERNAL`, `PUBLIC_LATER`, or nullable timestamp-style `applicationsOpen`.
-- Do not expose guest RSVP, check-in QR/scanner, attendance migration, historical Partiful import, public waitlist rank, custom chapter landing-page builder, production email/SMS delivery, or pitch queue replacement.
+- Do not expose guest RSVP, check-in QR/scanner, attendance migration, historical Partiful import, public waitlist rank, custom chapter landing-page builder, notification provider settings UI, or pitch queue replacement.
 - Keep `/pitch` and `/pitch/[eventId]` alive and link from native event pages only where relevant.
+
+## Approval And Decline Notifications
+
+- [X] T093 Send approval and decline emails through AWS SES according to active chapter-membership notification preferences.
+- [X] T094 Send approval and decline SMS messages through Twilio according to active chapter-membership notification preferences.
+- [X] T095 Keep registration decisions authoritative when a notification provider fails and add focused preference, content, and failure tests.

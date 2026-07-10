@@ -29,7 +29,8 @@ function jsonObject(value: JsonValue | null | undefined): JsonObject {
 function fieldValueToString(value: JsonValue | undefined) {
   if (value === null || value === undefined) return '';
   if (typeof value === 'string') return value;
-  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  if (typeof value === 'number' || typeof value === 'boolean')
+    return String(value);
   return '';
 }
 
@@ -46,11 +47,19 @@ function initialAnswers(input: {
   profile?: ProfilePrefillSource | null;
   registration?: PublicViewerRegistrationState | null;
 }) {
-  return applyProfilePrefillToAnswers({
+  const answers = applyProfilePrefillToAnswers({
     fields: input.fields,
     profile: input.profile,
     existingAnswers: jsonObject(input.registration?.answersJson),
   });
+
+  for (const field of input.fields) {
+    if (field.type === 'BOOLEAN' && answers[field.id] === undefined) {
+      answers[field.id] = false;
+    }
+  }
+
+  return answers;
 }
 
 function inputTypeFor(field: TemplateFieldDefinition) {
@@ -71,10 +80,6 @@ function normalizeSubmissionValue(
     return value.trim() ? Number(value) : null;
   }
 
-  if (field.type === 'BOOLEAN') {
-    return value === 'true';
-  }
-
   return value;
 }
 
@@ -92,6 +97,30 @@ function FieldInput({
   const classes = useManagementClasses();
   const inputId = `application-${field.id}`;
   const stringValue = fieldValueToString(value);
+
+  if (field.type === 'BOOLEAN') {
+    return (
+      <div className="grid gap-2">
+        <label className="flex items-start gap-3" htmlFor={inputId}>
+          <input
+            checked={value === true}
+            className={`${classes.checkbox} mt-1`}
+            id={inputId}
+            onChange={event => onChange(event.target.checked)}
+            type="checkbox"
+          />
+          <span className="text-sm font-semibold">
+            {field.label}
+            {field.required && <span aria-hidden="true"> *</span>}
+          </span>
+        </label>
+        {field.helpText && (
+          <p className={`text-xs ${classes.mutedText}`}>{field.helpText}</p>
+        )}
+        {error && <p className="text-sm text-red-600">{error}</p>}
+      </div>
+    );
+  }
 
   return (
     <div className="grid gap-2">
@@ -120,17 +149,6 @@ function FieldInput({
               {option.label}
             </option>
           ))}
-        </select>
-      ) : field.type === 'BOOLEAN' ? (
-        <select
-          className={classes.input}
-          id={inputId}
-          onChange={event => onChange(normalizeSubmissionValue(field, event.target.value))}
-          value={stringValue}
-        >
-          <option value="">Select an option</option>
-          <option value="true">Yes</option>
-          <option value="false">No</option>
         </select>
       ) : (
         <input
@@ -165,9 +183,7 @@ export function EventApplicationForm({
   const fields = event.applicationQuestionSet.composedFields;
   const registration = event.viewerRegistration;
   const controls: ApplicationControlsState = event.applicationControls;
-  const [isEditing, setIsEditing] = useState(
-    controls.canSubmit && !registration
-  );
+  const [isEditing, setIsEditing] = useState(false);
   const [answers, setAnswers] = useState<JsonObject>(() =>
     initialAnswers({ fields, profile: viewerProfile, registration })
   );
@@ -178,11 +194,19 @@ export function EventApplicationForm({
   const submittedAt = formatSubmittedAt(registration?.submittedAt);
 
   useEffect(() => {
-    setAnswers(initialAnswers({ fields, profile: viewerProfile, registration }));
-    setIsEditing(controls.canSubmit && !registration);
+    setAnswers(
+      initialAnswers({ fields, profile: viewerProfile, registration })
+    );
+    setIsEditing(false);
   }, [controls.canSubmit, fields, registration, viewerProfile]);
 
-  const canShowForm = fields.length > 0 && (controls.canSubmit || isEditing);
+  const canStartRegistration =
+    fields.length > 0 &&
+    controls.canSubmit &&
+    !registration &&
+    !isEditing &&
+    !actionMessage;
+  const canShowForm = fields.length > 0 && isEditing;
   const submitLabel = registration ? 'Save changes' : 'Submit application';
 
   const fieldErrors = useMemo(() => errors, [errors]);
@@ -197,7 +221,10 @@ export function EventApplicationForm({
   }
 
   async function submit() {
-    const validationErrors = validateRequiredApplicationAnswers(fields, answers);
+    const validationErrors = validateRequiredApplicationAnswers(
+      fields,
+      answers
+    );
     if (validationErrors.length > 0) {
       setErrors(
         Object.fromEntries(
@@ -256,6 +283,20 @@ export function EventApplicationForm({
           <ManagementAlert tone="danger">{actionError}</ManagementAlert>
         )}
 
+        {canStartRegistration && (
+          <div>
+            <button
+              aria-controls="event-registration-form"
+              aria-expanded="false"
+              className={classes.primaryButton}
+              onClick={() => setIsEditing(true)}
+              type="button"
+            >
+              Register
+            </button>
+          </div>
+        )}
+
         {!isEditing && registration?.canEditAnswers && (
           <button
             className={classes.secondaryButton}
@@ -269,6 +310,7 @@ export function EventApplicationForm({
         {canShowForm && (
           <form
             className="grid gap-4"
+            id="event-registration-form"
             onSubmit={event => {
               event.preventDefault();
               void submit();

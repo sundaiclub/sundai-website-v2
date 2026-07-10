@@ -203,11 +203,7 @@ async function selectStaff(buttonName: RegExp, hackerName: RegExp) {
   fireEvent.click(await screen.findByText(hackerName));
 }
 
-function addCustomQuestion(
-  label: string,
-  type = 'TEXT',
-  required = false
-) {
+function addCustomQuestion(label: string, type = 'TEXT', required = false) {
   changeControl(/custom question label/i, label);
   changeControl(/custom question type/i, type);
   if (required) {
@@ -288,10 +284,11 @@ describe('/organizer/events/new', () => {
     expect(screen.getByLabelText(/co[-\s]?mcs?/i)).toBeInTheDocument();
     expect(await screen.findByText(/full name/i)).toBeInTheDocument();
     expect(screen.getAllByText(/email/i).length).toBeGreaterThan(0);
-    expect(
-      screen.getByLabelText(/custom question label/i)
-    ).toBeInTheDocument();
+    expect(screen.getByLabelText(/custom question label/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/custom question type/i)).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: /checkbox/i })).toHaveValue(
+      'BOOLEAN'
+    );
     expect(
       screen.getByRole('button', { name: /add custom question/i })
     ).toBeDisabled();
@@ -299,6 +296,42 @@ describe('/organizer/events/new', () => {
     expect(screen.getByLabelText(/confirmation message/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/waitlist message/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/decline message/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/confirmation message/i)).toHaveValue(
+      'Your registration is confirmed. We look forward to seeing you at the event.'
+    );
+    expect(screen.getByLabelText(/waitlist message/i)).toHaveValue(
+      'You are on the waitlist. We will let you know if a spot opens up.'
+    );
+    expect(screen.getByLabelText(/decline message/i)).toHaveValue(
+      'Thank you for your interest. Unfortunately, we are unable to offer you a spot at this event.'
+    );
+  });
+
+  it('submits the site message defaults when the organizer leaves them unchanged', async () => {
+    await renderNewEventPage();
+
+    fillRequiredEventFields();
+    fireEvent.click(screen.getByRole('button', { name: /save draft/i }));
+
+    await waitFor(() => {
+      expect(latestFetchBody()).toEqual(
+        expect.objectContaining({
+          confirmationMessage:
+            'Your registration is confirmed. We look forward to seeing you at the event.',
+          waitlistMessage:
+            'You are on the waitlist. We will let you know if a spot opens up.',
+          declineMessage:
+            'Thank you for your interest. Unfortunately, we are unable to offer you a spot at this event.',
+        })
+      );
+    });
+
+    expect(
+      screen.getByText(/event draft was successfully created/i)
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: /event settings page/i })
+    ).toHaveAttribute('href', '/organizer/events/event-created/settings');
   });
 
   it('keeps publish visible but disabled until required fields are present', async () => {
@@ -313,6 +346,23 @@ describe('/organizer/events/new', () => {
       screen.getByRole('button', { name: /save draft/i })
     ).not.toBeDisabled();
     expect(screen.getByRole('button', { name: /publish/i })).not.toBeDisabled();
+  });
+
+  it('greys out and disables capacity when no capacity limit is selected', async () => {
+    await renderNewEventPage();
+
+    const capacityInput = screen.getByLabelText(/^capacity$/i);
+
+    expect(capacityInput).toBeEnabled();
+    expect(capacityInput).toBeRequired();
+
+    fireEvent.click(screen.getByLabelText(/no capacity limit/i));
+
+    expect(capacityInput).toBeDisabled();
+    expect(capacityInput).not.toBeRequired();
+    expect(capacityInput).toHaveClass('disabled:bg-gray-100');
+    expect(capacityInput).toHaveClass('disabled:cursor-not-allowed');
+    expect(capacityInput).toHaveClass('disabled:opacity-70');
   });
 
   it('opens the change time dialog and submits the selected time window', async () => {
@@ -389,6 +439,13 @@ describe('/organizer/events/new', () => {
         })
       );
     });
+
+    expect(
+      screen.getByText(/event was successfully published/i)
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: /event settings page/i })
+    ).toHaveAttribute('href', '/organizer/events/event-created/settings');
 
     expect(latestFetchBody()).toEqual(
       expect.objectContaining({
@@ -493,6 +550,24 @@ describe('/organizer/events/new', () => {
       );
 
       expect(labels).toEqual(['What do you want to build?']);
+    });
+  });
+
+  it('submits checkbox custom questions as boolean fields', async () => {
+    await renderNewEventPage();
+
+    fillRequiredEventFields();
+    addCustomQuestion('I agree to the event guidelines', 'BOOLEAN', true);
+    fireEvent.click(screen.getByRole('button', { name: /save draft/i }));
+
+    await waitFor(() => {
+      expect(latestFetchBody().applicationQuestionsJson).toEqual([
+        expect.objectContaining({
+          label: 'I agree to the event guidelines',
+          type: 'BOOLEAN',
+          required: true,
+        }),
+      ]);
     });
   });
 });

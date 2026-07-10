@@ -11,6 +11,7 @@ import {
   autoPromoteWaitlistAfterApprovedCancellation,
   updateEventRegistrationStatus,
 } from '@/lib/eventRegistrations';
+import { notifyEventDecision } from '@/lib/eventDecisionNotifications';
 
 export async function POST(
   _req: Request,
@@ -56,11 +57,18 @@ export async function POST(
     });
 
     if (existingRegistration.status === 'APPROVED') {
-      await autoPromoteWaitlistAfterApprovedCancellation({
+      const promotion = await autoPromoteWaitlistAfterApprovedCancellation({
         eventId: params.eventId,
         triggeringRegistrationId: params.registrationId,
         actorId: hacker.id,
       });
+      if (promotion.promoted) {
+        await notifyEventDecision({
+          eventId: params.eventId,
+          registrationId: promotion.registration.id,
+          status: 'APPROVED',
+        });
+      }
     }
 
     return NextResponse.json(cancelledRegistration);

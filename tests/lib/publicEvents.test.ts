@@ -24,6 +24,10 @@ type MockPublicEventsPrisma = PublicEventsPrismaClient & {
   event: {
     findMany: jest.Mock;
     findFirst: jest.Mock;
+    findUnique: jest.Mock;
+  };
+  applicationTemplate: {
+    findFirst: jest.Mock;
   };
   eventRegistration: {
     findMany: jest.Mock;
@@ -93,10 +97,50 @@ function buildPublicEvent(
 }
 
 function buildPrismaMock(): MockPublicEventsPrisma {
+  const siteFields = [
+    {
+      id: 'name',
+      label: 'Name',
+      type: 'TEXT',
+      required: true,
+      siteRequired: true,
+      order: 0,
+    },
+    {
+      id: 'email',
+      label: 'Email',
+      type: 'EMAIL',
+      required: true,
+      siteRequired: true,
+      order: 1,
+    },
+  ];
+
   return {
     event: {
       findMany: jest.fn(),
       findFirst: jest.fn(),
+      findUnique: jest.fn().mockResolvedValue({
+        id: 'event-1',
+        chapterId: 'chapter-1',
+        applicationQuestionsJson: buildPublicEvent().applicationQuestionsJson,
+        hideChapterDefaultQuestions: false,
+      }),
+    },
+    applicationTemplate: {
+      findFirst: jest.fn(({ where }) =>
+        Promise.resolve(
+          where.scope === 'SITE'
+            ? {
+                id: 'site-template-1',
+                scope: 'SITE',
+                chapterId: null,
+                fieldsJson: siteFields,
+                isActive: true,
+              }
+            : null
+        )
+      ),
     },
     eventRegistration: {
       findMany: jest.fn(),
@@ -347,6 +391,8 @@ describe('public event helpers', () => {
     expect(detail).toEqual(
       expect.objectContaining({
         approvedDetailsVisible: true,
+        viewerCanManageRegistrations: false,
+        viewerCanEditEvent: false,
         viewerRegistration: expect.objectContaining({
           id: 'registration-1',
           status: 'APPROVED',
@@ -357,6 +403,132 @@ describe('public event helpers', () => {
     );
     expect(detail?.addToCalendar.description).toBe(
       'Public event description.\n\nCheck in at suite 400.'
+    );
+  });
+
+  it('uses merged site fields when an event has no custom registration questions', async () => {
+    const event = buildPublicEvent({ applicationQuestionsJson: [] });
+    const prisma = buildPrismaMock();
+    prisma.event.findFirst.mockResolvedValue(event);
+    prisma.event.findUnique.mockResolvedValue({
+      id: event.id,
+      chapterId: event.chapterId,
+      applicationQuestionsJson: [],
+      hideChapterDefaultQuestions: false,
+    });
+
+    const detail = await getPublicEventBySlug({
+      chapterSlug: 'nyc',
+      eventSlug: 'demo-night',
+      now,
+      prismaClient: prisma,
+    });
+
+    expect(
+      detail?.applicationQuestionSet.composedFields.map(field => field.id)
+    ).toEqual(['name', 'email']);
+  });
+
+  it('marks chapter admins as able to edit public event details', async () => {
+    const prisma = buildPrismaMock();
+    prisma.event.findFirst.mockResolvedValue(buildPublicEvent());
+    prisma.eventRegistration.findFirst.mockResolvedValue(null);
+    prisma.hacker.findUnique.mockResolvedValue({
+      id: 'hacker-admin',
+      role: 'HACKER',
+    });
+    prisma.chapterMembership.findFirst.mockResolvedValue({
+      role: 'ADMIN',
+      status: 'ACTIVE',
+    });
+    prisma.eventStaff.findFirst.mockResolvedValue(null);
+
+    const detail = await getPublicEventBySlug({
+      chapterSlug: 'nyc',
+      eventSlug: 'demo-night',
+      viewer: { hackerId: 'hacker-admin' },
+      now,
+      prismaClient: prisma,
+    });
+
+    expect(detail).toEqual(
+      expect.objectContaining({
+        viewerCanEditEvent: true,
+        viewerCanManageRegistrations: true,
+      })
+    );
+  });
+
+  it.each([
+    ['MC', true],
+    ['CO_MC', false],
+  ] as const)(
+    'marks assigned %s staff attendee decision access as %s',
+    async (role, expected) => {
+      const prisma = buildPrismaMock();
+      prisma.event.findFirst.mockResolvedValue(buildPublicEvent());
+      prisma.eventRegistration.findFirst.mockResolvedValue(null);
+      prisma.hacker.findUnique.mockResolvedValue({
+        id: 'hacker-staff',
+        role: 'HACKER',
+      });
+      prisma.chapterMembership.findFirst.mockResolvedValue(null);
+      prisma.eventStaff.findFirst.mockResolvedValue({ role });
+
+      const detail = await getPublicEventBySlug({
+        chapterSlug: 'nyc',
+        eventSlug: 'demo-night',
+        viewer: { hackerId: 'hacker-staff' },
+        now,
+        prismaClient: prisma,
+      });
+
+      expect(detail).toEqual(
+        expect.objectContaining({
+          viewerCanEditEvent: false,
+          viewerCanManageRegistrations: expected,
+        })
+      );
+    }
+  );
+
+  it('resolves a signed-in Clerk viewer before building application controls', async () => {
+    const prisma = buildPrismaMock();
+    prisma.event.findFirst.mockResolvedValue(buildPublicEvent());
+    prisma.hacker.findUnique.mockResolvedValue({
+      id: 'hacker-1',
+      role: 'HACKER',
+    });
+    prisma.eventRegistration.findFirst.mockResolvedValue(null);
+    prisma.chapterMembership.findFirst.mockResolvedValue(null);
+    prisma.eventStaff.findFirst.mockResolvedValue(null);
+
+    const detail = await getPublicEventBySlug({
+      chapterSlug: 'nyc',
+      eventSlug: 'demo-night',
+      viewer: { clerkId: 'clerk-1' },
+      now,
+      prismaClient: prisma,
+    });
+
+    expect(prisma.hacker.findUnique).toHaveBeenCalledWith({
+      where: { clerkId: 'clerk-1' },
+      select: { id: true },
+    });
+    expect(prisma.eventRegistration.findFirst).toHaveBeenCalledWith({
+      where: {
+        eventId: 'event-1',
+        hackerId: 'hacker-1',
+        cancelledAt: null,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    expect(detail?.applicationControls).toEqual(
+      expect.objectContaining({
+        canSubmit: true,
+        signInRequired: false,
+        publicMessage: null,
+      })
     );
   });
 

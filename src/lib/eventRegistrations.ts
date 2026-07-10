@@ -2,6 +2,7 @@ import prisma from './prisma';
 import { Prisma } from '@prisma/client';
 import { fetchMergedApplicationTemplate } from '@/lib/applicationTemplates';
 import { BLOCKED_REGISTRATION_MESSAGE } from '@/lib/moderation';
+import { notifyEventDecision } from '@/lib/eventDecisionNotifications';
 import type {
   EntityId,
   EventApplicationMode,
@@ -121,6 +122,14 @@ export type ListEventRegistrationsOptions = {
   skip?: number;
 };
 
+const ORGANIZER_REVIEW_STATUSES = [
+  'PENDING',
+  'APPROVED',
+  'WAITLISTED',
+  'DECLINED',
+  'CANCELLED',
+] as const satisfies readonly RegistrationStatus[];
+
 export type SubmitPublicEventRegistrationInput = {
   eventId: EntityId;
   hackerId: EntityId;
@@ -186,6 +195,21 @@ type EventRegistrationRecord = Omit<
   answersJson?: JsonValue | null;
   templateSnapshotJson?: JsonValue | null;
   event?: { chapterId?: EntityId | null } | null;
+  hacker?: {
+    id: EntityId;
+    name: string;
+    username?: string | null;
+    email: string;
+    role: string;
+    organizerNote?: { body: string } | null;
+    userBans?: Array<{
+      id: EntityId;
+      publicSafeReason: string;
+      createdAt: Date | string;
+    }>;
+  } | null;
+  decidedBy?: { id: EntityId; name: string } | null;
+  cancelledBy?: { id: EntityId; name: string } | null;
 };
 
 type EventRegistrationAuditRecord = EventRegistrationAudit;
@@ -445,6 +469,29 @@ export async function listEventRegistrations(
       eventId,
       ...(options.status ? { status: options.status } : {}),
     },
+    include: {
+      hacker: {
+        select: {
+          id: true,
+          name: true,
+          username: true,
+          email: true,
+          role: true,
+          organizerNote: { select: { body: true } },
+          userBans: {
+            where: { revokedAt: null },
+            select: {
+              id: true,
+              publicSafeReason: true,
+              createdAt: true,
+            },
+            take: 1,
+          },
+        },
+      },
+      decidedBy: { select: { id: true, name: true } },
+      cancelledBy: { select: { id: true, name: true } },
+    },
     orderBy: { createdAt: 'desc' },
     take: options.take,
     skip: options.skip,
@@ -467,6 +514,31 @@ export async function listEventRegistrations(
     activeBannedHackerIds,
     isSiteAdmin
   );
+}
+
+export async function countEventRegistrationsByStatus(
+  eventId: EntityId,
+  isSiteAdmin: boolean,
+  db: EventManagementPrismaClient = client
+): Promise<Partial<Record<RegistrationStatus, number>>> {
+  const entries = await Promise.all(
+    ORGANIZER_REVIEW_STATUSES.map(async status => {
+      const count = await db.eventRegistration.count({
+        where: {
+          eventId,
+          status,
+          ...(!isSiteAdmin && {
+            hacker: {
+              userBans: { none: { revokedAt: null } },
+            },
+          }),
+        },
+      });
+      return [status, count] as const;
+    })
+  );
+
+  return Object.fromEntries(entries);
 }
 
 export async function createInternalEventRegistration(
@@ -705,68 +777,86 @@ export async function cancelPublicEventRegistration(
   input: CancelPublicEventRegistrationInput,
   db: EventManagementPrismaClient = client
 ): Promise<PublicRegistrationActionResult> {
-  return db.$transaction(async tx => {
-    const existingRegistration = await findCurrentUserEventRegistration(
-      input.eventId,
-      input.hackerId,
-      tx
-    );
+  let promotedRegistrationId: string | null = null;
+  const result: PublicRegistrationActionResult = await db.$transaction(
+    async tx => {
+      const existingRegistration = await findCurrentUserEventRegistration(
+        input.eventId,
+        input.hackerId,
+        tx
+      );
 
-    if (!existingRegistration) {
-      return { ok: false, reason: 'REGISTRATION_NOT_FOUND' };
-    }
+      if (!existingRegistration) {
+        return { ok: false, reason: 'REGISTRATION_NOT_FOUND' };
+      }
 
-    if (!canCancelPublicRegistration(existingRegistration.status)) {
-      return {
-        ok: false,
-        reason: 'CANCEL_NOT_ALLOWED',
-        registration: toPublicRegistrationResponse(existingRegistration),
-      };
-    }
+      if (!canCancelPublicRegistration(existingRegistration.status)) {
+        return {
+          ok: false,
+          reason: 'CANCEL_NOT_ALLOWED',
+          registration: toPublicRegistrationResponse(existingRegistration),
+        };
+      }
 
-    const cancelledAt = new Date();
-    const cancelledById = input.cancelledById ?? input.hackerId;
-    const registration = await tx.eventRegistration.update({
-      where: { id: existingRegistration.id },
-      data: {
-        status: 'CANCELLED',
-        cancelledAt,
-        cancelledById,
-      },
-    });
-
-    await writeEventRegistrationAudit(
-      {
-        registrationId: registration.id,
-        eventId: input.eventId,
-        actorId: cancelledById,
-        fromStatus: existingRegistration.status,
-        toStatus: 'CANCELLED',
-        changeJson: {
-          action: 'CANCEL_PUBLIC_REGISTRATION',
-          source: 'WEBSITE',
-          cancelledBySelf: cancelledById === input.hackerId,
+      const cancelledAt = new Date();
+      const cancelledById = input.cancelledById ?? input.hackerId;
+      const registration = await tx.eventRegistration.update({
+        where: { id: existingRegistration.id },
+        data: {
+          status: 'CANCELLED',
+          cancelledAt,
+          cancelledById,
         },
-      },
-      tx
-    );
+      });
 
-    if (existingRegistration.status === 'APPROVED') {
-      await autoPromoteWaitlistAfterApprovedCancellationInTransaction(
+      await writeEventRegistrationAudit(
         {
+          registrationId: registration.id,
           eventId: input.eventId,
-          triggeringRegistrationId: registration.id,
           actorId: cancelledById,
+          fromStatus: existingRegistration.status,
+          toStatus: 'CANCELLED',
+          changeJson: {
+            action: 'CANCEL_PUBLIC_REGISTRATION',
+            source: 'WEBSITE',
+            cancelledBySelf: cancelledById === input.hackerId,
+          },
         },
         tx
       );
-    }
 
-    return {
-      ok: true,
-      registration: toPublicRegistrationResponse(registration),
-    };
-  }, SERIALIZABLE_TRANSACTION_OPTIONS);
+      if (existingRegistration.status === 'APPROVED') {
+        const promotion =
+          await autoPromoteWaitlistAfterApprovedCancellationInTransaction(
+            {
+              eventId: input.eventId,
+              triggeringRegistrationId: registration.id,
+              actorId: cancelledById,
+            },
+            tx
+          );
+        if (promotion.promoted) {
+          promotedRegistrationId = promotion.registration.id;
+        }
+      }
+
+      return {
+        ok: true,
+        registration: toPublicRegistrationResponse(registration),
+      };
+    },
+    SERIALIZABLE_TRANSACTION_OPTIONS
+  );
+
+  if (promotedRegistrationId) {
+    await notifyEventDecision({
+      eventId: input.eventId,
+      registrationId: promotedRegistrationId,
+      status: 'APPROVED',
+    });
+  }
+
+  return result;
 }
 
 export async function countApprovedEventRegistrations(

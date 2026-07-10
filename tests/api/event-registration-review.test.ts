@@ -28,6 +28,13 @@ jest.mock('@clerk/nextjs/server', () =>
   require('../utils/api-auth').mockClerkServerModule()
 );
 
+jest.mock('../../src/lib/eventDecisionNotifications', () => ({
+  notifyEventDecision: jest.fn().mockResolvedValue({
+    email: 'sent',
+    sms: 'sent',
+  }),
+}));
+
 jest.mock('../../src/lib/prisma', () => ({
   __esModule: true,
   default: {
@@ -47,6 +54,7 @@ jest.mock('../../src/lib/prisma', () => ({
     eventRegistration: {
       findFirst: jest.fn(),
       findMany: jest.fn(),
+      count: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
     },
@@ -61,6 +69,9 @@ jest.mock('../../src/lib/prisma', () => ({
 }));
 
 const prisma = require('../../src/lib/prisma').default;
+const {
+  notifyEventDecision,
+} = require('../../src/lib/eventDecisionNotifications');
 
 type RegistrationNotesRoute = {
   POST: (
@@ -234,6 +245,24 @@ function mockRegistrationList(
         return true;
       })
   );
+  prisma.eventRegistration.count.mockImplementation(
+    async ({ where }: any = {}) =>
+      registrations.filter(registration => {
+        if (where?.eventId && registration.eventId !== where.eventId) {
+          return false;
+        }
+        if (where?.status && registration.status !== where.status) {
+          return false;
+        }
+        if (
+          where?.hacker?.userBans?.none &&
+          bannedHackerIds.includes(registration.hackerId)
+        ) {
+          return false;
+        }
+        return true;
+      }).length
+  );
   prisma.userBan.findMany.mockImplementation(async ({ where }: any = {}) => {
     const requestedIds = where?.hackerId?.in ?? [];
     return bannedHackerIds
@@ -279,16 +308,36 @@ describe('T051 organizer registration review listing API', () => {
         eventId: fixture.publishedEvent.id,
         status: 'PENDING',
       },
+      include: expect.objectContaining({ hacker: expect.any(Object) }),
       orderBy: { createdAt: 'desc' },
       take: 100,
       skip: 0,
     });
-    expect(body).toEqual([
+    expect(body).toEqual(
       expect.objectContaining({
-        id: fixture.pendingRegistration.id,
-        status: 'PENDING',
-      }),
-    ]);
+        counts: expect.objectContaining({
+          PENDING: 1,
+          APPROVED: 1,
+          WAITLISTED: 1,
+        }),
+        rows: [
+          expect.objectContaining({
+            id: fixture.pendingRegistration.id,
+            status: 'PENDING',
+            applicant: expect.objectContaining({
+              id: fixture.applicant.id,
+              name: fixture.applicant.name,
+              email: fixture.applicant.email,
+            }),
+            capabilities: expect.objectContaining({
+              canDecide: true,
+              canApprove: true,
+              canDecline: true,
+            }),
+          }),
+        ],
+      })
+    );
   });
 
   it('hides actively banned applicants from non-site-admin registration review', async () => {
@@ -313,15 +362,17 @@ describe('T051 organizer registration review listing API', () => {
     const body = await response.json();
 
     expect(response.status).toBe(200);
-    expect(body).toHaveLength(1);
-    expect(body[0]).toEqual(
+    expect(body.rows).toHaveLength(1);
+    expect(body.rows[0]).toEqual(
       expect.objectContaining({
         id: fixture.pendingRegistration.id,
         hackerId: fixture.applicant.id,
       })
     );
-    expect(JSON.stringify(body)).not.toContain(fixture.bannedApplicant.id);
-    expect(JSON.stringify(body)).not.toContain(fixture.ban.internalNote ?? '');
+    expect(JSON.stringify(body.rows)).not.toContain(fixture.bannedApplicant.id);
+    expect(JSON.stringify(body.rows)).not.toContain(
+      fixture.ban.internalNote ?? ''
+    );
   });
 
   it('allows site admins to include banned users in registration review', async () => {
@@ -347,7 +398,7 @@ describe('T051 organizer registration review listing API', () => {
 
     expect(response.status).toBe(200);
     expect(prisma.userBan.findMany).not.toHaveBeenCalled();
-    expect(body).toEqual(
+    expect(body.rows).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           id: fixture.blockedRegistration.id,
@@ -416,6 +467,15 @@ describe('T052 organizer registration review decisions API', () => {
           }),
         })
       );
+      if (status === 'APPROVED' || status === 'DECLINED') {
+        expect(notifyEventDecision).toHaveBeenCalledWith({
+          eventId: fixture.publishedEvent.id,
+          registrationId: fixture.pendingRegistration.id,
+          status,
+        });
+      } else {
+        expect(notifyEventDecision).not.toHaveBeenCalled();
+      }
     }
   );
 

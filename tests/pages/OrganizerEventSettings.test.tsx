@@ -2,27 +2,23 @@ import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 const mockUseTheme = jest.fn();
+const mockPush = jest.fn();
+const mockRefresh = jest.fn();
 
 jest.mock('../../src/app/contexts/ThemeContext', () => ({
   useTheme: () => mockUseTheme(),
 }));
 
-jest.mock('../../src/app/components/OrganizerNotePanel', () => {
-  return function MockOrganizerNotePanel({ title }: { title: string }) {
-    return <div data-testid="organizer-note-panel">{title}</div>;
-  };
-});
-
 jest.mock('next/navigation', () => ({
   usePathname: () => '/organizer/events/event-ai-build-night/settings',
   useSearchParams: () => new URLSearchParams(),
   useRouter: () => ({
-    push: jest.fn(),
+    push: mockPush,
     replace: jest.fn(),
     prefetch: jest.fn(),
     back: jest.fn(),
     forward: jest.fn(),
-    refresh: jest.fn(),
+    refresh: mockRefresh,
   }),
 }));
 
@@ -43,14 +39,26 @@ const eventSettings = {
   },
   description: 'Public builder night description.',
   publicLocation: 'Boston, MA',
+  startTime: '2026-07-12T14:00:00.000Z',
+  endTime: '2026-07-13T02:00:00.000Z',
   publicProgramLabel: 'Prototype sprint',
   publicSponsorText: 'Hosted with public sponsor copy.',
   publicExpertText: 'Public expert context.',
   approvedDetailsJson: {
     address: '123 Private Lab Street',
+    details: 'Bring a laptop and use the side entrance.',
     doorCode: 'Blue door code 2468',
     toolkitUrl: 'https://example.com/private-toolkit',
   },
+  applicationQuestionsJson: [
+    {
+      id: 'project-plan',
+      label: 'What are you planning to build?',
+      type: 'TEXTAREA',
+      required: true,
+      order: 0,
+    },
+  ],
   capacity: 40,
   approvedCount: 32,
   applicationMode: 'REQUIRES_APPROVAL',
@@ -80,6 +88,12 @@ const closedEventSettings = {
   applicationsCloseReason: 'Capacity reached for this format',
   autoPromoteWaitlist: true,
   publicStatus: 'CLOSED',
+};
+
+const draftEventSettings = {
+  ...eventSettings,
+  status: 'DRAFT',
+  canDelete: true,
 };
 
 function loadPage(route: string, modulePath: string): PageComponent {
@@ -150,8 +164,7 @@ function renderSettingsPage(eventId = eventSettings.id) {
 function patchBodyForEvent(eventId = eventSettings.id) {
   const patchCall = (global.fetch as jest.Mock).mock.calls.find(
     ([input, init]: [RequestInfo | URL, RequestInit | undefined]) =>
-      requestUrl(input) === `/api/events/${eventId}` &&
-      init?.method === 'PATCH'
+      requestUrl(input) === `/api/events/${eventId}` && init?.method === 'PATCH'
   );
 
   if (!patchCall) return null;
@@ -181,9 +194,8 @@ describe('/organizer/events/[eventId]/settings', () => {
     await expectSomeText(/ai build night/i);
     await expectSomeText(/requires approval/i, /approval required/i);
     await expectSomeText(/applications? open/i, /open for applications/i);
-    await expectSomeText(/capacity/i);
-    await expectSomeText(/40/i);
-    await expectSomeText(/32/i);
+    expect(await screen.findByLabelText(/^capacity$/i)).toHaveValue(40);
+    expect(screen.queryByText(/capacity 40/i)).not.toBeInTheDocument();
     await expectSomeText(/auto-promote waitlist/i, /waitlist auto-promotion/i);
 
     const waitlistToggle = screen.getByRole('checkbox', {
@@ -205,6 +217,52 @@ describe('/organizer/events/[eventId]/settings', () => {
       name: /auto-promote waitlist|waitlist auto-promotion/i,
     });
     expect(waitlistToggle).toBeChecked();
+  });
+
+  it('deletes draft events and returns to the organizer event list', async () => {
+    window.confirm = jest.fn().mockReturnValue(true);
+    global.fetch = jest.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = requestUrl(input);
+
+      if (url === `/api/events/${draftEventSettings.id}?management=true`) {
+        return jsonResponse(draftEventSettings);
+      }
+      if (
+        url === `/api/events/${draftEventSettings.id}` &&
+        init?.method === 'DELETE'
+      ) {
+        return jsonResponse({}, 204);
+      }
+
+      return jsonResponse({});
+    }) as jest.Mock;
+
+    renderSettingsPage(draftEventSettings.id);
+
+    fireEvent.click(
+      await screen.findByRole('button', { name: /delete draft/i })
+    );
+
+    expect(window.confirm).toHaveBeenCalledWith(
+      'Delete this draft event? This cannot be undone.'
+    );
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        `/api/events/${draftEventSettings.id}`,
+        { method: 'DELETE' }
+      );
+      expect(mockPush).toHaveBeenCalledWith('/organizer/events');
+      expect(mockRefresh).toHaveBeenCalled();
+    });
+  });
+
+  it('does not show delete draft for published events', async () => {
+    renderSettingsPage();
+
+    await screen.findByRole('heading', { name: /ai build night/i });
+    expect(
+      screen.queryByRole('button', { name: /delete draft/i })
+    ).not.toBeInTheDocument();
   });
 
   it('saves close controls and auto-promote waitlist toggle changes from organizer settings', async () => {
@@ -235,7 +293,6 @@ describe('/organizer/events/[eventId]/settings', () => {
       name: /applications open/i,
     });
     expect(applicationsOpenToggle).toBeChecked();
-    expect(screen.getByText(/capacity 40, 32 approved/i)).toBeInTheDocument();
 
     fireEvent.click(applicationsOpenToggle);
     fireEvent.click(
@@ -283,7 +340,6 @@ describe('/organizer/events/[eventId]/settings', () => {
       name: /applications open/i,
     });
     expect(applicationsOpenToggle).not.toBeChecked();
-    expect(screen.getByText(/capacity 40, 32 approved/i)).toBeInTheDocument();
     expect(
       screen.getByText(/applications closed.*capacity reached for this format/i)
     ).toBeInTheDocument();
@@ -326,6 +382,57 @@ describe('/organizer/events/[eventId]/settings', () => {
     );
     expect(screen.getByLabelText(/toolkit/i)).toHaveValue(
       'https://example.com/private-toolkit'
+    );
+  });
+
+  it('uses the new-event form for event timing, capacity, staff, questions, and messages', async () => {
+    renderSettingsPage();
+
+    expect(await screen.findByLabelText(/event day/i)).toHaveValue(
+      '2026-07-12'
+    );
+    expect(screen.getByText(/10:00 AM to 10:00 PM/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^capacity$/i)).toHaveValue(40);
+    expect(screen.getByLabelText(/^mcs?$/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/co[-\s]?mcs?/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/what are you planning to build/i)
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText(/approved-only details/i)).toHaveValue(
+      'Bring a laptop and use the side entrance.'
+    );
+    expect(screen.getByLabelText(/confirmation message/i)).toHaveValue(
+      'You are approved for AI Build Night.'
+    );
+    expect(screen.getByLabelText(/waitlist message/i)).toHaveValue(
+      'You are on the waitlist for AI Build Night.'
+    );
+    expect(screen.getByLabelText(/decline message/i)).toHaveValue(
+      'We cannot accommodate this application.'
+    );
+    expect(
+      screen.queryByRole('heading', { name: /organizer notes/i })
+    ).not.toBeInTheDocument();
+  });
+
+  it('prefills the same message defaults as the new-event form when messages are unset', async () => {
+    mockEventFetch({
+      ...eventSettings,
+      confirmationMessage: null,
+      waitlistMessage: null,
+      declineMessage: null,
+    } as unknown as typeof eventSettings);
+
+    renderSettingsPage();
+
+    expect(await screen.findByLabelText(/confirmation message/i)).toHaveValue(
+      'Your registration is confirmed. We look forward to seeing you at the event.'
+    );
+    expect(screen.getByLabelText(/waitlist message/i)).toHaveValue(
+      'You are on the waitlist. We will let you know if a spot opens up.'
+    );
+    expect(screen.getByLabelText(/decline message/i)).toHaveValue(
+      'Thank you for your interest. Unfortunately, we are unable to offer you a spot at this event.'
     );
   });
 
@@ -404,6 +511,26 @@ describe('/organizer/events/[eventId]/settings', () => {
         body: expect.stringContaining('"approvedDetailsJson"'),
       })
     );
+
+    expect(patchBodyForEvent()).toEqual(
+      expect.objectContaining({
+        startTime: '2026-07-12T10:00',
+        endTime: '2026-07-12T22:00',
+        capacity: 40,
+        staff: [{ hackerId: 'hacker-mc', role: 'MC' }],
+        applicationQuestionsJson: [
+          expect.objectContaining({
+            id: 'project-plan',
+            type: 'TEXTAREA',
+            required: true,
+          }),
+        ],
+        confirmationMessage: 'You are approved for AI Build Night.',
+        waitlistMessage: 'You are on the waitlist for AI Build Night.',
+        declineMessage: 'We cannot accommodate this application.',
+      })
+    );
+    expect(patchBodyForEvent()).not.toHaveProperty('visibility');
   });
 
   it('denies event settings controls when the management read is forbidden', async () => {

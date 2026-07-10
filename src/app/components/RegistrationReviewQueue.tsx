@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import type {
   OrganizerRegistrationReviewRow,
   RegistrationStatus,
@@ -31,9 +32,11 @@ function answerLabel(
 
 export function RegistrationReviewTabs({
   activeStatus,
+  counts,
   onChange,
 }: {
   activeStatus: RegistrationStatus;
+  counts: Partial<Record<RegistrationStatus, number>>;
   onChange: (status: RegistrationStatus) => void;
 }) {
   const classes = useManagementClasses();
@@ -53,7 +56,8 @@ export function RegistrationReviewTabs({
           role="tab"
           type="button"
         >
-          {status.toLowerCase()}
+          <span>{status.toLowerCase()}</span>
+          <ManagementBadge>{counts[status] ?? 0}</ManagementBadge>
         </button>
       ))}
     </div>
@@ -70,9 +74,36 @@ function RegistrationReviewRow({
     row: OrganizerRegistrationReviewRow,
     status: RegistrationStatus
   ) => void;
-  onSaveNotes: (row: OrganizerRegistrationReviewRow, notes: string) => void;
+  onSaveNotes: (
+    row: OrganizerRegistrationReviewRow,
+    notes: string
+  ) => Promise<void>;
 }) {
   const classes = useManagementClasses();
+  const initialNotes = row.activeBan ? '' : (row.internalReviewNotes ?? '');
+  const [notes, setNotes] = useState(initialNotes);
+  const [savedNotes, setSavedNotes] = useState(initialNotes);
+  const [saveState, setSaveState] = useState<
+    'idle' | 'dirty' | 'saving' | 'saved' | 'error'
+  >('idle');
+
+  useEffect(() => {
+    const nextNotes = row.activeBan ? '' : (row.internalReviewNotes ?? '');
+    setNotes(nextNotes);
+    setSavedNotes(nextNotes);
+    setSaveState('idle');
+  }, [row.activeBan, row.id, row.internalReviewNotes]);
+
+  async function saveNotes() {
+    setSaveState('saving');
+    try {
+      await onSaveNotes(row, notes);
+      setSavedNotes(notes);
+      setSaveState('saved');
+    } catch {
+      setSaveState('error');
+    }
+  }
 
   return (
     <article className={`${classes.panel} p-4`}>
@@ -129,29 +160,40 @@ function RegistrationReviewRow({
           </label>
           <textarea
             className={classes.textarea}
-            defaultValue={row.activeBan ? '' : (row.internalReviewNotes ?? '')}
+            disabled={saveState === 'saving'}
             id={`notes-${row.id}`}
+            onChange={event => {
+              const nextNotes = event.target.value;
+              setNotes(nextNotes);
+              setSaveState(nextNotes === savedNotes ? 'idle' : 'dirty');
+            }}
+            value={notes}
           />
-          <div>
+          <div className="flex flex-wrap items-center gap-3">
             <button
               className={classes.secondaryButton}
-              onClick={() => {
-                const textarea = document.getElementById(
-                  `notes-${row.id}`
-                ) as HTMLTextAreaElement | null;
-                onSaveNotes(row, textarea?.value ?? '');
-              }}
+              disabled={saveState !== 'dirty'}
+              onClick={() => void saveNotes()}
               type="button"
             >
-              Save internal note
+              {saveState === 'saving' ? 'Saving...' : 'Save'}
             </button>
+            <span aria-live="polite" className="text-sm" role="status">
+              {saveState === 'dirty' && 'Unsaved changes'}
+              {saveState === 'saved' && (
+                <span className="text-green-700">Saved successfully</span>
+              )}
+              {saveState === 'error' && (
+                <span className="text-red-700">Unable to save changes</span>
+              )}
+            </span>
           </div>
         </div>
       )}
 
       {row.capabilities.canDecide && (
         <div className="mt-4 flex flex-wrap gap-2">
-          {row.capabilities.canApprove && (
+          {row.capabilities.canApprove && row.status !== 'APPROVED' && (
             <button
               className={classes.primaryButton}
               onClick={() => onDecision(row, 'APPROVED')}
@@ -160,7 +202,7 @@ function RegistrationReviewRow({
               Approve
             </button>
           )}
-          {row.capabilities.canWaitlist && (
+          {row.capabilities.canWaitlist && row.status !== 'WAITLISTED' && (
             <button
               className={classes.secondaryButton}
               onClick={() => onDecision(row, 'WAITLISTED')}
@@ -169,7 +211,7 @@ function RegistrationReviewRow({
               Waitlist
             </button>
           )}
-          {row.capabilities.canDecline && (
+          {row.capabilities.canDecline && row.status !== 'DECLINED' && (
             <button
               className={classes.secondaryButton}
               onClick={() => onDecision(row, 'DECLINED')}
@@ -194,7 +236,10 @@ export function RegistrationReviewQueue({
     row: OrganizerRegistrationReviewRow,
     status: RegistrationStatus
   ) => void;
-  onSaveNotes: (row: OrganizerRegistrationReviewRow, notes: string) => void;
+  onSaveNotes: (
+    row: OrganizerRegistrationReviewRow,
+    notes: string
+  ) => Promise<void>;
 }) {
   if (rows.length === 0) {
     return (

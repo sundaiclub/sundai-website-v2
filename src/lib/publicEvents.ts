@@ -1,8 +1,13 @@
 import prisma from '@/lib/prisma';
 import type { Prisma } from '@prisma/client';
-import { canViewApprovedOnlyEventDetailsWithContext } from '@/lib/eventManagementAuth';
+import {
+  canDecideRegistrationsWithContext,
+  canPublishEventWithContext,
+  canViewApprovedOnlyEventDetailsWithContext,
+} from '@/lib/eventManagementAuth';
 import {
   buildApplicationControlsState,
+  fetchMergedApplicationTemplate,
   getApplicationPublicStatus,
   parseTemplateFieldsJson,
 } from '@/lib/applicationTemplates';
@@ -15,6 +20,7 @@ import type {
   EventStaffRole,
   JsonObject,
   JsonValue,
+  MergedApplicationTemplate,
   PublicEventCard,
   PublicEventDetail,
   PublicEventStatus,
@@ -133,7 +139,23 @@ export type PublicEventsPrismaClient = {
     PublicEventsEventRecord,
     PublicEventsEventFindManyArgs,
     PublicEventsEventFindFirstArgs
-  >;
+  > & {
+    findUnique(args: unknown): Promise<{
+      id: EntityId;
+      chapterId?: EntityId | null;
+      applicationQuestionsJson?: unknown;
+      hideChapterDefaultQuestions?: boolean | null;
+    } | null>;
+  };
+  applicationTemplate: {
+    findFirst(args: unknown): Promise<{
+      id: EntityId;
+      scope?: string;
+      chapterId?: EntityId | null;
+      fieldsJson: unknown;
+      isActive?: boolean | null;
+    } | null>;
+  };
   eventRegistration: PublicEventsDelegate<
     PublicEventsRegistrationRecord,
     Prisma.EventRegistrationFindManyArgs,
@@ -158,6 +180,7 @@ export type PublicEventsPrismaClient = {
 
 export type PublicEventViewer = {
   hackerId?: EntityId | null;
+  clerkId?: string | null;
 };
 
 export type ListPublicEventsOptions = {
@@ -179,9 +202,11 @@ export type GetPublicEventBySlugInput = {
 };
 
 export type RedactPublicEventOptions = {
+  applicationQuestionSet?: ApplicationQuestionSet;
   viewerRegistration?: PublicViewerRegistrationState | null;
   viewerCanManageRegistrations?: boolean;
   viewerCanViewApprovedDetails?: boolean;
+  viewerCanEditEvent?: boolean;
   viewerIsSignedIn?: boolean;
   approvedCalendarDetails?: boolean;
   approvedCount?: number;
@@ -198,6 +223,14 @@ const defaultPrisma: PublicEventsPrismaClient = {
       prisma.event
         .findFirst(args)
         .then(event => event as PublicEventsEventRecord | null),
+    findUnique: args =>
+      prisma.event.findUnique(args as Prisma.EventFindUniqueArgs),
+  },
+  applicationTemplate: {
+    findFirst: args =>
+      prisma.applicationTemplate.findFirst(
+        args as Prisma.ApplicationTemplateFindFirstArgs
+      ),
   },
   eventRegistration: {
     findMany: args =>
@@ -308,30 +341,49 @@ export async function getPublicEventBySlug(
 ): Promise<PublicEventDetail | null> {
   const client = input.prismaClient ?? defaultPrisma;
   const now = input.now ?? new Date();
-  const event = await client.event.findFirst({
-    where: {
-      ...publicEventVisibilityWhere(input.chapterSlug),
-      slug: input.eventSlug,
-    },
-    include: publicEventInclude(),
-  });
+  const [event, viewerHacker] = await Promise.all([
+    client.event.findFirst({
+      where: {
+        ...publicEventVisibilityWhere(input.chapterSlug),
+        slug: input.eventSlug,
+      },
+      include: publicEventInclude(),
+    }),
+    !input.viewer?.hackerId && input.viewer?.clerkId
+      ? client.hacker.findUnique({
+          where: { clerkId: input.viewer.clerkId },
+          select: { id: true },
+        })
+      : Promise.resolve(null),
+  ]);
 
   if (!event) return null;
 
-  const [viewerRegistration, readPermissionContext] = await Promise.all([
-    getViewerRegistrationState(event.id, input.viewer?.hackerId, client),
-    getPublicEventReadPermissionContext(event, input.viewer?.hackerId, client),
-  ]);
+  const viewerHackerId = input.viewer?.hackerId ?? viewerHacker?.id ?? null;
+
+  const [viewerRegistration, readPermissionContext, mergedTemplate] =
+    await Promise.all([
+      getViewerRegistrationState(event.id, viewerHackerId, client),
+      getPublicEventReadPermissionContext(event, viewerHackerId, client),
+      fetchMergedApplicationTemplate({ eventId: event.id, prisma: client }),
+    ]);
   const viewerCanViewApprovedDetails =
     canViewApprovedOnlyEventDetailsWithContext({
       ...readPermissionContext,
       viewerRegistration,
     });
+  const viewerCanManageRegistrations = canDecideRegistrationsWithContext(
+    readPermissionContext
+  );
+  const viewerCanEditEvent = canPublishEventWithContext(readPermissionContext);
 
   return redactPublicEventForViewer(event, {
+    applicationQuestionSet: buildApplicationQuestionSet(event, mergedTemplate),
     viewerRegistration,
+    viewerCanManageRegistrations,
     viewerCanViewApprovedDetails,
-    viewerIsSignedIn: Boolean(input.viewer?.hackerId),
+    viewerCanEditEvent,
+    viewerIsSignedIn: Boolean(input.viewer?.hackerId || input.viewer?.clerkId),
     approvedCalendarDetails: input.includeApprovedCalendarDetails,
     now,
   });
@@ -392,8 +444,11 @@ export function redactPublicEventForViewer(
     approvedDetailsJson: approvedDetails,
     approvedDetailsVisible,
     applicationControls,
-    applicationQuestionSet: buildApplicationQuestionSet(event),
+    applicationQuestionSet:
+      options.applicationQuestionSet ?? buildApplicationQuestionSet(event),
     viewerRegistration: options.viewerRegistration ?? null,
+    viewerCanManageRegistrations: options.viewerCanManageRegistrations === true,
+    viewerCanEditEvent: options.viewerCanEditEvent === true,
     addToCalendar: buildAddToCalendarPayload(event, {
       includeApprovedDetails:
         approvedDetailsVisible && options.approvedCalendarDetails === true,
@@ -559,15 +614,19 @@ function buildApplicationControls(input: {
 }
 
 function buildApplicationQuestionSet(
-  event: PublicEventsEventRecord
+  event: PublicEventsEventRecord,
+  mergedTemplate?: MergedApplicationTemplate | null
 ): ApplicationQuestionSet {
   const eventFields = parseEventFields(event.applicationQuestionsJson);
+  const composedFields = mergedTemplate?.fields ?? eventFields;
 
   return {
-    siteFields: [],
+    siteFields: composedFields.filter(field => field.siteRequired === true),
     chapterFields: [],
     eventFields,
-    composedFields: eventFields,
+    composedFields,
+    siteTemplateId: mergedTemplate?.siteTemplateId ?? null,
+    chapterTemplateId: mergedTemplate?.chapterTemplateId ?? null,
     eventId: event.id,
   };
 }

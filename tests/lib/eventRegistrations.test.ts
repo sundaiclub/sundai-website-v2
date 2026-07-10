@@ -22,6 +22,17 @@ jest.mock('@/lib/applicationTemplates', () => ({
   fetchMergedApplicationTemplate: jest.fn(),
 }));
 
+jest.mock('@/lib/eventDecisionNotifications', () => ({
+  notifyEventDecision: jest.fn().mockResolvedValue({
+    email: 'sent',
+    sms: 'sent',
+  }),
+}));
+
+const {
+  notifyEventDecision,
+} = require('../../src/lib/eventDecisionNotifications');
+
 const eventId = 'event-native-rsvp';
 const now = () => new Date('2026-06-23T14:00:00.000Z');
 
@@ -85,7 +96,7 @@ const createRegistrationDb = () => {
     $transaction: jest.fn(),
   };
 
-  db.$transaction.mockImplementation(async (callback) => callback(db));
+  db.$transaction.mockImplementation(async callback => callback(db));
 
   return db;
 };
@@ -201,6 +212,7 @@ describe('event registration review query helpers', () => {
         eventId,
         status: 'WAITLISTED',
       },
+      include: expect.objectContaining({ hacker: expect.any(Object) }),
       orderBy: { createdAt: 'desc' },
       take: 25,
       skip: 50,
@@ -238,6 +250,7 @@ describe('event registration review query helpers', () => {
         eventId,
         status: 'PENDING',
       },
+      include: expect.objectContaining({ hacker: expect.any(Object) }),
       orderBy: { createdAt: 'desc' },
       take: undefined,
       skip: undefined,
@@ -271,6 +284,7 @@ describe('event registration review query helpers', () => {
         eventId,
         status: 'BLOCKED',
       },
+      include: expect.objectContaining({ hacker: expect.any(Object) }),
       orderBy: { createdAt: 'desc' },
       take: undefined,
       skip: undefined,
@@ -452,6 +466,58 @@ describe('public registration cancellation helpers', () => {
           cancelledBySelf: true,
         },
       },
+    });
+  });
+
+  it('notifies an applicant who is approved by automatic promotion', async () => {
+    jest.mocked(notifyEventDecision).mockClear();
+    const db = createRegistrationDb();
+    const approvedRegistration = buildRegistration({
+      id: 'registration-approved-cancel-me',
+      hackerId: 'hacker-cancel-me',
+      status: 'APPROVED',
+    });
+    const cancelledRegistration = buildRegistration({
+      ...approvedRegistration,
+      status: 'CANCELLED',
+      cancelledAt: now(),
+      cancelledById: 'hacker-cancel-me',
+    });
+    const waitlistedRegistration = buildRegistration({
+      id: 'registration-waitlisted-promote',
+      hackerId: 'hacker-promoted',
+      status: 'WAITLISTED',
+      waitlistedAt: now(),
+    });
+    const promotedRegistration = buildRegistration({
+      ...waitlistedRegistration,
+      status: 'APPROVED',
+      decidedById: 'hacker-cancel-me',
+      decidedAt: now(),
+    });
+
+    db.eventRegistration.findFirst.mockResolvedValue(approvedRegistration);
+    db.eventRegistration.update.mockImplementation(async ({ data }) =>
+      data.status === 'APPROVED' ? promotedRegistration : cancelledRegistration
+    );
+    db.eventRegistration.findMany.mockResolvedValue([waitlistedRegistration]);
+    db.eventRegistration.count.mockResolvedValue(0);
+    db.event.findUnique.mockResolvedValue({
+      id: eventId,
+      capacity: 1,
+      autoPromoteWaitlist: true,
+    });
+    db.eventRegistrationAudit.create.mockResolvedValue({});
+
+    await cancelPublicEventRegistration(
+      { eventId, hackerId: approvedRegistration.hackerId },
+      db
+    );
+
+    expect(notifyEventDecision).toHaveBeenCalledWith({
+      eventId,
+      registrationId: promotedRegistration.id,
+      status: 'APPROVED',
     });
   });
 });

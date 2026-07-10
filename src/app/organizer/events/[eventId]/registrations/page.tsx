@@ -39,6 +39,7 @@ function normalizeReviewState(
       statusFilter,
       includeBannedUsers,
       viewerRole,
+      counts: { [statusFilter]: payload.length },
       rows: payload as OrganizerRegistrationReviewRow[],
     };
   }
@@ -49,6 +50,7 @@ function normalizeReviewState(
     statusFilter,
     includeBannedUsers,
     viewerRole,
+    counts: value?.counts ?? {},
     rows: value?.rows ?? [],
   };
 }
@@ -116,19 +118,41 @@ export default function OrganizerEventRegistrationsPage({
     row: OrganizerRegistrationReviewRow,
     status: RegistrationStatus
   ) {
-    await fetch(`/api/events/${params.eventId}/registrations/${row.id}`, {
-      method: 'PATCH',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ status }),
-    });
+    const response = await fetch(
+      `/api/events/${params.eventId}/registrations/${row.id}`,
+      {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ status }),
+      }
+    );
+    if (!response.ok) return;
+
+    setState(current =>
+      current
+        ? {
+            ...current,
+            counts: {
+              ...current.counts,
+              [row.status]: Math.max(0, (current.counts[row.status] ?? 1) - 1),
+              [status]: (current.counts[status] ?? 0) + 1,
+            },
+            rows: current.rows.filter(currentRow => currentRow.id !== row.id),
+          }
+        : current
+    );
   }
 
   async function saveNotes(row: OrganizerRegistrationReviewRow, notes: string) {
-    await fetch(`/api/events/${params.eventId}/registrations/${row.id}/notes`, {
-      method: 'PATCH',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ internalReviewNotes: notes }),
-    });
+    const response = await fetch(
+      `/api/events/${params.eventId}/registrations/${row.id}/notes`,
+      {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ internalReviewNotes: notes }),
+      }
+    );
+    if (!response.ok) throw new Error('Unable to save internal review notes.');
   }
 
   return (
@@ -162,6 +186,7 @@ export default function OrganizerEventRegistrationsPage({
         <div className="mb-5">
           <RegistrationReviewTabs
             activeStatus={statusFilter}
+            counts={state?.counts ?? {}}
             onChange={setStatusFilter}
           />
         </div>

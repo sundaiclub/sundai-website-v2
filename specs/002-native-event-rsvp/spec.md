@@ -168,6 +168,8 @@ Organizers can manually close applications, manage approved capacity, place appl
 - **FR-042**: New public event pages SHOULD link to the existing pitch workspace where relevant, but this phase MUST NOT require replacing the pitch queue.
 - **FR-043**: The system MUST NOT include check-in QR or scanner flows, attendance migration, historical external-event import, public waitlist rank, guest RSVPs, custom chapter landing page builder, or full pitch workspace replacement in this phase.
 - **FR-044**: The system MUST include validation coverage for public event visibility, approved-only details, chapter-admin publishing, MC/co-MC review permissions, user cancellation, pending-answer edits, answer locks after decision, waitlist auto-promotion behavior, manual application closure, default approval-required mode, ban filtering, and application composition order.
+- **FR-045**: When an applicant is approved or declined, the system MUST send the public-safe decision message through AWS SES email and/or Twilio SMS only when the applicant has an active membership in the event's chapter, has allowed notifications, has enabled that channel, and has a usable contact value.
+- **FR-046**: Email or SMS delivery failure MUST NOT roll back or change the applicant's committed registration status or audit history.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -195,6 +197,7 @@ Organizers can manually close applications, manage approved capacity, place appl
 - **SC-008**: Manual application closure blocks 100% of new applications while allowing organizers to continue reviewing existing registrations.
 - **SC-009**: With waitlist auto-promotion disabled, 0 tested cancellations automatically promote waitlisted users; with it enabled, the oldest eligible waitlisted user is promoted in 100% of tested capacity-opening cases.
 - **SC-010**: The phase ships without guest RSVPs, check-in QR/scanner flows, attendance migration, historical external-event import, public waitlist rank, custom chapter homepage builder, or pitch queue replacement exposed to users.
+- **SC-011**: 100% of tested approval and decline notifications honor the chapter-level master preference and individual email/SMS channel preferences, while simulated provider failures leave the committed decision unchanged.
 
 ## Assumptions
 
@@ -203,7 +206,7 @@ Organizers can manually close applications, manage approved capacity, place appl
 - Google Calendar becomes a downstream output later; it is not the authoring or primary discovery surface for this phase.
 - Past event archives are not part of the core phase 2 requirement unless already exposed through chapter pages or later reporting work.
 - Mailing-list signup on chapter pages can be represented as a call to action even if the final provider is not chosen yet.
-- Production email and SMS provider selection is outside this specification; phase 2 focuses on in-product statuses and public message text readiness.
+- Approval and decline decisions are sent through AWS SES email and Twilio SMS according to the applicant's active chapter-membership notification preferences and available contact information; in-product status remains authoritative if delivery fails.
 - Declined users receive organizer-configured public decline message text, not a globally fixed message.
 - Blocked or banned users receive the existing generic public-safe unable-to-register message unless a later policy explicitly changes it.
 - Historical external-event import is intentionally out of scope for this phase.

@@ -293,17 +293,15 @@ export default function ChapterLandingPage({
           >
             <div className={`divide-y ${classes.divider}`}>
               {pendingEvents.map(event => (
-                <div
+                <Link
                   key={event.id}
-                  className="grid gap-3 py-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
+                  className="group grid gap-3 rounded-md px-3 py-3 outline-none transition hover:bg-gray-500/5 focus-visible:ring-2 focus-visible:ring-gray-500 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
+                  href={`/organizer/events/${event.id}/settings`}
                 >
                   <div className="min-w-0">
-                    <Link
-                      className="font-semibold hover:underline"
-                      href={`/organizer/events/${event.id}/settings`}
-                    >
+                    <span className="font-semibold group-hover:underline">
                       {event.title}
-                    </Link>
+                    </span>
                     <div className={`mt-1 text-sm ${classes.mutedText}`}>
                       {[
                         event.publicLocation,
@@ -323,7 +321,7 @@ export default function ChapterLandingPage({
                       <ManagementBadge>{event.visibility}</ManagementBadge>
                     )}
                   </div>
-                </div>
+                </Link>
               ))}
               {pendingEvents.length === 0 && (
                 <ManagementEmptyState>
@@ -337,16 +335,37 @@ export default function ChapterLandingPage({
         <ManagementSection title="Upcoming events">
           <div className={`divide-y ${classes.divider}`}>
             {(chapter?.upcomingEvents ?? []).map(event => (
-              <div key={event.id} className="py-3">
+              <div
+                key={event.id}
+                className="grid gap-3 rounded-md px-3 py-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
+              >
                 <Link
-                  className="font-semibold hover:underline"
+                  className="group min-w-0 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-gray-500"
                   href={`/events/${eventChapterSlug}/${event.slug}`}
                 >
-                  {event.title}
+                  <span className="font-semibold group-hover:underline">
+                    {event.title}
+                  </span>
+                  <div className={`mt-1 text-sm ${classes.mutedText}`}>
+                    {[
+                      event.publicLocation,
+                      event.startTime
+                        ? new Date(event.startTime).toLocaleDateString()
+                        : null,
+                    ]
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </div>
                 </Link>
-                <div className={`mt-1 text-sm ${classes.mutedText}`}>
-                  {event.publicLocation}
-                </div>
+                {canManageChapter && (
+                  <Link
+                    aria-label={`Edit ${event.title}`}
+                    className={classes.secondaryButton}
+                    href={`/organizer/events/${event.id}/settings`}
+                  >
+                    Edit
+                  </Link>
+                )}
               </div>
             ))}
             {(chapter?.upcomingEvents ?? []).length === 0 && (

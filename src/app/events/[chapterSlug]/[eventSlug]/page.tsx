@@ -1,8 +1,9 @@
 import { notFound } from 'next/navigation';
-import { currentUser } from '@clerk/nextjs/server';
+import { auth, currentUser } from '@clerk/nextjs/server';
 import { EventDetailSections } from '@/app/components/EventDetailSections';
 import {
   ManagementHeader,
+  ManagementLinkButton,
   ManagementPage,
   ManagementSection,
 } from '@/app/components/ManagementSurface';
@@ -17,9 +18,11 @@ export default async function PublicEventDetailPage({
 }: {
   params: { chapterSlug: string; eventSlug: string };
 }) {
+  const { userId } = auth();
   const event = await getPublicEventBySlug({
     chapterSlug: params.chapterSlug,
     eventSlug: params.eventSlug,
+    viewer: userId ? { clerkId: userId } : null,
     includeApprovedCalendarDetails: true,
   });
 
@@ -36,12 +39,37 @@ export default async function PublicEventDetailPage({
 
   return (
     <ManagementPage maxWidth="max-w-4xl">
+      <div className="mb-4">
+        <ManagementLinkButton
+          href={`/chapters/${event.chapterSlug}`}
+          variant="ghost"
+        >
+          <span aria-hidden="true">&larr;</span>
+          Back to {event.chapterName}
+        </ManagementLinkButton>
+      </div>
+
       <ManagementHeader
         eyebrow={event.chapterName}
         title={event.title}
         description={event.description}
         actions={
           <>
+            {event.viewerCanManageRegistrations && (
+              <ManagementLinkButton
+                href={`/organizer/events/${event.id}/registrations`}
+                variant="primary"
+              >
+                Manage attendees
+              </ManagementLinkButton>
+            )}
+            {event.viewerCanEditEvent && (
+              <ManagementLinkButton
+                href={`/organizer/events/${event.id}/settings`}
+              >
+                Edit event
+              </ManagementLinkButton>
+            )}
             <PublicEventStatusBadge status={event.publicStatus} />
             {event.viewerRegistrationStatus && (
               <ViewerRegistrationStatusBadge

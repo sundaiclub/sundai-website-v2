@@ -66,7 +66,7 @@ const createRegistrationDb = () => {
     $transaction: jest.fn(),
   };
 
-  db.$transaction.mockImplementation(async (callback) => callback(db));
+  db.$transaction.mockImplementation(async callback => callback(db));
 
   return db;
 };
@@ -292,6 +292,7 @@ describe('/api/events/[eventId]/registrations internals', () => {
 
     expect(db.eventRegistration.findMany).toHaveBeenCalledWith({
       where: { eventId: 'event-boston-demo-night' },
+      include: expect.objectContaining({ hacker: expect.any(Object) }),
       orderBy: { createdAt: 'desc' },
       take: undefined,
       skip: undefined,
@@ -335,7 +336,7 @@ describe('/api/events/[eventId]/registrations internals', () => {
 describe('/api/events/[eventId]/registrations co-MC applicant decisions', () => {
   it.each(['APPROVED', 'WAITLISTED', 'DECLINED'] as const)(
     'denies co-MC status updates to %s',
-    (toStatus) => {
+    toStatus => {
       const guard = getRegistrationStatusGuard(
         { staffRole: 'CO_MC' },
         toStatus

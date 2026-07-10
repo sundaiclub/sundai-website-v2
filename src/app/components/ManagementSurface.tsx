@@ -55,9 +55,9 @@ export function useManagementClasses() {
     divider: isDarkMode ? 'divide-gray-800' : 'divide-gray-200',
     input: `${
       isDarkMode
-        ? 'border-gray-700 bg-gray-950 text-gray-100 placeholder:text-gray-500 focus:border-gray-400'
-        : 'border-gray-300 bg-white text-gray-900 placeholder:text-gray-500 focus:border-gray-900'
-    } min-h-11 rounded-md border px-3 py-2 text-sm outline-none transition`,
+        ? 'border-gray-700 bg-gray-950 text-gray-100 placeholder:text-gray-500 focus:border-gray-400 disabled:bg-gray-900'
+        : 'border-gray-300 bg-white text-gray-900 placeholder:text-gray-500 focus:border-gray-900 disabled:bg-gray-100'
+    } min-h-11 rounded-md border px-3 py-2 text-sm outline-none transition disabled:cursor-not-allowed disabled:opacity-70`,
     textarea: `${
       isDarkMode
         ? 'border-gray-700 bg-gray-950 text-gray-100 placeholder:text-gray-500 focus:border-gray-400 disabled:bg-gray-900'

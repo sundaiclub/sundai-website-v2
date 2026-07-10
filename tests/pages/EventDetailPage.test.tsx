@@ -169,8 +169,7 @@ function registrationState(
     id: `registration-${status.toLowerCase()}`,
     status,
     submittedAt: '2026-06-18T15:00:00.000Z',
-    cancelledAt:
-      status === 'CANCELLED' ? '2026-06-19T15:00:00.000Z' : null,
+    cancelledAt: status === 'CANCELLED' ? '2026-06-19T15:00:00.000Z' : null,
     publicSafeMessage: null,
     canEditAnswers: status === 'PENDING',
     canCancel,
@@ -382,6 +381,13 @@ async function findCalendarAction() {
   return screen.findByRole('button', { name: /add.*calendar/i });
 }
 
+async function openRegistrationForm() {
+  const registerButton = await screen.findByRole('button', {
+    name: /^register$/i,
+  });
+  fireEvent.click(registerButton);
+}
+
 describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -402,6 +408,63 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
     await expectSomeText(/july 10, 2026/i);
     await expectSomeText(/6:00\s*pm|6 pm/i);
     await expectSomeText(/sign in/i);
+    expect(
+      screen.getByRole('link', { name: /back to sundai boston/i })
+    ).toHaveAttribute('href', '/chapters/boston');
+    expect(
+      screen.queryByRole('link', { name: /edit event/i })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: /manage attendees/i })
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows an event settings action to admins', async () => {
+    mockSignedIn();
+
+    await renderDetailPage(
+      buildEventDetail({
+        viewerCanEditEvent: true,
+      })
+    );
+
+    expect(screen.getByRole('link', { name: /edit event/i })).toHaveAttribute(
+      'href',
+      `/organizer/events/${eventFixture.id}/settings`
+    );
+  });
+
+  it('links admins and event MCs to attendee management', async () => {
+    mockSignedIn();
+
+    await renderDetailPage(
+      buildEventDetail({
+        viewerCanManageRegistrations: true,
+      })
+    );
+
+    expect(
+      screen.getByRole('link', { name: /manage attendees/i })
+    ).toHaveAttribute(
+      'href',
+      `/organizer/events/${eventFixture.id}/registrations`
+    );
+  });
+
+  it('loads signed-in viewer status instead of anonymous application controls', async () => {
+    mockSignedIn();
+
+    await renderDetailPage(buildApplicationEvent());
+
+    expect(mockGetPublicEventBySlug).toHaveBeenCalledWith({
+      chapterSlug: 'boston',
+      eventSlug: 'ai-build-night',
+      viewer: { clerkId: signedInUser.clerkId },
+      includeApprovedCalendarDetails: true,
+    });
+    expect(
+      screen.queryByText(/sign in to (?:register|apply) for this event/i)
+    ).not.toBeInTheDocument();
   });
 
   it('hides approved-only details until the viewer is approved', async () => {
@@ -457,7 +520,7 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
     await expectSomeText(/applications are closed for this event/i);
     expect(
       screen.queryByRole('button', {
-        name: /submit application|apply|save.*changes|update application/i,
+        name: /register|submit application|apply|save.*changes|update application/i,
       })
     ).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/full name/i)).not.toBeInTheDocument();
@@ -639,8 +702,13 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
       mockSignedIn();
     });
 
-    it('renders the composed application form in site, chapter, and event order with profile prefill', async () => {
+    it('reveals the composed registration form from the register button with profile prefill', async () => {
       await renderDetailPage(buildApplicationEvent());
+
+      expect(screen.queryByLabelText(/full name/i)).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /^register$/i })).toBeEnabled();
+
+      await openRegistrationForm();
 
       const nameInput = await screen.findByLabelText(/full name/i);
       const emailInput = screen.getByLabelText(/email/i);
@@ -668,8 +736,43 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
       ).toBeEnabled();
     });
 
+    it('renders boolean application questions as checkboxes', async () => {
+      const event = buildApplicationEvent();
+      const checkboxField = applicationField('eventGuidelines', {
+        label: 'I agree to the event guidelines',
+        type: 'BOOLEAN',
+        required: true,
+        order: event.applicationQuestionSet.composedFields.length,
+      });
+
+      await renderDetailPage({
+        ...event,
+        applicationQuestionSet: {
+          ...event.applicationQuestionSet,
+          eventFields: [
+            ...event.applicationQuestionSet.eventFields,
+            checkboxField,
+          ],
+          composedFields: [
+            ...event.applicationQuestionSet.composedFields,
+            checkboxField,
+          ],
+        },
+      });
+
+      await openRegistrationForm();
+
+      expect(
+        screen.getByRole('checkbox', {
+          name: /i agree to the event guidelines/i,
+        })
+      ).not.toBeChecked();
+    });
+
     it('shows required-field errors before submitting incomplete application answers', async () => {
       await renderDetailPage(buildApplicationEvent());
+
+      await openRegistrationForm();
 
       fireEvent.change(await screen.findByLabelText(/project idea/i), {
         target: { value: '' },
@@ -770,7 +873,7 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
         ).not.toBeInTheDocument();
         expect(
           screen.queryByRole('button', {
-            name: /submit application|apply|save.*changes|update application/i,
+            name: /register|submit application|apply|save.*changes|update application/i,
           })
         ).not.toBeInTheDocument();
 

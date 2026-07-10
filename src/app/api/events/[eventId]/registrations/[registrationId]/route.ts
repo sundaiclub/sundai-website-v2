@@ -15,6 +15,7 @@ import {
   isApplicantDecisionStatus,
   updateEventRegistrationStatus,
 } from '@/lib/eventRegistrations';
+import { notifyEventDecision } from '@/lib/eventDecisionNotifications';
 import type { RegistrationStatus } from '@/types/event-management';
 
 export async function PATCH(
@@ -43,13 +44,27 @@ export async function PATCH(
       return forbidden();
     }
 
+    const previousRegistration = await prisma.eventRegistration.findFirst({
+      where: {
+        id: params.registrationId,
+        eventId: params.eventId,
+      },
+      select: { status: true },
+    });
+
     let publicSafeMessage = body.publicSafeMessage;
-    if (toStatus === 'DECLINED' && publicSafeMessage === undefined) {
+    if (
+      (toStatus === 'APPROVED' || toStatus === 'DECLINED') &&
+      publicSafeMessage === undefined
+    ) {
       const event = await prisma.event.findUnique({
         where: { id: params.eventId },
-        select: { declineMessage: true },
+        select: { confirmationMessage: true, declineMessage: true },
       });
-      publicSafeMessage = event?.declineMessage ?? undefined;
+      publicSafeMessage =
+        (toStatus === 'APPROVED'
+          ? event?.confirmationMessage
+          : event?.declineMessage) ?? undefined;
     }
 
     const registration = await updateEventRegistrationStatus({
@@ -63,6 +78,17 @@ export async function PATCH(
     });
 
     if (!registration) return notFound();
+
+    if (
+      previousRegistration?.status !== toStatus &&
+      (toStatus === 'APPROVED' || toStatus === 'DECLINED')
+    ) {
+      await notifyEventDecision({
+        eventId: params.eventId,
+        registrationId: params.registrationId,
+        status: toStatus,
+      });
+    }
 
     return NextResponse.json(registration);
   } catch (error) {

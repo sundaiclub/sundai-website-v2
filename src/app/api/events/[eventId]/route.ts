@@ -6,6 +6,8 @@ import {
   parseTemplateFieldsJson,
 } from '@/lib/applicationTemplates';
 import {
+  canDecideRegistrationsWithContext,
+  canManageChapterSettings,
   canManageEventSettings,
   canViewApprovedOnlyEventDetailsWithContext,
 } from '@/lib/eventManagementAuth';
@@ -35,6 +37,7 @@ export async function GET(
       const event = await prisma.event.findUnique({
         where: { id: params.eventId },
         include: {
+          chapter: true,
           staff: { include: { hacker: { include: { avatar: true } } } },
           pitchSessions: {
             include: {
@@ -81,7 +84,11 @@ export async function GET(
       );
       if (!canManage) return new NextResponse('Forbidden', { status: 403 });
 
-      return NextResponse.json(event);
+      const canDelete =
+        user.role === 'SITE_ADMIN' ||
+        (await canManageChapterSettings(prisma, user.id, event.chapterId));
+
+      return NextResponse.json({ ...event, canDelete });
     }
 
     const event = await prisma.event.findFirst({
@@ -182,10 +189,16 @@ export async function GET(
         staff,
         viewerRegistration,
       });
+    const viewerCanManageRegistrations = canDecideRegistrationsWithContext({
+      actor: viewer,
+      chapterMembership,
+      staff,
+    });
 
     return NextResponse.json(
       redactPublicEventForViewer(event, {
         viewerRegistration,
+        viewerCanManageRegistrations,
         viewerCanViewApprovedDetails,
         viewerIsSignedIn: Boolean(viewer),
       })
@@ -537,6 +550,74 @@ export async function PATCH(
       );
     }
     console.error('[EVENT_PATCH]', error);
+    return new NextResponse('Internal Error', { status: 500 });
+  }
+}
+
+export async function DELETE(
+  _req: Request,
+  { params }: { params: { eventId: string } }
+) {
+  try {
+    const { userId } = auth();
+    if (!userId) return new NextResponse('Unauthorized', { status: 401 });
+
+    const user = await prisma.hacker.findUnique({
+      where: { clerkId: userId },
+      select: { id: true, role: true },
+    });
+    if (!user) return new NextResponse('Unauthorized', { status: 401 });
+
+    const event = await prisma.event.findUnique({
+      where: { id: params.eventId },
+      select: { id: true, chapterId: true, status: true },
+    });
+    if (!event) return new NextResponse('Not Found', { status: 404 });
+
+    const canDelete =
+      user.role === 'SITE_ADMIN' ||
+      (await canManageChapterSettings(prisma, user.id, event.chapterId));
+    if (!canDelete) return new NextResponse('Forbidden', { status: 403 });
+
+    if (event.status !== 'DRAFT') {
+      return NextResponse.json(
+        { message: 'Only draft events can be deleted.' },
+        { status: 409 }
+      );
+    }
+
+    const pitchSessions = await prisma.pitchSession.findMany({
+      where: { eventId: event.id },
+      select: { id: true },
+    });
+    const pitchSessionIds = pitchSessions.map(session => session.id);
+    const pitchProjects = pitchSessionIds.length
+      ? await prisma.pitchProject.findMany({
+          where: { pitchSessionId: { in: pitchSessionIds } },
+          select: { id: true },
+        })
+      : [];
+    const pitchProjectIds = pitchProjects.map(project => project.id);
+
+    await prisma.$transaction([
+      prisma.pitchProjectVote.deleteMany({
+        where: { pitchProjectId: { in: pitchProjectIds } },
+      }),
+      prisma.pitchProject.deleteMany({
+        where: { pitchSessionId: { in: pitchSessionIds } },
+      }),
+      prisma.pitchSession.deleteMany({ where: { eventId: event.id } }),
+      prisma.eventRegistrationAudit.deleteMany({
+        where: { eventId: event.id },
+      }),
+      prisma.eventRegistration.deleteMany({ where: { eventId: event.id } }),
+      prisma.eventStaff.deleteMany({ where: { eventId: event.id } }),
+      prisma.event.delete({ where: { id: event.id } }),
+    ]);
+
+    return new NextResponse(null, { status: 204 });
+  } catch (error) {
+    console.error('[EVENT_DELETE]', error);
     return new NextResponse('Internal Error', { status: 500 });
   }
 }

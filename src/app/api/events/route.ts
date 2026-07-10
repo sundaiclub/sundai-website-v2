@@ -13,6 +13,7 @@ import {
   parseOptionalDateInput,
   slugifyEventValue,
 } from '@/lib/eventRequestParsing';
+import { DEFAULT_EVENT_MESSAGES } from '@/lib/eventMessageDefaults';
 import { listPublicEvents } from '@/lib/publicEvents';
 
 export async function GET(req: Request) {
@@ -271,15 +272,18 @@ export async function POST(req: Request) {
         ...(hideChapterDefaultQuestions !== undefined && {
           hideChapterDefaultQuestions: Boolean(hideChapterDefaultQuestions),
         }),
-        ...(confirmationMessage !== undefined && {
-          confirmationMessage: confirmationMessage || null,
-        }),
-        ...(waitlistMessage !== undefined && {
-          waitlistMessage: waitlistMessage || null,
-        }),
-        ...(declineMessage !== undefined && {
-          declineMessage: declineMessage || null,
-        }),
+        confirmationMessage:
+          confirmationMessage === undefined
+            ? DEFAULT_EVENT_MESSAGES.confirmation
+            : confirmationMessage || null,
+        waitlistMessage:
+          waitlistMessage === undefined
+            ? DEFAULT_EVENT_MESSAGES.waitlist
+            : waitlistMessage || null,
+        declineMessage:
+          declineMessage === undefined
+            ? DEFAULT_EVENT_MESSAGES.decline
+            : declineMessage || null,
         applicationsOpen: parsedApplicationsOpen,
         applicationsClosedAt: parsedApplicationsOpen
           ? null

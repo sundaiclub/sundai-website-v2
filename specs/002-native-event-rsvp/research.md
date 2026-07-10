@@ -74,11 +74,11 @@
 
 ## Notifications
 
-**Decision**: Do not implement production email or SMS delivery in Phase 2. Store public confirmation, waitlist, and decline message text on event/configuration surfaces and expose in-product status views.
+**Decision**: Deliver approval and decline decisions through AWS SES email and Twilio SMS when the applicant has an active membership in the event's chapter, has globally allowed notifications for that membership, has enabled the corresponding channel, and has a usable contact value. Keep the in-product status and public message as the source of truth; notification delivery failures do not roll back the registration decision.
 
-**Rationale**: Issue #143 leaves production provider selection open, and the spec scopes this phase to public status and message text readiness.
+**Rationale**: Decision notifications are transactional messages tied to a user-visible status change. Reusing the existing chapter-level master and channel preferences avoids introducing a second consent model, while committing status before delivery keeps registration state authoritative during provider outages.
 
-**Alternatives considered**: Adding a provider abstraction now was rejected as unnecessary for acceptance criteria and likely to expand scope.
+**Alternatives considered**: Rolling back a decision when delivery fails was rejected because an external provider outage must not corrupt organizer actions. Sending to every applicant regardless of membership preferences was rejected because it would bypass existing channel consent.
 
 ## Chapter Pages
 

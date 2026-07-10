@@ -44,7 +44,7 @@ No Phase 1 blocker prevents planning. The gaps above are expected cutover work f
 
 **Performance Goals**: Public event listing and chapter pages should use indexed chapter/status/time lookups and avoid per-card permission queries. Registration review should filter by event/status with indexed registration and ban lookups. Public event detail should do one scoped event lookup plus one current-user registration lookup when signed in.
 
-**Constraints**: Cutover only; do not keep long-term compatibility paths for placeholder Phase 1 public-registration enum values. Guest RSVPs, QR check-in/scanner, attendance migration, historical external-event import, public waitlist rank, custom chapter landing-page builder, production email/SMS delivery, and full pitch workspace replacement are out of scope. Global ban signals must remain hidden from non-site-admin workflows.
+**Constraints**: Cutover only; do not keep long-term compatibility paths for placeholder Phase 1 public-registration enum values. Guest RSVPs, QR check-in/scanner, attendance migration, historical external-event import, public waitlist rank, custom chapter landing-page builder, and full pitch workspace replacement are out of scope. Approval and decline decisions use chapter notification preferences to deliver transactional email through AWS SES and SMS through Twilio. Global ban signals must remain hidden from non-site-admin workflows.
 
 **Scale/Scope**: One Next.js app, one PostgreSQL schema, one public `/events` cutover, public event detail pages, public chapter directory/page updates, organizer event creation/review updates, user-owned registration actions, waitlist/capacity rules, shared helper updates, and focused tests for the phase 2 permission and visibility matrix.
 

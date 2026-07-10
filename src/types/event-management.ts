@@ -366,6 +366,8 @@ export type OrganizerEventSettings = {
   id: EntityId;
   title: string;
   slug?: string;
+  startTime?: ISODateTimeString | Date;
+  endTime?: ISODateTimeString | Date | null;
   status?: EventStatus;
   description?: string | null;
   publicLocation?: string | null;
@@ -380,9 +382,12 @@ export type OrganizerEventSettings = {
   approvedCount?: number;
   autoPromoteWaitlist?: boolean;
   approvedDetailsJson?: JsonObject | null;
+  applicationQuestionsJson?: JsonValue | null;
+  hideChapterDefaultQuestions?: boolean;
   confirmationMessage?: string | null;
   waitlistMessage?: string | null;
   declineMessage?: string | null;
+  canDelete?: boolean;
   chapter?: Pick<Chapter, 'id' | 'name' | 'slug' | 'timezone'>;
   staff?: Array<
     Pick<EventStaff, 'id' | 'role'> & {
@@ -470,6 +475,8 @@ export interface PublicEventDetail extends PublicEventCard {
   applicationControls: ApplicationControlsState;
   applicationQuestionSet: ApplicationQuestionSet;
   viewerRegistration?: PublicViewerRegistrationState | null;
+  viewerCanManageRegistrations?: boolean;
+  viewerCanEditEvent?: boolean;
   addToCalendar: AddToCalendarPayload;
 }
 
@@ -566,6 +573,7 @@ export interface OrganizerRegistrationReviewState {
   statusFilter?: Exclude<RegistrationStatus, 'BLOCKED'> | 'BLOCKED';
   includeBannedUsers: boolean;
   viewerRole: OrganizerReviewRole;
+  counts: Partial<Record<RegistrationStatus, number>>;
   rows: OrganizerRegistrationReviewRow[];
 }
 

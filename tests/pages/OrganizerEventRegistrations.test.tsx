@@ -303,6 +303,12 @@ function reviewState({
     statusFilter,
     includeBannedUsers,
     viewerRole,
+    counts: Object.fromEntries(
+      Object.entries(defaultRowsByStatus).map(([status, statusRows]) => [
+        status,
+        statusRows.length,
+      ])
+    ),
     rows,
   };
 }
@@ -430,6 +436,17 @@ describe('/organizer/events/[eventId]/registrations', () => {
     ]) {
       expect(screen.getByRole('tab', { name: label })).toBeInTheDocument();
     }
+    for (const status of [
+      'pending',
+      'approved',
+      'waitlisted',
+      'declined',
+      'cancelled',
+    ]) {
+      expect(
+        screen.getByRole('tab', { name: new RegExp(`${status} 1`, 'i') })
+      ).toBeInTheDocument();
+    }
 
     expect(screen.getByText(/applicant@example.com/i)).toBeInTheDocument();
     expect(
@@ -450,6 +467,11 @@ describe('/organizer/events/[eventId]/registrations', () => {
 
     expect(await screen.findByText(/approved applicant/i)).toBeInTheDocument();
     expect(screen.queryByText(/signed in applicant/i)).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /^approve$/i })
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^waitlist$/i })).toBeEnabled();
+    expect(screen.getByRole('button', { name: /^decline$/i })).toBeEnabled();
 
     await waitFor(() => {
       const urls = (global.fetch as jest.Mock).mock.calls.map(([input]) =>
@@ -464,6 +486,20 @@ describe('/organizer/events/[eventId]/registrations', () => {
         ])
       );
     });
+
+    fireEvent.click(screen.getByRole('tab', { name: /waitlisted/i }));
+    expect(
+      await screen.findByText(/waitlisted applicant/i)
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /^waitlist$/i })
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('tab', { name: /declined/i }));
+    expect(await screen.findByText(/declined applicant/i)).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /^decline$/i })
+    ).not.toBeInTheDocument();
   });
 
   it('saves event-specific internal review notes without mixing them with public messages', async () => {
@@ -475,9 +511,8 @@ describe('/organizer/events/[eventId]/registrations', () => {
     fireEvent.change(notes, {
       target: { value: 'Confirmed GPU access and mentor match.' },
     });
-    fireEvent.click(
-      screen.getByRole('button', { name: /save internal note|save notes/i })
-    );
+    expect(screen.getByText(/unsaved changes/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /^save$/i }));
 
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith(
@@ -494,6 +529,9 @@ describe('/organizer/events/[eventId]/registrations', () => {
     expect(
       latestFetchBody(/\/registrations\/registration-pending\/notes$/)
     ).not.toHaveProperty('publicSafeMessage');
+    expect(await screen.findByText(/saved successfully/i)).toBeInTheDocument();
+    expect(screen.queryByText(/unsaved changes/i)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^save$/i })).toBeDisabled();
   });
 
   it('shows decision controls to MCs but hides them from note-only co-MCs', async () => {
@@ -517,6 +555,18 @@ describe('/organizer/events/[eventId]/registrations', () => {
     ).toMatchObject({
       status: 'APPROVED',
     });
+    await waitFor(() => {
+      expect(
+        screen.queryByText(/signed in applicant/i)
+      ).not.toBeInTheDocument();
+    });
+    expect(
+      screen.getByText(/no registrations in this queue/i)
+    ).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /pending 0/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole('tab', { name: /approved 2/i })
+    ).toBeInTheDocument();
 
     cleanup();
     mockRegistrationReviewFetch({

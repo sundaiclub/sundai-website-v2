@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 
 import ChapterLandingPage from '../../src/app/chapters/[chapterSlug]/page';
 
@@ -37,7 +37,7 @@ const bostonChapter = {
       chapterSlug: 'boston',
       status: 'PUBLISHED',
       visibility: 'PUBLIC',
-      startsAt: '2026-07-10T22:00:00.000Z',
+      startTime: '2026-07-10T22:00:00.000Z',
       publicLocation: 'Kendall Square',
     },
     {
@@ -47,7 +47,7 @@ const bostonChapter = {
       chapterSlug: 'boston',
       status: 'PUBLISHED',
       visibility: 'PUBLIC',
-      startsAt: '2026-07-17T22:00:00.000Z',
+      startTime: '2026-07-17T22:00:00.000Z',
       publicLocation: 'The Foundry',
     },
   ],
@@ -145,6 +145,23 @@ describe('/chapters/[chapterSlug] public chapter page', () => {
 
     expect(demoNight).toHaveAttribute('href', '/events/boston/demo-night');
     expect(agentJam).toHaveAttribute('href', '/events/boston/agent-jam');
+    expect(
+      screen.queryByRole('link', { name: /edit boston demo night/i })
+    ).not.toBeInTheDocument();
+    expect(
+      within(demoNight).getByText(
+        `Kendall Square · ${new Date(
+          '2026-07-10T22:00:00.000Z'
+        ).toLocaleDateString()}`
+      )
+    ).toBeInTheDocument();
+    expect(
+      within(agentJam).getByText(
+        `The Foundry · ${new Date(
+          '2026-07-17T22:00:00.000Z'
+        ).toLocaleDateString()}`
+      )
+    ).toBeInTheDocument();
   });
 
   it('shows manage and new event actions to chapter admins', async () => {
@@ -181,6 +198,18 @@ describe('/chapters/[chapterSlug] public chapter page', () => {
     expect(screen.getByRole('link', { name: /new event/i })).toHaveAttribute(
       'href',
       '/organizer/events/new?chapterId=chapter-boston'
+    );
+    expect(
+      screen.getByRole('link', { name: /edit boston demo night/i })
+    ).toHaveAttribute(
+      'href',
+      '/organizer/events/event-boston-demo-night/settings'
+    );
+    expect(
+      screen.getByRole('link', { name: /edit boston agent jam/i })
+    ).toHaveAttribute(
+      'href',
+      '/organizer/events/event-boston-agent-jam/settings'
     );
   });
 
@@ -233,13 +262,16 @@ describe('/chapters/[chapterSlug] public chapter page', () => {
       pendingHeading.compareDocumentPosition(upcomingHeading) &
         Node.DOCUMENT_POSITION_FOLLOWING
     ).toBeTruthy();
-    expect(
-      screen.getByRole('link', { name: /boston draft night/i })
-    ).toHaveAttribute(
+    const pendingEventLink = screen.getByRole('link', {
+      name: /boston draft night/i,
+    });
+    expect(pendingEventLink).toHaveAttribute(
       'href',
       '/organizer/events/event-boston-draft-night/settings'
     );
-    expect(screen.getByText('DRAFT')).toBeInTheDocument();
+    expect(within(pendingEventLink).getByText(/^TBD · /)).toBeInTheDocument();
+    expect(within(pendingEventLink).getByText('DRAFT')).toBeInTheDocument();
+    expect(within(pendingEventLink).getByText('PUBLIC')).toBeInTheDocument();
   });
 
   it('does not show pending chapter events to signed-out visitors even when public admin memberships are present', async () => {
