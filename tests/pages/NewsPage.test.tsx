@@ -70,13 +70,15 @@ describe('/news page', () => {
     expect(html).not.toContain('Hacker Combinator')
 
     // Tools Club button should be black, square (no curve)
-    const ctaHref = 'https://partiful.com/e/xZtVjYqjTCVZQ2wlAjCg'
+    const ctaHref = 'https://www.sundai.club/events'
     const ctaIdx = html.indexOf(ctaHref)
     expect(ctaIdx).toBeGreaterThan(-1)
     const ctaSlice = html.slice(ctaIdx - 200, ctaIdx + 200)
     expect(ctaSlice).toContain('background:#111827')
     expect(ctaSlice).toContain('border-radius:0')
     expect(ctaSlice).not.toContain('#f87171')
+    expect(html).not.toContain('partiful.com/e/xZtVjYqjTCVZQ2wlAjCg')
+    expect(html).not.toContain('partiful.com/e/C3mnrNSv8YGnZefXcL0D')
   })
 
   it('streams generated content progressively', async () => {
@@ -154,6 +156,4 @@ describe('/news page', () => {
     expect(screen.getByText('Weekly News')).toBeInTheDocument()
   })
 })
-
-
 

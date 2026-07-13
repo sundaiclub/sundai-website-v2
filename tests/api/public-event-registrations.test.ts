@@ -1,7 +1,7 @@
 import { GET as GET_EVENT } from '../../src/app/api/events/[eventId]/route';
 import { POST as POST_REGISTRATION } from '../../src/app/api/events/[eventId]/registrations/route';
 import { PATCH as PATCH_CURRENT_USER_REGISTRATION } from '../../src/app/api/events/[eventId]/registrations/me/route';
-import { fetchMergedApplicationTemplate } from '../../src/lib/applicationTemplates';
+import { fetchMergedApplicationTemplate } from '../../src/lib/applicationTemplateQueries';
 import { Prisma } from '@prisma/client';
 import {
   createCurrentUserRegistrationCancelRequest,
@@ -26,15 +26,9 @@ jest.mock('@clerk/nextjs/server', () =>
   require('../utils/api-auth').mockClerkServerModule()
 );
 
-jest.mock('../../src/lib/applicationTemplates', () => {
-  const actual = jest.requireActual('../../src/lib/applicationTemplates');
-
-  return {
-    __esModule: true,
-    ...actual,
-    fetchMergedApplicationTemplate: jest.fn(),
-  };
-});
+jest.mock('../../src/lib/applicationTemplateQueries', () => ({
+  fetchMergedApplicationTemplate: jest.fn(),
+}));
 
 jest.mock('../../src/lib/prisma', () => ({
   __esModule: true,

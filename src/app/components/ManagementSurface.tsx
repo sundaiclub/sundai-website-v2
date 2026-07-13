@@ -4,9 +4,9 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 
-type SurfaceTone = 'default' | 'danger' | 'success' | 'warning';
+export type ManagementTone = 'default' | 'danger' | 'success' | 'warning';
 
-function toneClasses(tone: SurfaceTone, isDarkMode: boolean) {
+function toneClasses(tone: ManagementTone, isDarkMode: boolean) {
   if (tone === 'danger') {
     return isDarkMode
       ? 'border-red-900/70 bg-red-950/50 text-red-100'
@@ -193,7 +193,7 @@ export function ManagementBadge({
   tone = 'default',
 }: {
   children: ReactNode;
-  tone?: SurfaceTone;
+  tone?: ManagementTone;
 }) {
   const { isDarkMode } = useManagementClasses();
 
@@ -211,7 +211,7 @@ export function ManagementAlert({
   tone = 'default',
 }: {
   children: ReactNode;
-  tone?: SurfaceTone;
+  tone?: ManagementTone;
 }) {
   const { isDarkMode } = useManagementClasses();
 

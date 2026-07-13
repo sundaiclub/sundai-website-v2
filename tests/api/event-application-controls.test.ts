@@ -630,16 +630,22 @@ describe('T069 event application close/open controls API', () => {
         eventId: fixture.publishedEvent.id,
         status: 'PENDING',
       },
+      include: expect.objectContaining({ hacker: expect.any(Object) }),
       orderBy: { createdAt: 'desc' },
       take: 100,
       skip: 0,
     });
-    expect(body).toEqual([
+    expect(body).toEqual(
       expect.objectContaining({
-        id: fixture.pendingRegistration.id,
-        status: 'PENDING',
-      }),
-    ]);
+        statusFilter: 'PENDING',
+        rows: [
+          expect.objectContaining({
+            id: fixture.pendingRegistration.id,
+            status: 'PENDING',
+          }),
+        ],
+      })
+    );
   });
 });
 

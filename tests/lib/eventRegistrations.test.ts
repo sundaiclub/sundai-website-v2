@@ -1,4 +1,4 @@
-import { fetchMergedApplicationTemplate } from '@/lib/applicationTemplates';
+import { fetchMergedApplicationTemplate } from '@/lib/applicationTemplateQueries';
 import {
   autoPromoteWaitlistAfterApprovedCancellation,
   cancelPublicEventRegistration,
@@ -18,7 +18,7 @@ jest.mock('../../src/lib/prisma', () => ({
   default: {},
 }));
 
-jest.mock('@/lib/applicationTemplates', () => ({
+jest.mock('@/lib/applicationTemplateQueries', () => ({
   fetchMergedApplicationTemplate: jest.fn(),
 }));
 

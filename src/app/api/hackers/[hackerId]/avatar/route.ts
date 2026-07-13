@@ -60,7 +60,9 @@ export async function POST(
     });
 
     if (existing?.avatarId) {
-      await prisma.image.delete({ where: { id: existing.avatarId } }).catch(() => {});
+      await prisma.image.delete({ where: { id: existing.avatarId } }).catch(error => {
+        console.error("Failed to clean up the previous avatar record:", error);
+      });
     }
 
     return NextResponse.json(updated);

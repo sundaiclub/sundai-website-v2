@@ -16,7 +16,7 @@ import {
   updateEventRegistrationStatus,
 } from '@/lib/eventRegistrations';
 import { notifyEventDecision } from '@/lib/eventDecisionNotifications';
-import type { RegistrationStatus } from '@/types/event-management';
+import { parseRegistrationStatus } from '@/lib/eventRequestParsing';
 
 export async function PATCH(
   req: Request,
@@ -34,8 +34,9 @@ export async function PATCH(
     if (!canManage) return forbidden();
 
     const body = await req.json();
-    const toStatus = body?.status as RegistrationStatus | undefined;
-    if (!toStatus) return badRequest('status is required');
+    const toStatus = parseRegistrationStatus(body?.status);
+    if (toStatus === undefined) return badRequest('status is required');
+    if (toStatus === null) return badRequest('status is invalid');
 
     if (
       isApplicantDecisionStatus(toStatus) &&

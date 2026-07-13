@@ -20,23 +20,53 @@ import {
   submitPublicEventRegistration,
 } from '@/lib/eventRegistrations';
 import { publicRegistrationActionResponse } from '@/lib/publicRegistrationApi';
+import { parseTemplateFieldsJson } from '@/lib/applicationTemplates';
+import {
+  parseRegistrationSource,
+  parseRegistrationStatus,
+} from '@/lib/eventRequestParsing';
 import type {
   JsonObject,
   OrganizerRegistrationReviewCapabilities,
   OrganizerRegistrationReviewRow,
-  RegistrationStatus,
-  Role,
   TemplateFieldDefinition,
 } from '@/types/event-management';
 
 function jsonObject(value: unknown): JsonObject | null {
-  return value && typeof value === 'object' && !Array.isArray(value)
-    ? (value as JsonObject)
-    : null;
+  return isJsonObject(value) ? value : null;
 }
 
 function templateFields(value: unknown): TemplateFieldDefinition[] | null {
-  return Array.isArray(value) ? (value as TemplateFieldDefinition[]) : null;
+  if (value === null || value === undefined) return null;
+  try {
+    return parseTemplateFieldsJson(value, 'registration.templateSnapshotJson');
+  } catch {
+    return null;
+  }
+}
+
+function isJsonValue(
+  value: unknown
+): value is import('@/types/event-management').JsonValue {
+  if (
+    value === null ||
+    typeof value === 'string' ||
+    typeof value === 'boolean'
+  ) {
+    return true;
+  }
+  if (typeof value === 'number') return Number.isFinite(value);
+  if (Array.isArray(value)) return value.every(isJsonValue);
+  return isJsonObject(value);
+}
+
+function isJsonObject(value: unknown): value is JsonObject {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    !Array.isArray(value) &&
+    Object.values(value).every(isJsonValue)
+  );
 }
 
 function reviewRow(
@@ -60,7 +90,7 @@ function reviewRow(
           name: registration.hacker.name,
           username: registration.hacker.username ?? null,
           email: registration.hacker.email,
-          role: registration.hacker.role as Role,
+          role: registration.hacker.role,
         }
       : {
           id: registration.hackerId,
@@ -115,16 +145,15 @@ export async function GET(
     };
 
     const url = new URL(req.url);
-    const statusFilter =
-      (url.searchParams.get('status') as RegistrationStatus | null) ??
-      'PENDING';
+    const rawStatus = url.searchParams.get('status') ?? undefined;
+    const parsedStatus = parseRegistrationStatus(rawStatus);
+    if (parsedStatus === null) return badRequest('status is invalid');
+    const statusFilter = parsedStatus ?? 'PENDING';
     const includeBannedUsers =
       url.searchParams.get('includeBannedUsers') === 'true';
     const [registrations, counts] = await Promise.all([
       listEventRegistrations(params.eventId, siteAdmin, {
-        status:
-          (url.searchParams.get('status') as RegistrationStatus | null) ??
-          undefined,
+        status: parsedStatus,
         includeBannedUsers,
         take: Number(url.searchParams.get('take') ?? 100),
         skip: Number(url.searchParams.get('skip') ?? 0),
@@ -176,7 +205,10 @@ export async function POST(
 
     if (!body?.hackerId) return badRequest('hackerId is required');
 
-    const status = (body.status ?? 'PENDING') as RegistrationStatus;
+    const status = parseRegistrationStatus(body.status, 'PENDING');
+    if (!status) return badRequest('status is invalid');
+    const source = parseRegistrationSource(body.source, 'INTERNAL');
+    if (!source) return badRequest('source is invalid');
     if (
       isApplicantDecisionStatus(status) &&
       !(await canDecideRegistrations(prisma, hacker.id, params.eventId))
@@ -189,7 +221,7 @@ export async function POST(
       hackerId: body.hackerId,
       actorId: hacker.id,
       status,
-      source: body.source ?? 'INTERNAL',
+      source,
       answersJson: body.answersJson ?? null,
       templateSnapshotJson: body.templateSnapshotJson ?? null,
       publicSafeMessage: body.publicSafeMessage ?? null,

@@ -1,13 +1,14 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { HackerSelector, ProjectRoles, Hacker, TeamMember } from '../../src/app/components/HackerSelector';
+import { HackerSelector, ProjectRoles } from '../../src/app/components/HackerSelector';
+import type { HackerSelectionOption } from '../../src/types/hacker';
 
 // Mock the theme context
 jest.mock('../../src/app/contexts/ThemeContext', () => ({
   useTheme: () => ({ isDarkMode: false }),
 }));
 
-const mockHackers: Hacker[] = [
+const mockHackers: HackerSelectionOption[] = [
   { id: '1', name: 'John Doe', email: 'john@example.com' },
   { id: '2', name: 'Jane Smith', email: 'jane@example.com' },
   { id: '3', name: 'Bob Johnson', email: 'bob@example.com' },

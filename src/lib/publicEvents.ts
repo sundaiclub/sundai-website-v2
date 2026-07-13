@@ -7,10 +7,10 @@ import {
 } from '@/lib/eventManagementAuth';
 import {
   buildApplicationControlsState,
-  fetchMergedApplicationTemplate,
   getApplicationPublicStatus,
   parseTemplateFieldsJson,
 } from '@/lib/applicationTemplates';
+import { fetchMergedApplicationTemplate } from '@/lib/applicationTemplateQueries';
 import type {
   AddToCalendarPayload,
   ApplicationControlsState,

@@ -48,3 +48,5 @@ sundai-dev-bucket-key.json
 test_screenshots
 
 .playwright-mcp
+
+docs/code-quality

@@ -18,7 +18,8 @@ import {
   ManagementSection,
   useManagementClasses,
 } from '../../components/ManagementSurface';
-import { HackerSelector, type Hacker } from '../../components/HackerSelector';
+import { HackerSelector } from '../../components/HackerSelector';
+import type { HackerSelectionOption } from '@/types/hacker';
 import type {
   ApplicationTemplateListItem,
   JsonValue,
@@ -28,18 +29,12 @@ import type {
 } from '@/types/event-management';
 import { DEFAULT_EVENT_MESSAGES } from '@/lib/eventMessageDefaults';
 
-type StaffCandidate = {
-  id: string;
-  name: string;
-  email?: string | null;
-};
-
 type ChapterListPayload = ManageableChapterListItem[] | null;
 type StaffListPayload =
-  | StaffCandidate[]
+  | HackerSelectionOption[]
   | {
-      hackers?: StaffCandidate[];
-      items?: StaffCandidate[];
+      hackers?: HackerSelectionOption[];
+      items?: HackerSelectionOption[];
     }
   | null;
 type ApplicationTemplatePayload =
@@ -58,7 +53,7 @@ function chapterList(payload: ChapterListPayload): ManageableChapterListItem[] {
   return Array.isArray(payload) ? payload : [];
 }
 
-function staffList(payload: StaffListPayload): StaffCandidate[] {
+function staffList(payload: StaffListPayload): HackerSelectionOption[] {
   if (Array.isArray(payload)) return payload;
   if (payload && typeof payload === 'object') {
     return payload.hackers ?? payload.items ?? [];
@@ -106,14 +101,6 @@ function formatClock(value: string) {
   if (Number.isNaN(hour)) return value;
   const suffix = hour >= 12 ? 'PM' : 'AM';
   return `${hour % 12 || 12}:${minute} ${suffix}`;
-}
-
-function toHacker(candidate: StaffCandidate): Hacker {
-  return {
-    id: candidate.id,
-    name: candidate.name,
-    email: candidate.email ?? '',
-  };
 }
 
 function dateInputValue(date: Date) {
@@ -211,8 +198,8 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
   const [toolkitUrl, setToolkitUrl] = useState('');
   const [applicationsOpen, setApplicationsOpen] = useState(true);
   const [applicationsCloseReason, setApplicationsCloseReason] = useState('');
-  const [selectedMcs, setSelectedMcs] = useState<StaffCandidate[]>([]);
-  const [selectedCoMcs, setSelectedCoMcs] = useState<StaffCandidate[]>([]);
+  const [selectedMcs, setSelectedMcs] = useState<HackerSelectionOption[]>([]);
+  const [selectedCoMcs, setSelectedCoMcs] = useState<HackerSelectionOption[]>([]);
   const [isMcModalOpen, setIsMcModalOpen] = useState(false);
   const [isCoMcModalOpen, setIsCoMcModalOpen] = useState(false);
   const [mcSearchTerm, setMcSearchTerm] = useState('');
@@ -243,7 +230,7 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
     DEFAULT_EVENT_MESSAGES.decline
   );
   const [chapters, setChapters] = useState<ManageableChapterListItem[]>([]);
-  const [staffCandidates, setStaffCandidates] = useState<StaffCandidate[]>([]);
+  const [staffCandidates, setStaffCandidates] = useState<HackerSelectionOption[]>([]);
   const [message, setMessage] = useState('');
   const [savedEventId, setSavedEventId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -540,7 +527,7 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
     if (!isEditing) setSlug(slugify(value));
   }
 
-  function addMc(hacker: Hacker) {
+  function addMc(hacker: HackerSelectionOption) {
     setSelectedMcs(current =>
       current.some(staff => staff.id === hacker.id)
         ? current
@@ -549,7 +536,7 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
     setMcSearchTerm('');
   }
 
-  function addCoMc(hacker: Hacker) {
+  function addCoMc(hacker: HackerSelectionOption) {
     setSelectedCoMcs(current =>
       current.some(staff => staff.id === hacker.id)
         ? current
@@ -1448,7 +1435,7 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
         </div>
       )}
       <HackerSelector
-        filteredHackers={filteredMcCandidates.map(toHacker)}
+        filteredHackers={filteredMcCandidates}
         handleAddMember={addMc}
         isDarkMode={classes.isDarkMode}
         searchTerm={mcSearchTerm}
@@ -1459,7 +1446,7 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
         title="Select MCs"
       />
       <HackerSelector
-        filteredHackers={filteredCoMcCandidates.map(toHacker)}
+        filteredHackers={filteredCoMcCandidates}
         handleAddMember={addCoMc}
         isDarkMode={classes.isDarkMode}
         searchTerm={coMcSearchTerm}

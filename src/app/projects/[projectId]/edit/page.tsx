@@ -19,7 +19,8 @@ import type { Project } from "@/types/project";
 import PermissionDenied from "../../../components/PermissionDenied";
 import TagSelector from "../../../components/TagSelector";
 import { XMarkIcon, PlusIcon, ArrowLeftIcon, SparklesIcon } from "@heroicons/react/24/outline";
-import { HackerSelector, ProjectRoles, Hacker } from "../../../components/HackerSelector";
+import { HackerSelector, ProjectRoles } from "../../../components/HackerSelector";
+import type { HackerSelectionOption } from '@/types/hacker';
 import { swapFirstLetters } from "../../../utils/nameUtils";
 import ImageGenerationModal from "../../../components/ImageGenerationModal";
 import ProjectMarkdown from "../../../components/ProjectMarkdown";
@@ -150,7 +151,7 @@ export default function ProjectEditPage() {
 
   const formRef = useRef<HTMLFormElement>(null);
 
-  const [hackers, setHackers] = useState<Hacker[]>([]);
+  const [hackers, setHackers] = useState<HackerSelectionOption[]>([]);
   const [showTeamModal, setShowTeamModal] = useState(false);
   const [showLaunchLeadModal, setShowLaunchLeadModal] = useState(false);
   const [showImageGenerationModal, setShowImageGenerationModal] = useState(false);
@@ -159,12 +160,12 @@ export default function ProjectEditPage() {
 
   const filteredTeamHackers = hackers.filter(hacker =>
     hacker.name.toLowerCase().includes(teamSearchTerm.toLowerCase()) ||
-    hacker.email.toLowerCase().includes(teamSearchTerm.toLowerCase())
+    hacker.email?.toLowerCase().includes(teamSearchTerm.toLowerCase())
   );
 
   const filteredLeadHackers = hackers.filter(hacker =>
     hacker.name.toLowerCase().includes(leadSearchTerm.toLowerCase()) ||
-    hacker.email.toLowerCase().includes(leadSearchTerm.toLowerCase())
+    hacker.email?.toLowerCase().includes(leadSearchTerm.toLowerCase())
   );
 
   useEffect(() => {
@@ -484,7 +485,7 @@ export default function ProjectEditPage() {
     });
   };
 
-  const handleAddMember = (hacker: Hacker, role: string) => {
+  const handleAddMember = (hacker: HackerSelectionOption, role: string) => {
     if (!project) return;
     setProject({
       ...project,
@@ -502,7 +503,7 @@ export default function ProjectEditPage() {
     });
   };
 
-  const handleChangeLaunchLead = (hacker: Hacker) => {
+  const handleChangeLaunchLead = (hacker: HackerSelectionOption) => {
     if (!project || !userInfo) return;
     if (project.launchLead.id === userInfo.id && hacker.id !== userInfo.id) {
       if (!confirm("Warning: If you change the launch lead from yourself, you will lose access to managing team members after saving. Continue?")) {

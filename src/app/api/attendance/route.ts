@@ -1,12 +1,13 @@
-import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
-import prisma from "@/lib/prisma";
+import { NextResponse } from 'next/server';
+import { auth } from '@clerk/nextjs/server';
+import prisma from '@/lib/prisma';
+import { getOrCreateCurrentWeek } from '@/lib/weeks';
 
 export async function POST(req: Request) {
   try {
     const { userId } = auth();
     if (!userId) {
-      return new NextResponse("Unauthorized", { status: 401 });
+      return new NextResponse('Unauthorized', { status: 401 });
     }
 
     // Get the hacker using clerkId
@@ -15,41 +16,11 @@ export async function POST(req: Request) {
     });
 
     if (!hacker) {
-      return new NextResponse("Builder not found", { status: 404 });
+      return new NextResponse('Builder not found', { status: 404 });
     }
 
-    // Get current week
     const now = new Date();
-    let currentWeek = await prisma.week.findFirst({
-      where: {
-        startDate: { lte: now },
-        endDate: { gte: now },
-      },
-    });
-
-    if (!currentWeek) {
-      // Create a new week if none exists
-      const startDate = new Date(now);
-      startDate.setHours(0, 0, 0, 0);
-      const endDate = new Date(startDate);
-      endDate.setDate(endDate.getDate() + 6);
-      endDate.setHours(23, 59, 59, 999);
-
-      const latestWeek = await prisma.week.findFirst({
-        orderBy: { number: "desc" },
-      });
-      const weekNumber = (latestWeek?.number || 0) + 1;
-
-      currentWeek = await prisma.week.create({
-        data: {
-          number: weekNumber,
-          startDate,
-          endDate,
-          theme: `Week ${weekNumber}`,
-          description: `Projects for week ${weekNumber}`,
-        },
-      });
-    }
+    const currentWeek = await getOrCreateCurrentWeek();
 
     // Check if already checked in for this week
     const existingAttendance = await prisma.attendance.findUnique({
@@ -62,7 +33,7 @@ export async function POST(req: Request) {
     });
 
     if (existingAttendance) {
-      return new NextResponse("Already checked in for this week", {
+      return new NextResponse('Already checked in for this week', {
         status: 400,
       });
     }
@@ -83,18 +54,18 @@ export async function POST(req: Request) {
 
     return NextResponse.json(attendance);
   } catch (error) {
-    console.error("[ATTENDANCE_POST]", error);
-    return new NextResponse("Internal Error", { status: 500 });
+    console.error('[ATTENDANCE_POST]', error);
+    return new NextResponse('Internal Error', { status: 500 });
   }
 }
 
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
-    const weekId = searchParams.get("weekId");
+    const weekId = searchParams.get('weekId');
 
     if (!weekId) {
-      return new NextResponse("Week ID is required", { status: 400 });
+      return new NextResponse('Week ID is required', { status: 400 });
     }
 
     const attendance = await prisma.attendance.findMany({
@@ -111,13 +82,13 @@ export async function GET(req: Request) {
         },
       },
       orderBy: {
-        timestamp: "desc",
+        timestamp: 'desc',
       },
     });
 
     return NextResponse.json(attendance);
   } catch (error) {
-    console.error("[ATTENDANCE_GET]", error);
-    return new NextResponse("Internal Error", { status: 500 });
+    console.error('[ATTENDANCE_GET]', error);
+    return new NextResponse('Internal Error', { status: 500 });
   }
 }

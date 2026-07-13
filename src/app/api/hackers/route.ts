@@ -9,7 +9,6 @@ export async function GET(request: Request) {
     const clerkId = searchParams.get("clerkId");
 
     if (clerkId) {
-      // If clerkId is provided, return that specific hacker
       const hacker = await prisma.hacker.findUnique({
         where: { clerkId },
         select: {
@@ -29,7 +28,6 @@ export async function GET(request: Request) {
       return NextResponse.json(hacker);
     }
 
-    // If no clerkId, return all hackers (you might want to add pagination here)
     const hackers = await prisma.hacker.findMany({
       select: {
         id: true,

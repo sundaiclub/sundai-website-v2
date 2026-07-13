@@ -1,18 +1,20 @@
 'use client';
 
 import Link from 'next/link';
-import { ManagementBadge, useManagementClasses } from './ManagementSurface';
+import {
+  ManagementBadge,
+  useManagementClasses,
+  type ManagementTone,
+} from './ManagementSurface';
 import type {
   PublicEventCard as PublicEventCardData,
   PublicEventStatus,
   RegistrationStatus,
 } from '@/types/event-management';
 
-type BadgeTone = 'default' | 'danger' | 'success' | 'warning';
-
 type PublicEventStatusDisplay = {
   label: string;
-  tone: BadgeTone;
+  tone: ManagementTone;
 };
 
 const publicStatusDisplay: Record<PublicEventStatus, PublicEventStatusDisplay> =

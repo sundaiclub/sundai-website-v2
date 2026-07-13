@@ -657,3 +657,9 @@ export interface HackerOrganizerNoteRevision {
   createdAt: ISODateTimeString | Date;
   editedBy?: EventManagementHackerSummary;
 }
+
+export type OrganizerNoteAccess = {
+  canViewCurrentNote: boolean;
+  canEditCurrentNote: boolean;
+  canViewRevisions: boolean;
+};

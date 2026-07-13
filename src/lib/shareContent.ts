@@ -1,5 +1,5 @@
-import type { Project } from "@/types/project";
-import { GoogleGenAI } from "@google/genai";
+import type { Project } from '@/types/project';
+import { GoogleGenAI } from '@google/genai';
 
 export type SharePlatform = 'twitter' | 'linkedin' | 'reddit';
 
@@ -13,6 +13,11 @@ type ShareTeamMember = {
   twitterUrl?: string | null;
   linkedinUrl?: string | null;
 };
+
+type SharePromptRequest = Pick<
+  ShareContentRequest,
+  'project' | 'platform' | 'isTeamMember'
+>;
 
 export interface ShareContentRequest {
   project: Project;
@@ -34,35 +39,48 @@ const PLATFORM_LIMITS: Record<SharePlatform, number> = {
 };
 
 const PLATFORM_STYLES: Record<SharePlatform, string> = {
-  twitter: "concise, engaging, with relevant emojis and hashtags",
-  linkedin: "professional, detailed, focusing on technical achievements and team collaboration", 
-  reddit: "informative, community-focused, with technical details that would interest developers",
+  twitter: 'concise, engaging, with relevant emojis and hashtags',
+  linkedin:
+    'professional, detailed, focusing on technical achievements and team collaboration',
+  reddit:
+    'informative, community-focused, with technical details that would interest developers',
 };
 
+export const SHARE_CONTENT_MODEL = 'gemini-2.5-flash';
+
 // Platform-specific team tagging helper
-function formatTeamNames(teamMembers: ShareTeamMember[], platform: SharePlatform): string {
+function formatTeamNames(
+  teamMembers: ShareTeamMember[],
+  platform: SharePlatform
+): string {
   const getUsername = (person: ShareTeamMember, platform: SharePlatform) => {
     switch (platform) {
       case 'twitter':
         if (person.twitterUrl) {
           // Extract username from Twitter URL (twitter.com/username or x.com/username)
-          const match = person.twitterUrl.match(/(?:twitter\.com|x\.com)\/([^/?]+)/);
-          return match ? `@${match[1]}` : `@${person.name.split(' ')[0].toLowerCase()}`;
+          const match = person.twitterUrl.match(
+            /(?:twitter\.com|x\.com)\/([^/?]+)/
+          );
+          return match
+            ? `@${match[1]}`
+            : `@${person.name.split(' ')[0].toLowerCase()}`;
         }
         return `@${person.name.split(' ')[0].toLowerCase()}`;
-      
+
       case 'linkedin':
         if (person.linkedinUrl) {
           // Extract username from LinkedIn URL (linkedin.com/in/username)
           const match = person.linkedinUrl.match(/linkedin\.com\/in\/([^/?]+)/);
-          return match ? `@${match[1]}` : `@${person.name.toLowerCase().replace(/\s+/g, '-')}`;
+          return match
+            ? `@${match[1]}`
+            : `@${person.name.toLowerCase().replace(/\s+/g, '-')}`;
         }
         return `@${person.name.toLowerCase().replace(/\s+/g, '-')}`;
-      
+
       case 'reddit':
         // Reddit doesn't have URLs in our schema, use name-based format
         return `u/${person.name.split(' ')[0].toLowerCase()}`;
-      
+
       default:
         return person.name;
     }
@@ -71,28 +89,28 @@ function formatTeamNames(teamMembers: ShareTeamMember[], platform: SharePlatform
   return teamMembers.map(person => getUsername(person, platform)).join(', ');
 }
 
-export async function generateShareContent({
+export function buildShareContentPrompt({
   project,
-  userInfo,
   platform,
   isTeamMember,
-}: ShareContentRequest): Promise<ShareContentResponse> {
+}: SharePromptRequest): string {
   const teamMembers = [
     project.launchLead,
-    ...project.participants.map(p => p.hacker)
+    ...project.participants.map(participant => participant.hacker),
   ];
-  
   const formattedTeamNames = formatTeamNames(teamMembers, platform);
-  const perspective = isTeamMember ? "first-person as a team member" : "third-person promoting Sundai";
+  const perspective = isTeamMember
+    ? 'first-person as a team member'
+    : 'third-person promoting Sundai';
   const characterLimit = PLATFORM_LIMITS[platform];
   const style = PLATFORM_STYLES[platform];
 
-  const prompt = `Generate a viral social media post for ${platform} about this project:
+  return `Generate a viral social media post for ${platform} about this project:
 
 Project: ${project.title}
 Description: ${project.preview}
 Full Description: ${project.description}
-Team: ${teamMembers.map(p => p.name).join(', ')}
+Team: ${teamMembers.map(person => person.name).join(', ')}
 Launch Lead: ${project.launchLead.name}
 
 Platform-specific tagging for ${platform}:
@@ -123,11 +141,22 @@ Requirements:
 Avoid fluff, keep it concise, professional and to the point.
 Avoid emojis.
 Generate only the post content, no explanations.`;
+}
+
+export async function generateShareContent({
+  project,
+  userInfo,
+  platform,
+  isTeamMember,
+}: ShareContentRequest): Promise<ShareContentResponse> {
+  const prompt = buildShareContentPrompt({ project, platform, isTeamMember });
 
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY });
+    const ai = new GoogleGenAI({
+      apiKey: process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY,
+    });
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: SHARE_CONTENT_MODEL,
       contents: prompt,
     });
 
@@ -149,7 +178,12 @@ Generate only the post content, no explanations.`;
   } catch (error) {
     console.error('Error generating content with Gemini:', error);
     // Fallback to template-based content if API fails
-    return generateFallbackContent({ project, userInfo, platform, isTeamMember });
+    return generateFallbackContent({
+      project,
+      userInfo,
+      platform,
+      isTeamMember,
+    });
   }
 }
 
@@ -161,20 +195,22 @@ function generateFallbackContent({
 }: ShareContentRequest): ShareContentResponse {
   const teamMembers = [
     project.launchLead,
-    ...project.participants.map(p => p.hacker)
+    ...project.participants.map(p => p.hacker),
   ];
 
   const formattedTeamNames = formatTeamNames(teamMembers, platform);
-  const intro = isTeamMember 
-    ? `🚀 We just built ${project.title}!` 
+  const intro = isTeamMember
+    ? `🚀 We just built ${project.title}!`
     : `🚀 Check out ${project.title} built by the team at Sundai!`;
 
   const links = [
     project.demoUrl && `🔗 Demo: ${project.demoUrl}`,
     project.githubUrl && `💻 Code: ${project.githubUrl}`,
     `📄 Project: https://www.sundai.club/projects/${project.id}`,
-    `🌟 More projects: https://www.sundai.club/projects`
-  ].filter(Boolean).join('\n');
+    `🌟 More projects: https://www.sundai.club/projects`,
+  ]
+    .filter(Boolean)
+    .join('\n');
 
   const hashtags = ['Sundai', 'TechProjects', 'Innovation', 'BuildInPublic'];
   const hashtagString = hashtags.map(tag => `#${tag}`).join(' ');

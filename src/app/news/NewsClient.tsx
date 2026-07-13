@@ -170,7 +170,7 @@ export default function NewsClient() {
           <li>Adaptive quantization in training</li>
         </ul>
         <div style="margin-top:12px">
-          <a href="https://partiful.com/e/C3mnrNSv8YGnZefXcL0D" style="display:inline-block;padding:10px 14px;background:#111827;color:#ffffff;text-decoration:none;border-radius:0;border:1px solid #111827">RSVP on Partiful</a>
+          <a href="https://www.sundai.club/events" style="display:inline-block;padding:10px 14px;background:#111827;color:#ffffff;text-decoration:none;border-radius:0;border:1px solid #111827">Browse Sundai events</a>
         </div>
       </section>`;
 
@@ -186,7 +186,7 @@ export default function NewsClient() {
 
         </ul>
         <div style="margin-top:8px">
-          <a href="https://partiful.com/e/xZtVjYqjTCVZQ2wlAjCg" style="display:inline-block;padding:10px 14px;background:#111827;color:#ffffff;text-decoration:none;border-radius:0;border:1px solid #111827">Join us Tuesdays @ 5pm</a>
+          <a href="https://www.sundai.club/events" style="display:inline-block;padding:10px 14px;background:#111827;color:#ffffff;text-decoration:none;border-radius:0;border:1px solid #111827">Find the next session</a>
         </div>
       </section>`;
 
@@ -277,16 +277,11 @@ export default function NewsClient() {
     try {
       const freshTop = await loadTopProjects();
       setTopProjects(freshTop);
-      // Fetch TLDR HTML from VectorLab
-      let aiNewsHtml: string | undefined = undefined;
-      try {
-        const tldrResp = await fetch('https://vectorlab.dev/api/tldr', { cache: 'no-store' });
-        if (tldrResp.ok) {
-          aiNewsHtml = await tldrResp.text();
-        }
-      } catch (e) {
-        // Silent fallback to built-in TLDR
+      const tldrResp = await fetch('https://vectorlab.dev/api/tldr', { cache: 'no-store' });
+      if (!tldrResp.ok) {
+        throw new Error(`TLDR request failed with status ${tldrResp.status}`);
       }
+      const aiNewsHtml = await tldrResp.text();
 
       let built = buildEmailHtml(freshTop, aiNewsHtml);
       if (instruction.trim().length > 0) {
@@ -297,7 +292,7 @@ export default function NewsClient() {
           body: JSON.stringify({ htmlBody: bodyInner, instruction }),
         });
         if (!resp.ok) {
-          toast.error('Generation failed. Please try again.');
+          throw new Error(`News generation failed with status ${resp.status}`);
         }
         // Try streaming first
         const contentType = resp.headers.get('Content-Type') || '';

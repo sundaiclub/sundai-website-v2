@@ -63,7 +63,6 @@ export async function DELETE(
       return new NextResponse("Unauthorized", { status: 401 });
     }
 
-    // Get the hacker making the request
     const hacker = await prisma.hacker.findUnique({
       where: { clerkId: userId },
     });
@@ -72,7 +71,6 @@ export async function DELETE(
       return new NextResponse("Builder not found", { status: 404 });
     }
 
-    // Get the project to check ownership
     const project = await prisma.project.findUnique({
       where: { id: params.projectId },
       include: {
@@ -85,7 +83,6 @@ export async function DELETE(
       return new NextResponse("Project not found", { status: 404 });
     }
 
-    // Check if user is admin or launch lead
     const isAdmin = hacker.role === "SITE_ADMIN";
     const isLaunchLead = project.launchLeadId === hacker.id;
 
@@ -93,17 +90,13 @@ export async function DELETE(
       return new NextResponse("Unauthorized", { status: 401 });
     }
 
-    // Delete related records first
     await prisma.$transaction([
-      // Delete likes
       prisma.projectLike.deleteMany({
         where: { projectId: params.projectId },
       }),
-      // Delete participants
       prisma.projectToParticipant.deleteMany({
         where: { projectId: params.projectId },
       }),
-      // Finally delete the project
       prisma.project.delete({
         where: { id: params.projectId },
       }),

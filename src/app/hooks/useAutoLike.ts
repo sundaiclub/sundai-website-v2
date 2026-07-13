@@ -30,7 +30,9 @@ export function useAutoLike(projectId: string | null) {
               redirectUrl: `/projects/${projectId}?like=1`,
             });
           }
-        } catch {}
+        } catch (error) {
+          console.error("Unable to open sign-in for automatic like:", error);
+        }
         return;
       }
 
@@ -43,8 +45,8 @@ export function useAutoLike(projectId: string | null) {
           params.delete("like");
           router.replace(`?${params.toString()}`);
         }
-      } catch (e) {
-        // no-op
+      } catch (error) {
+        console.error("Unable to apply automatic project like:", error);
       }
     };
 
