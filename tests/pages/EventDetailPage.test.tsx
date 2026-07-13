@@ -73,6 +73,54 @@ const approvedOnlyDetails = {
     'Approved attendees should enter through the side door and check in with the host.',
 };
 
+const publicMaterial = {
+  id: 'material-public-guide',
+  eventId: eventFixture.id,
+  kind: 'LINK',
+  visibility: 'PUBLIC',
+  title: 'Public build night guide',
+  description: 'What to bring and how the event works.',
+  externalUrl: 'https://example.com/public-guide',
+  originalFilename: null,
+  mimeType: null,
+  size: null,
+  position: 10,
+  isAvailable: true,
+  availableFrom: null,
+  availableUntil: null,
+  createdById: 'hacker-organizer',
+  createdAt: '2026-07-01T12:00:00.000Z',
+  updatedAt: '2026-07-01T12:00:00.000Z',
+};
+
+const approvedMaterial = {
+  ...publicMaterial,
+  id: 'material-approved-brief',
+  kind: 'FILE',
+  visibility: 'APPROVED_ATTENDEES',
+  title: 'Approved attendee brief',
+  description: 'Arrival and workshop preparation.',
+  externalUrl: null,
+  originalFilename: 'attendee-brief.pdf',
+  mimeType: 'application/pdf',
+  size: 481_230,
+  position: 20,
+  contentUrl: `/api/events/${eventFixture.id}/materials/material-approved-brief/content`,
+};
+
+const organizerMaterialWithPrivateMetadata = {
+  ...approvedMaterial,
+  id: 'material-organizer-runbook',
+  visibility: 'ORGANIZERS_ONLY',
+  title: 'Organizer incident runbook',
+  description: 'Private escalation instructions.',
+  originalFilename: 'incident-runbook.pdf',
+  objectKey: 'events/private/opaque-object-key',
+  bucket: 'private-event-materials',
+  uploadToken: 'private-upload-token',
+  contentUrl: `/api/events/${eventFixture.id}/materials/material-organizer-runbook/content`,
+};
+
 const signedOutUser = null;
 
 const signedInUser = {
@@ -562,6 +610,81 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
     await expectSomeText(/42 private lane/i);
     await expectSomeText(/loading dock entrance/i);
     await expectSomeText(/you are approved for this event/i);
+  });
+
+  it('renders only public material links for anonymous and non-approved viewers', async () => {
+    await renderDetailPage(
+      buildEventDetail({
+        viewerRegistrationStatus: 'PENDING',
+        materials: [publicMaterial],
+      } as any)
+    );
+
+    expect(
+      await screen.findByRole('heading', { name: /event materials/i })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: /public build night guide/i })
+    ).toHaveAttribute('href', publicMaterial.externalUrl);
+    expect(
+      screen.queryByText(/approved attendee brief/i)
+    ).not.toBeInTheDocument();
+  });
+
+  it('renders public and approved-attendee materials for an approved viewer', async () => {
+    mockSignedIn();
+
+    await renderDetailPage(
+      buildEventDetail({
+        viewerRegistrationStatus: 'APPROVED',
+        viewerRegistration: registrationState('APPROVED'),
+        materials: [publicMaterial, approvedMaterial],
+      } as any)
+    );
+
+    expect(
+      await screen.findByRole('link', { name: /public build night guide/i })
+    ).toHaveAttribute('href', publicMaterial.externalUrl);
+    expect(
+      screen.getByRole('link', { name: /approved attendee brief/i })
+    ).toHaveAttribute('href', approvedMaterial.contentUrl);
+  });
+
+  it('never renders organizer-only rows or private storage metadata on the public event surface', async () => {
+    mockSignedIn();
+
+    await renderDetailPage(
+      buildEventDetail({
+        viewerRegistrationStatus: 'APPROVED',
+        viewerRegistration: registrationState('APPROVED'),
+        materials: [
+          publicMaterial,
+          approvedMaterial,
+          organizerMaterialWithPrivateMetadata,
+        ],
+      } as any)
+    );
+
+    expect(
+      await screen.findByRole('heading', { name: /event materials/i })
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(organizerMaterialWithPrivateMetadata.title)
+    ).not.toBeInTheDocument();
+    expect(document.body.textContent).not.toContain(
+      organizerMaterialWithPrivateMetadata.objectKey
+    );
+    expect(document.body.textContent).not.toContain(
+      organizerMaterialWithPrivateMetadata.bucket
+    );
+    expect(document.body.textContent).not.toContain(
+      organizerMaterialWithPrivateMetadata.uploadToken
+    );
+    expect(
+      screen.queryByRole('link', {
+        name: /organizer incident runbook/i,
+      })
+    ).not.toBeInTheDocument();
   });
 
   it('shows waitlisted status without approved-only details', async () => {

@@ -53,15 +53,25 @@ describe('queue endpoints', () => {
   it('status patch requires site admin or assigned event staff', async () => {
     mockAuth.mockReturnValue({ userId: 'u1' });
     prisma.hacker.findUnique.mockResolvedValue({ id: 'h1', role: 'HACKER' });
+    prisma.event.findUnique.mockResolvedValue({
+      id: 'e1',
+      chapterId: 'chapter-boston',
+      staff: [],
+    });
     const request = new NextRequest('http://localhost:3000/api/events/e1/pitch/queue/ep1/status', { method: 'PATCH' });
     request.json = jest.fn().mockResolvedValue({ status: 'APPROVED' });
     const res = await PATCH_STATUS(request as any, { params: { eventId: 'e1', pitchProjectId: 'ep1' } } as any);
-    expect(res.status).toBe(401);
+    expect(res.status).toBe(403);
   });
 
   it('allows assigned EventStaff MCs to update queue item status', async () => {
     mockAuth.mockReturnValue({ userId: 'clerk-mc' });
     prisma.hacker.findUnique.mockResolvedValue({ id: 'h-mc', role: 'HACKER' });
+    prisma.event.findUnique.mockResolvedValue({
+      id: 'e1',
+      chapterId: 'chapter-boston',
+      staff: [{ role: 'MC' }],
+    });
     prisma.pitchProject.findUnique.mockResolvedValue({
       id: 'ep1',
       pitchSession: {
@@ -80,6 +90,11 @@ describe('queue endpoints', () => {
   it('allows assigned EventStaff co-MCs to update queue item status', async () => {
     mockAuth.mockReturnValue({ userId: 'clerk-co-mc' });
     prisma.hacker.findUnique.mockResolvedValue({ id: 'h-co-mc', role: 'HACKER' });
+    prisma.event.findUnique.mockResolvedValue({
+      id: 'e1',
+      chapterId: 'chapter-boston',
+      staff: [{ role: 'CO_MC' }],
+    });
     prisma.pitchProject.findUnique.mockResolvedValue({
       id: 'ep1',
       pitchSession: {
@@ -350,5 +365,40 @@ describe('queue endpoints', () => {
     request.json = jest.fn().mockResolvedValue({ items: [{ id: 'ep1', position: 2 }] });
     const res = await PATCH_REORDER(request as any, { params: { eventId: 'e1' } } as any);
     expect(res.status).toBe(204);
+  });
+
+  it('does not gate organizer queue status changes on project card readiness', async () => {
+    mockAuth.mockReturnValue({ userId: 'clerk-co-mc' });
+    prisma.hacker.findUnique.mockResolvedValue({
+      id: 'h-co-mc',
+      role: 'HACKER',
+    });
+    prisma.pitchProject.findUnique.mockResolvedValue({
+      id: 'ep-draft-card',
+      cardStatus: 'DRAFT',
+      pitchSession: {
+        eventId: 'e1',
+        event: { staff: [{ hackerId: 'h-co-mc', role: 'CO_MC' }] },
+      },
+    });
+    prisma.pitchProject.update.mockResolvedValue({
+      id: 'ep-draft-card',
+      cardStatus: 'DRAFT',
+      status: 'APPROVED',
+    });
+
+    const request = new NextRequest(
+      'http://localhost:3000/api/events/e1/pitch/queue/ep-draft-card/status',
+      { method: 'PATCH' }
+    );
+    request.json = jest.fn().mockResolvedValue({ status: 'APPROVED' });
+    const response = await PATCH_STATUS(request as any, {
+      params: { eventId: 'e1', pitchProjectId: 'ep-draft-card' },
+    } as any);
+
+    expect(response.status).toBe(200);
+    expect(prisma.pitchProject.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { status: 'APPROVED' } })
+    );
   });
 });

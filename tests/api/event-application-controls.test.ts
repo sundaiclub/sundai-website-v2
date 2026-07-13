@@ -315,11 +315,6 @@ function buildAllowedApplicationControlActors(): ApplicationControlActor[] {
 
   return [
     {
-      label: 'MC',
-      actor: fixture.mc.hacker,
-      staff: fixture.mc.staff,
-    },
-    {
       label: 'chapter admin',
       actor: chapterAdmin.hacker,
       membership: chapterAdmin.membership,
@@ -415,9 +410,8 @@ describe('T069 event application close/open controls API', () => {
     const { POST } = loadApplicationCloseRoute();
     const fixture = buildNativeEventRsvpFixture();
     mockApplicationControlDatabase({
-      actor: fixture.mc.hacker,
+      actor: buildSiteAdmin(),
       event: fixture.publishedEvent,
-      staff: fixture.mc.staff,
     });
 
     const response = await POST(
@@ -439,9 +433,8 @@ describe('T069 event application close/open controls API', () => {
     const { POST } = loadApplicationCloseRoute();
     const fixture = buildNativeEventRsvpFixture();
     mockApplicationControlDatabase({
-      actor: fixture.mc.hacker,
+      actor: buildSiteAdmin(),
       event: fixture.publishedEvent,
-      staff: fixture.mc.staff,
     });
 
     const response = await POST(
@@ -461,13 +454,17 @@ describe('T069 event application close/open controls API', () => {
     expect(prisma.event.update).not.toHaveBeenCalled();
   });
 
-  it('denies co-MCs from closing applications', async () => {
+  it.each([
+    ['MC', (fixture: ReturnType<typeof buildNativeEventRsvpFixture>) => fixture.mc],
+    ['co-MC', (fixture: ReturnType<typeof buildNativeEventRsvpFixture>) => fixture.coMc],
+  ])('denies %s staff from closing applications', async (_label, staffFixture) => {
     const { POST } = loadApplicationCloseRoute();
     const fixture = buildNativeEventRsvpFixture();
+    const assigned = staffFixture(fixture);
     mockApplicationControlDatabase({
-      actor: fixture.coMc.hacker,
+      actor: assigned.hacker,
       event: fixture.publishedEvent,
-      staff: fixture.coMc.staff,
+      staff: assigned.staff,
     });
 
     const response = await POST(
@@ -537,9 +534,13 @@ describe('T069 event application close/open controls API', () => {
     }
   );
 
-  it('denies co-MCs from reopening applications', async () => {
+  it.each([
+    ['MC', (fixture: ReturnType<typeof buildNativeEventRsvpFixture>) => fixture.mc],
+    ['co-MC', (fixture: ReturnType<typeof buildNativeEventRsvpFixture>) => fixture.coMc],
+  ])('denies %s staff from reopening applications', async (_label, staffFixture) => {
     const { POST } = loadApplicationOpenRoute();
     const fixture = buildNativeEventRsvpFixture();
+    const assigned = staffFixture(fixture);
     const closedEvent = {
       ...fixture.publishedEvent,
       applicationsOpen: false,
@@ -548,9 +549,9 @@ describe('T069 event application close/open controls API', () => {
       applicationsCloseReason: 'Capacity reached for this format.',
     };
     mockApplicationControlDatabase({
-      actor: fixture.coMc.hacker,
+      actor: assigned.hacker,
       event: closedEvent,
-      staff: fixture.coMc.staff,
+      staff: assigned.staff,
     });
 
     const response = await POST(
@@ -625,16 +626,19 @@ describe('T069 event application close/open controls API', () => {
     const body = await response.json();
 
     expect(response.status).toBe(200);
-    expect(prisma.eventRegistration.findMany).toHaveBeenCalledWith({
-      where: {
-        eventId: fixture.publishedEvent.id,
-        status: 'PENDING',
-      },
-      orderBy: { createdAt: 'desc' },
-      take: 100,
-      skip: 0,
-    });
-    expect(body).toEqual([
+    expect(prisma.eventRegistration.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          eventId: fixture.publishedEvent.id,
+          status: 'PENDING',
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 100,
+        skip: 0,
+      })
+    );
+    const rows = Array.isArray(body) ? body : body.rows;
+    expect(rows).toEqual([
       expect.objectContaining({
         id: fixture.pendingRegistration.id,
         status: 'PENDING',

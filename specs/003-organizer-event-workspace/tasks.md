@@ -18,8 +18,8 @@
 
 **Purpose**: Add shared configuration and types used by the organizer workspace.
 
-- [ ] T001 Add private material-storage and versioned SMS-consent configuration placeholders and comments to `.env.example`
-- [ ] T002 [P] Define workspace capabilities, overview projections, material contracts, communication contracts, and project-card states in `src/types/event-workspace.ts`
+- [X] T001 Add private material-storage and versioned SMS-consent configuration placeholders and comments to `.env.example`
+- [X] T002 [P] Define workspace capabilities, overview projections, material contracts, communication contracts, and project-card states in `src/types/event-workspace.ts`
 
 ---
 
@@ -29,13 +29,13 @@
 
 **⚠️ CRITICAL**: Complete this phase before beginning user-story implementation.
 
-- [ ] T003 Add organizer-workspace enums, `EventMaterial`, `EventMaterialAudit`, `EventCommunication`, `EventCommunicationRecipient`, `EventStaffAudit`, `ChapterMembership.smsConsentAt/smsConsentVersion`, the `PitchProject.cardStatus` field, relations, indexes, and the one-role-per-event staff constraint to `prisma/schema.prisma`
-- [ ] T004 Create the cutover migration, including deterministic MC precedence for duplicate staff assignments and all new tables/indexes, in `prisma/migrations/20260710_organizer_event_workspace/migration.sql`
-- [ ] T005 [P] Extend Prisma mocks and builders for materials, communications, recipient snapshots, staff audits, consent evidence, and card status in `tests/utils/event-management-fixtures.ts`
-- [ ] T006 [P] Add failing capability-matrix tests for workspace access, event administration, operational management, communications, materials, notes, pitch, and applicant decisions in `tests/lib/eventManagementAuth.test.ts`
-- [ ] T007 Implement capability-specific context helpers and remove staff-role MC access from generic event administration in `src/lib/eventManagementAuth.ts`
-- [ ] T008 Add reusable current-scope route guards for workspace access, event administration, event operations, communications, materials, notes, and pitch in `src/lib/eventManagementApi.ts`
-- [ ] T009 Validate the new persistence model and generated client against `prisma/schema.prisma`
+- [X] T003 Add organizer-workspace enums, `EventMaterial`, `EventMaterialAudit`, `EventCommunication`, `EventCommunicationRecipient`, `EventStaffAudit`, `ChapterMembership.smsConsentAt/smsConsentVersion`, the `PitchProject.cardStatus` field, relations, indexes, and the one-role-per-event staff constraint to `prisma/schema.prisma`
+- [X] T004 Create the cutover migration, including deterministic MC precedence for duplicate staff assignments and all new tables/indexes, in `prisma/migrations/20260710_organizer_event_workspace/migration.sql`
+- [X] T005 [P] Extend Prisma mocks and builders for materials, communications, recipient snapshots, staff audits, consent evidence, and card status in `tests/utils/event-management-fixtures.ts`
+- [X] T006 [P] Add failing capability-matrix tests for workspace access, event administration, operational management, communications, materials, notes, pitch, and applicant decisions in `tests/lib/eventManagementAuth.test.ts`
+- [X] T007 Implement capability-specific context helpers and remove staff-role MC access from generic event administration in `src/lib/eventManagementAuth.ts`
+- [X] T008 Add reusable current-scope route guards for workspace access, event administration, event operations, communications, materials, notes, and pitch in `src/lib/eventManagementApi.ts`
+- [X] T009 Validate the new persistence model and generated client against `prisma/schema.prisma`
 
 **Checkpoint**: Persistence and permission foundations are ready; User Story 1 can start, followed by the remaining story phases.
 
@@ -49,22 +49,22 @@
 
 ### Tests for User Story 1
 
-- [ ] T010 [P] [US1] Add failing API tests for workspace access, capability flags, ban-safe overview aggregates, empty states, and deferred metrics in `tests/api/organizer-event-workspace.test.ts`
-- [ ] T011 [P] [US1] Add failing page tests for the event shell, overview, navigation, permission-lost state, and absent check-in controls in `tests/pages/OrganizerEventWorkspace.test.tsx`
-- [ ] T012 [P] [US1] Add failing integration tests for opening existing registration review inside the workspace shell without changing co-MC decision boundaries in `tests/pages/OrganizerEventRegistrations.test.tsx`
+- [X] T010 [P] [US1] Add failing API tests for workspace access, capability flags, ban-safe overview aggregates, empty states, and deferred metrics in `tests/api/organizer-event-workspace.test.ts`
+- [X] T011 [P] [US1] Add failing page tests for the event shell, overview, navigation, permission-lost state, and absent check-in controls in `tests/pages/OrganizerEventWorkspace.test.tsx`
+- [X] T012 [P] [US1] Add failing integration tests for opening existing registration review inside the workspace shell without changing co-MC decision boundaries in `tests/pages/OrganizerEventRegistrations.test.tsx`
 
 ### Implementation for User Story 1
 
-- [ ] T013 [US1] Implement the event workspace loader, role-aware capability projection, ban-safe aggregate queries, public URL, and deferred-metric descriptors in `src/lib/eventWorkspace.ts`
-- [ ] T014 [US1] Implement `GET /api/events/[eventId]/workspace` with current-scope authorization and stable error responses in `src/app/api/events/[eventId]/workspace/route.ts`
-- [ ] T015 [P] [US1] Create accessible event workspace navigation, role/status presentation, loading, unavailable, and permission-lost components in `src/app/organizer/events/[eventId]/WorkspaceShell.tsx`
-- [ ] T016 [US1] Add the shared organizer event layout and event-scoped section navigation in `src/app/organizer/events/[eventId]/layout.tsx`
-- [ ] T017 [US1] Build the overview page with identity, schedule, capacity, application state, staff, safe counts, public-link, empty states, and capability-gated actions in `src/app/organizer/events/[eventId]/page.tsx`
-- [ ] T018 [US1] Update organizer event-list links to make the workspace the operational entry point while retaining explicit settings access in `src/app/organizer/events/page.tsx`
-- [ ] T019 [US1] Adapt the existing registration-review page to the workspace layout and capability projection in `src/app/organizer/events/[eventId]/registrations/page.tsx`
-- [ ] T020 [P] [US1] Implement completed-phase-only reporting aggregates and explicit attendance/check-in/no-show unavailability in `src/lib/eventReportingPreview.ts`
-- [ ] T021 [US1] Add the reporting-preview API route in `src/app/api/events/[eventId]/reporting-preview/route.ts`
-- [ ] T022 [US1] Build the reporting preview section without legacy `Week`/`Attendance` inference in `src/app/organizer/events/[eventId]/reporting/page.tsx`
+- [X] T013 [US1] Implement the event workspace loader, role-aware capability projection, ban-safe aggregate queries, public URL, and deferred-metric descriptors in `src/lib/eventWorkspace.ts`
+- [X] T014 [US1] Implement `GET /api/events/[eventId]/workspace` with current-scope authorization and stable error responses in `src/app/api/events/[eventId]/workspace/route.ts`
+- [X] T015 [P] [US1] Create accessible event workspace navigation, role/status presentation, loading, unavailable, and permission-lost components in `src/app/organizer/events/[eventId]/WorkspaceShell.tsx`
+- [X] T016 [US1] Add the shared organizer event layout and event-scoped section navigation in `src/app/organizer/events/[eventId]/layout.tsx`
+- [X] T017 [US1] Build the overview page with identity, schedule, capacity, application state, staff, safe counts, public-link, empty states, and capability-gated actions in `src/app/organizer/events/[eventId]/page.tsx`
+- [X] T018 [US1] Update organizer event-list links to make the workspace the operational entry point while retaining explicit settings access in `src/app/organizer/events/page.tsx`
+- [X] T019 [US1] Adapt the existing registration-review page to the workspace layout and capability projection in `src/app/organizer/events/[eventId]/registrations/page.tsx`
+- [X] T020 [P] [US1] Implement completed-phase-only reporting aggregates and explicit attendance/check-in/no-show unavailability in `src/lib/eventReportingPreview.ts`
+- [X] T021 [US1] Add the reporting-preview API route in `src/app/api/events/[eventId]/reporting-preview/route.ts`
+- [X] T022 [US1] Build the reporting preview section without legacy `Week`/`Attendance` inference in `src/app/organizer/events/[eventId]/reporting/page.tsx`
 
 **Checkpoint**: Authorized organizers can operate from one event context and reach existing capabilities; no phase-3 or unauthorized data appears.
 
@@ -78,22 +78,22 @@
 
 ### Tests for User Story 2
 
-- [ ] T023 [P] [US2] Add failing unit tests for the 25 MiB allowlist, link validation, visibility filtering, availability windows, finalization, and audit changes in `tests/lib/eventMaterials.test.ts`
-- [ ] T024 [P] [US2] Add failing route tests for upload intents, link/file creation, update, removal, and authorization-checked content redirects in `tests/api/event-materials.test.ts`
-- [ ] T025 [P] [US2] Add failing organizer UI tests for policy display, upload/link flows, visibility, ordering, empty/error states, and deletion in `tests/pages/OrganizerEventMaterials.test.tsx`
-- [ ] T026 [P] [US2] Add failing public event tests for public/approved material projection and organizer-only metadata redaction in `tests/pages/EventDetailPage.test.tsx`
+- [X] T023 [P] [US2] Add failing unit tests for the 25 MiB allowlist, link validation, visibility filtering, availability windows, finalization, and audit changes in `tests/lib/eventMaterials.test.ts`
+- [X] T024 [P] [US2] Add failing route tests for upload intents, link/file creation, update, removal, and authorization-checked content redirects in `tests/api/event-materials.test.ts`
+- [X] T025 [P] [US2] Add failing organizer UI tests for policy display, upload/link flows, visibility, ordering, empty/error states, and deletion in `tests/pages/OrganizerEventMaterials.test.tsx`
+- [X] T026 [P] [US2] Add failing public event tests for public/approved material projection and organizer-only metadata redaction in `tests/pages/EventDetailPage.test.tsx`
 
 ### Implementation for User Story 2
 
-- [ ] T027 [P] [US2] Add private-object upload intent, metadata inspection, deletion, and short-lived signed download helpers without durable public URLs in `src/lib/gcp-storage.ts`
-- [ ] T028 [US2] Implement material validation, visibility/availability queries, upload finalization cleanup, ordering, deletion, and transactional audits in `src/lib/eventMaterials.ts`
-- [ ] T029 [US2] Implement the signed upload-intent endpoint in `src/app/api/events/[eventId]/materials/upload-intents/route.ts`
-- [ ] T030 [US2] Implement visibility-filtered listing and organizer link/file creation in `src/app/api/events/[eventId]/materials/route.ts`
-- [ ] T031 [US2] Implement organizer update/removal with audit preservation in `src/app/api/events/[eventId]/materials/[materialId]/route.ts`
-- [ ] T032 [US2] Implement current-viewer authorization and signed file redirect behavior in `src/app/api/events/[eventId]/materials/[materialId]/content/route.ts`
-- [ ] T033 [P] [US2] Build the material policy, editor, uploader, visibility labels, ordering, availability, and confirmation components in `src/app/organizer/events/[eventId]/materials/EventMaterialsPanel.tsx`
-- [ ] T034 [US2] Add the workspace Materials section with loading, empty, invalid-upload, provider-failure, and permission-lost states in `src/app/organizer/events/[eventId]/materials/page.tsx`
-- [ ] T035 [US2] Render only authorized, currently available material links/downloads on the native public event experience in `src/app/events/[chapterSlug]/[eventSlug]/page.tsx`
+- [X] T027 [P] [US2] Add private-object upload intent, metadata inspection, deletion, and short-lived signed download helpers without durable public URLs in `src/lib/gcp-storage.ts`
+- [X] T028 [US2] Implement material validation, visibility/availability queries, upload finalization cleanup, ordering, deletion, and transactional audits in `src/lib/eventMaterials.ts`
+- [X] T029 [US2] Implement the signed upload-intent endpoint in `src/app/api/events/[eventId]/materials/upload-intents/route.ts`
+- [X] T030 [US2] Implement visibility-filtered listing and organizer link/file creation in `src/app/api/events/[eventId]/materials/route.ts`
+- [X] T031 [US2] Implement organizer update/removal with audit preservation in `src/app/api/events/[eventId]/materials/[materialId]/route.ts`
+- [X] T032 [US2] Implement current-viewer authorization and signed file redirect behavior in `src/app/api/events/[eventId]/materials/[materialId]/content/route.ts`
+- [X] T033 [P] [US2] Build the material policy, editor, uploader, visibility labels, ordering, availability, and confirmation components in `src/app/organizer/events/[eventId]/materials/EventMaterialsPanel.tsx`
+- [X] T034 [US2] Add the workspace Materials section with loading, empty, invalid-upload, provider-failure, and permission-lost states in `src/app/organizer/events/[eventId]/materials/page.tsx`
+- [X] T035 [US2] Render only authorized, currently available material links/downloads on the native public event experience in `src/app/events/[chapterSlug]/[eventSlug]/page.tsx`
 
 **Checkpoint**: Material metadata and underlying content enforce the full visibility matrix, and invalid uploads leave no active material record.
 
@@ -107,25 +107,25 @@
 
 ### Tests for User Story 3
 
-- [ ] T036 [P] [US3] Add failing audience-resolution tests for statuses, selected users, cancellation, channel eligibility, versioned SMS consent, global-ban privacy, and deterministic fingerprints in `tests/lib/eventCommunications.test.ts`
-- [ ] T037 [P] [US3] Add failing provider-adapter tests for SES/Twilio availability, successful sends, sanitized failures, and independent recipient outcomes in `tests/lib/eventDelivery.test.ts`
-- [ ] T038 [P] [US3] Add failing API tests for draft immutability, preview counts, `409` reconfirmation, idempotent send state, snapshots, and partial failures in `tests/api/event-communications.test.ts`
-- [ ] T039 [P] [US3] Add failing UI tests for channel availability, audience composer, preview confirmation, changed-audience handling, and history details in `tests/pages/OrganizerEventCommunications.test.tsx`
-- [ ] T040 [P] [US3] Add failing membership API/page tests for recording and clearing versioned SMS consent with notification preferences in `tests/api/chapter-membership.test.ts` and `tests/pages/ChaptersPage.test.tsx`
+- [X] T036 [P] [US3] Add failing audience-resolution tests for statuses, selected users, cancellation, channel eligibility, versioned SMS consent, global-ban privacy, and deterministic fingerprints in `tests/lib/eventCommunications.test.ts`
+- [X] T037 [P] [US3] Add failing provider-adapter tests for SES/Twilio availability, successful sends, sanitized failures, and independent recipient outcomes in `tests/lib/eventDelivery.test.ts`
+- [X] T038 [P] [US3] Add failing API tests for draft immutability, preview counts, `409` reconfirmation, idempotent send state, snapshots, and partial failures in `tests/api/event-communications.test.ts`
+- [X] T039 [P] [US3] Add failing UI tests for channel availability, audience composer, preview confirmation, changed-audience handling, and history details in `tests/pages/OrganizerEventCommunications.test.tsx`
+- [X] T040 [P] [US3] Add failing membership API/page tests for recording and clearing versioned SMS consent with notification preferences in `tests/api/chapter-membership.test.ts` and `tests/pages/ChaptersPage.test.tsx`
 
 ### Implementation for User Story 3
 
-- [ ] T041 [US3] Extend notification preference types and update logic to record/clear `smsConsentAt` and configured consent version only on explicit opt-in in `src/types/event-management.ts` and `src/lib/chapters.ts`
-- [ ] T042 [US3] Enforce versioned SMS consent in the chapter notification endpoint in `src/app/api/chapters/[chapterId]/notifications/route.ts`
-- [ ] T043 [US3] Display configured consent copy and explicit SMS opt-in behavior on the chapter preference surface in `src/app/chapters/[chapterSlug]/page.tsx`
-- [ ] T044 [US3] Implement communication draft validation, provider availability, audience resolution, privacy-safe exclusions, fingerprints, atomic recipient snapshots, and aggregate final states in `src/lib/eventCommunications.ts`
-- [ ] T045 [P] [US3] Extract provider-neutral SES/Twilio send operations and sanitized delivery results while reusing existing configuration patterns in `src/lib/eventDelivery.ts`
-- [ ] T046 [US3] Implement paginated communication history and draft creation in `src/app/api/events/[eventId]/blasts/route.ts`
-- [ ] T047 [US3] Implement draft update, immutable sent-detail reads, and recipient-result pagination in `src/app/api/events/[eventId]/blasts/[blastId]/route.ts`
-- [ ] T048 [US3] Implement current-state audience preview and deterministic fingerprint responses in `src/app/api/events/[eventId]/blasts/[blastId]/preview/route.ts`
-- [ ] T049 [US3] Implement send-time audience recalculation, `409` reconfirmation, atomic snapshots, delivery, idempotent retry behavior, and result finalization in `src/app/api/events/[eventId]/blasts/[blastId]/send/route.ts`
-- [ ] T050 [P] [US3] Build the draft composer, channel/audience selectors, preview confirmation, aggregate exclusions, sending states, and immutable history detail components in `src/app/organizer/events/[eventId]/communications/EventCommunicationsPanel.tsx`
-- [ ] T051 [US3] Add the workspace Communications section with empty, unavailable-provider, retryable failure, partial-success, and permission-lost states in `src/app/organizer/events/[eventId]/communications/page.tsx`
+- [X] T041 [US3] Extend notification preference types and update logic to record/clear `smsConsentAt` and configured consent version only on explicit opt-in in `src/types/event-management.ts` and `src/lib/chapters.ts`
+- [X] T042 [US3] Enforce versioned SMS consent in the chapter notification endpoint in `src/app/api/chapters/[chapterId]/notifications/route.ts`
+- [X] T043 [US3] Display configured consent copy and explicit SMS opt-in behavior on the chapter preference surface in `src/app/chapters/[chapterSlug]/page.tsx`
+- [X] T044 [US3] Implement communication draft validation, provider availability, audience resolution, privacy-safe exclusions, fingerprints, atomic recipient snapshots, and aggregate final states in `src/lib/eventCommunications.ts`
+- [X] T045 [P] [US3] Extract provider-neutral SES/Twilio send operations and sanitized delivery results while reusing existing configuration patterns in `src/lib/eventDelivery.ts`
+- [X] T046 [US3] Implement paginated communication history and draft creation in `src/app/api/events/[eventId]/blasts/route.ts`
+- [X] T047 [US3] Implement draft update, immutable sent-detail reads, and recipient-result pagination in `src/app/api/events/[eventId]/blasts/[blastId]/route.ts`
+- [X] T048 [US3] Implement current-state audience preview and deterministic fingerprint responses in `src/app/api/events/[eventId]/blasts/[blastId]/preview/route.ts`
+- [X] T049 [US3] Implement send-time audience recalculation, `409` reconfirmation, atomic snapshots, delivery, idempotent retry behavior, and result finalization in `src/app/api/events/[eventId]/blasts/[blastId]/send/route.ts`
+- [X] T050 [P] [US3] Build the draft composer, channel/audience selectors, preview confirmation, aggregate exclusions, sending states, and immutable history detail components in `src/app/organizer/events/[eventId]/communications/EventCommunicationsPanel.tsx`
+- [X] T051 [US3] Add the workspace Communications section with empty, unavailable-provider, retryable failure, partial-success, and permission-lost states in `src/app/organizer/events/[eventId]/communications/page.tsx`
 
 **Checkpoint**: Enabled channels send only to eligible recipients, changed audiences require reconfirmation, and sent history remains immutable after later registration/preference changes.
 
@@ -139,19 +139,19 @@
 
 ### Tests for User Story 4
 
-- [ ] T052 [P] [US4] Add failing organizer-note domain tests for explicit event relevance, multi-context current-body consistency, ban filtering, and admin-only revisions in `tests/lib/organizerNotes.test.ts`
-- [ ] T053 [P] [US4] Add failing event-scoped route tests for note list/search, current note, update, revision denial, and removed-staff access in `tests/api/organizer-notes.test.ts`
-- [ ] T054 [P] [US4] Add failing workspace Notes UI tests for search, shared editing, warning copy, history visibility, and empty/error states in `tests/pages/OrganizerEventNotes.test.tsx`
-- [ ] T055 [P] [US4] Add failing cross-surface redaction assertions for notes/revisions in `tests/api/public-events.test.ts`, `tests/api/public-event-registrations.test.ts`, and `tests/api/event-communications.test.ts`
+- [X] T052 [P] [US4] Add failing organizer-note domain tests for explicit event relevance, multi-context current-body consistency, ban filtering, and admin-only revisions in `tests/lib/organizerNotes.test.ts`
+- [X] T053 [P] [US4] Add failing event-scoped route tests for note list/search, current note, update, revision denial, and removed-staff access in `tests/api/organizer-notes.test.ts`
+- [X] T054 [P] [US4] Add failing workspace Notes UI tests for search, shared editing, warning copy, history visibility, and empty/error states in `tests/pages/OrganizerEventNotes.test.tsx`
+- [X] T055 [P] [US4] Add failing cross-surface redaction assertions for notes/revisions in `tests/api/public-events.test.ts`, `tests/api/public-event-registrations.test.ts`, and `tests/api/event-communications.test.ts`
 
 ### Implementation for User Story 4
 
-- [ ] T056 [US4] Require explicit event scope for note relevance, list/search targets, current note updates, revisions, and ban-safe projections in `src/lib/organizerNotes.ts`
-- [ ] T057 [US4] Implement event-scoped note list/search in `src/app/api/events/[eventId]/notes/route.ts`
-- [ ] T058 [US4] Implement event-scoped current-note read/update in `src/app/api/events/[eventId]/notes/[hackerId]/route.ts`
-- [ ] T059 [US4] Implement admin-only event-scoped revision history in `src/app/api/events/[eventId]/notes/[hackerId]/revisions/route.ts`
-- [ ] T060 [US4] Cut over organizer note consumers and remove unscoped MC/co-MC access from `src/app/api/hackers/[hackerId]/organizer-note/route.ts`, `src/app/api/hackers/[hackerId]/organizer-note/revisions/route.ts`, and `src/app/components/OrganizerNotePanel.tsx`
-- [ ] T061 [US4] Build the event Notes search/list/editor/history surface with privacy guidance and capability-gated revision controls in `src/app/organizer/events/[eventId]/notes/page.tsx`
+- [X] T056 [US4] Require explicit event scope for note relevance, list/search targets, current note updates, revisions, and ban-safe projections in `src/lib/organizerNotes.ts`
+- [X] T057 [US4] Implement event-scoped note list/search in `src/app/api/events/[eventId]/notes/route.ts`
+- [X] T058 [US4] Implement event-scoped current-note read/update in `src/app/api/events/[eventId]/notes/[hackerId]/route.ts`
+- [X] T059 [US4] Implement admin-only event-scoped revision history in `src/app/api/events/[eventId]/notes/[hackerId]/revisions/route.ts`
+- [X] T060 [US4] Cut over organizer note consumers and remove unscoped MC/co-MC access from `src/app/api/hackers/[hackerId]/organizer-note/route.ts`, `src/app/api/hackers/[hackerId]/organizer-note/revisions/route.ts`, and `src/app/components/OrganizerNotePanel.tsx`
+- [X] T061 [US4] Build the event Notes search/list/editor/history surface with privacy guidance and capability-gated revision controls in `src/app/organizer/events/[eventId]/notes/page.tsx`
 
 **Checkpoint**: Current notes are consistent across authorized event contexts, revisions are admin-only, and no attendee/public/message/report output leaks note data.
 
@@ -165,18 +165,18 @@
 
 ### Tests for User Story 5
 
-- [ ] T062 [P] [US5] Add failing route tests for event project projections, per-event card-status updates, authorization, and multi-event identity in `tests/api/event-workspace-projects.test.ts`
-- [ ] T063 [P] [US5] Add failing Projects/Pitch workspace UI tests for project details, card states, queue/outcome data, and focused-controller links in `tests/pages/OrganizerEventProjects.test.tsx`
-- [ ] T064 [P] [US5] Extend pitch regression tests for site admin, chapter admin, MC, co-MC, hacker voting, and no card-status gate in `tests/api/events-transition.test.ts`, `tests/api/events-queue.test.ts`, and `tests/api/event-project-vote.test.ts`
+- [X] T062 [P] [US5] Add failing route tests for event project projections, per-event card-status updates, authorization, and multi-event identity in `tests/api/event-workspace-projects.test.ts`
+- [X] T063 [P] [US5] Add failing Projects/Pitch workspace UI tests for project details, card states, queue/outcome data, and focused-controller links in `tests/pages/OrganizerEventProjects.test.tsx`
+- [X] T064 [P] [US5] Extend pitch regression tests for site admin, chapter admin, MC, co-MC, hacker voting, and no card-status gate in `tests/api/events-transition.test.ts`, `tests/api/events-queue.test.ts`, and `tests/api/event-project-vote.test.ts`
 
 ### Implementation for User Story 5
 
-- [ ] T065 [US5] Implement event-linked `PitchProject` projections, event-specific card-status updates, and pitch summaries without a duplicate participation model in `src/lib/eventWorkspaceProjects.ts`
-- [ ] T066 [US5] Implement authorized event project listing in `src/app/api/events/[eventId]/projects/route.ts`
-- [ ] T067 [US5] Implement non-blocking card-status updates in `src/app/api/events/[eventId]/projects/[pitchProjectId]/route.ts`
-- [ ] T068 [US5] Cut existing pitch controller routes over to the shared event-pitch capability guard in `src/app/api/events/[eventId]/pitch/`
-- [ ] T069 [P] [US5] Build the workspace Projects section with global project identity and event-specific card/queue/pitch state in `src/app/organizer/events/[eventId]/projects/page.tsx`
-- [ ] T070 [P] [US5] Build the workspace Pitch summary and `Open pitch controller` link to `/pitch/[eventId]` in `src/app/organizer/events/[eventId]/pitch/page.tsx`
+- [X] T065 [US5] Implement event-linked `PitchProject` projections, event-specific card-status updates, and pitch summaries without a duplicate participation model in `src/lib/eventWorkspaceProjects.ts`
+- [X] T066 [US5] Implement authorized event project listing in `src/app/api/events/[eventId]/projects/route.ts`
+- [X] T067 [US5] Implement non-blocking card-status updates in `src/app/api/events/[eventId]/projects/[pitchProjectId]/route.ts`
+- [X] T068 [US5] Cut existing pitch controller routes over to the shared event-pitch capability guard in `src/app/api/events/[eventId]/pitch/`
+- [X] T069 [P] [US5] Build the workspace Projects section with global project identity and event-specific card/queue/pitch state in `src/app/organizer/events/[eventId]/projects/page.tsx`
+- [X] T070 [P] [US5] Build the workspace Pitch summary and `Open pitch controller` link to `/pitch/[eventId]` in `src/app/organizer/events/[eventId]/pitch/page.tsx`
 
 **Checkpoint**: Projects remain global, event participation/card/pitch state remains independent, and existing pitch/voting behavior has no new card gate.
 
@@ -190,17 +190,17 @@
 
 ### Tests for User Story 6
 
-- [ ] T071 [P] [US6] Add failing staff route tests for authorized reads, one-role assignment changes, transactional audits, removal, immediate revocation, and cross-chapter denial in `tests/api/event-staff.test.ts`
-- [ ] T072 [P] [US6] Add failing lifecycle/settings permission tests for admin success and MC/co-MC denial in `tests/api/events.test.ts` and `tests/api/organizer-events.test.ts`
-- [ ] T073 [P] [US6] Add failing workspace UI tests for admin-only staff/settings/lifecycle controls and audit history in `tests/pages/OrganizerEventAdministration.test.tsx`
+- [X] T071 [P] [US6] Add failing staff route tests for authorized reads, one-role assignment changes, transactional audits, removal, immediate revocation, and cross-chapter denial in `tests/api/event-staff.test.ts`
+- [X] T072 [P] [US6] Add failing lifecycle/settings permission tests for admin success and MC/co-MC denial in `tests/api/events.test.ts` and `tests/api/organizer-events.test.ts`
+- [X] T073 [P] [US6] Add failing workspace UI tests for admin-only staff/settings/lifecycle controls and audit history in `tests/pages/OrganizerEventAdministration.test.tsx`
 
 ### Implementation for User Story 6
 
-- [ ] T074 [US6] Make staff listing require workspace access and make assignment/role-change writes admin-only with same-transaction `EventStaffAudit` records in `src/app/api/events/[eventId]/staff/route.ts`
-- [ ] T075 [US6] Make staff removal admin-only with same-transaction audit and current-assignment revocation in `src/app/api/events/[eventId]/staff/[staffId]/route.ts`
-- [ ] T076 [US6] Apply admin-only event settings and lifecycle guards to event update, publish, application open/close, and organizer settings routes in `src/app/api/events/[eventId]/route.ts`, `src/app/api/events/[eventId]/publish/route.ts`, `src/app/api/events/[eventId]/applications/open/route.ts`, and `src/app/api/events/[eventId]/applications/close/route.ts`
-- [ ] T077 [US6] Build staff assignment/role/removal controls and admin-only audit history in `src/app/organizer/events/[eventId]/staff/EventStaffPanel.tsx`
-- [ ] T078 [US6] Integrate capability-gated staff, event settings, and lifecycle actions into `src/app/organizer/events/[eventId]/page.tsx` and `src/app/organizer/events/[eventId]/settings/page.tsx`
+- [X] T074 [US6] Make staff listing require workspace access and make assignment/role-change writes admin-only with same-transaction `EventStaffAudit` records in `src/app/api/events/[eventId]/staff/route.ts`
+- [X] T075 [US6] Make staff removal admin-only with same-transaction audit and current-assignment revocation in `src/app/api/events/[eventId]/staff/[staffId]/route.ts`
+- [X] T076 [US6] Apply admin-only event settings and lifecycle guards to event update, publish, application open/close, and organizer settings routes in `src/app/api/events/[eventId]/route.ts`, `src/app/api/events/[eventId]/publish/route.ts`, `src/app/api/events/[eventId]/applications/open/route.ts`, and `src/app/api/events/[eventId]/applications/close/route.ts`
+- [X] T077 [US6] Build staff assignment/role/removal controls and admin-only audit history in `src/app/organizer/events/[eventId]/staff/EventStaffPanel.tsx`
+- [X] T078 [US6] Integrate capability-gated staff, event settings, and lifecycle actions into `src/app/organizer/events/[eventId]/page.tsx` and `src/app/organizer/events/[eventId]/settings/page.tsx`
 
 **Checkpoint**: Admin authority is chapter-scoped and audited; operational staff retain only their defined event capabilities and lose access immediately when removed.
 
@@ -210,13 +210,13 @@
 
 **Purpose**: Close security, accessibility, performance, documentation, and full-regression requirements across all delivered stories.
 
-- [ ] T079 [P] Add cross-story serialization tests preventing organizer notes, storage keys, contact snapshots, provider errors, internal review reasons, and moderation data from public/attendee responses in `tests/api/organizer-workspace-redaction.test.ts`
-- [ ] T080 [P] Add accessibility coverage for keyboard navigation, focus restoration, live status, visibility/status semantics, and destructive confirmations in `tests/pages/OrganizerEventWorkspaceAccessibility.test.tsx`
-- [ ] T081 Prevent organizer-only material references from becoming public communication attachments and add regression coverage in `src/lib/eventCommunications.ts` and `tests/lib/eventCommunications.test.ts`
-- [ ] T082 Review workspace aggregate/list queries for pagination, bounded includes, and indexed filters and document any query-shape adjustments in `src/lib/eventWorkspace.ts`, `src/lib/eventMaterials.ts`, `src/lib/eventCommunications.ts`, `src/lib/organizerNotes.ts`, and `src/lib/eventWorkspaceProjects.ts`
-- [ ] T083 [P] Document private material storage, provider availability, SMS consent versioning, and operational setup in `README.md`
-- [ ] T084 Run every focused verification command and record any necessary corrections in `specs/003-organizer-event-workspace/quickstart.md`
-- [ ] T085 Run the complete Jest suite and production build, resolving feature-related regressions in `tests/` and `src/`
+- [X] T079 [P] Add cross-story serialization tests preventing organizer notes, storage keys, contact snapshots, provider errors, internal review reasons, and moderation data from public/attendee responses in `tests/api/organizer-workspace-redaction.test.ts`
+- [X] T080 [P] Add accessibility coverage for keyboard navigation, focus restoration, live status, visibility/status semantics, and destructive confirmations in `tests/pages/OrganizerEventWorkspaceAccessibility.test.tsx`
+- [X] T081 Prevent organizer-only material references from becoming public communication attachments and add regression coverage in `src/lib/eventCommunications.ts` and `tests/lib/eventCommunications.test.ts`
+- [X] T082 Review workspace aggregate/list queries for pagination, bounded includes, and indexed filters and document any query-shape adjustments in `src/lib/eventWorkspace.ts`, `src/lib/eventMaterials.ts`, `src/lib/eventCommunications.ts`, `src/lib/organizerNotes.ts`, and `src/lib/eventWorkspaceProjects.ts`
+- [X] T083 [P] Document private material storage, provider availability, SMS consent versioning, and operational setup in `README.md`
+- [X] T084 Run every focused verification command and record any necessary corrections in `specs/003-organizer-event-workspace/quickstart.md`
+- [X] T085 Run the complete Jest suite and production build, resolving feature-related regressions in `tests/` and `src/`
 
 ---
 

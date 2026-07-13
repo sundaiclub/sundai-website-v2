@@ -30,7 +30,10 @@ type OrganizerNoteRevision = {
 type OrganizerNotePanelProps = {
   hackerId: string;
   title?: string;
-};
+} & (
+  | { eventId: string; chapterId?: never }
+  | { eventId?: never; chapterId: string }
+);
 
 const emptyAccess: OrganizerNoteAccess = {
   canViewCurrentNote: false,
@@ -41,6 +44,8 @@ const emptyAccess: OrganizerNoteAccess = {
 export default function OrganizerNotePanel({
   hackerId,
   title = 'Organizer note',
+  eventId,
+  chapterId,
 }: OrganizerNotePanelProps) {
   const classes = useManagementClasses();
   const [note, setNote] = useState<OrganizerNote | null>(null);
@@ -48,11 +53,14 @@ export default function OrganizerNotePanel({
   const [access, setAccess] = useState<OrganizerNoteAccess>(emptyAccess);
   const [revisions, setRevisions] = useState<OrganizerNoteRevision[]>([]);
   const [status, setStatus] = useState('');
+  const scope = eventId
+    ? `eventId=${encodeURIComponent(eventId)}`
+    : `chapterId=${encodeURIComponent(chapterId!)}`;
 
   useEffect(() => {
     if (!hackerId) return;
 
-    fetch(`/api/hackers/${hackerId}/organizer-note`)
+    fetch(`/api/hackers/${hackerId}/organizer-note?${scope}`)
       .then(async response => {
         if (!response.ok) {
           setStatus('Organizer note unavailable');
@@ -67,14 +75,17 @@ export default function OrganizerNotePanel({
         setAccess(payload.access ?? emptyAccess);
       })
       .catch(() => setStatus('Organizer note unavailable'));
-  }, [hackerId]);
+  }, [hackerId, scope]);
 
   async function saveNote() {
-    const response = await fetch(`/api/hackers/${hackerId}/organizer-note`, {
-      method: 'PUT',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ body }),
-    });
+    const response = await fetch(
+      `/api/hackers/${hackerId}/organizer-note?${scope}`,
+      {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ body }),
+      }
+    );
 
     if (!response.ok) {
       setStatus('Unable to save organizer note');
@@ -89,7 +100,7 @@ export default function OrganizerNotePanel({
 
   async function loadRevisions() {
     const response = await fetch(
-      `/api/hackers/${hackerId}/organizer-note/revisions`
+      `/api/hackers/${hackerId}/organizer-note/revisions?${scope}`
     );
 
     if (!response.ok) {

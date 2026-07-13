@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getCurrentHacker } from '@/lib/eventManagementApi';
 import { updateChapterNotificationPreferences } from '@/lib/chapters';
+import type { JsonObject } from '@/types/event-management';
 
 export async function PATCH(
   req: Request,
@@ -10,15 +11,75 @@ export async function PATCH(
     const hacker = await getCurrentHacker();
     if (!hacker) return new NextResponse('Unauthorized', { status: 401 });
 
-    const body = await req.json();
+    let body: unknown;
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json(
+        { message: 'Request body must be valid JSON.' },
+        { status: 400 }
+      );
+    }
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return NextResponse.json(
+        { message: 'Notification preferences are required.' },
+        { status: 400 }
+      );
+    }
+
+    const preferences = body as Record<string, unknown>;
+    for (const field of [
+      'notificationsAllowed',
+      'emailNotificationsEnabled',
+      'smsNotificationsEnabled',
+      'smsConsentGranted',
+    ]) {
+      if (
+        preferences[field] !== undefined &&
+        typeof preferences[field] !== 'boolean'
+      ) {
+        return NextResponse.json(
+          { message: `${field} must be a boolean.` },
+          { status: 400 }
+        );
+      }
+    }
+
+    const activeSmsOptIn =
+      preferences.notificationsAllowed !== false &&
+      preferences.smsNotificationsEnabled === true;
+    if (activeSmsOptIn && preferences.smsConsentGranted !== true) {
+      return NextResponse.json(
+        { message: 'Explicit SMS consent is required to enable SMS.' },
+        { status: 400 }
+      );
+    }
+    if (activeSmsOptIn && !process.env.SMS_CONSENT_VERSION?.trim()) {
+      return NextResponse.json(
+        { message: 'SMS consent is not currently available.' },
+        { status: 503 }
+      );
+    }
+
     const membership = await updateChapterNotificationPreferences(
       params.chapterId,
       hacker.id,
       {
-        notificationsAllowed: body?.notificationsAllowed,
-        emailNotificationsEnabled: body?.emailNotificationsEnabled,
-        smsNotificationsEnabled: body?.smsNotificationsEnabled,
-        notificationPreferencesJson: body?.notificationPreferencesJson ?? null,
+        notificationsAllowed: preferences.notificationsAllowed as
+          | boolean
+          | undefined,
+        emailNotificationsEnabled: preferences.emailNotificationsEnabled as
+          | boolean
+          | undefined,
+        smsNotificationsEnabled: preferences.smsNotificationsEnabled as
+          | boolean
+          | undefined,
+        smsConsentGranted: preferences.smsConsentGranted as
+          | boolean
+          | undefined,
+        notificationPreferencesJson:
+          (preferences.notificationPreferencesJson as JsonObject | null) ??
+          null,
       }
     );
 

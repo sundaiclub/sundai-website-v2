@@ -701,6 +701,52 @@ describe('chapter public directory and landing pages', () => {
       )
     })
 
+    it('requires explicit versioned SMS consent and sends consent evidence with preferences', async () => {
+      process.env.NEXT_PUBLIC_SMS_CONSENT_COPY =
+        'I consent to receive event text messages from Sundai. Message and data rates may apply.'
+      process.env.NEXT_PUBLIC_SMS_CONSENT_VERSION = '2026-07-10'
+      mockSignedIn(activeMemberUser)
+
+      renderLandingPage('boston')
+
+      const smsControl = await screen.findByRole('checkbox', {
+        name: /^sms|text notifications$/i,
+      })
+      fireEvent.click(smsControl)
+
+      expect(
+        screen.getByText(/message and data rates may apply/i),
+      ).toBeInTheDocument()
+      expect(screen.getByText(/consent version 2026-07-10/i)).toBeInTheDocument()
+
+      const explicitConsent = screen.getByRole('checkbox', {
+        name: /i consent to receive event text messages/i,
+      })
+      expect(explicitConsent).not.toBeChecked()
+      fireEvent.click(explicitConsent)
+
+      fireEvent.click(
+        screen.getByRole('button', {
+          name: /save.*notification|update.*notification|save preferences/i,
+        }),
+      )
+
+      await waitFor(() => {
+        const notificationRequest = (global.fetch as jest.Mock).mock.calls.find(
+          ([url, init]) =>
+            requestUrl(url).includes('/notifications') &&
+            init?.method?.toUpperCase() === 'PATCH',
+        )
+        expect(requestBody(notificationRequest?.[1])).toEqual(
+          expect.objectContaining({
+            smsNotificationsEnabled: true,
+            smsConsentGranted: true,
+            smsConsentVersion: '2026-07-10',
+          }),
+        )
+      })
+    })
+
     it('shows a manage link to chapter admins', async () => {
       mockSignedIn(chapterAdminUser)
 

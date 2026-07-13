@@ -39,6 +39,46 @@ npm run test -- --runInBand tests/api/events-transition.test.ts tests/api/events
 
 New test filenames above are expected targets for implementation.
 
+### Verification Record — 2026-07-10
+
+All focused commands above were executed from the repository root without
+feature corrections between runs.
+
+| Command                                                                                                                               | Result                                              |
+| ------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| `npx prisma validate`                                                                                                                 | PASS — `prisma/schema.prisma` is valid.             |
+| `npx prisma generate`                                                                                                                 | PASS — Prisma Client 5.22.0 generated successfully. |
+| `npm run test -- --runInBand tests/lib/eventManagementAuth.test.ts`                                                                   | PASS — 48/48 tests.                                 |
+| `npm run test -- --runInBand tests/api/event-staff.test.ts`                                                                           | PASS — 7/7 tests.                                   |
+| `npm run test -- --runInBand tests/api/event-registration-review.test.ts`                                                             | PASS — 16/16 tests.                                 |
+| `npm run test -- --runInBand tests/api/organizer-notes.test.ts`                                                                       | PASS — 12/12 tests.                                 |
+| `npm run test -- --runInBand tests/api/event-materials.test.ts`                                                                       | PASS — 6/6 tests.                                   |
+| `npm run test -- --runInBand tests/api/event-communications.test.ts`                                                                  | PASS — 7/7 tests.                                   |
+| `npm run test -- --runInBand tests/api/organizer-event-workspace.test.ts`                                                             | PASS — 6/6 tests.                                   |
+| `npm run test -- --runInBand tests/pages/OrganizerEventWorkspace.test.tsx`                                                            | PASS — 5/5 tests.                                   |
+| `npm run test -- --runInBand tests/api/events-transition.test.ts tests/api/events-queue.test.ts tests/api/event-project-vote.test.ts` | PASS — 3 suites, 42/42 tests.                       |
+
+Focused total: 11 successful commands and 149 passing tests. No failed,
+skipped, or updated snapshots were reported.
+
+Query-shape review notes:
+
+- Workspace aggregates use database counts/grouping with event-scoped filters;
+  hidden globally banned registrations are excluded for non-site-admin actors.
+- Inline workspace staff and pitch-session summary relations are capped at 100.
+- Material lists are event-scoped, deterministically ordered, and normalize
+  pagination to a maximum page size of 100.
+- Project workspace lists use deterministic ordering, a maximum page size of
+  100, and one-row lookahead for `nextOffset`.
+- Organizer note targets and revision history use bounded pagination (maximum
+  100); revision reads filter by hacker and order newest first.
+- Communication snapshot creation keeps the indexed communication/status
+  transition atomic and projects only recipient IDs/contact values needed for
+  delivery, ordered deterministically.
+- Event, staff, registration, material, communication, project, and note reads
+  retain their event/chapter/hacker filters aligned with the indexes declared
+  in `prisma/schema.prisma`.
+
 ## Full Verification
 
 ```bash

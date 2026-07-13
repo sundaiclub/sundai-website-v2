@@ -95,7 +95,7 @@ export default function OrganizerEventsPage() {
       <ManagementHeader
         eyebrow="Organizer"
         title="Organizer events"
-        description="Review events you can manage and open their operational settings."
+        description="Review events you can manage and open their operational workspace."
         actions={
           <ManagementLinkButton href="/organizer/events/new" variant="primary">
             New event
@@ -117,7 +117,7 @@ export default function OrganizerEventsPage() {
               <div className="min-w-0">
                 <Link
                   className="truncate font-semibold underline-offset-4 hover:underline"
-                  href={`/organizer/events/${event.id}/settings`}
+                  href={`/organizer/events/${event.id}`}
                 >
                   {event.title}
                 </Link>
@@ -146,16 +146,16 @@ export default function OrganizerEventsPage() {
                   })}
                 </ManagementBadge>
                 <Link
+                  className={classes.primaryButton}
+                  href={`/organizer/events/${event.id}`}
+                >
+                  Open workspace
+                </Link>
+                <Link
                   className={classes.secondaryButton}
                   href={`/organizer/events/${event.id}/settings`}
                 >
                   Settings
-                </Link>
-                <Link
-                  className={classes.secondaryButton}
-                  href={`/organizer/events/${event.id}/registrations`}
-                >
-                  Registrations
                 </Link>
               </div>
             </div>

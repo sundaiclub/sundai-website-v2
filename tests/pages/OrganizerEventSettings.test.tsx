@@ -135,6 +135,10 @@ function mockEventFetch(event = eventSettings) {
   global.fetch = jest.fn((input: RequestInfo | URL) => {
     const url = requestUrl(input);
 
+    if (url === `/api/events/${event.id}/workspace`) {
+      return jsonResponse({ capabilities: { administerEvent: true } });
+    }
+
     if (url === `/api/events/${event.id}?management=true`) {
       return jsonResponse(event);
     }
@@ -224,6 +228,10 @@ describe('/organizer/events/[eventId]/settings', () => {
     global.fetch = jest.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = requestUrl(input);
 
+      if (url === `/api/events/${draftEventSettings.id}/workspace`) {
+        return jsonResponse({ capabilities: { administerEvent: true } });
+      }
+
       if (url === `/api/events/${draftEventSettings.id}?management=true`) {
         return jsonResponse(draftEventSettings);
       }
@@ -268,6 +276,10 @@ describe('/organizer/events/[eventId]/settings', () => {
   it('saves close controls and auto-promote waitlist toggle changes from organizer settings', async () => {
     global.fetch = jest.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = requestUrl(input);
+
+      if (url === `/api/events/${eventSettings.id}/workspace`) {
+        return jsonResponse({ capabilities: { administerEvent: true } });
+      }
 
       if (url === `/api/events/${eventSettings.id}?management=true`) {
         return jsonResponse(eventSettings);
@@ -315,6 +327,10 @@ describe('/organizer/events/[eventId]/settings', () => {
   it('shows close reason and saves reopen controls with auto-promote disabled', async () => {
     global.fetch = jest.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = requestUrl(input);
+
+      if (url === `/api/events/${closedEventSettings.id}/workspace`) {
+        return jsonResponse({ capabilities: { administerEvent: true } });
+      }
 
       if (url === `/api/events/${closedEventSettings.id}?management=true`) {
         return jsonResponse(closedEventSettings);
@@ -439,6 +455,10 @@ describe('/organizer/events/[eventId]/settings', () => {
   it('saves authorized edits to application mode, waitlist, public details, and approved-only details', async () => {
     global.fetch = jest.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = requestUrl(input);
+
+      if (url === `/api/events/${eventSettings.id}/workspace`) {
+        return jsonResponse({ capabilities: { administerEvent: true } });
+      }
 
       if (url === `/api/events/${eventSettings.id}?management=true`) {
         return jsonResponse(eventSettings);

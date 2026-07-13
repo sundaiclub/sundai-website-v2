@@ -644,6 +644,35 @@ describe('/api/events organizer immediate publishing', () => {
     );
   });
 
+  it.each([
+    ['MC', buildMcFixture],
+    ['co-MC', buildCoMcFixture],
+  ])(
+    'denies an assigned %s publishing an event by staff role alone',
+    async (_label, buildStaffFixture) => {
+      const { hacker, staff } = buildStaffFixture();
+      const draftEvent = buildUnpublishedEvent({
+        id: staff.eventId,
+        chapterId: 'chapter-boston',
+      });
+
+      mockActor(hacker);
+      mockMembershipLookup();
+      prisma.event.findUnique.mockResolvedValue(draftEvent);
+      prisma.eventStaff.findFirst.mockResolvedValue(staff);
+
+      const response = await POST_PUBLISH_EVENT(
+        createJsonRequest(`/api/events/${draftEvent.id}/publish`, {
+          method: 'POST',
+        }) as any,
+        createRouteContext({ eventId: draftEvent.id }) as any
+      );
+
+      expect(response.status).toBe(403);
+      expect(prisma.event.update).not.toHaveBeenCalled();
+    }
+  );
+
   it('shows published public events on public listing responses', async () => {
     const chapter = buildChapter();
     const publishedEvent = buildPublishedEvent({

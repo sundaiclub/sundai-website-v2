@@ -474,4 +474,107 @@ describe('chapter membership API', () => {
       })
     );
   });
+
+  it('records configured versioned SMS consent only after explicit opt-in', async () => {
+    const previousVersion = process.env.SMS_CONSENT_VERSION;
+    process.env.SMS_CONSENT_VERSION = '2026-07-10';
+    const { PATCH } = loadChapterNotificationsRoute();
+    const hacker = buildHacker();
+    const activeMembership = buildChapterMembership({
+      id: 'membership-sms-opt-in',
+      chapterId: 'chapter-boston',
+      hackerId: hacker.id,
+      notificationsAllowed: true,
+      smsNotificationsEnabled: false,
+      smsConsentAt: null,
+      smsConsentVersion: null,
+    });
+    const consentAt = new Date('2026-07-10T16:00:00.000Z');
+
+    mockActor(hacker);
+    mockMembershipLookup(activeMembership);
+    prisma.chapterMembership.update.mockImplementation(
+      async ({ data }: { data: Record<string, unknown> }) => ({
+        ...activeMembership,
+        ...data,
+        smsConsentAt: data.smsConsentAt ?? consentAt,
+      })
+    );
+
+    const response = await PATCH(
+      createJsonRequest('/api/chapters/chapter-boston/notifications', {
+        method: 'PATCH',
+        body: {
+          notificationsAllowed: true,
+          emailNotificationsEnabled: true,
+          smsNotificationsEnabled: true,
+          smsConsentGranted: true,
+        },
+      }) as any,
+      createRouteContext({ chapterId: activeMembership.chapterId }) as any
+    );
+
+    expect(response.status).toBe(200);
+    expect(prisma.chapterMembership.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: activeMembership.id },
+        data: expect.objectContaining({
+          smsNotificationsEnabled: true,
+          smsConsentAt: expect.any(Date),
+          smsConsentVersion: '2026-07-10',
+        }),
+      })
+    );
+
+    if (previousVersion === undefined) delete process.env.SMS_CONSENT_VERSION;
+    else process.env.SMS_CONSENT_VERSION = previousVersion;
+  });
+
+  it('clears SMS consent evidence when the member opts out', async () => {
+    const { PATCH } = loadChapterNotificationsRoute();
+    const hacker = buildHacker();
+    const activeMembership = buildChapterMembership({
+      id: 'membership-sms-opt-out',
+      chapterId: 'chapter-boston',
+      hackerId: hacker.id,
+      notificationsAllowed: true,
+      smsNotificationsEnabled: true,
+      smsConsentAt: new Date('2026-07-10T16:00:00.000Z'),
+      smsConsentVersion: '2026-07-10',
+    });
+
+    mockActor(hacker);
+    mockMembershipLookup(activeMembership);
+    prisma.chapterMembership.update.mockResolvedValue({
+      ...activeMembership,
+      smsNotificationsEnabled: false,
+      smsConsentAt: null,
+      smsConsentVersion: null,
+    });
+
+    const response = await PATCH(
+      createJsonRequest('/api/chapters/chapter-boston/notifications', {
+        method: 'PATCH',
+        body: {
+          notificationsAllowed: true,
+          emailNotificationsEnabled: true,
+          smsNotificationsEnabled: false,
+          smsConsentGranted: false,
+        },
+      }) as any,
+      createRouteContext({ chapterId: activeMembership.chapterId }) as any
+    );
+
+    expect(response.status).toBe(200);
+    expect(prisma.chapterMembership.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: activeMembership.id },
+        data: expect.objectContaining({
+          smsNotificationsEnabled: false,
+          smsConsentAt: null,
+          smsConsentVersion: null,
+        }),
+      })
+    );
+  });
 });

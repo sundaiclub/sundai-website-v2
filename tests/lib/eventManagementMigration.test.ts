@@ -12,7 +12,9 @@ const schema = fs.readFileSync(schemaPath, 'utf8');
 const migration = fs.readFileSync(migrationPath, 'utf8');
 
 const readBlock = (source: string, kind: 'enum' | 'model', name: string) => {
-  const match = source.match(new RegExp(`\\b${kind}\\s+${name}\\s*{([\\s\\S]*?)\\n}`));
+  const match = source.match(
+    new RegExp(`\\b${kind}\\s+${name}\\s*{([\\s\\S]*?)\\n}`)
+  );
 
   if (!match) {
     throw new Error(`Could not find ${kind} ${name}`);
@@ -51,11 +53,29 @@ describe('event management foundation migration', () => {
 
     expectSchemaLine(chapterModel, ['slug', 'String', '@unique']);
     expectSchemaLine(chapterModel, ['timezone', 'String']);
-    expectSchemaLine(eventModel, ['chapter', 'Chapter', '@relation(fields:', '[chapterId],', 'references:', '[id])']);
+    expectSchemaLine(eventModel, [
+      'chapter',
+      'Chapter',
+      '@relation(fields:',
+      '[chapterId],',
+      'references:',
+      '[id])',
+    ]);
     expectSchemaLine(eventModel, ['chapterId', 'String']);
-    expectSchemaLine(pitchSessionModel, ['chapter', 'Chapter', '@relation(fields:', '[chapterId],', 'references:', '[id])']);
+    expectSchemaLine(pitchSessionModel, [
+      'chapter',
+      'Chapter',
+      '@relation(fields:',
+      '[chapterId],',
+      'references:',
+      '[id])',
+    ]);
     expectSchemaLine(pitchSessionModel, ['chapterId', 'String']);
-    expectSchemaLine(pitchSessionModel, ['legacyBackfill', 'Boolean', '@default(false)']);
+    expectSchemaLine(pitchSessionModel, [
+      'legacyBackfill',
+      'Boolean',
+      '@default(false)',
+    ]);
 
     expectSql(`
       INSERT INTO "Chapter" (
@@ -87,7 +107,11 @@ describe('event management foundation migration', () => {
     const eventModel = readBlock(schema, 'model', 'Event');
 
     expectSchemaLine(eventModel, ['slug', 'String']);
-    expectSchemaLine(eventModel, ['slugNeedsCleanup', 'Boolean', '@default(false)']);
+    expectSchemaLine(eventModel, [
+      'slugNeedsCleanup',
+      'Boolean',
+      '@default(false)',
+    ]);
     expect(eventModel).toContain('@@unique([chapterId, slug])');
     expect(eventModel).toContain('@@index([chapterId, status, startTime])');
     expect(eventModel).toContain('@@index([visibility, status])');
@@ -110,7 +134,7 @@ describe('event management foundation migration', () => {
     expectSchemaLine(eventStaffModel, ['eventId', 'String']);
     expectSchemaLine(eventStaffModel, ['hackerId', 'String']);
     expectSchemaLine(eventStaffModel, ['role', 'EventStaffRole']);
-    expect(eventStaffModel).toContain('@@unique([eventId, hackerId, role])');
+    expect(eventStaffModel).toContain('@@unique([eventId, hackerId])');
     expect(eventStaffModel).toContain('@@index([eventId, role])');
     expect(eventStaffModel).toContain('@@index([hackerId])');
 
@@ -147,7 +171,7 @@ describe('event management foundation migration', () => {
       'UserBanFlag',
       'HackerOrganizerNote',
       'HackerOrganizerNoteRevision',
-    ].forEach((modelName) => {
+    ].forEach(modelName => {
       expect(schema).toMatch(new RegExp(`\\bmodel\\s+${modelName}\\s*{`));
       expect(migration).toContain(`CREATE TABLE "${modelName}"`);
     });
@@ -162,7 +186,7 @@ describe('event management foundation migration', () => {
       'EventRegistration_eventId_hackerId_key',
       'UserBan_one_active_per_hacker',
       'HackerOrganizerNote_hackerId_key',
-    ].forEach((indexName) => {
+    ].forEach(indexName => {
       expect(migration).toContain(`"${indexName}"`);
     });
   });

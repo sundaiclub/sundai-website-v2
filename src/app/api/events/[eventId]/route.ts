@@ -8,7 +8,6 @@ import {
 import {
   canDecideRegistrationsWithContext,
   canManageChapterSettings,
-  canManageEventSettings,
   canViewApprovedOnlyEventDetailsWithContext,
 } from '@/lib/eventManagementAuth';
 import {
@@ -22,6 +21,7 @@ import {
   getViewerRegistrationState,
   redactPublicEventForViewer,
 } from '@/lib/publicEvents';
+import { requireEventSettingsManager } from '@/lib/eventManagementApi';
 
 export async function GET(
   req: Request,
@@ -34,6 +34,9 @@ export async function GET(
       searchParams.get('manageable') === 'true';
 
     if (managementRead) {
+      const access = await requireEventSettingsManager(params.eventId);
+      if (access.response) return access.response;
+
       const event = await prisma.event.findUnique({
         where: { id: params.eventId },
         include: {
@@ -68,25 +71,13 @@ export async function GET(
 
       if (!event) return new NextResponse('Not Found', { status: 404 });
 
-      const { userId } = auth();
-      if (!userId) return new NextResponse('Unauthorized', { status: 401 });
-
-      const user = await prisma.hacker.findUnique({
-        where: { clerkId: userId },
-        select: { id: true, role: true },
-      });
-      if (!user) return new NextResponse('Unauthorized', { status: 401 });
-
-      const canManage = await canManageEventSettings(
-        prisma,
-        user.id,
-        params.eventId
-      );
-      if (!canManage) return new NextResponse('Forbidden', { status: 403 });
-
       const canDelete =
-        user.role === 'SITE_ADMIN' ||
-        (await canManageChapterSettings(prisma, user.id, event.chapterId));
+        access.hacker!.role === 'SITE_ADMIN' ||
+        (await canManageChapterSettings(
+          prisma,
+          access.hacker!.id,
+          event.chapterId
+        ));
 
       return NextResponse.json({ ...event, canDelete });
     }
@@ -214,21 +205,9 @@ export async function PATCH(
   { params }: { params: { eventId: string } }
 ) {
   try {
-    const { userId } = auth();
-    if (!userId) return new NextResponse('Unauthorized', { status: 401 });
-
-    const user = await prisma.hacker.findUnique({
-      where: { clerkId: userId },
-      select: { id: true, role: true },
-    });
-    if (!user) return new NextResponse('Unauthorized', { status: 401 });
-
-    const canManage = await canManageEventSettings(
-      prisma,
-      user.id,
-      params.eventId
-    );
-    if (!canManage) return new NextResponse('Forbidden', { status: 403 });
+    const access = await requireEventSettingsManager(params.eventId);
+    if (access.response) return access.response;
+    const user = access.hacker!;
 
     const existingEvent = await prisma.event.findUnique({
       where: { id: params.eventId },

@@ -1,17 +1,22 @@
-import { NextResponse } from "next/server";
-import type { Prisma } from "@prisma/client";
-import prisma from "@/lib/prisma";
-import { requireEventPitchManager } from "@/lib/eventManagementApi";
+import { NextResponse } from 'next/server';
+import type { Prisma } from '@prisma/client';
+import prisma from '@/lib/prisma';
+import { requireEventPitchAccess } from '@/lib/eventManagementApi';
 import {
   getFrozenTopProjectIds,
   rankPitchProjectsForPitching,
-} from "@/lib/eventTopProjects";
+} from '@/lib/eventTopProjects';
 
-const EVENT_PHASES = ["VOTING", "PITCHING", "FINISHED"] as const;
+const EVENT_PHASES = ['VOTING', 'PITCHING', 'FINISHED'] as const;
 type PitchSessionPhaseTransition = (typeof EVENT_PHASES)[number];
 
-function isPitchSessionPhaseTransition(value: unknown): value is PitchSessionPhaseTransition {
-  return typeof value === "string" && EVENT_PHASES.includes(value as PitchSessionPhaseTransition);
+function isPitchSessionPhaseTransition(
+  value: unknown
+): value is PitchSessionPhaseTransition {
+  return (
+    typeof value === 'string' &&
+    EVENT_PHASES.includes(value as PitchSessionPhaseTransition)
+  );
 }
 
 export async function POST(
@@ -19,22 +24,34 @@ export async function POST(
   { params }: { params: { eventId: string } }
 ) {
   try {
-    const { pitchSession, response } = await requireEventPitchManager(params.eventId);
+    const { response } = await requireEventPitchAccess(params.eventId);
     if (response) return response;
-    if (!pitchSession) return new NextResponse("Pitch session not found", { status: 404 });
+    const pitchSession = await prisma.pitchSession.findFirst({
+      where: { eventId: params.eventId },
+    });
+    if (!pitchSession)
+      return new NextResponse('Pitch session not found', { status: 404 });
 
-    const body = (await req.json().catch(() => ({}))) as { targetPhase?: unknown };
+    const body = (await req.json().catch(() => ({}))) as {
+      targetPhase?: unknown;
+    };
     const targetPhase = body?.targetPhase;
 
     if (!isPitchSessionPhaseTransition(targetPhase)) {
-      return NextResponse.json({ message: "Valid targetPhase is required" }, { status: 400 });
+      return NextResponse.json(
+        { message: 'Valid targetPhase is required' },
+        { status: 400 }
+      );
     }
 
     if (targetPhase === pitchSession.phase) {
-      return NextResponse.json({ message: `Pitch session is already ${pitchSession.phase}` }, { status: 400 });
+      return NextResponse.json(
+        { message: `Pitch session is already ${pitchSession.phase}` },
+        { status: 400 }
+      );
     }
 
-    if (targetPhase === "FINISHED") {
+    if (targetPhase === 'FINISHED') {
       const updated = await prisma.pitchSession.update({
         where: { id: pitchSession.id },
         data: { phase: targetPhase },
@@ -43,7 +60,7 @@ export async function POST(
       return NextResponse.json(updated);
     }
 
-    if (targetPhase === "VOTING") {
+    if (targetPhase === 'VOTING') {
       await prisma.$transaction([
         prisma.pitchProject.updateMany({
           where: { pitchSessionId: pitchSession.id },
@@ -58,7 +75,7 @@ export async function POST(
       const updated = await prisma.pitchSession.findUnique({
         where: { id: pitchSession.id },
         include: {
-          projects: { orderBy: { position: "asc" } },
+          projects: { orderBy: { position: 'asc' } },
         },
       });
 
@@ -67,19 +84,19 @@ export async function POST(
 
     let ops: Prisma.PrismaPromise<unknown>[];
 
-    if (pitchSession.phase === "FINISHED") {
+    if (pitchSession.phase === 'FINISHED') {
       const ordered = await prisma.pitchProject.findMany({
         where: { pitchSessionId: pitchSession.id },
-        orderBy: { position: "asc" },
+        orderBy: { position: 'asc' },
       });
 
       ops = ordered.map((ep, idx) =>
         prisma.pitchProject.update({
           where: { id: ep.id },
           data: {
-            status: idx === 0 ? "CURRENT" : "APPROVED",
+            status: idx === 0 ? 'CURRENT' : 'APPROVED',
             approved: true,
-            pitchPhase: "WAITING",
+            pitchPhase: 'WAITING',
             presentingStartedAt: null,
             questionsStartedAt: null,
             completedAt: null,
@@ -94,11 +111,14 @@ export async function POST(
         include: {
           pitchVotes: { select: { id: true, value: true } },
         },
-        orderBy: { createdAt: "asc" },
+        orderBy: { createdAt: 'asc' },
       });
 
       const sorted = rankPitchProjectsForPitching(pitchProjects);
-      const topProjectIds = getFrozenTopProjectIds(sorted, pitchSession.topProjectCount);
+      const topProjectIds = getFrozenTopProjectIds(
+        sorted,
+        pitchSession.topProjectCount
+      );
 
       ops = sorted.map((ep, idx) => {
         const isTopProject = topProjectIds.has(ep.id);
@@ -106,10 +126,10 @@ export async function POST(
           where: { id: ep.id },
           data: {
             position: idx + 1,
-            status: idx === 0 ? "CURRENT" : "APPROVED",
+            status: idx === 0 ? 'CURRENT' : 'APPROVED',
             approved: true,
             isTopProject,
-            pitchPhase: "WAITING",
+            pitchPhase: 'WAITING',
             presentingStartedAt: null,
             questionsStartedAt: null,
             completedAt: null,
@@ -137,13 +157,13 @@ export async function POST(
     const updated = await prisma.pitchSession.findUnique({
       where: { id: pitchSession.id },
       include: {
-        projects: { orderBy: { position: "asc" } },
+        projects: { orderBy: { position: 'asc' } },
       },
     });
 
     return NextResponse.json(updated);
   } catch (error) {
-    console.error("[EVENT_TRANSITION_POST]", error);
-    return new NextResponse("Internal Error", { status: 500 });
+    console.error('[EVENT_TRANSITION_POST]', error);
+    return new NextResponse('Internal Error', { status: 500 });
   }
 }

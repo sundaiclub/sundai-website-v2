@@ -13,6 +13,44 @@ import {
 } from '@/app/components/PublicEventCard';
 import { getPublicEventBySlug } from '@/lib/publicEvents';
 
+type PublicMaterial = {
+  id: string;
+  kind: 'LINK' | 'FILE';
+  visibility: 'PUBLIC' | 'APPROVED_ATTENDEES' | 'ORGANIZERS_ONLY';
+  title: string;
+  description?: string | null;
+  externalUrl?: string | null;
+  isAvailable: boolean;
+  availableFrom?: string | Date | null;
+  availableUntil?: string | Date | null;
+};
+
+function currentlyAvailable(material: PublicMaterial, now: Date) {
+  if (!material.isAvailable) return false;
+  const from = material.availableFrom ? new Date(material.availableFrom) : null;
+  const until = material.availableUntil
+    ? new Date(material.availableUntil)
+    : null;
+  if (from && Number.isNaN(from.getTime())) return false;
+  if (until && Number.isNaN(until.getTime())) return false;
+  if (from && until && until <= from) return false;
+  if (from && now < from) return false;
+  if (until && now >= until) return false;
+  return true;
+}
+
+function publicMaterials(
+  materials: PublicMaterial[],
+  approved: boolean,
+  now = new Date()
+) {
+  return materials.filter(material => {
+    if (!currentlyAvailable(material, now)) return false;
+    if (material.visibility === 'PUBLIC') return true;
+    return material.visibility === 'APPROVED_ATTENDEES' && approved;
+  });
+}
+
 export default async function PublicEventDetailPage({
   params,
 }: {
@@ -36,6 +74,10 @@ export default async function PublicEventDetailPage({
         username: viewer.username,
       }
     : null;
+  const materials = publicMaterials(
+    (event as typeof event & { materials?: PublicMaterial[] }).materials ?? [],
+    event.viewerRegistrationStatus === 'APPROVED'
+  );
 
   return (
     <ManagementPage maxWidth="max-w-4xl">
@@ -100,6 +142,46 @@ export default async function PublicEventDetailPage({
       <div className="mt-5">
         <EventDetailSections event={event} viewerProfile={viewerProfile} />
       </div>
+
+      {materials.length > 0 && (
+        <div className="mt-5">
+          <ManagementSection title="Event materials">
+            <ul className="grid gap-3">
+              {materials.map(material => {
+                const href =
+                  material.kind === 'FILE'
+                    ? `/api/events/${event.id}/materials/${material.id}/content`
+                    : material.externalUrl;
+                if (
+                  !href ||
+                  (!href.startsWith('https://') && material.kind === 'LINK')
+                ) {
+                  return null;
+                }
+
+                return (
+                  <li key={material.id}>
+                    <a
+                      className="font-semibold underline underline-offset-4 hover:no-underline"
+                      href={href}
+                      {...(material.kind === 'LINK'
+                        ? { rel: 'noopener noreferrer' }
+                        : {})}
+                    >
+                      {material.title}
+                    </a>
+                    {material.description && (
+                      <p className="mt-1 text-sm text-gray-600">
+                        {material.description}
+                      </p>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </ManagementSection>
+        </div>
+      )}
     </ManagementPage>
   );
 }

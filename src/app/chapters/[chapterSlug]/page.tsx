@@ -49,6 +49,11 @@ export default function ChapterLandingPage({
   const [emailNotificationsEnabled, setEmailNotificationsEnabled] =
     useState(false);
   const [smsNotificationsEnabled, setSmsNotificationsEnabled] = useState(false);
+  const [smsConsentGranted, setSmsConsentGranted] = useState(false);
+  const smsConsentCopy = process.env.NEXT_PUBLIC_SMS_CONSENT_COPY?.trim() ?? '';
+  const smsConsentVersion =
+    process.env.NEXT_PUBLIC_SMS_CONSENT_VERSION?.trim() ?? '';
+  const smsConsentAvailable = Boolean(smsConsentCopy && smsConsentVersion);
 
   useEffect(() => {
     setDenied(false);
@@ -75,9 +80,16 @@ export default function ChapterLandingPage({
         setSmsNotificationsEnabled(
           Boolean(nextMembership?.smsNotificationsEnabled)
         );
+        setSmsConsentGranted(
+          Boolean(
+            nextMembership?.smsNotificationsEnabled &&
+              nextMembership.smsConsentAt &&
+              nextMembership.smsConsentVersion === smsConsentVersion
+          )
+        );
       })
       .catch(() => setLoadError('Unable to load chapter.'));
-  }, [params.chapterSlug]);
+  }, [params.chapterSlug, smsConsentVersion]);
 
   async function join() {
     if (!chapter) return;
@@ -189,6 +201,9 @@ export default function ChapterLandingPage({
           notificationsAllowed,
           emailNotificationsEnabled,
           smsNotificationsEnabled,
+          smsConsentGranted:
+            smsNotificationsEnabled && smsConsentGranted,
+          smsConsentVersion,
         }),
       });
       if (!response.ok) {
@@ -462,13 +477,40 @@ export default function ChapterLandingPage({
                   aria-label="SMS"
                   className={classes.checkbox}
                   checked={smsNotificationsEnabled}
-                  onChange={event =>
-                    setSmsNotificationsEnabled(event.target.checked)
-                  }
+                  disabled={!smsConsentAvailable}
+                  onChange={event => {
+                    setSmsNotificationsEnabled(event.target.checked);
+                    if (!event.target.checked) setSmsConsentGranted(false);
+                  }}
                   type="checkbox"
                 />
                 SMS
               </label>
+              {!smsConsentAvailable && (
+                <p className={`text-sm ${classes.mutedText}`} role="status">
+                  SMS notifications are unavailable until consent information
+                  is configured.
+                </p>
+              )}
+              {smsNotificationsEnabled && smsConsentAvailable && (
+                <div className={`${classes.subtlePanel} grid gap-2 p-3`}>
+                  <label className="flex items-start gap-3 text-sm">
+                    <input
+                      aria-label={smsConsentCopy}
+                      checked={smsConsentGranted}
+                      className={`${classes.checkbox} mt-0.5`}
+                      onChange={event =>
+                        setSmsConsentGranted(event.target.checked)
+                      }
+                      type="checkbox"
+                    />
+                    <span>{smsConsentCopy}</span>
+                  </label>
+                  <p className={`text-xs ${classes.mutedText}`}>
+                    Consent version {smsConsentVersion}
+                  </p>
+                </div>
+              )}
               <button
                 className={classes.primaryButton}
                 disabled={isActing}

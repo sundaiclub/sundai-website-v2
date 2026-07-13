@@ -329,6 +329,9 @@ describe('/api/events/[eventId]', () => {
         chapterId: 'chapter-boston',
       })
       .mockResolvedValueOnce({
+        chapterId: 'chapter-boston',
+      })
+      .mockResolvedValueOnce({
         id: 'evt-1',
         title: 'Updated Event',
         pitchSessions: [
@@ -415,6 +418,43 @@ describe('/api/events/[eventId]', () => {
     expect(body.pitchSessions[0].projects[0].allottedPresentingSec).toBe(150);
     expect(body.pitchSessions[0].projects[1].allottedPresentingSec).toBe(75);
   });
+
+  it.each([
+    ['MC', 'hacker-event-mc'],
+    ['CO_MC', 'hacker-event-co-mc'],
+  ])(
+    'PATCH denies an assigned %s changing event settings',
+    async (staffRole, hackerId) => {
+      mockAuth.mockReturnValue({ userId: `clerk-${staffRole.toLowerCase()}` });
+      prisma.hacker.findUnique.mockResolvedValue({
+        id: hackerId,
+        role: 'HACKER',
+      });
+      prisma.event.findUnique.mockResolvedValue({
+        id: 'evt-1',
+        chapterId: 'chapter-boston',
+      });
+      prisma.chapterMembership.findFirst.mockResolvedValue(null);
+      prisma.eventStaff.findFirst.mockResolvedValue({
+        id: `staff-${staffRole.toLowerCase()}`,
+        eventId: 'evt-1',
+        hackerId,
+        role: staffRole,
+      });
+
+      const response = await PATCH_EVENT(
+        new NextRequest('http://localhost:3000/api/events/evt-1', {
+          method: 'PATCH',
+          body: JSON.stringify({ title: 'Unauthorized title change' }),
+          headers: { 'content-type': 'application/json' },
+        }) as any,
+        { params: { eventId: 'evt-1' } } as any
+      );
+
+      expect(response.status).toBe(403);
+      expect(prisma.event.update).not.toHaveBeenCalled();
+    }
+  );
 
   it('DELETE rejects non-draft events', async () => {
     mockAuth.mockReturnValue({ userId: 'clerk-admin' });

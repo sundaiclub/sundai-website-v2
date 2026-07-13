@@ -29,15 +29,29 @@ jest.mock('../../src/lib/prisma', () => ({
   default: {
     hacker: {
       findUnique: jest.fn(),
+      findMany: jest.fn(),
     },
     chapterMembership: {
       findMany: jest.fn(),
+      findFirst: jest.fn(),
     },
     eventStaff: {
       findMany: jest.fn(),
+      findFirst: jest.fn(),
+    },
+    event: {
+      findUnique: jest.fn(),
     },
     eventRegistration: {
       findMany: jest.fn(),
+      findFirst: jest.fn(),
+      count: jest.fn(),
+    },
+    pitchProject: {
+      findFirst: jest.fn(),
+    },
+    userBan: {
+      findFirst: jest.fn(),
     },
     hackerOrganizerNote: {
       findUnique: jest.fn(),
@@ -45,6 +59,7 @@ jest.mock('../../src/lib/prisma', () => ({
       update: jest.fn(),
     },
     hackerOrganizerNoteRevision: {
+      findMany: jest.fn(),
       create: jest.fn(),
     },
     $transaction: jest.fn(),
@@ -54,8 +69,14 @@ jest.mock('../../src/lib/prisma', () => ({
 const prisma = require('../../src/lib/prisma').default;
 
 type OrganizerNoteRoute = {
-  GET: (req: Request, context: { params: { hackerId: string } }) => Promise<Response>;
-  PUT: (req: Request, context: { params: { hackerId: string } }) => Promise<Response>;
+  GET: (
+    req: Request,
+    context: { params: { hackerId: string } }
+  ) => Promise<Response>;
+  PUT: (
+    req: Request,
+    context: { params: { hackerId: string } }
+  ) => Promise<Response>;
 };
 
 type TargetRegistration = {
@@ -85,7 +106,7 @@ const mockHackerLookup = (...hackers: HackerFixture[]) => {
   prisma.hacker.findUnique.mockImplementation(async ({ where }: any) => {
     return (
       hackers.find(
-        (hacker) => where?.id === hacker.id || where?.clerkId === hacker.clerkId
+        hacker => where?.id === hacker.id || where?.clerkId === hacker.clerkId
       ) ?? null
     );
   });
@@ -116,25 +137,83 @@ const mockOrganizerNoteRelevance = ({
   targetRegistrations?: TargetRegistration[];
 }) => {
   mockActor(actor, target);
-  prisma.chapterMembership.findMany.mockImplementation(async ({ where }: any) => {
-    return memberships.filter((membership) => {
-      if (where?.hackerId && membership.hackerId !== where.hackerId) return false;
-      if (where?.role && membership.role !== where.role) return false;
-      if (typeof where?.status === 'string' && membership.status !== where.status) {
-        return false;
-      }
-      if (where?.status?.in && !where.status.in.includes(membership.status)) {
-        return false;
-      }
-      return true;
-    });
-  });
+  prisma.chapterMembership.findMany.mockImplementation(
+    async ({ where }: any) => {
+      return memberships.filter(membership => {
+        if (where?.hackerId && membership.hackerId !== where.hackerId)
+          return false;
+        if (where?.role && membership.role !== where.role) return false;
+        if (
+          typeof where?.status === 'string' &&
+          membership.status !== where.status
+        ) {
+          return false;
+        }
+        if (where?.status?.in && !where.status.in.includes(membership.status)) {
+          return false;
+        }
+        return true;
+      });
+    }
+  );
+  prisma.chapterMembership.findFirst.mockImplementation(
+    async ({ where }: any) =>
+      memberships.find(membership => {
+        if (where?.chapterId && membership.chapterId !== where.chapterId)
+          return false;
+        if (where?.hackerId && membership.hackerId !== where.hackerId)
+          return false;
+        if (where?.role && membership.role !== where.role) return false;
+        if (
+          typeof where?.status === 'string' &&
+          membership.status !== where.status
+        ) {
+          return false;
+        }
+        if (where?.status?.in && !where.status.in.includes(membership.status)) {
+          return false;
+        }
+        return true;
+      }) ?? null
+  );
   prisma.eventStaff.findMany.mockImplementation(async ({ where }: any) =>
-    assignedStaff.filter((staff) => !where?.hackerId || staff.hackerId === where.hackerId)
+    assignedStaff.filter(
+      staff => !where?.hackerId || staff.hackerId === where.hackerId
+    )
   );
-  prisma.eventRegistration.findMany.mockImplementation(async ({ where }: any) =>
-    where?.hackerId === target.id ? targetRegistrations : []
+  prisma.eventStaff.findFirst.mockImplementation(
+    async ({ where }: any) =>
+      assignedStaff.find(
+        staff =>
+          (!where?.eventId || staff.eventId === where.eventId) &&
+          (!where?.hackerId || staff.hackerId === where.hackerId)
+      ) ?? null
   );
+  prisma.eventRegistration.findMany.mockImplementation(
+    async ({ where }: any) =>
+      where?.hackerId === target.id ? targetRegistrations : []
+  );
+  prisma.eventRegistration.findFirst.mockImplementation(
+    async ({ where }: any) =>
+      targetRegistrations.find(
+        registration =>
+          (!where?.eventId || registration.eventId === where.eventId) &&
+          (!where?.event?.chapterId ||
+            registration.event.chapterId === where.event.chapterId)
+      ) ?? null
+  );
+  prisma.event.findUnique.mockImplementation(async ({ where }: any) => {
+    const scopedStaff = assignedStaff.find(staff => staff.eventId === where.id);
+    const scopedRegistration = targetRegistrations.find(
+      registration => registration.eventId === where.id
+    );
+    if (!scopedStaff && !scopedRegistration) return null;
+    return {
+      id: where.id,
+      chapterId:
+        scopedStaff?.event.chapterId ?? scopedRegistration?.event.chapterId,
+    };
+  });
 };
 
 const expectReadAndUpdateAllowed = async ({
@@ -143,12 +222,14 @@ const expectReadAndUpdateAllowed = async ({
   memberships,
   assignedStaff,
   targetRegistrations,
+  scope,
 }: {
   actor: HackerFixture;
   target: HackerFixture;
   memberships?: ChapterMembershipFixture[];
   assignedStaff?: Array<EventStaffFixture & { event: { chapterId: string } }>;
   targetRegistrations?: TargetRegistration[];
+  scope: { eventId?: string; chapterId?: string };
 }) => {
   const { GET, PUT } = loadOrganizerNoteRoute();
   const currentNote = buildOrganizerNote({
@@ -176,10 +257,13 @@ const expectReadAndUpdateAllowed = async ({
   prisma.hackerOrganizerNote.findUnique.mockResolvedValue(currentNote);
   prisma.hackerOrganizerNote.update.mockResolvedValue(updatedNote);
   prisma.hackerOrganizerNoteRevision.create.mockResolvedValue(revision);
-  prisma.$transaction.mockImplementation(async (operation: any) => operation(prisma));
+  prisma.$transaction.mockImplementation(async (operation: any) =>
+    operation(prisma)
+  );
 
+  const query = new URLSearchParams(scope as Record<string, string>).toString();
   const getResponse = await GET(
-    createJsonRequest(`/api/hackers/${target.id}/organizer-note`, {
+    createJsonRequest(`/api/hackers/${target.id}/organizer-note?${query}`, {
       method: 'GET',
     }) as any,
     createRouteContext({ hackerId: target.id }) as any
@@ -196,7 +280,7 @@ const expectReadAndUpdateAllowed = async ({
   });
 
   const putResponse = await PUT(
-    createJsonRequest(`/api/hackers/${target.id}/organizer-note`, {
+    createJsonRequest(`/api/hackers/${target.id}/organizer-note?${query}`, {
       method: 'PUT',
       body: { body: updatedNote.body },
     }) as any,
@@ -239,13 +323,15 @@ const expectReadAndUpdateDenied = async ({
   memberships = [],
   assignedStaff = [],
   targetRegistrations = [],
+  scope,
 }: {
   actor: HackerFixture | null;
   target: HackerFixture;
-  expectedStatus: 401 | 403;
+  expectedStatus: 400 | 401 | 403;
   memberships?: ChapterMembershipFixture[];
   assignedStaff?: Array<EventStaffFixture & { event: { chapterId: string } }>;
   targetRegistrations?: TargetRegistration[];
+  scope?: { eventId?: string; chapterId?: string };
 }) => {
   const { GET, PUT } = loadOrganizerNoteRoute();
   const currentNote = buildOrganizerNote({ hackerId: target.id });
@@ -263,16 +349,21 @@ const expectReadAndUpdateDenied = async ({
     mockHackerLookup(target);
   }
   prisma.hackerOrganizerNote.findUnique.mockResolvedValue(currentNote);
-  prisma.$transaction.mockImplementation(async (operation: any) => operation(prisma));
+  prisma.$transaction.mockImplementation(async (operation: any) =>
+    operation(prisma)
+  );
 
+  const query = scope
+    ? `?${new URLSearchParams(scope as Record<string, string>).toString()}`
+    : '';
   const getResponse = await GET(
-    createJsonRequest(`/api/hackers/${target.id}/organizer-note`, {
+    createJsonRequest(`/api/hackers/${target.id}/organizer-note${query}`, {
       method: 'GET',
     }) as any,
     createRouteContext({ hackerId: target.id }) as any
   );
   const putResponse = await PUT(
-    createJsonRequest(`/api/hackers/${target.id}/organizer-note`, {
+    createJsonRequest(`/api/hackers/${target.id}/organizer-note${query}`, {
       method: 'PUT',
       body: { body: 'Denied update.' },
     }) as any,
@@ -290,21 +381,34 @@ describe('/api/hackers/[hackerId]/organizer-note', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     resetClerkMocks();
+    prisma.userBan.findFirst.mockResolvedValue(null);
   });
 
   it('allows a site admin to read and update a current organizer note', async () => {
+    const target = buildHacker({
+      id: 'hacker-note-target',
+      clerkId: 'clerk-note-target',
+    });
     await expectReadAndUpdateAllowed({
       actor: buildSiteAdmin(),
-      target: buildHacker({
-        id: 'hacker-note-target',
-        clerkId: 'clerk-note-target',
-      }),
+      target,
+      memberships: [
+        buildChapterMembership({
+          chapterId: 'chapter-boston',
+          hackerId: target.id,
+          status: 'ACTIVE',
+        }),
+      ],
+      scope: { chapterId: 'chapter-boston' },
     });
   });
 
   it('allows a relevant chapter admin to read and update a current organizer note', async () => {
-    const { chapter, hacker: chapterAdmin, membership: adminMembership } =
-      buildChapterAdminFixture();
+    const {
+      chapter,
+      hacker: chapterAdmin,
+      membership: adminMembership,
+    } = buildChapterAdminFixture();
     const target = buildHacker({
       id: 'hacker-note-target',
       clerkId: 'clerk-note-target',
@@ -320,6 +424,7 @@ describe('/api/hackers/[hackerId]/organizer-note', () => {
       actor: chapterAdmin,
       target,
       memberships: [adminMembership, targetMembership],
+      scope: { chapterId: chapter.id },
     });
   });
 
@@ -340,6 +445,7 @@ describe('/api/hackers/[hackerId]/organizer-note', () => {
           event: { chapterId: 'chapter-boston' },
         },
       ],
+      scope: { eventId: staff.eventId },
     });
   });
 
@@ -360,6 +466,7 @@ describe('/api/hackers/[hackerId]/organizer-note', () => {
           event: { chapterId: 'chapter-boston' },
         },
       ],
+      scope: { eventId: staff.eventId },
     });
   });
 
@@ -375,6 +482,7 @@ describe('/api/hackers/[hackerId]/organizer-note', () => {
         clerkId: 'clerk-note-target',
       }),
       expectedStatus: 403,
+      scope: { chapterId: 'chapter-boston' },
     });
   });
 
@@ -387,5 +495,234 @@ describe('/api/hackers/[hackerId]/organizer-note', () => {
       }),
       expectedStatus: 401,
     });
+  });
+
+  it('rejects authenticated organizer-note calls without an explicit scope', async () => {
+    await expectReadAndUpdateDenied({
+      actor: buildSiteAdmin(),
+      target: buildHacker({
+        id: 'hacker-note-target',
+        clerkId: 'clerk-note-target',
+      }),
+      expectedStatus: 400,
+    });
+  });
+});
+
+type EventNoteCollectionRoute = {
+  GET: (
+    request: Request,
+    context: { params: { eventId: string } }
+  ) => Promise<Response>;
+};
+
+type EventNoteRoute = {
+  GET: (
+    request: Request,
+    context: { params: { eventId: string; hackerId: string } }
+  ) => Promise<Response>;
+  PUT: (
+    request: Request,
+    context: { params: { eventId: string; hackerId: string } }
+  ) => Promise<Response>;
+};
+
+function loadEventNoteCollectionRoute(): EventNoteCollectionRoute {
+  try {
+    return require('../../src/app/api/events/[eventId]/notes/route');
+  } catch (error) {
+    throw new Error(
+      `Expected event-scoped organizer-note list route: ${String(error)}`
+    );
+  }
+}
+
+function loadEventNoteRoute(): EventNoteRoute {
+  try {
+    return require('../../src/app/api/events/[eventId]/notes/[hackerId]/route');
+  } catch (error) {
+    throw new Error(
+      `Expected event-scoped organizer-note current route: ${String(error)}`
+    );
+  }
+}
+
+function loadEventNoteRevisionsRoute(): Pick<EventNoteRoute, 'GET'> {
+  try {
+    return require('../../src/app/api/events/[eventId]/notes/[hackerId]/revisions/route');
+  } catch (error) {
+    throw new Error(
+      `Expected event-scoped organizer-note revisions route: ${String(error)}`
+    );
+  }
+}
+
+describe('/api/events/[eventId]/notes', () => {
+  const eventId = 'event-boston-ai-build-night';
+  const target = buildHacker({
+    id: 'hacker-event-note-target',
+    clerkId: 'clerk-event-note-target',
+    name: 'Ada Builder',
+  });
+
+  function mockEventActor(
+    actor: HackerFixture,
+    role: 'MC' | 'CO_MC' = 'MC',
+    assigned = true
+  ) {
+    mockActor(actor, target);
+    prisma.event.findUnique.mockResolvedValue({
+      id: eventId,
+      chapterId: 'chapter-boston',
+      staff: assigned ? [{ role }] : [],
+    });
+    prisma.chapterMembership.findFirst.mockResolvedValue(null);
+    prisma.eventStaff.findFirst.mockResolvedValue(
+      assigned ? { eventId, hackerId: actor.id, role } : null
+    );
+    prisma.eventRegistration.findFirst.mockResolvedValue({
+      id: 'registration-event-note-target',
+      eventId,
+      hackerId: target.id,
+      status: 'APPROVED',
+    });
+    prisma.pitchProject.findFirst.mockResolvedValue(null);
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    resetClerkMocks();
+    prisma.userBan.findFirst.mockResolvedValue(null);
+    prisma.$transaction.mockImplementation(async (operation: any) =>
+      operation(prisma)
+    );
+  });
+
+  it('lists and searches only hackers relevant to the active event', async () => {
+    const { hacker: mc } = buildEventStaffFixture({
+      staff: { eventId },
+    });
+    const note = buildOrganizerNote({ hackerId: target.id });
+    mockEventActor(mc);
+    prisma.hacker.findMany.mockResolvedValue([
+      { ...target, organizerNote: note },
+    ]);
+    prisma.eventRegistration.findMany.mockResolvedValue([
+      { eventId, hackerId: target.id, hacker: target },
+    ]);
+
+    const { GET } = loadEventNoteCollectionRoute();
+    const response = await GET(
+      createJsonRequest(`/api/events/${eventId}/notes?search=Ada`, {
+        method: 'GET',
+      }) as any,
+      createRouteContext({ eventId }) as any
+    );
+    const body = await response.json();
+    const rows = Array.isArray(body) ? body : (body.items ?? body.rows);
+
+    expect(response.status).toBe(200);
+    expect(rows).toEqual([
+      expect.objectContaining({
+        hacker: expect.objectContaining({ id: target.id, name: 'Ada Builder' }),
+        note: expect.objectContaining({ body: note.body }),
+      }),
+    ]);
+    expect(JSON.stringify(body)).not.toContain('hacker-unrelated');
+  });
+
+  it('reads the current shared note only for a hacker relevant to this event', async () => {
+    const { hacker: mc } = buildEventStaffFixture({ staff: { eventId } });
+    const note = buildOrganizerNote({ hackerId: target.id });
+    mockEventActor(mc);
+    prisma.hackerOrganizerNote.findUnique.mockResolvedValue(note);
+
+    const { GET } = loadEventNoteRoute();
+    const response = await GET(
+      createJsonRequest(`/api/events/${eventId}/notes/${target.id}`, {
+        method: 'GET',
+      }) as any,
+      createRouteContext({ eventId, hackerId: target.id }) as any
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      note: expect.objectContaining({ hackerId: target.id, body: note.body }),
+    });
+  });
+
+  it('updates the shared current note and revision in one transaction', async () => {
+    const { hacker: mc } = buildEventStaffFixture({ staff: { eventId } });
+    const existing = buildOrganizerNote({ hackerId: target.id });
+    const updated = buildOrganizerNote({
+      ...existing,
+      body: 'Needs a quiet demo station.',
+      updatedById: mc.id,
+    });
+    mockEventActor(mc);
+    prisma.hackerOrganizerNote.findUnique.mockResolvedValue(existing);
+    prisma.hackerOrganizerNote.update.mockResolvedValue(updated);
+    prisma.hackerOrganizerNoteRevision.create.mockResolvedValue(
+      buildOrganizerNoteRevision({
+        noteId: existing.id,
+        hackerId: target.id,
+        editedById: mc.id,
+      })
+    );
+
+    const { PUT } = loadEventNoteRoute();
+    const response = await PUT(
+      createJsonRequest(`/api/events/${eventId}/notes/${target.id}`, {
+        method: 'PUT',
+        body: { body: updated.body },
+      }) as any,
+      createRouteContext({ eventId, hackerId: target.id }) as any
+    );
+
+    expect(response.status).toBe(200);
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(prisma.hackerOrganizerNote.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          body: updated.body,
+          updatedById: mc.id,
+        }),
+      })
+    );
+    expect(prisma.hackerOrganizerNoteRevision.create).toHaveBeenCalled();
+  });
+
+  it('denies revision history to an assigned co-MC', async () => {
+    const { hacker: coMc } = buildCoMcFixture({ staff: { eventId } });
+    mockEventActor(coMc, 'CO_MC');
+
+    const { GET } = loadEventNoteRevisionsRoute();
+    const response = await GET(
+      createJsonRequest(`/api/events/${eventId}/notes/${target.id}/revisions`, {
+        method: 'GET',
+      }) as any,
+      createRouteContext({ eventId, hackerId: target.id }) as any
+    );
+
+    expect(response.status).toBe(403);
+    expect(prisma.hackerOrganizerNoteRevision.findMany).not.toHaveBeenCalled();
+  });
+
+  it('denies the next scoped read immediately after event staff is removed', async () => {
+    const { hacker: removedMc } = buildEventStaffFixture({
+      staff: { eventId },
+    });
+    mockEventActor(removedMc, 'MC', false);
+
+    const { GET } = loadEventNoteRoute();
+    const response = await GET(
+      createJsonRequest(`/api/events/${eventId}/notes/${target.id}`, {
+        method: 'GET',
+      }) as any,
+      createRouteContext({ eventId, hackerId: target.id }) as any
+    );
+
+    expect(response.status).toBe(403);
+    expect(prisma.hackerOrganizerNote.findUnique).not.toHaveBeenCalled();
   });
 });

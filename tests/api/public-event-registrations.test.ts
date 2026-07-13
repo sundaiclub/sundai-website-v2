@@ -709,4 +709,49 @@ describe('POST /api/events/[eventId]/registrations/me/cancel', () => {
       })
     );
   });
+
+  it('redacts organizer notes and revisions from attendee registration responses', async () => {
+    const fixture = buildNativeEventRsvpFixture();
+    const registrationWithPrivateNotes = {
+      ...buildEventRegistration({
+        id: 'registration-private-note-sentinel',
+        eventId: fixture.publishedEvent.id,
+        hackerId: fixture.applicant.id,
+        status: 'APPROVED',
+        submittedAt,
+        createdAt: submittedAt,
+        updatedAt: submittedAt,
+      }),
+      organizerNote: { body: 'PRIVATE REGISTRATION NOTE SENTINEL' },
+      organizerNoteRevisions: [
+        { patchText: 'PRIVATE REGISTRATION REVISION SENTINEL' },
+      ],
+      internalReviewNotes: 'PRIVATE INTERNAL REVIEW SENTINEL',
+    } as EventRegistrationFixture;
+
+    mockAuthenticatedClerk({ userId: fixture.applicant.clerkId });
+    mockHackerLookup(fixture.applicant);
+    prisma.event.findFirst.mockResolvedValue({
+      ...fixture.publishedEvent,
+      chapter: fixture.publicChapter,
+      _count: { registrations: 1 },
+    });
+    prisma.chapterMembership.findFirst.mockResolvedValue(null);
+    prisma.eventStaff.findFirst.mockResolvedValue(null);
+    prisma.eventRegistration.findFirst.mockResolvedValue(
+      registrationWithPrivateNotes
+    );
+
+    const response = await GET_EVENT(
+      createJsonRequest(`/api/events/${fixture.publishedEvent.id}`) as any,
+      createRouteContext({ eventId: fixture.publishedEvent.id })
+    );
+    const serialized = JSON.stringify(await response.json());
+
+    expect(response.status).toBe(200);
+    expect(serialized).not.toContain('PRIVATE REGISTRATION NOTE SENTINEL');
+    expect(serialized).not.toContain('PRIVATE REGISTRATION REVISION SENTINEL');
+    expect(serialized).not.toContain('PRIVATE INTERNAL REVIEW SENTINEL');
+    expect(serialized).not.toMatch(/organizerNote|noteRevisions/i);
+  });
 });

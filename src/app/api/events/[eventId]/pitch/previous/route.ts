@@ -1,18 +1,25 @@
-import { NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
-import { requireEventPitchManager } from "@/lib/eventManagementApi";
+import { NextResponse } from 'next/server';
+import prisma from '@/lib/prisma';
+import { requireEventPitchAccess } from '@/lib/eventManagementApi';
 
 export async function POST(
   req: Request,
   { params }: { params: { eventId: string } }
 ) {
   try {
-    const { pitchSession, response } = await requireEventPitchManager(params.eventId);
+    const { response } = await requireEventPitchAccess(params.eventId);
     if (response) return response;
-    if (!pitchSession) return new NextResponse("Pitch session not found", { status: 404 });
+    const pitchSession = await prisma.pitchSession.findFirst({
+      where: { eventId: params.eventId },
+    });
+    if (!pitchSession)
+      return new NextResponse('Pitch session not found', { status: 404 });
 
-    if (pitchSession.phase !== "PITCHING") {
-      return NextResponse.json({ message: "Can only go previous during PITCHING phase" }, { status: 400 });
+    if (pitchSession.phase !== 'PITCHING') {
+      return NextResponse.json(
+        { message: 'Can only go previous during PITCHING phase' },
+        { status: 400 }
+      );
     }
 
     const ordered = await prisma.pitchProject.findMany({
@@ -25,33 +32,62 @@ export async function POST(
       // No current: prefer last DONE/SKIPPED; if none, pick last APPROVED/QUEUED
       let targetIdx = -1;
       for (let i = ordered.length - 1; i >= 0; i--) {
-        if (ordered[i].status === 'DONE' || ordered[i].status === 'SKIPPED') { targetIdx = i; break; }
+        if (ordered[i].status === 'DONE' || ordered[i].status === 'SKIPPED') {
+          targetIdx = i;
+          break;
+        }
       }
       if (targetIdx === -1) {
         for (let i = ordered.length - 1; i >= 0; i--) {
-          if (ordered[i].status === 'APPROVED' || ordered[i].status === 'QUEUED') { targetIdx = i; break; }
+          if (
+            ordered[i].status === 'APPROVED' ||
+            ordered[i].status === 'QUEUED'
+          ) {
+            targetIdx = i;
+            break;
+          }
         }
       }
       if (targetIdx === -1) return new NextResponse(null, { status: 204 });
-      await prisma.pitchProject.update({ where: { id: ordered[targetIdx].id }, data: { status: 'CURRENT' } });
+      await prisma.pitchProject.update({
+        where: { id: ordered[targetIdx].id },
+        data: { status: 'CURRENT' },
+      });
     } else {
       // Find nearest previous item (DONE/SKIPPED/APPROVED/QUEUED) and make it CURRENT
       let prevIdx = -1;
       for (let i = currentIdx - 1; i >= 0; i--) {
         const st = ordered[i].status as string;
-        if (st === 'DONE' || st === 'SKIPPED' || st === 'APPROVED' || st === 'QUEUED') { prevIdx = i; break; }
+        if (
+          st === 'DONE' ||
+          st === 'SKIPPED' ||
+          st === 'APPROVED' ||
+          st === 'QUEUED'
+        ) {
+          prevIdx = i;
+          break;
+        }
       }
       if (prevIdx === -1) return new NextResponse(null, { status: 204 });
       await prisma.$transaction([
-        prisma.pitchProject.update({ where: { id: ordered[currentIdx].id }, data: { status: 'APPROVED' } }),
-        prisma.pitchProject.update({ where: { id: ordered[prevIdx].id }, data: { status: 'CURRENT', approved: true } }),
+        prisma.pitchProject.update({
+          where: { id: ordered[currentIdx].id },
+          data: { status: 'APPROVED' },
+        }),
+        prisma.pitchProject.update({
+          where: { id: ordered[prevIdx].id },
+          data: { status: 'CURRENT', approved: true },
+        }),
       ]);
     }
 
-    const updated = await prisma.pitchSession.findUnique({ where: { id: pitchSession.id }, include: { projects: { orderBy: { position: 'asc' } } } });
+    const updated = await prisma.pitchSession.findUnique({
+      where: { id: pitchSession.id },
+      include: { projects: { orderBy: { position: 'asc' } } },
+    });
     return NextResponse.json(updated);
   } catch (error) {
-    console.error("[EVENT_PREVIOUS_POST]", error);
-    return new NextResponse("Internal Error", { status: 500 });
+    console.error('[EVENT_PREVIOUS_POST]', error);
+    return new NextResponse('Internal Error', { status: 500 });
   }
 }

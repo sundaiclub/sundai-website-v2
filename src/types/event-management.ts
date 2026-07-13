@@ -104,6 +104,8 @@ export type ChapterMembershipSummary = Pick<
   | 'notificationsAllowed'
   | 'emailNotificationsEnabled'
   | 'smsNotificationsEnabled'
+  | 'smsConsentAt'
+  | 'smsConsentVersion'
 > & {
   hacker?: Pick<EventManagementHackerSummary, 'id' | 'name' | 'email' | 'role'>;
   invitedBy?: Pick<
@@ -208,11 +210,21 @@ export interface ChapterMembership {
   notificationsAllowed: boolean;
   emailNotificationsEnabled: boolean;
   smsNotificationsEnabled: boolean;
+  smsConsentAt?: ISODateTimeString | Date | null;
+  smsConsentVersion?: string | null;
   notificationPreferencesJson?: JsonObject | null;
   createdAt: ISODateTimeString | Date;
   updatedAt: ISODateTimeString | Date;
   hacker?: EventManagementHackerSummary;
   chapter?: Pick<Chapter, 'id' | 'name' | 'slug' | 'accessMode' | 'status'>;
+}
+
+export interface ChapterNotificationPreferenceInput {
+  notificationsAllowed?: boolean;
+  emailNotificationsEnabled?: boolean;
+  smsNotificationsEnabled?: boolean;
+  smsConsentGranted?: boolean;
+  notificationPreferencesJson?: JsonObject | null;
 }
 
 interface EventStaff {
