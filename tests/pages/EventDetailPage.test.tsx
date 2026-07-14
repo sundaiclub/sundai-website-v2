@@ -736,11 +736,40 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
       ).toBeEnabled();
     });
 
+    it('prefills only prior answers enabled for reuse', async () => {
+      const event = buildApplicationEvent();
+      const composedFields = event.applicationQuestionSet.composedFields.map(
+        field => ({
+          ...field,
+          reusePreviousAnswer: field.id === 'project',
+        })
+      );
+
+      await renderDetailPage({
+        ...event,
+        reusableAnswersJson: {
+          project: 'Answer from my previous application',
+          chapterGoals: 'This answer should not be reused',
+        },
+        applicationQuestionSet: {
+          ...event.applicationQuestionSet,
+          composedFields,
+        },
+      });
+
+      await openRegistrationForm();
+
+      expect(screen.getByLabelText(/project idea/i)).toHaveValue(
+        'Answer from my previous application'
+      );
+      expect(screen.getByLabelText(/chapter goals/i)).toHaveValue('');
+    });
+
     it('renders boolean application questions as checkboxes', async () => {
       const event = buildApplicationEvent();
       const checkboxField = applicationField('eventGuidelines', {
         label: 'I agree to the event guidelines',
-        type: 'BOOLEAN',
+        type: 'CHECKBOX',
         required: true,
         order: event.applicationQuestionSet.composedFields.length,
       });

@@ -1453,7 +1453,7 @@ function isAnswerTypeValid(
   value: JsonValue | undefined
 ): boolean {
   switch (field.type) {
-    case 'BOOLEAN':
+    case 'CHECKBOX':
       return typeof value === 'boolean';
     case 'MULTI_SELECT':
       return (

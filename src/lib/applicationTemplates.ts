@@ -21,7 +21,7 @@ const TEMPLATE_FIELD_TYPES: readonly TemplateFieldType[] = [
   'PHONE',
   'URL',
   'NUMBER',
-  'BOOLEAN',
+  'CHECKBOX',
   'SELECT',
   'MULTI_SELECT',
   'DATE',
@@ -54,6 +54,7 @@ type ApplicationTemplateValidationIssueCode =
   | 'FIELD_LABEL_REQUIRED'
   | 'FIELD_TYPE_INVALID'
   | 'FIELD_REQUIRED_INVALID'
+  | 'FIELD_REUSE_PREVIOUS_ANSWER_INVALID'
   | 'FIELD_SITE_REQUIRED_INVALID'
   | 'FIELD_ORDER_INVALID'
   | 'FIELD_OPTIONS_REQUIRED'
@@ -181,6 +182,17 @@ function validateApplicationTemplateFields(
       issues.push({
         code: 'FIELD_REQUIRED_INVALID',
         message: `Field "${fieldLabel}" must include a boolean required flag.`,
+        fieldId: fieldId || undefined,
+      });
+    }
+
+    if (
+      field.reusePreviousAnswer !== undefined &&
+      typeof field.reusePreviousAnswer !== 'boolean'
+    ) {
+      issues.push({
+        code: 'FIELD_REUSE_PREVIOUS_ANSWER_INVALID',
+        message: `Field "${fieldLabel}" must use a boolean reusePreviousAnswer flag.`,
         fieldId: fieldId || undefined,
       });
     }
@@ -687,7 +699,7 @@ function isBlankApplicationAnswer(
     return value.length === 0;
   }
 
-  if (fieldType === 'BOOLEAN') {
+  if (fieldType === 'CHECKBOX') {
     return typeof value !== 'boolean';
   }
 
@@ -787,6 +799,10 @@ function coerceTemplateField(value: unknown): TemplateFieldDefinition {
         ? (value.type as TemplateFieldType)
         : ('' as TemplateFieldType),
     required: value.required as boolean,
+    reusePreviousAnswer:
+      value.reusePreviousAnswer === undefined
+        ? undefined
+        : (value.reusePreviousAnswer as boolean),
     siteRequired:
       value.siteRequired === undefined
         ? undefined

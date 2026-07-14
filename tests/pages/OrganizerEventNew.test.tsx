@@ -287,7 +287,7 @@ describe('/organizer/events/new', () => {
     expect(screen.getByLabelText(/custom question label/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/custom question type/i)).toBeInTheDocument();
     expect(screen.getByRole('option', { name: /checkbox/i })).toHaveValue(
-      'BOOLEAN'
+      'CHECKBOX'
     );
     expect(
       screen.getByRole('button', { name: /add custom question/i })
@@ -370,6 +370,7 @@ describe('/organizer/events/new', () => {
 
     fillRequiredEventFields();
     fireEvent.click(screen.getByRole('button', { name: /change time/i }));
+    expect(screen.getByRole('dialog')).toHaveClass('!bg-white');
     changeControl(/start time of day/i, '18:00');
     changeControl(/end time of day/i, '21:00');
     fireEvent.click(screen.getByRole('button', { name: /done/i }));
@@ -553,19 +554,50 @@ describe('/organizer/events/new', () => {
     });
   });
 
-  it('submits checkbox custom questions as boolean fields', async () => {
+  it('submits checkbox custom questions as checkbox fields', async () => {
     await renderNewEventPage();
 
     fillRequiredEventFields();
-    addCustomQuestion('I agree to the event guidelines', 'BOOLEAN', true);
+    addCustomQuestion('I agree to the event guidelines', 'CHECKBOX', true);
+
+    expect(
+      screen.getByLabelText(
+        /drag application question i agree to the event guidelines/i
+      )
+    ).toHaveTextContent('Checkbox');
+    expect(screen.queryByText('BOOLEAN')).not.toBeInTheDocument();
+
     fireEvent.click(screen.getByRole('button', { name: /save draft/i }));
 
     await waitFor(() => {
       expect(latestFetchBody().applicationQuestionsJson).toEqual([
         expect.objectContaining({
           label: 'I agree to the event guidelines',
-          type: 'BOOLEAN',
+          type: 'CHECKBOX',
           required: true,
+        }),
+      ]);
+    });
+  });
+
+  it('lets custom questions opt into reusing a previous answer', async () => {
+    await renderNewEventPage();
+
+    fillRequiredEventFields();
+    changeControl(/custom question label/i, 'What do you want to build?');
+    fireEvent.click(
+      screen.getByLabelText(/reuse previous answer for custom question/i)
+    );
+    fireEvent.click(
+      screen.getByRole('button', { name: /add custom question/i })
+    );
+    fireEvent.click(screen.getByRole('button', { name: /save draft/i }));
+
+    await waitFor(() => {
+      expect(latestFetchBody().applicationQuestionsJson).toEqual([
+        expect.objectContaining({
+          label: 'What do you want to build?',
+          reusePreviousAnswer: true,
         }),
       ]);
     });

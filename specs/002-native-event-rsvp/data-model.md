@@ -88,6 +88,8 @@ Site and chapter application field definitions from Phase 1.
 - Site-required fields cannot be removed or weakened.
 - Event-level fields cannot override site-required fields.
 - Server validates required fields against the submitted snapshot.
+- Each JSON field definition may set `reusePreviousAnswer: true`; omitted or false disables cross-event answer reuse for that question.
+- Reuse matches the current question ID to the latest nonblank answer in the applicant's prior event registrations. Current-event answers take precedence.
 
 ### EventRegistration
 

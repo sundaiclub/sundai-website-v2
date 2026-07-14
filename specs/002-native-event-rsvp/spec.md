@@ -170,6 +170,7 @@ Organizers can manually close applications, manage approved capacity, place appl
 - **FR-044**: The system MUST include validation coverage for public event visibility, approved-only details, chapter-admin publishing, MC/co-MC review permissions, user cancellation, pending-answer edits, answer locks after decision, waitlist auto-promotion behavior, manual application closure, default approval-required mode, ban filtering, and application composition order.
 - **FR-045**: When an applicant is approved or declined, the system MUST send the public-safe decision message through AWS SES email and/or Twilio SMS only when the applicant has an active membership in the event's chapter, has allowed notifications, has enabled that channel, and has a usable contact value.
 - **FR-046**: Email or SMS delivery failure MUST NOT roll back or change the applicant's committed registration status or audit history.
+- **FR-047**: Every template and event-level application question MUST let its author opt into reusing a prior answer. A new application MUST prefill opted-in questions from the signed-in applicant's latest nonblank answer with the same question ID, MUST leave questions without the setting unfilled by application history, and MUST prefer answers already saved for the current event.
 
 ### Key Entities *(include if feature involves data)*
 

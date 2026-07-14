@@ -184,6 +184,9 @@ const matchesEventWhere = (event: EventFixture, where: any = {}) => {
   if (where.startTime?.gte && event.startTime < where.startTime.gte) {
     return false;
   }
+  if (where.startTime?.lt && event.startTime >= where.startTime.lt) {
+    return false;
+  }
   return true;
 };
 
@@ -632,7 +635,7 @@ describe('chapter visibility API', () => {
     );
   });
 
-  it('returns only upcoming published public event summaries on chapter details', async () => {
+  it('returns upcoming and previous published public event summaries on chapter details', async () => {
     const publicChapter = buildChapter({ id: 'chapter-boston', slug: 'boston' });
     const publishedFutureEvent = buildPublishedEvent({
       id: 'event-boston-next-build-night',
@@ -706,6 +709,16 @@ describe('chapter visibility API', () => {
         return publicChapter;
       }
     );
+    prisma.event.findMany.mockImplementation(
+      async ({ where, orderBy, select }: any) => {
+        const matchingEvents = events
+          .filter((event) => matchesEventWhere(event, where))
+          .sort((a, b) => a.startTime.getTime() - b.startTime.getTime());
+
+        if (orderBy?.startTime === 'desc') matchingEvents.reverse();
+        return matchingEvents.map((event) => selectEventSummary(event, select));
+      }
+    );
 
     const response = await GET_CHAPTER(
       createJsonRequest('/api/chapters/boston') as any,
@@ -731,6 +744,16 @@ describe('chapter visibility API', () => {
     expect(body.upcomingEvents.map((event: any) => event.id)).not.toContain(
       pastPublishedEvent.id
     );
+    expect(body.previousEvents).toEqual([
+      expect.objectContaining({
+        id: pastPublishedEvent.id,
+        title: pastPublishedEvent.title,
+        slug: pastPublishedEvent.slug,
+        publicLocation: pastPublishedEvent.publicLocation,
+      }),
+    ]);
+    expect(body.previousEvents[0]).not.toHaveProperty('status');
+    expect(body.previousEvents[0]).not.toHaveProperty('visibility');
     expect(body.upcomingEvents[0]).not.toHaveProperty('status');
     expect(body.upcomingEvents[0]).not.toHaveProperty('visibility');
     expect(body.upcomingEvents[0]).not.toHaveProperty('approvedDetailsJson');
@@ -805,7 +828,12 @@ describe('chapter visibility API', () => {
 
     expect(response.status).toBe(200);
     expect(body).not.toHaveProperty('pendingEvents');
-    expect(prisma.event.findMany).not.toHaveBeenCalled();
+    expect(prisma.event.findMany).toHaveBeenCalledTimes(1);
+    expect(prisma.event.findMany).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ OR: expect.any(Array) }),
+      })
+    );
   });
 
   it('returns private chapter details to invited hackers', async () => {

@@ -95,6 +95,10 @@ function uniqueFields(fields: TemplateFieldDefinition[]) {
   });
 }
 
+function applicationQuestionTypeLabel(type: TemplateFieldDefinition['type']) {
+  return type === 'CHECKBOX' ? 'Checkbox' : type;
+}
+
 function formatClock(value: string) {
   const [rawHour, minute = '00'] = value.split(':');
   const hour = Number(rawHour);
@@ -199,7 +203,9 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
   const [applicationsOpen, setApplicationsOpen] = useState(true);
   const [applicationsCloseReason, setApplicationsCloseReason] = useState('');
   const [selectedMcs, setSelectedMcs] = useState<HackerSelectionOption[]>([]);
-  const [selectedCoMcs, setSelectedCoMcs] = useState<HackerSelectionOption[]>([]);
+  const [selectedCoMcs, setSelectedCoMcs] = useState<HackerSelectionOption[]>(
+    []
+  );
   const [isMcModalOpen, setIsMcModalOpen] = useState(false);
   const [isCoMcModalOpen, setIsCoMcModalOpen] = useState(false);
   const [mcSearchTerm, setMcSearchTerm] = useState('');
@@ -208,6 +214,8 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
   const [questionType, setQuestionType] =
     useState<TemplateFieldDefinition['type']>('TEXT');
   const [questionRequired, setQuestionRequired] = useState(false);
+  const [questionReusePreviousAnswer, setQuestionReusePreviousAnswer] =
+    useState(false);
   const [customQuestions, setCustomQuestions] = useState<
     TemplateFieldDefinition[]
   >([]);
@@ -230,7 +238,9 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
     DEFAULT_EVENT_MESSAGES.decline
   );
   const [chapters, setChapters] = useState<ManageableChapterListItem[]>([]);
-  const [staffCandidates, setStaffCandidates] = useState<HackerSelectionOption[]>([]);
+  const [staffCandidates, setStaffCandidates] = useState<
+    HackerSelectionOption[]
+  >([]);
   const [message, setMessage] = useState('');
   const [savedEventId, setSavedEventId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -606,11 +616,13 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
       label,
       type: questionType,
       required: questionRequired,
+      reusePreviousAnswer: questionReusePreviousAnswer,
     };
     setCustomQuestions(current => [...current, field]);
     setQuestionLabel('');
     setQuestionType('TEXT');
     setQuestionRequired(false);
+    setQuestionReusePreviousAnswer(false);
   }
 
   function buildEventPayload() {
@@ -1163,7 +1175,9 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
                     key={field.id}
                   >
                     <span>{field.label}</span>
-                    <ManagementBadge>{field.type}</ManagementBadge>
+                    <ManagementBadge>
+                      {applicationQuestionTypeLabel(field.type)}
+                    </ManagementBadge>
                   </div>
                 ))}
                 {siteRequiredFields.length === 0 && (
@@ -1215,7 +1229,9 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
                           </ManagementBadge>
                         </>
                       )}
-                      <ManagementBadge>{field.type}</ManagementBadge>
+                      <ManagementBadge>
+                        {applicationQuestionTypeLabel(field.type)}
+                      </ManagementBadge>
                     </span>
                     {customQuestions.some(
                       question => question.id === field.id
@@ -1270,7 +1286,7 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
                   <option value="TEXTAREA">TEXTAREA</option>
                   <option value="EMAIL">EMAIL</option>
                   <option value="URL">URL</option>
-                  <option value="BOOLEAN">CHECKBOX</option>
+                  <option value="CHECKBOX">Checkbox</option>
                 </select>
               </label>
               <label className="flex items-center gap-2">
@@ -1283,6 +1299,20 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
                 />
                 <span className="text-sm font-semibold">
                   Required custom question
+                </span>
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  aria-label="Reuse previous answer for custom question"
+                  checked={questionReusePreviousAnswer}
+                  className={classes.checkbox}
+                  onChange={event =>
+                    setQuestionReusePreviousAnswer(event.target.checked)
+                  }
+                  type="checkbox"
+                />
+                <span className="text-sm font-semibold">
+                  Reuse answer from a previous application
                 </span>
               </label>
               <div className="sm:col-span-2">
@@ -1389,7 +1419,9 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div
             aria-modal="true"
-            className={`${classes.panel} w-full max-w-md p-5`}
+            className={`${classes.panel} ${
+              classes.isDarkMode ? '!bg-gray-900' : '!bg-white'
+            } w-full max-w-md p-5`}
             role="dialog"
           >
             <div className="mb-4 flex items-center justify-between gap-3">

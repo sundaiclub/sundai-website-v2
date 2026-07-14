@@ -51,6 +51,16 @@ const bostonChapter = {
       publicLocation: 'The Foundry',
     },
   ],
+  previousEvents: [
+    {
+      id: 'event-boston-spring-demo',
+      title: 'Boston Spring Demo',
+      slug: 'spring-demo',
+      chapterSlug: 'boston',
+      startTime: '2026-05-15T22:00:00.000Z',
+      publicLocation: 'Central Square',
+    },
+  ],
   pendingEvents: [],
 };
 
@@ -159,6 +169,36 @@ describe('/chapters/[chapterSlug] public chapter page', () => {
       within(agentJam).getByText(
         `The Foundry · ${new Date(
           '2026-07-17T22:00:00.000Z'
+        ).toLocaleDateString()}`
+      )
+    ).toBeInTheDocument();
+  });
+
+  it('shows previous events beneath upcoming events with native event links', async () => {
+    renderChapterPage();
+
+    const upcomingHeading = await screen.findByRole('heading', {
+      name: /upcoming events/i,
+    });
+    const previousHeading = screen.getByRole('heading', {
+      name: /previous events/i,
+    });
+    expect(
+      upcomingHeading.compareDocumentPosition(previousHeading) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+
+    const previousEvent = await screen.findByRole('link', {
+      name: /boston spring demo/i,
+    });
+    expect(previousEvent).toHaveAttribute(
+      'href',
+      '/events/boston/spring-demo'
+    );
+    expect(
+      within(previousEvent).getByText(
+        `Central Square · ${new Date(
+          '2026-05-15T22:00:00.000Z'
         ).toLocaleDateString()}`
       )
     ).toBeInTheDocument();

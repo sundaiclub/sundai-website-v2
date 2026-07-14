@@ -653,7 +653,17 @@ describe('chapter public directory and landing pages', () => {
       renderLandingPage('boston')
 
       await expectSomeText(/active member|membership active/i)
-      await expectSomeText(/notification/i)
+      expect(
+        screen.queryByRole('dialog', { name: /notification preferences/i }),
+      ).not.toBeInTheDocument()
+
+      fireEvent.click(
+        await screen.findByRole('button', { name: /^preferences$/i }),
+      )
+
+      expect(
+        screen.getByRole('dialog', { name: /notification preferences/i }),
+      ).toBeInTheDocument()
 
       const notificationsControl = await screen.findByRole('checkbox', {
         name: /notifications|allow notifications/i,
@@ -663,12 +673,19 @@ describe('chapter public directory and landing pages', () => {
       const emailControl = screen.getByRole('checkbox', {
         name: /email/i,
       })
-      fireEvent.click(emailControl)
-
       const smsControl = screen.getByRole('checkbox', {
         name: /sms|text/i,
       })
-      fireEvent.click(smsControl)
+
+      expect(notificationsControl).not.toBeChecked()
+      expect(emailControl).not.toBeChecked()
+      expect(smsControl).not.toBeChecked()
+
+      fireEvent.click(notificationsControl)
+
+      expect(notificationsControl).toBeChecked()
+      expect(emailControl).toBeChecked()
+      expect(smsControl).toBeChecked()
 
       const saveButton = screen.getByRole('button', {
         name: /save.*notification|update.*notification|save preferences/i,
@@ -693,11 +710,11 @@ describe('chapter public directory and landing pages', () => {
           init?.method?.toUpperCase() === 'PATCH',
       )
       expect(JSON.parse(notificationRequest[1].body)).toEqual(
-        expect.objectContaining({
+        {
           notificationsAllowed: expect.any(Boolean),
-          emailNotificationsEnabled: expect.any(Boolean),
-          smsNotificationsEnabled: expect.any(Boolean),
-        }),
+          emailNotificationsEnabled: true,
+          smsNotificationsEnabled: true,
+        },
       )
     })
 
