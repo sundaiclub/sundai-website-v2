@@ -1,15 +1,32 @@
 import { NextRequest } from 'next/server';
-import { GET as GET_EVENTS, POST as POST_EVENTS } from '../../src/app/api/events/route';
-import { GET as GET_EVENT, PATCH as PATCH_EVENT } from '../../src/app/api/events/[eventId]/route';
+import {
+  GET as GET_EVENTS,
+  POST as POST_EVENTS,
+} from '../../src/app/api/events/route';
+import {
+  DELETE as DELETE_EVENT,
+  GET as GET_EVENT,
+  PATCH as PATCH_EVENT,
+} from '../../src/app/api/events/[eventId]/route';
 
 jest.mock('../../src/lib/prisma', () => ({
   __esModule: true,
   default: {
     event: {
       findMany: jest.fn(),
+      findFirst: jest.fn(),
       create: jest.fn(),
       findUnique: jest.fn(),
       update: jest.fn(),
+      delete: jest.fn(),
+    },
+    eventRegistration: {
+      findMany: jest.fn(),
+      findFirst: jest.fn(),
+      deleteMany: jest.fn(),
+    },
+    eventRegistrationAudit: {
+      deleteMany: jest.fn(),
     },
     hacker: {
       findUnique: jest.fn(),
@@ -25,10 +42,17 @@ jest.mock('../../src/lib/prisma', () => ({
     },
     pitchSession: {
       findFirst: jest.fn(),
+      findMany: jest.fn(),
       update: jest.fn(),
+      deleteMany: jest.fn(),
     },
     pitchProject: {
+      findMany: jest.fn(),
       updateMany: jest.fn(),
+      deleteMany: jest.fn(),
+    },
+    pitchProjectVote: {
+      deleteMany: jest.fn(),
     },
     $transaction: jest.fn(),
   },
@@ -41,23 +65,68 @@ jest.mock('@clerk/nextjs/server', () => ({
 const prisma = require('../../src/lib/prisma').default;
 const mockAuth = require('@clerk/nextjs/server').auth as jest.Mock;
 
+function buildPublicEvent(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'evt-1',
+    slug: 'test',
+    title: 'Test',
+    description: 'Public test event',
+    startTime: new Date('2026-07-01T18:00:00.000Z'),
+    endTime: new Date('2026-07-01T20:00:00.000Z'),
+    publicLocation: 'Boston, MA',
+    status: 'PUBLISHED',
+    visibility: 'PUBLIC',
+    publicProgramLabel: null,
+    programType: 'HACK_NIGHT',
+    capacity: 40,
+    applicationMode: 'REQUIRES_APPROVAL',
+    applicationsOpen: true,
+    applicationsClosedAt: null,
+    applicationsCloseReason: null,
+    autoPromoteWaitlist: true,
+    approvedDetailsJson: null,
+    applicationQuestionsJson: null,
+    hideChapterDefaultQuestions: false,
+    chapterId: 'chapter-boston',
+    chapter: {
+      id: 'chapter-boston',
+      slug: 'boston',
+      name: 'Sundai Boston',
+      timezone: 'America/New_York',
+      status: 'ACTIVE',
+      accessMode: 'PUBLIC',
+    },
+    _count: {
+      registrations: 0,
+    },
+    ...overrides,
+  };
+}
+
 describe('/api/events', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockAuth.mockReturnValue({ userId: null });
     prisma.chapterMembership.findMany.mockResolvedValue([]);
     prisma.chapterMembership.findFirst.mockResolvedValue(null);
+    prisma.event.findFirst.mockResolvedValue(null);
+    prisma.eventRegistration.findMany.mockResolvedValue([]);
+    prisma.eventRegistration.findFirst.mockResolvedValue(null);
   });
 
   it('GET lists upcoming events', async () => {
     prisma.event.findMany.mockResolvedValue([]);
-    const request = new NextRequest('http://localhost:3000/api/events?upcoming=true');
+    const request = new NextRequest(
+      'http://localhost:3000/api/events?upcoming=true'
+    );
     const res = await GET_EVENTS(request as any);
     expect(res.status).toBe(200);
   });
 
   it('GET organizer listing requires sign-in', async () => {
-    const request = new NextRequest('http://localhost:3000/api/events?organizer=true');
+    const request = new NextRequest(
+      'http://localhost:3000/api/events?organizer=true'
+    );
     const res = await GET_EVENTS(request as any);
     expect(res.status).toBe(401);
     expect(prisma.event.findMany).not.toHaveBeenCalled();
@@ -65,17 +134,22 @@ describe('/api/events', () => {
 
   it('GET organizer listing denies signed-in users without organizer permissions', async () => {
     mockAuth.mockReturnValue({ userId: 'clerk-regular' });
-    prisma.hacker.findUnique.mockResolvedValue({ id: 'h-regular', role: 'HACKER' });
+    prisma.hacker.findUnique.mockResolvedValue({
+      id: 'h-regular',
+      role: 'HACKER',
+    });
     prisma.chapterMembership.findMany.mockResolvedValue([]);
 
-    const request = new NextRequest('http://localhost:3000/api/events?organizer=true');
+    const request = new NextRequest(
+      'http://localhost:3000/api/events?organizer=true'
+    );
     const res = await GET_EVENTS(request as any);
 
     expect(res.status).toBe(403);
     expect(prisma.event.findMany).not.toHaveBeenCalled();
   });
 
-  it('GET lists events newest first', async () => {
+  it('GET lists public upcoming events soonest first', async () => {
     prisma.event.findMany.mockResolvedValue([]);
 
     const request = new NextRequest('http://localhost:3000/api/events');
@@ -84,7 +158,7 @@ describe('/api/events', () => {
     expect(res.status).toBe(200);
     expect(prisma.event.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        orderBy: { startTime: 'desc' },
+        orderBy: [{ startTime: 'asc' }, { title: 'asc' }],
       })
     );
   });
@@ -92,19 +166,38 @@ describe('/api/events', () => {
   it('POST requires site admin or chapter admin', async () => {
     mockAuth.mockReturnValue({ userId: 'clerk-1' });
     prisma.hacker.findUnique.mockResolvedValue({ id: 'h1', role: 'HACKER' });
-    const request = new NextRequest('http://localhost:3000/api/events', { method: 'POST' });
-    request.json = jest.fn().mockResolvedValue({ title: 'E', startTime: new Date().toISOString() });
+    const request = new NextRequest('http://localhost:3000/api/events', {
+      method: 'POST',
+    });
+    request.json = jest
+      .fn()
+      .mockResolvedValue({ title: 'E', startTime: new Date().toISOString() });
     const res = await POST_EVENTS(request as any);
     expect(res.status).toBe(403);
   });
 
   it('POST creates event with VOTING phase by default', async () => {
     mockAuth.mockReturnValue({ userId: 'clerk-admin' });
-    prisma.hacker.findUnique.mockResolvedValue({ id: 'h-admin', role: 'SITE_ADMIN' });
-    const created = { id: 'evt-1', title: 'Test', phase: 'VOTING', startTime: new Date().toISOString() };
+    prisma.hacker.findUnique.mockResolvedValue({
+      id: 'h-admin',
+      role: 'SITE_ADMIN',
+    });
+    const created = {
+      id: 'evt-1',
+      title: 'Test',
+      phase: 'VOTING',
+      startTime: new Date().toISOString(),
+    };
     prisma.event.create.mockResolvedValue(created);
-    const request = new NextRequest('http://localhost:3000/api/events', { method: 'POST' });
-    request.json = jest.fn().mockResolvedValue({ title: 'Test', startTime: new Date().toISOString() });
+    const request = new NextRequest('http://localhost:3000/api/events', {
+      method: 'POST',
+    });
+    request.json = jest
+      .fn()
+      .mockResolvedValue({
+        title: 'Test',
+        startTime: new Date().toISOString(),
+      });
     const res = await POST_EVENTS(request as any);
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -119,29 +212,50 @@ describe('/api/events/[eventId]', () => {
     mockAuth.mockReturnValue({ userId: null });
     prisma.chapterMembership.findMany.mockResolvedValue([]);
     prisma.chapterMembership.findFirst.mockResolvedValue(null);
+    prisma.event.findFirst.mockResolvedValue(null);
+    prisma.eventRegistration.findMany.mockResolvedValue([]);
+    prisma.eventRegistration.findFirst.mockResolvedValue(null);
   });
 
   it('GET returns 404 when missing', async () => {
-    prisma.event.findUnique.mockResolvedValue(null);
+    prisma.event.findFirst.mockResolvedValue(null);
     const request = new NextRequest('http://localhost:3000/api/events/evt-1');
-    const res = await GET_EVENT(request as any, { params: { eventId: 'evt-1' } } as any);
+    const res = await GET_EVENT(
+      request as any,
+      { params: { eventId: 'evt-1' } } as any
+    );
     expect(res.status).toBe(404);
   });
 
-  it('GET single event includes phase field', async () => {
-    prisma.event.findUnique.mockResolvedValue({
-      id: 'evt-1',
-      title: 'Test',
-      phase: 'VOTING',
-      startTime: new Date().toISOString(),
-      projects: [],
-      staff: [],
-    });
+  it('GET single event returns public event detail', async () => {
+    prisma.event.findFirst.mockResolvedValue(buildPublicEvent());
     const request = new NextRequest('http://localhost:3000/api/events/evt-1');
-    const res = await GET_EVENT(request as any, { params: { eventId: 'evt-1' } } as any);
+    const res = await GET_EVENT(
+      request as any,
+      { params: { eventId: 'evt-1' } } as any
+    );
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.phase).toBe('VOTING');
+    expect(body).toEqual(
+      expect.objectContaining({
+        id: 'evt-1',
+        slug: 'test',
+        title: 'Test',
+        description: 'Public test event',
+        publicLocation: 'Boston, MA',
+        approvedDetailsVisible: false,
+        viewerRegistration: null,
+      })
+    );
+    expect(body.applicationControls).toEqual(
+      expect.objectContaining({
+        applicationMode: 'REQUIRES_APPROVAL',
+        applicationsOpen: true,
+        canSubmit: false,
+        signInRequired: true,
+      })
+    );
+    expect(body).not.toHaveProperty('phase');
   });
 
   it('GET management event details requires sign-in', async () => {
@@ -154,15 +268,23 @@ describe('/api/events/[eventId]', () => {
       staff: [],
     });
 
-    const request = new NextRequest('http://localhost:3000/api/events/evt-1?management=true');
-    const res = await GET_EVENT(request as any, { params: { eventId: 'evt-1' } } as any);
+    const request = new NextRequest(
+      'http://localhost:3000/api/events/evt-1?management=true'
+    );
+    const res = await GET_EVENT(
+      request as any,
+      { params: { eventId: 'evt-1' } } as any
+    );
 
     expect(res.status).toBe(401);
   });
 
   it('GET management event details denies users without event permissions', async () => {
     mockAuth.mockReturnValue({ userId: 'clerk-regular' });
-    prisma.hacker.findUnique.mockResolvedValue({ id: 'h-regular', role: 'HACKER' });
+    prisma.hacker.findUnique.mockResolvedValue({
+      id: 'h-regular',
+      role: 'HACKER',
+    });
     prisma.eventStaff.findFirst.mockResolvedValue(null);
     prisma.chapterMembership.findFirst.mockResolvedValue(null);
     prisma.event.findUnique
@@ -180,15 +302,23 @@ describe('/api/events/[eventId]', () => {
         chapterId: 'chapter-boston',
       });
 
-    const request = new NextRequest('http://localhost:3000/api/events/evt-1?management=true');
-    const res = await GET_EVENT(request as any, { params: { eventId: 'evt-1' } } as any);
+    const request = new NextRequest(
+      'http://localhost:3000/api/events/evt-1?management=true'
+    );
+    const res = await GET_EVENT(
+      request as any,
+      { params: { eventId: 'evt-1' } } as any
+    );
 
     expect(res.status).toBe(403);
   });
 
   it('PATCH updates active pitching allotments when timing changes', async () => {
     mockAuth.mockReturnValue({ userId: 'clerk-admin' });
-    prisma.hacker.findUnique.mockResolvedValue({ id: 'h-admin', role: 'SITE_ADMIN' });
+    prisma.hacker.findUnique.mockResolvedValue({
+      id: 'h-admin',
+      role: 'SITE_ADMIN',
+    });
     prisma.eventStaff.findFirst.mockResolvedValue(null);
     prisma.event.findUnique
       .mockResolvedValueOnce({
@@ -210,8 +340,18 @@ describe('/api/events/[eventId]', () => {
             defaultPresentingSec: 75,
             defaultQuestionsSec: 120,
             projects: [
-              { id: 'ep-top', isTopProject: true, allottedPresentingSec: 150, allottedQuestionsSec: 180 },
-              { id: 'ep-regular', isTopProject: false, allottedPresentingSec: 75, allottedQuestionsSec: 120 },
+              {
+                id: 'ep-top',
+                isTopProject: true,
+                allottedPresentingSec: 150,
+                allottedQuestionsSec: 180,
+              },
+              {
+                id: 'ep-regular',
+                isTopProject: false,
+                allottedPresentingSec: 75,
+                allottedQuestionsSec: 120,
+              },
             ],
           },
         ],
@@ -228,16 +368,23 @@ describe('/api/events/[eventId]', () => {
     });
     prisma.pitchSession.update.mockResolvedValue({ id: 'pitch-1' });
     prisma.pitchProject.updateMany.mockResolvedValue({ count: 1 });
-    prisma.$transaction.mockImplementation(async (ops: Array<Promise<unknown>>) => Promise.all(ops));
+    prisma.$transaction.mockImplementation(
+      async (ops: Array<Promise<unknown>>) => Promise.all(ops)
+    );
 
-    const request = new NextRequest('http://localhost:3000/api/events/evt-1', { method: 'PATCH' });
+    const request = new NextRequest('http://localhost:3000/api/events/evt-1', {
+      method: 'PATCH',
+    });
     request.json = jest.fn().mockResolvedValue({
       title: 'Updated Event',
       topPresentingSec: 150,
       defaultPresentingSec: 75,
     });
 
-    const res = await PATCH_EVENT(request as any, { params: { eventId: 'evt-1' } } as any);
+    const res = await PATCH_EVENT(
+      request as any,
+      { params: { eventId: 'evt-1' } } as any
+    );
 
     expect(res.status).toBe(200);
     expect(prisma.$transaction).toHaveBeenCalled();
@@ -267,5 +414,66 @@ describe('/api/events/[eventId]', () => {
     const body = await res.json();
     expect(body.pitchSessions[0].projects[0].allottedPresentingSec).toBe(150);
     expect(body.pitchSessions[0].projects[1].allottedPresentingSec).toBe(75);
+  });
+
+  it('DELETE rejects non-draft events', async () => {
+    mockAuth.mockReturnValue({ userId: 'clerk-admin' });
+    prisma.hacker.findUnique.mockResolvedValue({
+      id: 'h-admin',
+      role: 'SITE_ADMIN',
+    });
+    prisma.event.findUnique.mockResolvedValue({
+      id: 'evt-1',
+      chapterId: 'chapter-boston',
+      status: 'PUBLISHED',
+    });
+
+    const response = await DELETE_EVENT(
+      new NextRequest('http://localhost:3000/api/events/evt-1', {
+        method: 'DELETE',
+      }) as any,
+      { params: { eventId: 'evt-1' } } as any
+    );
+
+    expect(response.status).toBe(409);
+    expect(prisma.event.delete).not.toHaveBeenCalled();
+  });
+
+  it('DELETE removes a draft and its event-owned records transactionally', async () => {
+    mockAuth.mockReturnValue({ userId: 'clerk-admin' });
+    prisma.hacker.findUnique.mockResolvedValue({
+      id: 'h-admin',
+      role: 'SITE_ADMIN',
+    });
+    prisma.event.findUnique.mockResolvedValue({
+      id: 'evt-1',
+      chapterId: 'chapter-boston',
+      status: 'DRAFT',
+    });
+    prisma.pitchSession.findMany.mockResolvedValue([{ id: 'pitch-1' }]);
+    prisma.pitchProject.findMany.mockResolvedValue([{ id: 'queue-1' }]);
+    prisma.$transaction.mockResolvedValue([]);
+
+    const response = await DELETE_EVENT(
+      new NextRequest('http://localhost:3000/api/events/evt-1', {
+        method: 'DELETE',
+      }) as any,
+      { params: { eventId: 'evt-1' } } as any
+    );
+
+    expect(response.status).toBe(204);
+    expect(prisma.pitchProjectVote.deleteMany).toHaveBeenCalledWith({
+      where: { pitchProjectId: { in: ['queue-1'] } },
+    });
+    expect(prisma.eventRegistrationAudit.deleteMany).toHaveBeenCalledWith({
+      where: { eventId: 'evt-1' },
+    });
+    expect(prisma.eventStaff.deleteMany).toHaveBeenCalledWith({
+      where: { eventId: 'evt-1' },
+    });
+    expect(prisma.event.delete).toHaveBeenCalledWith({
+      where: { id: 'evt-1' },
+    });
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
   });
 });

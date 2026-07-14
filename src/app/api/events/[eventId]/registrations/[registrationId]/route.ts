@@ -15,7 +15,8 @@ import {
   isApplicantDecisionStatus,
   updateEventRegistrationStatus,
 } from '@/lib/eventRegistrations';
-import type { RegistrationStatus } from '@/types/event-management';
+import { notifyEventDecision } from '@/lib/eventDecisionNotifications';
+import { parseRegistrationStatus } from '@/lib/eventRequestParsing';
 
 export async function PATCH(
   req: Request,
@@ -33,8 +34,9 @@ export async function PATCH(
     if (!canManage) return forbidden();
 
     const body = await req.json();
-    const toStatus = body?.status as RegistrationStatus | undefined;
-    if (!toStatus) return badRequest('status is required');
+    const toStatus = parseRegistrationStatus(body?.status);
+    if (toStatus === undefined) return badRequest('status is required');
+    if (toStatus === null) return badRequest('status is invalid');
 
     if (
       isApplicantDecisionStatus(toStatus) &&
@@ -43,17 +45,51 @@ export async function PATCH(
       return forbidden();
     }
 
+    const previousRegistration = await prisma.eventRegistration.findFirst({
+      where: {
+        id: params.registrationId,
+        eventId: params.eventId,
+      },
+      select: { status: true },
+    });
+
+    let publicSafeMessage = body.publicSafeMessage;
+    if (
+      (toStatus === 'APPROVED' || toStatus === 'DECLINED') &&
+      publicSafeMessage === undefined
+    ) {
+      const event = await prisma.event.findUnique({
+        where: { id: params.eventId },
+        select: { confirmationMessage: true, declineMessage: true },
+      });
+      publicSafeMessage =
+        (toStatus === 'APPROVED'
+          ? event?.confirmationMessage
+          : event?.declineMessage) ?? undefined;
+    }
+
     const registration = await updateEventRegistrationStatus({
       registrationId: params.registrationId,
       eventId: params.eventId,
       actorId: hacker.id,
       toStatus,
-      publicSafeMessage: body.publicSafeMessage,
+      publicSafeMessage,
       internalReviewNotes: body.internalReviewNotes,
       changeJson: body.changeJson ?? undefined,
     });
 
     if (!registration) return notFound();
+
+    if (
+      previousRegistration?.status !== toStatus &&
+      (toStatus === 'APPROVED' || toStatus === 'DECLINED')
+    ) {
+      await notifyEventDecision({
+        eventId: params.eventId,
+        registrationId: params.registrationId,
+        status: toStatus,
+      });
+    }
 
     return NextResponse.json(registration);
   } catch (error) {

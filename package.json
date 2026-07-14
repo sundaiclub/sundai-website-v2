@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "node --no-deprecation node_modules/.bin/next dev",
+    "dev": "node --no-deprecation node_modules/.bin/next dev -p 3001",
     "build": "node --no-deprecation node_modules/.bin/next build",
     "postbuild": "next-sitemap",
     "start": "node --no-deprecation node_modules/.bin/next start",
@@ -27,6 +27,7 @@
     "db:populate": "./scripts/populate_db.sh"
   },
   "dependencies": {
+    "@aws-sdk/client-ses": "^3.1084.0",
     "@clerk/nextjs": "^5.7.2",
     "@google-cloud/storage": "^7.14.0",
     "@google/genai": "^1.25.0",
@@ -46,6 +47,7 @@
     "remark-gfm": "^4.0.1",
     "replicate": "^1.1.0",
     "svix": "^1.37.0",
+    "twilio": "^6.0.2",
     "typewriter-effect": "^2.21.0",
     "uuid": "^11.0.2"
   },

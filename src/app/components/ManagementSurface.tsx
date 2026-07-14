@@ -4,9 +4,9 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 
-type SurfaceTone = 'default' | 'danger' | 'success' | 'warning';
+export type ManagementTone = 'default' | 'danger' | 'success' | 'warning';
 
-function toneClasses(tone: SurfaceTone, isDarkMode: boolean) {
+function toneClasses(tone: ManagementTone, isDarkMode: boolean) {
   if (tone === 'danger') {
     return isDarkMode
       ? 'border-red-900/70 bg-red-950/50 text-red-100'
@@ -55,9 +55,9 @@ export function useManagementClasses() {
     divider: isDarkMode ? 'divide-gray-800' : 'divide-gray-200',
     input: `${
       isDarkMode
-        ? 'border-gray-700 bg-gray-950 text-gray-100 placeholder:text-gray-500 focus:border-gray-400'
-        : 'border-gray-300 bg-white text-gray-900 placeholder:text-gray-500 focus:border-gray-900'
-    } min-h-11 rounded-md border px-3 py-2 text-sm outline-none transition`,
+        ? 'border-gray-700 bg-gray-950 text-gray-100 placeholder:text-gray-500 focus:border-gray-400 disabled:bg-gray-900'
+        : 'border-gray-300 bg-white text-gray-900 placeholder:text-gray-500 focus:border-gray-900 disabled:bg-gray-100'
+    } min-h-11 rounded-md border px-3 py-2 text-sm outline-none transition disabled:cursor-not-allowed disabled:opacity-70`,
     textarea: `${
       isDarkMode
         ? 'border-gray-700 bg-gray-950 text-gray-100 placeholder:text-gray-500 focus:border-gray-400 disabled:bg-gray-900'
@@ -193,7 +193,7 @@ export function ManagementBadge({
   tone = 'default',
 }: {
   children: ReactNode;
-  tone?: SurfaceTone;
+  tone?: ManagementTone;
 }) {
   const { isDarkMode } = useManagementClasses();
 
@@ -211,7 +211,7 @@ export function ManagementAlert({
   tone = 'default',
 }: {
   children: ReactNode;
-  tone?: SurfaceTone;
+  tone?: ManagementTone;
 }) {
   const { isDarkMode } = useManagementClasses();
 

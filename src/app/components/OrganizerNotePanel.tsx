@@ -6,26 +6,11 @@ import {
   ManagementSection,
   useManagementClasses,
 } from './ManagementSurface';
-
-type OrganizerNote = {
-  id: string;
-  body: string;
-  updatedAt?: string | Date;
-  updatedBy?: { name?: string | null } | null;
-};
-
-type OrganizerNoteAccess = {
-  canViewCurrentNote: boolean;
-  canEditCurrentNote: boolean;
-  canViewRevisions: boolean;
-};
-
-type OrganizerNoteRevision = {
-  id: string;
-  patchText: string;
-  createdAt?: string | Date;
-  editedBy?: { name?: string | null } | null;
-};
+import type {
+  HackerOrganizerNote,
+  HackerOrganizerNoteRevision,
+  OrganizerNoteAccess,
+} from '@/types/event-management';
 
 type OrganizerNotePanelProps = {
   hackerId: string;
@@ -43,10 +28,10 @@ export default function OrganizerNotePanel({
   title = 'Organizer note',
 }: OrganizerNotePanelProps) {
   const classes = useManagementClasses();
-  const [note, setNote] = useState<OrganizerNote | null>(null);
+  const [note, setNote] = useState<HackerOrganizerNote | null>(null);
   const [body, setBody] = useState('');
   const [access, setAccess] = useState<OrganizerNoteAccess>(emptyAccess);
-  const [revisions, setRevisions] = useState<OrganizerNoteRevision[]>([]);
+  const [revisions, setRevisions] = useState<HackerOrganizerNoteRevision[]>([]);
   const [status, setStatus] = useState('');
 
   useEffect(() => {

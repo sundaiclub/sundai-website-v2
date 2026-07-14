@@ -1,8 +1,13 @@
-import prisma from '@/lib/prisma';
 import type {
-  ApplicationTemplateScope,
-  EntityId,
-  MergedApplicationTemplate,
+  ApplicationControlsState,
+  EventApplicationMode,
+  JsonObject,
+  JsonValue,
+  ProfilePrefillSource,
+  PublicEventStatus,
+  PublicViewerRegistrationState,
+  RegistrationFormValidationError,
+  RegistrationStatus,
   TemplateFieldDefinition,
   TemplateFieldOption,
   TemplateFieldType,
@@ -16,7 +21,7 @@ const TEMPLATE_FIELD_TYPES: readonly TemplateFieldType[] = [
   'PHONE',
   'URL',
   'NUMBER',
-  'BOOLEAN',
+  'CHECKBOX',
   'SELECT',
   'MULTI_SELECT',
   'DATE',
@@ -49,6 +54,7 @@ type ApplicationTemplateValidationIssueCode =
   | 'FIELD_LABEL_REQUIRED'
   | 'FIELD_TYPE_INVALID'
   | 'FIELD_REQUIRED_INVALID'
+  | 'FIELD_REUSE_PREVIOUS_ANSWER_INVALID'
   | 'FIELD_SITE_REQUIRED_INVALID'
   | 'FIELD_ORDER_INVALID'
   | 'FIELD_OPTIONS_REQUIRED'
@@ -81,42 +87,39 @@ export interface ComposeApplicationFieldsInput {
   hideChapterDefaultQuestions?: boolean | null;
 }
 
-interface ApplicationTemplatePrismaRecord {
-  id: EntityId;
-  scope?: ApplicationTemplateScope | string;
-  chapterId?: EntityId | null;
-  fieldsJson: unknown;
-  isActive?: boolean | null;
+export interface ApplicationControlStateInput {
+  applicationMode: EventApplicationMode;
+  applicationsOpen?: boolean | null;
+  applicationsClosedAt?: Date | string | null;
+  applicationsCloseReason?: string | null;
+  capacity?: number | null;
+  approvedCount?: number | null;
+  autoPromoteWaitlist?: boolean | null;
+  startTime?: Date | string | null;
+  endTime?: Date | string | null;
+  now?: Date;
+  viewerSignedIn?: boolean;
+  viewerRegistration?: Pick<
+    PublicViewerRegistrationState,
+    'status' | 'publicSafeMessage'
+  > | null;
+  waitlistAvailable?: boolean;
+  includeCloseReason?: boolean;
 }
 
-interface EventApplicationQuestionPrismaRecord {
-  id: EntityId;
-  chapterId?: EntityId | null;
-  applicationQuestionsJson?: unknown;
-  hideChapterDefaultQuestions?: boolean | null;
+export interface ApplicationProfilePrefillInput {
+  fields: readonly TemplateFieldDefinition[];
+  profile?: ProfilePrefillSource | null;
+  existingAnswers?: JsonObject | null;
 }
 
-interface ApplicationTemplatePrismaClient {
-  applicationTemplate: {
-    findFirst(args: unknown): Promise<ApplicationTemplatePrismaRecord | null>;
-  };
-  event: {
-    findUnique(
-      args: unknown
-    ): Promise<EventApplicationQuestionPrismaRecord | null>;
-  };
-}
-
-interface FetchApplicationTemplateInput {
-  scope: ApplicationTemplateScope;
-  chapterId?: EntityId | null;
-  prisma?: ApplicationTemplatePrismaClient;
-}
-
-interface FetchMergedApplicationTemplateInput {
-  chapterId?: EntityId | null;
-  eventId?: EntityId | null;
-  prisma?: ApplicationTemplatePrismaClient;
+interface PublicSafeStatusMessageInput {
+  status?: RegistrationStatus | null;
+  publicSafeMessage?: string | null;
+  applicationControls?: Pick<
+    ApplicationControlsState,
+    'publicStatus' | 'signInRequired' | 'disabledReason'
+  > | null;
 }
 
 export class ApplicationTemplateValidationError extends Error {
@@ -179,6 +182,17 @@ function validateApplicationTemplateFields(
       issues.push({
         code: 'FIELD_REQUIRED_INVALID',
         message: `Field "${fieldLabel}" must include a boolean required flag.`,
+        fieldId: fieldId || undefined,
+      });
+    }
+
+    if (
+      field.reusePreviousAnswer !== undefined &&
+      typeof field.reusePreviousAnswer !== 'boolean'
+    ) {
+      issues.push({
+        code: 'FIELD_REUSE_PREVIOUS_ANSWER_INVALID',
+        message: `Field "${fieldLabel}" must use a boolean reusePreviousAnswer flag.`,
         fieldId: fieldId || undefined,
       });
     }
@@ -366,129 +380,183 @@ export function parseTemplateFieldsJson(
   return normalizeTemplateFields(fields);
 }
 
-async function fetchActiveApplicationTemplate(
-  input: FetchApplicationTemplateInput
-): Promise<ApplicationTemplatePrismaRecord | null> {
-  const client = input.prisma ?? getApplicationTemplatePrismaClient();
-  const where =
-    input.scope === 'SITE'
-      ? { scope: 'SITE', isActive: true }
-      : {
-          scope: 'CHAPTER',
-          chapterId: input.chapterId,
-          isActive: true,
-        };
-
-  return client.applicationTemplate.findFirst({
-    where,
-    orderBy: { updatedAt: 'desc' },
+export function buildApplicationControlsState(
+  input: ApplicationControlStateInput
+): ApplicationControlsState {
+  const applicationsOpen = input.applicationsOpen === true;
+  const publicStatus = getApplicationPublicStatus(input);
+  const registrationStatus = input.viewerRegistration?.status ?? null;
+  const canEditAnswers = registrationStatus === 'PENDING';
+  const canCancelRegistration =
+    registrationStatus === 'PENDING' ||
+    registrationStatus === 'APPROVED' ||
+    registrationStatus === 'WAITLISTED';
+  const signInRequired = input.viewerSignedIn !== true && !registrationStatus;
+  const disabledReason = getApplicationDisabledReason({
+    ...input,
+    publicStatus,
+    applicationsOpen,
+    registrationStatus,
   });
-}
-
-function fetchActiveSiteApplicationTemplate(
-  client?: ApplicationTemplatePrismaClient
-): Promise<ApplicationTemplatePrismaRecord | null> {
-  return fetchActiveApplicationTemplate({
-    scope: 'SITE',
-    prisma: client,
-  });
-}
-
-function fetchActiveChapterApplicationTemplate(
-  chapterId: EntityId,
-  client?: ApplicationTemplatePrismaClient
-): Promise<ApplicationTemplatePrismaRecord | null> {
-  return fetchActiveApplicationTemplate({
-    scope: 'CHAPTER',
-    chapterId,
-    prisma: client,
-  });
-}
-
-async function fetchEventApplicationQuestionConfig(
-  eventId: EntityId,
-  client?: ApplicationTemplatePrismaClient
-): Promise<EventApplicationQuestionPrismaRecord | null> {
-  const prismaClient = client ?? getApplicationTemplatePrismaClient();
-
-  return prismaClient.event.findUnique({
-    where: { id: eventId },
-    select: {
-      id: true,
-      chapterId: true,
-      applicationQuestionsJson: true,
-      hideChapterDefaultQuestions: true,
-    },
-  });
-}
-
-export async function fetchMergedApplicationTemplate(
-  input: FetchMergedApplicationTemplateInput = {}
-): Promise<MergedApplicationTemplate> {
-  const client = input.prisma ?? getApplicationTemplatePrismaClient();
-  const eventConfig = input.eventId
-    ? await fetchEventApplicationQuestionConfig(input.eventId, client)
-    : null;
-  const chapterId = input.chapterId ?? eventConfig?.chapterId ?? null;
-  const siteTemplate = await fetchActiveSiteApplicationTemplate(client);
-
-  if (!siteTemplate) {
-    throw new ApplicationTemplateValidationError(
-      [
-        {
-          code: 'SITE_REQUIRED_FIELD_MISSING',
-          message: 'An active site application template is required.',
-        },
-      ],
-      'Active site application template not found'
-    );
-  }
-
-  const chapterTemplate = chapterId
-    ? await fetchActiveChapterApplicationTemplate(chapterId, client)
-    : null;
-  const siteFields = parseTemplateFieldsJson(
-    siteTemplate.fieldsJson,
-    'siteTemplate.fieldsJson',
-    { requireSiteRequiredFields: true }
-  );
-  const siteRequiredFields = siteFields.filter(field => field.siteRequired);
-  const chapterFields = chapterTemplate
-    ? parseTemplateFieldsJson(
-        chapterTemplate.fieldsJson,
-        'chapterTemplate.fieldsJson',
-        {
-          requiredSiteFields: siteRequiredFields,
-          allowSiteRequiredFieldIds: false,
-        }
-      )
-    : [];
-  const eventFields = eventConfig?.applicationQuestionsJson
-    ? parseTemplateFieldsJson(
-        eventConfig.applicationQuestionsJson,
-        'event.applicationQuestionsJson',
-        {
-          requiredSiteFields: siteRequiredFields,
-          allowSiteRequiredFieldIds: false,
-        }
-      )
-    : [];
 
   return {
-    siteTemplateId: siteTemplate.id,
-    chapterTemplateId: chapterTemplate?.id ?? null,
-    eventId: eventConfig?.id ?? input.eventId ?? null,
-    fields: composeApplicationFields({
-      siteFields,
-      chapterFields,
-      eventFields,
-      hideChapterDefaultQuestions: eventConfig?.hideChapterDefaultQuestions,
+    applicationMode: input.applicationMode,
+    applicationsOpen,
+    applicationsClosedAt: input.applicationsClosedAt ?? null,
+    applicationsCloseReason:
+      input.includeCloseReason === true
+        ? normalizePublicSafeMessage(input.applicationsCloseReason)
+        : null,
+    capacity: input.capacity ?? null,
+    approvedCount: input.approvedCount ?? 0,
+    autoPromoteWaitlist: input.autoPromoteWaitlist === true,
+    publicStatus,
+    canSubmit: disabledReason === null,
+    canEditAnswers,
+    canCancelRegistration,
+    signInRequired,
+    disabledReason,
+    publicMessage: getPublicSafeApplicationStatusMessage({
+      status: registrationStatus,
+      publicSafeMessage: input.viewerRegistration?.publicSafeMessage ?? null,
+      applicationControls: {
+        publicStatus,
+        signInRequired,
+        disabledReason,
+      },
     }),
   };
 }
 
-function getApplicationTemplatePrismaClient(): ApplicationTemplatePrismaClient {
-  return prisma as unknown as ApplicationTemplatePrismaClient;
+export function getApplicationPublicStatus(
+  input: Pick<
+    ApplicationControlStateInput,
+    | 'applicationsOpen'
+    | 'capacity'
+    | 'approvedCount'
+    | 'startTime'
+    | 'endTime'
+    | 'now'
+    | 'waitlistAvailable'
+  >
+): PublicEventStatus {
+  if (hasEventEnded(input)) {
+    return 'ENDED';
+  }
+
+  if (input.applicationsOpen !== true) {
+    return 'CLOSED';
+  }
+
+  if (isApplicationCapacityFull(input)) {
+    return input.waitlistAvailable === true ? 'WAITLIST_AVAILABLE' : 'FULL';
+  }
+
+  return 'OPEN';
+}
+
+export function validateApplicationAnswersAgainstSnapshot(
+  snapshot: unknown,
+  answers: JsonObject | null | undefined
+): RegistrationFormValidationError[] {
+  const fields = parseTemplateFieldsJson(snapshot, 'templateSnapshotJson');
+
+  return validateRequiredApplicationAnswers(fields, answers);
+}
+
+export function validateRequiredApplicationAnswers(
+  fields: readonly TemplateFieldDefinition[],
+  answers: JsonObject | null | undefined
+): RegistrationFormValidationError[] {
+  const answerMap = answers ?? {};
+  const errors: RegistrationFormValidationError[] = [];
+
+  for (const field of fields) {
+    const value = answerMap[field.id];
+
+    if (field.required && isBlankApplicationAnswer(value, field.type)) {
+      errors.push({
+        fieldId: field.id,
+        message: `${field.label} is required.`,
+      });
+    }
+  }
+
+  return errors;
+}
+
+export function mapProfileToApplicationPrefill(
+  input: ApplicationProfilePrefillInput
+): JsonObject {
+  const profile = input.profile;
+  const existingAnswers = input.existingAnswers ?? {};
+  const prefill: JsonObject = {};
+
+  if (!profile) {
+    return prefill;
+  }
+
+  for (const field of input.fields) {
+    if (existingAnswers[field.id] !== undefined) {
+      continue;
+    }
+
+    const value = getProfilePrefillValue(field, profile);
+
+    if (value !== null) {
+      prefill[field.id] = value;
+    }
+  }
+
+  return prefill;
+}
+
+export function applyProfilePrefillToAnswers(
+  input: ApplicationProfilePrefillInput
+): JsonObject {
+  return {
+    ...mapProfileToApplicationPrefill(input),
+    ...(input.existingAnswers ?? {}),
+  };
+}
+
+function getPublicSafeApplicationStatusMessage(
+  input: PublicSafeStatusMessageInput
+): string | null {
+  const configuredMessage = normalizePublicSafeMessage(input.publicSafeMessage);
+
+  if (input.status === 'BLOCKED') {
+    return 'You are unable to register for this event at this time.';
+  }
+
+  if (configuredMessage) {
+    return configuredMessage;
+  }
+
+  switch (input.status) {
+    case 'PENDING':
+      return 'Your application is pending review.';
+    case 'APPROVED':
+      return 'You are approved for this event.';
+    case 'WAITLISTED':
+      return 'You are on the waitlist for this event.';
+    case 'DECLINED':
+      return 'We cannot accommodate your application for this event.';
+    case 'CANCELLED':
+      return 'Your registration has been cancelled.';
+    default:
+      break;
+  }
+
+  if (input.applicationControls?.signInRequired) {
+    return 'Sign in to register for this event.';
+  }
+
+  if (input.applicationControls?.disabledReason) {
+    return input.applicationControls.disabledReason;
+  }
+
+  return null;
 }
 
 function mergeFieldLayer(
@@ -549,6 +617,170 @@ function cloneTemplateField(
   };
 }
 
+function getApplicationDisabledReason(
+  input: ApplicationControlStateInput & {
+    publicStatus: PublicEventStatus;
+    applicationsOpen: boolean;
+    registrationStatus: RegistrationStatus | null;
+  }
+): string | null {
+  if (input.registrationStatus) {
+    return 'You already have a registration for this event.';
+  }
+
+  if (input.viewerSignedIn !== true) {
+    return 'Sign in to register for this event.';
+  }
+
+  if (input.publicStatus === 'ENDED') {
+    return 'This event has ended.';
+  }
+
+  if (!input.applicationsOpen || input.publicStatus === 'CLOSED') {
+    return 'Applications are closed for this event.';
+  }
+
+  if (input.publicStatus === 'FULL') {
+    return 'This event is full.';
+  }
+
+  return null;
+}
+
+function isApplicationCapacityFull(
+  input: Pick<ApplicationControlStateInput, 'capacity' | 'approvedCount'>
+): boolean {
+  return (
+    typeof input.capacity === 'number' &&
+    Number.isFinite(input.capacity) &&
+    input.capacity > 0 &&
+    (input.approvedCount ?? 0) >= input.capacity
+  );
+}
+
+function hasEventEnded(
+  input: Pick<ApplicationControlStateInput, 'startTime' | 'endTime' | 'now'>
+): boolean {
+  const now = input.now ?? new Date();
+  const endTime = coerceDate(input.endTime);
+  const startTime = coerceDate(input.startTime);
+  const cutoff = endTime ?? startTime;
+
+  return cutoff !== null && cutoff.getTime() <= now.getTime();
+}
+
+function coerceDate(value: Date | string | null | undefined): Date | null {
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : value;
+  }
+
+  if (typeof value !== 'string' || value.trim().length === 0) {
+    return null;
+  }
+
+  const date = new Date(value);
+
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function isBlankApplicationAnswer(
+  value: JsonValue | undefined,
+  fieldType: TemplateFieldType
+): boolean {
+  if (value === undefined || value === null) {
+    return true;
+  }
+
+  if (typeof value === 'string') {
+    return value.trim().length === 0;
+  }
+
+  if (Array.isArray(value)) {
+    return value.length === 0;
+  }
+
+  if (fieldType === 'CHECKBOX') {
+    return typeof value !== 'boolean';
+  }
+
+  return false;
+}
+
+function getProfilePrefillValue(
+  field: TemplateFieldDefinition,
+  profile: ProfilePrefillSource
+): JsonValue | null {
+  const profileValue = getProfileFieldValue(field.id, profile);
+
+  if (profileValue === null) {
+    return null;
+  }
+
+  if (!canPrefillFieldType(field.type)) {
+    return null;
+  }
+
+  return profileValue;
+}
+
+function getProfileFieldValue(
+  fieldId: string,
+  profile: ProfilePrefillSource
+): string | null {
+  const normalizedFieldId = normalizeFieldId(fieldId);
+  const profileValues: Record<string, string | null | undefined> = {
+    name: profile.name,
+    fullname: profile.name,
+    email: profile.email,
+    phonenumber: profile.phoneNumber,
+    phone: profile.phoneNumber,
+    username: profile.username,
+    handle: profile.username,
+    bio: profile.bio,
+    githuburl: profile.githubUrl,
+    github: profile.githubUrl,
+    linkedinurl: profile.linkedinUrl,
+    linkedin: profile.linkedinUrl,
+    twitterurl: profile.twitterUrl,
+    twitter: profile.twitterUrl,
+    websiteurl: profile.websiteUrl,
+    website: profile.websiteUrl,
+    discordname: profile.discordName,
+    discord: profile.discordName,
+  };
+  const value = profileValues[normalizedFieldId];
+
+  return typeof value === 'string' && value.trim().length > 0
+    ? value.trim()
+    : null;
+}
+
+function normalizeFieldId(fieldId: string): string {
+  return fieldId.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+}
+
+function canPrefillFieldType(fieldType: TemplateFieldType): boolean {
+  return (
+    fieldType === 'TEXT' ||
+    fieldType === 'TEXTAREA' ||
+    fieldType === 'EMAIL' ||
+    fieldType === 'PHONE' ||
+    fieldType === 'URL'
+  );
+}
+
+function normalizePublicSafeMessage(
+  message: string | null | undefined
+): string | null {
+  if (typeof message !== 'string') {
+    return null;
+  }
+
+  const trimmedMessage = message.trim();
+
+  return trimmedMessage.length > 0 ? trimmedMessage : null;
+}
+
 function coerceTemplateField(value: unknown): TemplateFieldDefinition {
   if (!isRecord(value)) {
     return {
@@ -567,6 +799,10 @@ function coerceTemplateField(value: unknown): TemplateFieldDefinition {
         ? (value.type as TemplateFieldType)
         : ('' as TemplateFieldType),
     required: value.required as boolean,
+    reusePreviousAnswer:
+      value.reusePreviousAnswer === undefined
+        ? undefined
+        : (value.reusePreviousAnswer as boolean),
     siteRequired:
       value.siteRequired === undefined
         ? undefined

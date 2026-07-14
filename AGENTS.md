@@ -1,5 +1,5 @@
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan:
-`specs/001-event-management-foundations/plan.md`
+`specs/002-native-event-rsvp/plan.md`
 <!-- SPECKIT END -->

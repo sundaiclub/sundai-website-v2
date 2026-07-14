@@ -5,29 +5,52 @@ import {
   getCurrentHacker,
   requireChapterManager,
 } from '@/lib/eventManagementApi';
-import { canViewChapter as canViewChapterWithAuth } from '@/lib/eventManagementAuth';
+import {
+  canManageChapterSettingsWithContext,
+  canViewChapter as canViewChapterWithAuth,
+} from '@/lib/eventManagementAuth';
 
-const chapterInclude = {
-  heroImage: { select: { id: true, url: true, alt: true, filename: true } },
-  memberships: {
-    where: { status: 'ACTIVE' as const, role: 'ADMIN' as const },
-    include: { hacker: { select: { id: true, name: true, email: true } } },
-  },
-  events: {
-    where: {
-      status: 'PUBLISHED' as const,
-      visibility: 'PUBLIC' as const,
-      startTime: { gte: new Date() },
+function chapterInclude(now: Date) {
+  return {
+    heroImage: { select: { id: true, url: true, alt: true, filename: true } },
+    memberships: {
+      where: { status: 'ACTIVE' as const, role: 'ADMIN' as const },
+      include: { hacker: { select: { id: true, name: true, email: true } } },
     },
-    orderBy: { startTime: 'desc' as const },
-    select: {
-      id: true,
-      title: true,
-      slug: true,
-      startTime: true,
-      publicLocation: true,
+    events: {
+      where: {
+        status: 'PUBLISHED' as const,
+        visibility: 'PUBLIC' as const,
+        startTime: { gte: now },
+      },
+      orderBy: { startTime: 'asc' as const },
+      select: {
+        id: true,
+        title: true,
+        slug: true,
+        startTime: true,
+        publicLocation: true,
+      },
     },
-  },
+  } as const;
+}
+
+const eventSummarySelect = {
+  id: true,
+  title: true,
+  slug: true,
+  startTime: true,
+  publicLocation: true,
+  status: true,
+  visibility: true,
+} as const;
+
+const publicEventSummarySelect = {
+  id: true,
+  title: true,
+  slug: true,
+  startTime: true,
+  publicLocation: true,
 } as const;
 
 async function resolveChapterIdentifier(chapterIdOrSlug: string) {
@@ -48,6 +71,7 @@ export async function GET(
   { params }: { params: { chapterId: string } }
 ) {
   try {
+    const now = new Date();
     const hacker = await getCurrentHacker();
     const resolvedChapter = await resolveChapterIdentifier(params.chapterId);
     if (!resolvedChapter) return new NextResponse('Not Found', { status: 404 });
@@ -61,10 +85,21 @@ export async function GET(
 
     const chapter = await prisma.chapter.findUnique({
       where: { id: resolvedChapter.id },
-      include: chapterInclude,
+      include: chapterInclude(now),
     });
 
     if (!chapter) return new NextResponse('Not Found', { status: 404 });
+
+    const previousEvents = await prisma.event.findMany({
+      where: {
+        chapterId: resolvedChapter.id,
+        status: 'PUBLISHED',
+        visibility: 'PUBLIC',
+        startTime: { lt: now },
+      },
+      orderBy: { startTime: 'desc' },
+      select: publicEventSummarySelect,
+    });
 
     const viewerMembership = hacker
       ? await prisma.chapterMembership.findFirst({
@@ -74,12 +109,33 @@ export async function GET(
           },
         })
       : null;
+    const canManageChapter = canManageChapterSettingsWithContext({
+      actor: hacker,
+      membership: viewerMembership,
+    });
+    const pendingEvents = canManageChapter
+      ? await prisma.event.findMany({
+          where: {
+            chapterId: resolvedChapter.id,
+            status: { not: 'ARCHIVED' },
+            startTime: { gte: now },
+            OR: [
+              { status: { not: 'PUBLISHED' } },
+              { visibility: { not: 'PUBLIC' } },
+            ],
+          },
+          orderBy: { startTime: 'asc' },
+          select: eventSummarySelect,
+        })
+      : undefined;
 
     const { events, ...chapterDetails } = chapter;
 
     return NextResponse.json({
       ...chapterDetails,
       upcomingEvents: events,
+      previousEvents,
+      ...(pendingEvents ? { pendingEvents } : {}),
       viewerMembership,
     });
   } catch (error) {
@@ -93,6 +149,7 @@ export async function PATCH(
   { params }: { params: { chapterId: string } }
 ) {
   try {
+    const now = new Date();
     const resolvedChapter = await resolveChapterIdentifier(params.chapterId);
     if (!resolvedChapter) return new NextResponse('Not Found', { status: 404 });
 
@@ -125,7 +182,7 @@ export async function PATCH(
     const chapter = await prisma.chapter.update({
       where: { id: resolvedChapter.id },
       data,
-      include: chapterInclude,
+      include: chapterInclude(now),
     });
 
     return NextResponse.json(chapter);

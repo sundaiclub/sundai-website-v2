@@ -4,6 +4,7 @@ import type {
   ChapterRole,
   EntityId,
   EventStaffRole,
+  RegistrationStatus,
   Role,
 } from '@/types/event-management';
 import type { PrismaClient } from '@prisma/client';
@@ -43,6 +44,7 @@ type EventRegistrationRecord = {
   id?: EntityId;
   eventId: EntityId;
   hackerId: EntityId;
+  status?: RegistrationStatus;
 };
 
 export type EventManagementAuthPrisma = {
@@ -68,6 +70,10 @@ export type EventPermissionContext = {
   staff?: Pick<EventStaffRecord, 'role'> | null;
 };
 
+export type PublicEventReadPermissionContext = EventPermissionContext & {
+  viewerRegistration?: Pick<EventRegistrationRecord, 'status'> | null;
+};
+
 export type OrganizerNotePermissionContext = EventPermissionContext & {
   targetIsRelevantToChapter?: boolean;
   targetIsRelevantToEvent?: boolean;
@@ -84,6 +90,7 @@ export const INVITED_MEMBERSHIP_STATUS: ChapterMembershipStatus = 'INVITED';
 export const CHAPTER_ADMIN_ROLE: ChapterRole = 'ADMIN';
 export const EVENT_MC_ROLE: EventStaffRole = 'MC';
 export const EVENT_CO_MC_ROLE: EventStaffRole = 'CO_MC';
+const APPROVED_REGISTRATION_STATUS: RegistrationStatus = 'APPROVED';
 
 export function isSiteAdminRole(role: Role | null | undefined): boolean {
   return role === SITE_ADMIN_ROLE;
@@ -182,6 +189,13 @@ export function canManageEventSettingsWithContext({
   );
 }
 
+export function canPublishEventWithContext({
+  actor,
+  chapterMembership,
+}: EventPermissionContext): boolean {
+  return isSiteAdminActor(actor) || isChapterAdminMembership(chapterMembership);
+}
+
 export function canManagePitchWithContext({
   actor,
   chapterMembership,
@@ -206,6 +220,12 @@ export function canManageRegistrationsWithContext({
   );
 }
 
+export function canReviewRegistrationsWithContext(
+  context: EventPermissionContext
+): boolean {
+  return canManageRegistrationsWithContext(context);
+}
+
 export function canDecideRegistrationsWithContext({
   actor,
   chapterMembership,
@@ -215,6 +235,60 @@ export function canDecideRegistrationsWithContext({
     isSiteAdminActor(actor) ||
     isChapterAdminMembership(chapterMembership) ||
     isEventMcStaff(staff)
+  );
+}
+
+export function canDecideEventRegistrationWithContext(
+  context: EventPermissionContext
+): boolean {
+  return canDecideRegistrationsWithContext(context);
+}
+
+export function canEditRegistrationNotesWithContext({
+  actor,
+  chapterMembership,
+  staff,
+}: EventPermissionContext): boolean {
+  return (
+    isSiteAdminActor(actor) ||
+    isChapterAdminMembership(chapterMembership) ||
+    isEventPitchStaff(staff)
+  );
+}
+
+export function isCoMcNoteOnlyRegistrationReviewerWithContext(
+  context: EventPermissionContext
+): boolean {
+  return (
+    canReviewRegistrationsWithContext(context) &&
+    canEditRegistrationNotesWithContext(context) &&
+    !canDecideRegistrationsWithContext(context)
+  );
+}
+
+export function canViewBannedUserReviewContextWithContext({
+  actor,
+}: EventPermissionContext): boolean {
+  return isSiteAdminActor(actor);
+}
+
+export function canIncludeBannedUsersInReviewWithContext(
+  context: EventPermissionContext
+): boolean {
+  return canViewBannedUserReviewContextWithContext(context);
+}
+
+export function canViewApprovedOnlyEventDetailsWithContext({
+  actor,
+  chapterMembership,
+  staff,
+  viewerRegistration,
+}: PublicEventReadPermissionContext): boolean {
+  return (
+    isSiteAdminActor(actor) ||
+    isChapterAdminMembership(chapterMembership) ||
+    isEventPitchStaff(staff) ||
+    viewerRegistration?.status === APPROVED_REGISTRATION_STATUS
   );
 }
 
@@ -448,6 +522,15 @@ export async function canDecideRegistrations(
 ): Promise<boolean> {
   const context = await getEventPermissionContext(prisma, hackerId, eventId);
   return context ? canDecideRegistrationsWithContext(context) : false;
+}
+
+export async function canEditRegistrationNotes(
+  prisma: EventManagementAuthPrisma,
+  hackerId: NullableHackerId,
+  eventId: EntityId
+): Promise<boolean> {
+  const context = await getEventPermissionContext(prisma, hackerId, eventId);
+  return context ? canEditRegistrationNotesWithContext(context) : false;
 }
 
 export async function hasEventRegistrationForPermissions(

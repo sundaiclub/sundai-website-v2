@@ -4,9 +4,14 @@ import type {
   ChapterMembershipStatus,
   ChapterRole,
   ChapterStatus,
+  EventApplicationMode as SharedEventApplicationMode,
   EventStaffRole,
+  EventStatus as SharedEventStatus,
+  EventVisibility as SharedEventVisibility,
   JsonObject,
   JsonValue,
+  RegistrationSource,
+  RegistrationStatus,
   Role,
 } from '../../src/types/event-management';
 
@@ -15,6 +20,11 @@ export type FixtureOverrides<T> = Partial<T>;
 type EventManagementRole = Role;
 type ChapterMembershipRole = ChapterRole;
 type UserBanFlagStatus = BanFlagStatus;
+export type EventStatus = SharedEventStatus;
+export type EventVisibility = SharedEventVisibility;
+export type EventApplicationMode = SharedEventApplicationMode;
+export type EventRegistrationStatus = RegistrationStatus;
+export type EventRegistrationSource = RegistrationSource;
 
 export type HackerFixture = {
   id: string;
@@ -85,6 +95,62 @@ export type EventStaffFixture = {
   updatedAt: Date;
 };
 
+export type EventFixture = {
+  id: string;
+  title: string;
+  description: string | null;
+  startTime: Date;
+  endTime: Date | null;
+  meetingUrl: string | null;
+  location: string | null;
+  venueName: string | null;
+  publicLocation: string | null;
+  address: string | null;
+  virtualUrl: string | null;
+  createdById: string;
+  chapterId: string;
+  slug: string;
+  slugNeedsCleanup: boolean;
+  status: EventStatus;
+  visibility: EventVisibility;
+  programType: string | null;
+  publicProgramLabel: string | null;
+  capacity: number | null;
+  applicationMode: EventApplicationMode;
+  autoPromoteWaitlist: boolean;
+  approvedDetailsJson: JsonObject | null;
+  applicationQuestionsJson: JsonValue;
+  hideChapterDefaultQuestions: boolean;
+  applicationsOpen: boolean;
+  applicationsClosedAt: Date | null;
+  applicationsClosedById: string | null;
+  applicationsCloseReason: string | null;
+  checkInOpensAt: Date | null;
+  checkInClosesAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type EventRegistrationFixture = {
+  id: string;
+  eventId: string;
+  hackerId: string;
+  status: EventRegistrationStatus;
+  source: EventRegistrationSource;
+  answersJson: JsonObject | null;
+  templateSnapshotJson: JsonValue;
+  publicSafeMessage: string | null;
+  internalReviewNotes: string | null;
+  decidedById: string | null;
+  decidedAt: Date | null;
+  submittedAt: Date;
+  cancelledAt: Date | null;
+  cancelledById: string | null;
+  waitlistedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
 export type UserBanFixture = {
   id: string;
   hackerId: string;
@@ -140,7 +206,44 @@ export type EventStaffRoleFixture = {
   staff: EventStaffFixture;
 };
 
+export type BannedApplicantFixture = {
+  hacker: HackerFixture;
+  ban: UserBanFixture;
+};
+
+export type NativeEventRsvpFixture = {
+  publicChapter: ChapterFixture;
+  privateChapter: ChapterFixture;
+  publishedEvent: EventFixture;
+  unpublishedEvent: EventFixture;
+  privateChapterEvent: EventFixture;
+  applicant: HackerFixture;
+  approvedApplicant: HackerFixture;
+  waitlistedApplicant: HackerFixture;
+  bannedApplicant: HackerFixture;
+  ban: UserBanFixture;
+  mc: EventStaffRoleFixture;
+  coMc: EventStaffRoleFixture;
+  pendingRegistration: EventRegistrationFixture;
+  approvedRegistration: EventRegistrationFixture;
+  waitlistedRegistration: EventRegistrationFixture;
+  blockedRegistration: EventRegistrationFixture;
+};
+
 const fixtureNow = () => new Date('2026-05-25T12:00:00.000Z');
+
+const fixtureSubmittedAt = () => new Date('2026-06-22T16:00:00.000Z');
+
+export const buildApprovedOnlyDetails = (
+  overrides: FixtureOverrides<JsonObject> = {}
+): JsonObject => ({
+  address: '123 Builder Lane, Boston, MA 02110',
+  arrivalInstructions: 'Use the side entrance and check in with Sundai staff.',
+  virtualUrl: 'https://example.com/events/boston-ai-build-night/stream',
+  toolkitUrl: 'https://example.com/events/boston-ai-build-night/toolkit',
+  onsiteContact: 'Sundai event team',
+  ...overrides,
+});
 
 export const buildHacker = (
   overrides: FixtureOverrides<HackerFixture> = {}
@@ -201,6 +304,30 @@ export const buildChapter = (
   updatedAt: fixtureNow(),
   ...overrides,
 });
+
+export const buildPublicChapter = (
+  overrides: FixtureOverrides<ChapterFixture> = {}
+): ChapterFixture =>
+  buildChapter({
+    status: 'ACTIVE',
+    accessMode: 'PUBLIC',
+    ...overrides,
+  });
+
+export const buildPrivateChapter = (
+  overrides: FixtureOverrides<ChapterFixture> = {}
+): ChapterFixture =>
+  buildChapter({
+    id: 'chapter-cambridge-private',
+    name: 'Sundai Cambridge',
+    slug: 'cambridge',
+    city: 'Cambridge',
+    description: 'Private Cambridge chapter',
+    accessMode: 'PRIVATE',
+    mailingListName: 'Cambridge builders',
+    mailingListExternalId: 'list-cambridge-builders',
+    ...overrides,
+  });
 
 export const buildChapterMembership = (
   overrides: FixtureOverrides<ChapterMembershipFixture> = {}
@@ -287,6 +414,80 @@ export const buildChapterMemberFixture = ({
   };
 };
 
+export const buildEvent = (
+  overrides: FixtureOverrides<EventFixture> = {}
+): EventFixture => ({
+  id: 'event-boston-ai-build-night',
+  title: 'AI Build Night',
+  description: 'Public event description for Boston builders.',
+  startTime: new Date('2026-07-10T22:00:00.000Z'),
+  endTime: new Date('2026-07-11T01:00:00.000Z'),
+  meetingUrl: null,
+  location: null,
+  venueName: 'Sundai Boston HQ',
+  publicLocation: 'Boston, MA',
+  address: '123 Builder Lane, Boston, MA 02110',
+  virtualUrl: 'https://example.com/events/boston-ai-build-night/stream',
+  createdById: 'hacker-chapter-admin',
+  chapterId: 'chapter-boston',
+  slug: 'ai-build-night',
+  slugNeedsCleanup: false,
+  status: 'PUBLISHED',
+  visibility: 'PUBLIC',
+  programType: 'BUILD_NIGHT',
+  publicProgramLabel: 'AI Build Night',
+  capacity: 40,
+  applicationMode: 'REQUIRES_APPROVAL',
+  autoPromoteWaitlist: false,
+  approvedDetailsJson: buildApprovedOnlyDetails(),
+  applicationQuestionsJson: [
+    {
+      id: 'why_this_event',
+      label: 'Why do you want to join this event?',
+      type: 'TEXTAREA',
+      required: true,
+      order: 10,
+    },
+    {
+      id: 'project_url',
+      label: 'Project URL',
+      type: 'URL',
+      required: false,
+      order: 20,
+    },
+  ],
+  hideChapterDefaultQuestions: false,
+  applicationsOpen: true,
+  applicationsClosedAt: null,
+  applicationsClosedById: null,
+  applicationsCloseReason: null,
+  checkInOpensAt: null,
+  checkInClosesAt: null,
+  createdAt: fixtureNow(),
+  updatedAt: fixtureNow(),
+  ...overrides,
+});
+
+export const buildPublishedEvent = (
+  overrides: FixtureOverrides<EventFixture> = {}
+): EventFixture =>
+  buildEvent({
+    status: 'PUBLISHED',
+    visibility: 'PUBLIC',
+    ...overrides,
+  });
+
+export const buildUnpublishedEvent = (
+  overrides: FixtureOverrides<EventFixture> = {}
+): EventFixture =>
+  buildEvent({
+    id: 'event-boston-unpublished-demo-night',
+    title: 'Unpublished Demo Night',
+    slug: 'unpublished-demo-night',
+    status: 'DRAFT',
+    ...overrides,
+  });
+
 export const buildEventStaff = (
   overrides: FixtureOverrides<EventStaffFixture> = {}
 ): EventStaffFixture => ({
@@ -324,6 +525,10 @@ export const buildEventStaffFixture = ({
   };
 };
 
+export const buildMcFixture = (
+  overrides: Parameters<typeof buildEventStaffFixture>[0] = {}
+): EventStaffRoleFixture => buildEventStaffFixture(overrides);
+
 export const buildCoMcFixture = (
   overrides: Parameters<typeof buildEventStaffFixture>[0] = {}
 ): EventStaffRoleFixture =>
@@ -343,6 +548,19 @@ export const buildCoMcFixture = (
     },
   });
 
+export const buildSignedInApplicant = (
+  overrides: FixtureOverrides<HackerFixture> = {}
+): HackerFixture =>
+  buildHacker({
+    id: 'hacker-applicant',
+    clerkId: 'clerk-applicant',
+    name: 'Signed In Applicant',
+    username: 'signedinapplicant',
+    email: 'applicant@example.com',
+    role: 'HACKER',
+    ...overrides,
+  });
+
 export const buildUserBan = (
   overrides: FixtureOverrides<UserBanFixture> = {}
 ): UserBanFixture => ({
@@ -357,6 +575,197 @@ export const buildUserBan = (
   revocationReason: null,
   ...overrides,
 });
+
+export const buildBannedApplicantFixture = ({
+  hacker: hackerOverrides,
+  ban: banOverrides,
+}: {
+  hacker?: FixtureOverrides<HackerFixture>;
+  ban?: FixtureOverrides<UserBanFixture>;
+} = {}): BannedApplicantFixture => {
+  const hacker = buildSignedInApplicant({
+    id: 'hacker-banned-applicant',
+    clerkId: 'clerk-banned-applicant',
+    name: 'Banned Applicant',
+    username: 'bannedapplicant',
+    email: 'banned-applicant@example.com',
+    ...hackerOverrides,
+  });
+
+  return {
+    hacker,
+    ban: buildUserBan({
+      hackerId: hacker.id,
+      ...banOverrides,
+    }),
+  };
+};
+
+export const buildEventRegistration = (
+  overrides: FixtureOverrides<EventRegistrationFixture> = {}
+): EventRegistrationFixture => ({
+  id: 'registration-applicant-pending',
+  eventId: 'event-boston-ai-build-night',
+  hackerId: 'hacker-applicant',
+  status: 'PENDING',
+  source: 'WEBSITE',
+  answersJson: {
+    name: 'Signed In Applicant',
+    email: 'applicant@example.com',
+    why_this_event: 'I want to build with the Boston AI community.',
+    project_url: 'https://example.com/applicant-project',
+  },
+  templateSnapshotJson: [
+    {
+      id: 'name',
+      label: 'Name',
+      type: 'TEXT',
+      required: true,
+      siteRequired: true,
+      order: 1,
+    },
+    {
+      id: 'email',
+      label: 'Email',
+      type: 'EMAIL',
+      required: true,
+      siteRequired: true,
+      order: 2,
+    },
+    {
+      id: 'why_this_event',
+      label: 'Why do you want to join this event?',
+      type: 'TEXTAREA',
+      required: true,
+      order: 10,
+    },
+  ],
+  publicSafeMessage: null,
+  internalReviewNotes: null,
+  decidedById: null,
+  decidedAt: null,
+  submittedAt: fixtureSubmittedAt(),
+  cancelledAt: null,
+  cancelledById: null,
+  waitlistedAt: null,
+  createdAt: fixtureSubmittedAt(),
+  updatedAt: fixtureSubmittedAt(),
+  ...overrides,
+});
+
+export const buildApprovedRegistration = (
+  overrides: FixtureOverrides<EventRegistrationFixture> = {}
+): EventRegistrationFixture =>
+  buildEventRegistration({
+    id: 'registration-applicant-approved',
+    status: 'APPROVED',
+    publicSafeMessage: 'You are approved.',
+    decidedById: 'hacker-event-mc',
+    decidedAt: new Date('2026-06-22T18:00:00.000Z'),
+    updatedAt: new Date('2026-06-22T18:00:00.000Z'),
+    ...overrides,
+  });
+
+export const buildWaitlistedRegistration = (
+  overrides: FixtureOverrides<EventRegistrationFixture> = {}
+): EventRegistrationFixture =>
+  buildEventRegistration({
+    id: 'registration-applicant-waitlisted',
+    status: 'WAITLISTED',
+    publicSafeMessage: 'You are on the waitlist.',
+    decidedById: 'hacker-event-mc',
+    decidedAt: new Date('2026-06-22T18:15:00.000Z'),
+    waitlistedAt: new Date('2026-06-22T18:15:00.000Z'),
+    updatedAt: new Date('2026-06-22T18:15:00.000Z'),
+    ...overrides,
+  });
+
+export const buildBlockedRegistration = (
+  overrides: FixtureOverrides<EventRegistrationFixture> = {}
+): EventRegistrationFixture =>
+  buildEventRegistration({
+    id: 'registration-banned-applicant-blocked',
+    hackerId: 'hacker-banned-applicant',
+    status: 'BLOCKED',
+    publicSafeMessage: 'You are unable to register for this event at this time.',
+    answersJson: null,
+    templateSnapshotJson: null,
+    internalReviewNotes: 'Active global ban; visible to site admins only.',
+    ...overrides,
+  });
+
+export const buildNativeEventRsvpFixture = (): NativeEventRsvpFixture => {
+  const publicChapter = buildPublicChapter();
+  const privateChapter = buildPrivateChapter();
+  const publishedEvent = buildPublishedEvent({
+    chapterId: publicChapter.id,
+  });
+  const unpublishedEvent = buildUnpublishedEvent({
+    chapterId: publicChapter.id,
+  });
+  const privateChapterEvent = buildPublishedEvent({
+    id: 'event-cambridge-private-ai-salon',
+    chapterId: privateChapter.id,
+    title: 'Private AI Salon',
+    slug: 'private-ai-salon',
+    publicLocation: 'Cambridge, MA',
+  });
+  const applicant = buildSignedInApplicant();
+  const approvedApplicant = buildSignedInApplicant({
+    id: 'hacker-approved-applicant',
+    clerkId: 'clerk-approved-applicant',
+    name: 'Approved Applicant',
+    username: 'approvedapplicant',
+    email: 'approved-applicant@example.com',
+  });
+  const waitlistedApplicant = buildSignedInApplicant({
+    id: 'hacker-waitlisted-applicant',
+    clerkId: 'clerk-waitlisted-applicant',
+    name: 'Waitlisted Applicant',
+    username: 'waitlistedapplicant',
+    email: 'waitlisted-applicant@example.com',
+  });
+  const banned = buildBannedApplicantFixture();
+  const mc = buildMcFixture({
+    staff: { eventId: publishedEvent.id },
+  });
+  const coMc = buildCoMcFixture({
+    staff: { eventId: publishedEvent.id },
+  });
+
+  return {
+    publicChapter,
+    privateChapter,
+    publishedEvent,
+    unpublishedEvent,
+    privateChapterEvent,
+    applicant,
+    approvedApplicant,
+    waitlistedApplicant,
+    bannedApplicant: banned.hacker,
+    ban: banned.ban,
+    mc,
+    coMc,
+    pendingRegistration: buildEventRegistration({
+      eventId: publishedEvent.id,
+      hackerId: applicant.id,
+    }),
+    approvedRegistration: buildApprovedRegistration({
+      id: 'registration-applicant-approved',
+      eventId: publishedEvent.id,
+      hackerId: approvedApplicant.id,
+    }),
+    waitlistedRegistration: buildWaitlistedRegistration({
+      id: 'registration-applicant-waitlisted',
+      eventId: publishedEvent.id,
+      hackerId: waitlistedApplicant.id,
+    }),
+    blockedRegistration: buildBlockedRegistration({
+      eventId: publishedEvent.id,
+      hackerId: banned.hacker.id,
+    }),
+  };
+};
 
 export const buildUserBanFlag = (
   overrides: FixtureOverrides<UserBanFlagFixture> = {}

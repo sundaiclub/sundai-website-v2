@@ -5,6 +5,7 @@ import {
   listEventRegistrations,
   updateEventRegistrationStatus,
 } from '../../src/lib/eventRegistrations';
+import { Prisma } from '@prisma/client';
 import type { EventRegistration } from '../../src/types/event-management';
 
 jest.mock('../../src/lib/prisma', () => ({
@@ -65,7 +66,7 @@ const createRegistrationDb = () => {
     $transaction: jest.fn(),
   };
 
-  db.$transaction.mockImplementation(async (callback) => callback(db));
+  db.$transaction.mockImplementation(async callback => callback(db));
 
   return db;
 };
@@ -103,8 +104,8 @@ describe('/api/events/[eventId]/registrations internals', () => {
         hackerId: createdRegistration.hackerId,
         status: 'PENDING',
         source: 'INTERNAL',
-        answersJson: null,
-        templateSnapshotJson: null,
+        answersJson: Prisma.DbNull,
+        templateSnapshotJson: Prisma.DbNull,
         publicSafeMessage: null,
         internalReviewNotes: null,
         decidedById: null,
@@ -291,6 +292,7 @@ describe('/api/events/[eventId]/registrations internals', () => {
 
     expect(db.eventRegistration.findMany).toHaveBeenCalledWith({
       where: { eventId: 'event-boston-demo-night' },
+      include: expect.objectContaining({ hacker: expect.any(Object) }),
       orderBy: { createdAt: 'desc' },
       take: undefined,
       skip: undefined,
@@ -334,7 +336,7 @@ describe('/api/events/[eventId]/registrations internals', () => {
 describe('/api/events/[eventId]/registrations co-MC applicant decisions', () => {
   it.each(['APPROVED', 'WAITLISTED', 'DECLINED'] as const)(
     'denies co-MC status updates to %s',
-    (toStatus) => {
+    toStatus => {
       const guard = getRegistrationStatusGuard(
         { staffRole: 'CO_MC' },
         toStatus

@@ -24,6 +24,13 @@ function list(payload: unknown): OrganizerEventListItem[] {
   return Array.isArray(payload) ? (payload as OrganizerEventListItem[]) : [];
 }
 
+function applicationState(event: OrganizerEventListItem) {
+  if (event.applicationsOpen === false) return 'Applications closed';
+  if (event.applicationMode === 'OPEN_RSVP') return 'Open RSVP';
+  if (event.applicationMode === 'REQUIRES_APPROVAL') return 'Approval required';
+  return 'Application state unavailable';
+}
+
 export default function OrganizerEventsPage() {
   const classes = useManagementClasses();
   const [events, setEvents] = useState<OrganizerEventListItem[]>([]);
@@ -103,25 +110,55 @@ export default function OrganizerEventsPage() {
       <ManagementSection title="Events">
         <div className={`divide-y ${classes.divider}`}>
           {events.map(event => (
-            <Link
+            <div
               key={event.id}
-              href={`/organizer/events/${event.id}/settings`}
-              className="grid gap-2 rounded-md py-4 transition hover:px-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
+              className="grid gap-3 py-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
             >
               <div className="min-w-0">
-                <div className="truncate font-semibold">{event.title}</div>
+                <Link
+                  className="truncate font-semibold underline-offset-4 hover:underline"
+                  href={`/organizer/events/${event.id}/settings`}
+                >
+                  {event.title}
+                </Link>
                 <div className={`mt-1 text-sm ${classes.mutedText}`}>
                   {event.chapter?.name || 'Chapter event'}
                 </div>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {event.status && (
+                    <ManagementBadge>{event.status}</ManagementBadge>
+                  )}
+                  {event.publicStatus && (
+                    <ManagementBadge>{event.publicStatus}</ManagementBadge>
+                  )}
+                  <ManagementBadge>{applicationState(event)}</ManagementBadge>
+                  <ManagementBadge>
+                    Capacity {event.capacity ?? 'unlimited'}
+                  </ManagementBadge>
+                </div>
               </div>
-              <ManagementBadge>
-                {new Date(event.startTime).toLocaleDateString(undefined, {
-                  month: 'short',
-                  day: 'numeric',
-                  year: 'numeric',
-                })}
-              </ManagementBadge>
-            </Link>
+              <div className="flex flex-wrap gap-2 sm:justify-end">
+                <ManagementBadge>
+                  {new Date(event.startTime).toLocaleDateString(undefined, {
+                    month: 'short',
+                    day: 'numeric',
+                    year: 'numeric',
+                  })}
+                </ManagementBadge>
+                <Link
+                  className={classes.secondaryButton}
+                  href={`/organizer/events/${event.id}/settings`}
+                >
+                  Settings
+                </Link>
+                <Link
+                  className={classes.secondaryButton}
+                  href={`/organizer/events/${event.id}/registrations`}
+                >
+                  Registrations
+                </Link>
+              </div>
+            </div>
           ))}
           {events.length === 0 && (
             <ManagementEmptyState>

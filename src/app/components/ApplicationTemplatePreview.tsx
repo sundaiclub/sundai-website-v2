@@ -44,7 +44,7 @@ function PreviewControl({ field }: { field: TemplateFieldDefinition }) {
     );
   }
 
-  if (field.type === 'BOOLEAN') {
+  if (field.type === 'CHECKBOX') {
     return (
       <label className="flex items-start gap-3">
         <input

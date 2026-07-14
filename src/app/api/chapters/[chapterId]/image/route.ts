@@ -81,7 +81,9 @@ export async function POST(
     if (existing.heroImageId) {
       await prisma.image
         .delete({ where: { id: existing.heroImageId } })
-        .catch(() => {});
+        .catch(error => {
+          console.error('[CHAPTER_IMAGE_CLEANUP]', error);
+        });
     }
 
     return NextResponse.json(chapter);

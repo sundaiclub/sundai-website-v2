@@ -1,6 +1,3 @@
-// Shared trending score used by both client and server.
-// Matches the client-side logic from ProjectSearch/TrendingSections.
-
 export type Trendable = {
   likes?: Array<{ hackerId?: string; createdAt?: string | Date }>;
 };
@@ -60,7 +57,6 @@ export function calculateTrendingScore(
   }, 0);
 }
 
-// Alias with the same name used in client code
 export function calculateProjectScore(
   project: Trendable,
   options: { timeDecayDays?: number; recentLikeWindowDays?: number } = {}

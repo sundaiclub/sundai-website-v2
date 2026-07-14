@@ -70,7 +70,17 @@ describe('chapter helper indexed query shapes', () => {
   });
 
   it('passes visible where and viewer membership include into chapter listing', async () => {
-    const chapter = buildChapter();
+    const nextEvent = {
+      id: 'event-next',
+      title: 'Next Build Night',
+      slug: 'next-build-night',
+      startTime: new Date('2026-07-02T22:00:00.000Z'),
+      publicLocation: 'Sundai HQ',
+    };
+    const chapter = {
+      ...buildChapter(),
+      events: [nextEvent],
+    };
     const { hacker } = buildChapterAdminFixture();
     const prismaClient = {
       chapter: {
@@ -98,7 +108,12 @@ describe('chapter helper indexed query shapes', () => {
         includeViewerMembership: true,
         prismaClient,
       })
-    ).resolves.toEqual([chapter]);
+    ).resolves.toEqual([
+      {
+        ...buildChapter(),
+        nextEvent,
+      },
+    ]);
 
     expect(prismaClient.chapter.findMany).toHaveBeenCalledWith({
       where: visibleChapterWhere(hacker),
@@ -106,6 +121,22 @@ describe('chapter helper indexed query shapes', () => {
       include: {
         heroImage: {
           select: { id: true, url: true, alt: true, filename: true },
+        },
+        events: {
+          where: {
+            status: 'PUBLISHED',
+            visibility: 'PUBLIC',
+            startTime: { gte: expect.any(Date) },
+          },
+          orderBy: { startTime: 'asc' },
+          take: 1,
+          select: {
+            id: true,
+            title: true,
+            slug: true,
+            startTime: true,
+            publicLocation: true,
+          },
         },
         memberships: {
           where: { hackerId: hacker.id },

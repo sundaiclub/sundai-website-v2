@@ -12,10 +12,8 @@ import {
   ManagementSection,
   useManagementClasses,
 } from '../../components/ManagementSurface';
-import {
-  HackerSearchSelect,
-  type HackerSearchOption,
-} from '../../components/HackerSearchSelect';
+import { HackerSearchSelect } from '../../components/HackerSearchSelect';
+import type { HackerSelectionOption } from '@/types/hacker';
 import { useUserContext } from '../../contexts/UserContext';
 import type {
   AdminBanFlagListItem,
@@ -52,12 +50,12 @@ export default function AdminBansPage() {
   const { isAdmin, loading, userInfo } = useUserContext();
   const [bans, setBans] = useState<AdminBanListItem[]>([]);
   const [flags, setFlags] = useState<AdminBanFlagListItem[]>([]);
-  const [hackers, setHackers] = useState<HackerSearchOption[]>([]);
+  const [hackers, setHackers] = useState<HackerSelectionOption[]>([]);
   const [loadError, setLoadError] = useState('');
   const [createError, setCreateError] = useState('');
   const [hackerQuery, setHackerQuery] = useState('');
   const [selectedHacker, setSelectedHacker] =
-    useState<HackerSearchOption | null>(null);
+    useState<HackerSelectionOption | null>(null);
 
   useEffect(() => {
     if (!isAdmin) return;
@@ -79,7 +77,7 @@ export default function AdminBansPage() {
         if (!response.ok) {
           throw new Error(`Request failed with status ${response.status}`);
         }
-        return response.json() as Promise<HackerSearchOption[]>;
+        return response.json() as Promise<HackerSelectionOption[]>;
       }),
     ])
       .then(([bansPayload, flagsPayload, hackersPayload]) => {
@@ -115,7 +113,7 @@ export default function AdminBansPage() {
     setCreateError(body?.message ?? 'Unable to create ban.');
   }
 
-  function handleSelectedHackerChange(hacker: HackerSearchOption | null) {
+  function handleSelectedHackerChange(hacker: HackerSelectionOption | null) {
     setSelectedHacker(hacker);
     setCreateError('');
   }

@@ -71,7 +71,7 @@ const buildEvent = (overrides: Record<string, unknown> = {}) => ({
   publicLocation: 'Downtown Boston',
   address: '1 Demo Way, Boston, MA',
   virtualUrl: 'https://meet.example.com/boston-ai-showcase',
-  applicationMode: 'INTERNAL',
+  applicationMode: 'REQUIRES_APPROVAL',
   autoPromoteWaitlist: true,
   approvedDetailsJson: {
     arrivalInstructions: 'Use the side entrance after 6pm.',
@@ -85,7 +85,9 @@ const buildEvent = (overrides: Record<string, unknown> = {}) => ({
     },
   ],
   hideChapterDefaultQuestions: true,
-  applicationsOpen: new Date('2026-06-01T13:00:00.000Z'),
+  applicationsOpen: true,
+  applicationsClosedAt: null,
+  applicationsClosedById: null,
   applicationsCloseReason: 'Capacity reached',
   checkInOpensAt: new Date('2026-06-18T21:30:00.000Z'),
   checkInClosesAt: new Date('2026-06-18T23:00:00.000Z'),
@@ -163,7 +165,7 @@ describe('/api/events event-management foundations', () => {
     const createdEvent = buildEvent({ chapterId: chapter.id });
     const startTime = '2026-06-18T22:00:00.000Z';
     const endTime = '2026-06-19T00:00:00.000Z';
-    const applicationsOpen = '2026-06-01T13:00:00.000Z';
+    const applicationsClosedAt = '2026-06-01T13:00:00.000Z';
     const checkInOpensAt = '2026-06-18T21:30:00.000Z';
     const checkInClosesAt = '2026-06-18T23:00:00.000Z';
     const approvedDetailsJson = {
@@ -200,12 +202,13 @@ describe('/api/events event-management foundations', () => {
           publicLocation: 'Downtown Boston',
           address: '1 Demo Way, Boston, MA',
           virtualUrl: 'https://meet.example.com/boston-ai-showcase',
-          applicationMode: 'INTERNAL',
+          applicationMode: 'REQUIRES_APPROVAL',
           autoPromoteWaitlist: true,
           approvedDetailsJson,
           applicationQuestionsJson,
           hideChapterDefaultQuestions: true,
-          applicationsOpen,
+          applicationsOpen: false,
+          applicationsClosedAt,
           applicationsCloseReason: 'Capacity reached',
           checkInOpensAt,
           checkInClosesAt,
@@ -232,12 +235,14 @@ describe('/api/events event-management foundations', () => {
           publicLocation: 'Downtown Boston',
           address: '1 Demo Way, Boston, MA',
           virtualUrl: 'https://meet.example.com/boston-ai-showcase',
-          applicationMode: 'INTERNAL',
+          applicationMode: 'REQUIRES_APPROVAL',
           autoPromoteWaitlist: true,
           approvedDetailsJson,
           applicationQuestionsJson,
           hideChapterDefaultQuestions: true,
-          applicationsOpen: new Date(applicationsOpen),
+          applicationsOpen: false,
+          applicationsClosedAt: new Date(applicationsClosedAt),
+          applicationsClosedById: siteAdmin.id,
           applicationsCloseReason: 'Capacity reached',
           checkInOpensAt: new Date(checkInOpensAt),
           checkInClosesAt: new Date(checkInClosesAt),
@@ -442,8 +447,18 @@ describe('/api/events event-management foundations', () => {
     ]);
   });
 
-  it('keeps signed-out event listing public and unscoped', async () => {
-    const publicEvent = buildEvent({ status: 'PUBLISHED', visibility: 'PUBLIC' });
+  it('keeps signed-out event listing public and scoped to published public events', async () => {
+    const publicEvent = buildEvent({
+      status: 'PUBLISHED',
+      visibility: 'PUBLIC',
+      chapter: {
+        id: 'chapter-boston',
+        name: 'Sundai Boston',
+        slug: 'boston',
+        timezone: 'America/New_York',
+      },
+      _count: { registrations: 0 },
+    });
 
     mockSignedOutClerk();
     prisma.event.findMany.mockResolvedValue([publicEvent]);
@@ -458,9 +473,23 @@ describe('/api/events event-management foundations', () => {
     expect(response.status).toBe(200);
     expect(prisma.event.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: undefined,
+        where: expect.objectContaining({
+          status: 'PUBLISHED',
+          visibility: 'PUBLIC',
+          startTime: expect.objectContaining({ gte: expect.any(Date) }),
+          chapter: expect.objectContaining({
+            status: 'ACTIVE',
+            accessMode: 'PUBLIC',
+          }),
+        }),
       })
     );
-    expect(body).toEqual([expect.objectContaining({ id: publicEvent.id })]);
+    expect(body).toEqual([
+      expect.objectContaining({
+        id: publicEvent.id,
+        chapterSlug: 'boston',
+        publicStatus: expect.any(String),
+      }),
+    ]);
   });
 });

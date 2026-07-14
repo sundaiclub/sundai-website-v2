@@ -11,10 +11,6 @@ const replicate = new Replicate({
 const PROMPT_MODEL = "gemini-3-flash-preview";
 const IMAGE_MODEL = "black-forest-labs/flux-2-klein-9b";
 
-type GenerateImagesRequest = {
-  prompt?: unknown;
-};
-
 function getReplicateOutputUrl(output: unknown): string | null {
   if (Array.isArray(output)) {
     const first = output[0];
@@ -27,8 +23,12 @@ function getReplicateOutputUrl(output: unknown): string | null {
       return first;
     }
 
-    if (typeof (first as { url?: unknown }).url === "function") {
-      return ((first as { url: () => string }).url)();
+    if (
+      typeof first === "object" &&
+      "url" in first &&
+      typeof first.url === "function"
+    ) {
+      return String(first.url());
     }
   }
 
@@ -36,8 +36,13 @@ function getReplicateOutputUrl(output: unknown): string | null {
     return output;
   }
 
-  if (output && typeof (output as { url?: unknown }).url === "function") {
-    return ((output as { url: () => string }).url)();
+  if (
+    output !== null &&
+    typeof output === "object" &&
+    "url" in output &&
+    typeof output.url === "function"
+  ) {
+    return String(output.url());
   }
 
   return null;
@@ -58,8 +63,11 @@ export async function POST(
       return new NextResponse("Replicate API token not configured", { status: 500 });
     }
 
-    const body = (await req.json()) as GenerateImagesRequest;
-    const { prompt } = body;
+    const body: unknown = await req.json();
+    const prompt =
+      body !== null && typeof body === "object" && "prompt" in body
+        ? body.prompt
+        : undefined;
 
     if (typeof prompt !== "string" || prompt.trim().length === 0) {
       return new NextResponse("Prompt is required", { status: 400 });
@@ -121,49 +129,33 @@ Generate only the new prompt text, no explanations.`;
       return generatedVariation.trim();
     };
 
-    // Generate 4 different prompts concurrently
-    const promptVariationPromises = [];
-    for (let i = 1; i <= 4; i++) {
-      promptVariationPromises.push(
-        generatePromptVariation(projectContext, i).catch(() => {
-          // Fallback to a basic prompt if variation fails
-          return `Pixel art thumbnail, 16:9 aspect ratio, vibrant colors, professional and modern style. Depict ${project.title} with visual elements representing ${project.techTags.map((tag) => tag.name).join(', ')} and ${project.domainTags.map((tag) => tag.name).join(', ')}. Focus on visual metaphor rather than literal representation.`;
-        })
-      );
-    }
+    const promptVariations = await Promise.all(
+      Array.from({ length: 4 }, (_, index) =>
+        generatePromptVariation(projectContext, index + 1)
+      )
+    );
 
-    const promptVariations = await Promise.all(promptVariationPromises);
-
-    // Generate 4 images concurrently using qwen-image
-    const imageGenerationPromises = promptVariations.map(async (promptVariation, index) => {
-      try {
-        const input = {
-          prompt: promptVariation,
-          aspect_ratio: "16:9",
-          output_format: "webp",
-          output_quality: 90,
-          seed: Math.floor(Math.random() * 10000)
-        };
-
-        const output = await replicate.run(IMAGE_MODEL, { input });
+    // Generate four images concurrently.
+    const images = await Promise.all(
+      promptVariations.map(async promptVariation => {
+        const output = await replicate.run(IMAGE_MODEL, {
+          input: {
+            prompt: promptVariation,
+            aspect_ratio: "16:9",
+            output_format: "webp",
+            output_quality: 90,
+            seed: Math.floor(Math.random() * 10000)
+          }
+        });
         const imageUrl = getReplicateOutputUrl(output);
 
         if (!imageUrl) {
           throw new Error("Image generation returned no URL");
         }
 
-        return {
-          url: imageUrl,
-          prompt: promptVariation,
-        };
-      } catch (error) {
-        console.error(`Error generating image ${index + 1}:`, error);
-        return null; // Return null for failed generations
+        return { url: imageUrl, prompt: promptVariation };
       }
-    });
-
-    const imageResults = await Promise.all(imageGenerationPromises);
-    const images = imageResults.filter(image => image !== null); // Filter out failed generations
+    ));
 
     return NextResponse.json({ images });
   } catch (error) {

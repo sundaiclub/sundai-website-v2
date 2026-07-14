@@ -1,24 +1,32 @@
 // Mock @google/genai SDK
 const generateContentMock = jest.fn();
-jest.mock('@google/genai', () => {
-  return {
-    __esModule: true,
-    GoogleGenAI: jest.fn().mockImplementation(() => ({
-      models: {
-        generateContent: generateContentMock,
-      },
-    })),
-  };
-}, { virtual: true });
+jest.mock(
+  '@google/genai',
+  () => {
+    return {
+      __esModule: true,
+      GoogleGenAI: jest.fn().mockImplementation(() => ({
+        models: {
+          generateContent: generateContentMock,
+        },
+      })),
+    };
+  },
+  { virtual: true }
+);
 
-import { generateShareContent } from '../../src/lib/shareContent';
+import {
+  buildShareContentPrompt,
+  generateShareContent,
+} from '../../src/lib/shareContent';
 
 // Mock the Project type
 const mockProject = {
   id: 'project-123',
   title: 'Amazing Project',
   preview: 'A brief description of the project',
-  description: 'A detailed description of the amazing project that does incredible things',
+  description:
+    'A detailed description of the amazing project that does incredible things',
   demoUrl: 'https://demo.example.com',
   githubUrl: 'https://github.com/user/repo',
   blogUrl: 'https://blog.example.com',
@@ -33,8 +41,8 @@ const mockProject = {
         name: 'Jane Smith',
         twitterUrl: 'https://twitter.com/janesmith',
         linkedinUrl: 'https://linkedin.com/in/janesmith',
-      }
-    }
+      },
+    },
   ],
 };
 
@@ -51,12 +59,40 @@ describe('ShareContent', () => {
     generateContentMock.mockReset();
   });
 
+  describe('buildShareContentPrompt', () => {
+    it('uses the project, platform limit, and real team handles', () => {
+      const prompt = buildShareContentPrompt({
+        project: mockProject,
+        platform: 'twitter',
+        isTeamMember: true,
+      });
+
+      expect(prompt).toContain('Project: Amazing Project');
+      expect(prompt).toContain('Keep under 280 characters');
+      expect(prompt).toContain(
+        'Use the real social handles: @johndoe, @janesmith'
+      );
+      expect(prompt).toContain('Start with "We just built..."');
+    });
+
+    it('applies the non-team-member perspective consistently', () => {
+      const prompt = buildShareContentPrompt({
+        project: mockProject,
+        platform: 'linkedin',
+        isTeamMember: false,
+      });
+
+      expect(prompt).toContain('Write from third-person promoting Sundai');
+      expect(prompt).toContain('Keep under 3000 characters');
+      expect(prompt).toContain('@johndoe, @janesmith');
+    });
+  });
 
   describe('generateShareContent', () => {
     it('should generate content using Gemini API successfully', async () => {
-    generateContentMock.mockResolvedValueOnce({
-      text: '🚀 We just built Amazing Project! Check out this incredible innovation #TechInnovation #Sundai',
-    });
+      generateContentMock.mockResolvedValueOnce({
+        text: '🚀 We just built Amazing Project! Check out this incredible innovation #TechInnovation #Sundai',
+      });
 
       const result = await generateShareContent({
         project: mockProject,
@@ -66,21 +102,22 @@ describe('ShareContent', () => {
       });
 
       expect(result).toEqual({
-        content: '🚀 We just built Amazing Project! Check out this incredible innovation #TechInnovation #Sundai',
+        content:
+          '🚀 We just built Amazing Project! Check out this incredible innovation #TechInnovation #Sundai',
         hashtags: ['TechInnovation', 'Sundai'],
         characterCount: 94,
       });
 
-    expect(generateContentMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        model: 'gemini-2.5-flash',
-        contents: expect.stringContaining('Amazing Project'),
-      })
-    );
+      expect(generateContentMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          model: 'gemini-2.5-flash',
+          contents: expect.stringContaining('Amazing Project'),
+        })
+      );
     });
 
     it('should fallback to template content when API fails', async () => {
-    generateContentMock.mockRejectedValueOnce(new Error('API Error'));
+      generateContentMock.mockRejectedValueOnce(new Error('API Error'));
 
       const result = await generateShareContent({
         project: mockProject,
@@ -91,11 +128,16 @@ describe('ShareContent', () => {
 
       expect(result.content).toContain('🚀 We just built Amazing Project!');
       expect(result.content).toContain('Built by: @johndoe, @jane');
-      expect(result.hashtags).toEqual(['Sundai', 'TechProjects', 'Innovation', 'BuildInPublic']);
+      expect(result.hashtags).toEqual([
+        'Sundai',
+        'TechProjects',
+        'Innovation',
+        'BuildInPublic',
+      ]);
     });
 
     it('should fallback when API returns no content', async () => {
-    generateContentMock.mockResolvedValueOnce({ text: '' });
+      generateContentMock.mockResolvedValueOnce({ text: '' });
 
       const result = await generateShareContent({
         project: mockProject,
@@ -108,7 +150,7 @@ describe('ShareContent', () => {
     });
 
     it('should generate LinkedIn content with professional tone', async () => {
-    generateContentMock.mockRejectedValueOnce(new Error('API Error'));
+      generateContentMock.mockRejectedValueOnce(new Error('API Error'));
 
       const result = await generateShareContent({
         project: mockProject,
@@ -117,13 +159,15 @@ describe('ShareContent', () => {
         isTeamMember: false,
       });
 
-      expect(result.content).toContain('🚀 Check out Amazing Project built by the team at Sundai!');
+      expect(result.content).toContain(
+        '🚀 Check out Amazing Project built by the team at Sundai!'
+      );
       expect(result.content).toContain('Our amazing team');
       expect(result.content).toContain('#TeamWork #Innovation');
     });
 
     it('should generate Reddit content without hashtags', async () => {
-    generateContentMock.mockRejectedValueOnce(new Error('API Error'));
+      generateContentMock.mockRejectedValueOnce(new Error('API Error'));
 
       const result = await generateShareContent({
         project: mockProject,
@@ -158,15 +202,19 @@ describe('ShareContent', () => {
         isTeamMember: true,
       });
 
-      expect(result.content).toContain('📄 Project: https://www.sundai.club/projects/project-123');
+      expect(result.content).toContain(
+        '📄 Project: https://www.sundai.club/projects/project-123'
+      );
       expect(result.content).not.toContain('Demo:');
       expect(result.content).not.toContain('Code:');
     });
 
     it('should handle API errors gracefully', async () => {
       const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
-      
-      (global.fetch as jest.Mock).mockRejectedValueOnce(new Error('Network error'));
+
+      (global.fetch as jest.Mock).mockRejectedValueOnce(
+        new Error('Network error')
+      );
 
       const result = await generateShareContent({
         project: mockProject,
@@ -176,8 +224,11 @@ describe('ShareContent', () => {
       });
 
       expect(result.content).toContain('🚀 We just built Amazing Project!');
-      expect(consoleSpy).toHaveBeenCalledWith('Error generating content with Gemini:', expect.any(Error));
-      
+      expect(consoleSpy).toHaveBeenCalledWith(
+        'Error generating content with Gemini:',
+        expect.any(Error)
+      );
+
       consoleSpy.mockRestore();
     });
 
@@ -221,8 +272,12 @@ describe('ShareContent', () => {
 
       expect(result.content).toContain('🔗 Demo: https://demo.example.com');
       expect(result.content).toContain('💻 Code: https://github.com/user/repo');
-      expect(result.content).toContain('📄 Project: https://www.sundai.club/projects/project-123');
-      expect(result.content).toContain('🌟 More projects: https://www.sundai.club/projects');
+      expect(result.content).toContain(
+        '📄 Project: https://www.sundai.club/projects/project-123'
+      );
+      expect(result.content).toContain(
+        '🌟 More projects: https://www.sundai.club/projects'
+      );
     });
   });
 });

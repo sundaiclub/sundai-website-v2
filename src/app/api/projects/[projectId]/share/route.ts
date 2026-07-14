@@ -1,29 +1,31 @@
-export const runtime = 'nodejs'
+export const runtime = 'nodejs';
 export const maxDuration = 300;
 
-import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
-import prisma from "@/lib/prisma";
+import { NextResponse } from 'next/server';
+import { auth } from '@clerk/nextjs/server';
+import prisma from '@/lib/prisma';
 import {
+  buildShareContentPrompt,
   generateShareContent,
+  SHARE_CONTENT_MODEL,
   type SharePlatform,
-} from "@/lib/shareContent";
-import type { Project } from "@/types/project";
+} from '@/lib/shareContent';
+import type { Project } from '@/types/project';
 
 type ShareRequestBody = {
   platform?: unknown;
 };
 
-type ShareTeamMember = {
-  name: string;
-  twitterUrl?: string | null;
-  linkedinUrl?: string | null;
-};
-
-const SHARE_PLATFORMS = new Set<SharePlatform>(['twitter', 'linkedin', 'reddit']);
+const SHARE_PLATFORMS = new Set<SharePlatform>([
+  'twitter',
+  'linkedin',
+  'reddit',
+]);
 
 function isSharePlatform(value: unknown): value is SharePlatform {
-  return typeof value === 'string' && SHARE_PLATFORMS.has(value as SharePlatform);
+  return (
+    typeof value === 'string' && SHARE_PLATFORMS.has(value as SharePlatform)
+  );
 }
 
 export async function POST(
@@ -33,14 +35,14 @@ export async function POST(
   try {
     const { userId } = auth();
     if (!userId) {
-      return new NextResponse("Unauthorized", { status: 401 });
+      return new NextResponse('Unauthorized', { status: 401 });
     }
 
     const body = (await req.json()) as ShareRequestBody;
     const { platform } = body;
 
     if (!isSharePlatform(platform)) {
-      return new NextResponse("Invalid platform", { status: 400 });
+      return new NextResponse('Invalid platform', { status: 400 });
     }
 
     // Get the current user's hacker record
@@ -49,7 +51,7 @@ export async function POST(
     });
 
     if (!currentUser) {
-      return new NextResponse("User not found", { status: 404 });
+      return new NextResponse('User not found', { status: 404 });
     }
 
     // Get the project with all necessary data
@@ -116,19 +118,21 @@ export async function POST(
     });
 
     if (!project) {
-      return new NextResponse("Project not found", { status: 404 });
+      return new NextResponse('Project not found', { status: 404 });
     }
 
     // Check if user is a team member
-    const isTeamMember = project.participants.some(p => p.hacker.id === currentUser.id) || 
-                        project.launchLeadId === currentUser.id;
+    const isTeamMember =
+      project.participants.some(p => p.hacker.id === currentUser.id) ||
+      project.launchLeadId === currentUser.id;
 
     // Generate content using Gemini API
     const projectData: Project = {
       id: project.id,
       title: project.title,
       preview: project.preview || project.title,
-      description: project.description || project.preview || 'No description available',
+      description:
+        project.description || project.preview || 'No description available',
       githubUrl: project.githubUrl,
       demoUrl: project.demoUrl,
       blogUrl: project.blogUrl,
@@ -167,93 +171,32 @@ export async function POST(
     };
 
     const acceptHeader = req.headers.get('accept') || '';
-    const wantsStream = acceptHeader.includes('text/event-stream') || acceptHeader.includes('text/plain');
+    const wantsStream =
+      acceptHeader.includes('text/event-stream') ||
+      acceptHeader.includes('text/plain');
 
     if (wantsStream) {
       const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
       if (!apiKey) {
-        return new NextResponse("Gemini API key not configured", { status: 500 });
+        return new NextResponse('Gemini API key not configured', {
+          status: 500,
+        });
       }
 
-      const teamMembers: ShareTeamMember[] = [
-        projectData.launchLead,
-        ...projectData.participants.map((p) => p.hacker),
-      ];
-      const formatTeamNames = (members: ShareTeamMember[], plat: SharePlatform) => {
-        const mapOne = (person: ShareTeamMember) => {
-          switch (plat) {
-            case 'twitter': {
-              if (person.twitterUrl) {
-                const m = person.twitterUrl.match(/(?:twitter\.com|x\.com)\/([^/?]+)/);
-                return m ? `@${m[1]}` : `@${String(person.name).split(' ')[0].toLowerCase()}`;
-              }
-              return `@${String(person.name).split(' ')[0].toLowerCase()}`;
-            }
-            case 'linkedin': {
-              if (person.linkedinUrl) {
-                const m = person.linkedinUrl.match(/linkedin\.com\/in\/([^/?]+)/);
-                return m ? `@${m[1]}` : `@${String(person.name).toLowerCase().replace(/\s+/g, '-')}`;
-              }
-              return `@${String(person.name).toLowerCase().replace(/\s+/g, '-')}`;
-            }
-            case 'reddit':
-              return `u/${String(person.name).split(' ')[0].toLowerCase()}`;
-            default:
-              return String(person.name);
-          }
-        };
-        return members.map(mapOne).join(', ');
-      };
+      const prompt = buildShareContentPrompt({
+        project: projectData,
+        platform,
+        isTeamMember,
+      });
 
-      const formattedTeamNames = formatTeamNames(teamMembers, platform);
-      const perspective = isTeamMember ? "first-person as a team member" : "third-person promoting Sundai";
-      const characterLimit = platform === 'twitter' ? 280 : platform === 'linkedin' ? 3000 : 40000;
-      const style = platform === 'twitter' ? "concise, engaging, with relevant emojis and hashtags" : platform === 'linkedin' ? "professional, detailed, focusing on technical achievements and team collaboration" : "informative, community-focused, with technical details that would interest developers";
-
-      const prompt = `Generate a viral social media post for ${platform} about this project:
-
-Project: ${projectData.title}
-Description: ${projectData.preview}
-Full Description: ${projectData.description}
-Team: ${teamMembers.map((p) => p.name).join(', ')}
-Launch Lead: ${projectData.launchLead.name}
-
-Platform-specific tagging for ${platform}:
-${platform === 'linkedin' ? '- Tag people with their actual @username from LinkedIn profiles' : ''}
-${platform === 'twitter' ? '- Tag people with their actual @username from Twitter profiles' : ''}
-${platform === 'reddit' ? '- Tag people with u/username format, avoid hashtags' : ''}
-Formatted team tags (with real social handles): ${formattedTeamNames}
-
-Links available:
-${projectData.demoUrl ? `- Demo: ${projectData.demoUrl}` : ''}
-${projectData.githubUrl ? `- GitHub: ${projectData.githubUrl}` : ''}
-${projectData.blogUrl ? `- Blog: ${projectData.blogUrl}` : ''}
-- Project Page: https://www.sundai.club/projects/${projectData.id}
-
-Write from ${perspective}. Style should be ${style}.
-
-Requirements:
-- ${isTeamMember ? 'Start with "We just built..." or similar first-person language' : 'Mention "The team at Sundai built..." to promote Sundai'}
-- Keep under ${characterLimit} characters
-- Include relevant emojis
-- Use the real social handles: ${formattedTeamNames}
-- ${platform === 'reddit' ? 'Avoid hashtags, use plain text' : 'Add appropriate hashtags'}
-- Include team member names with their actual social handles when available
-- Mention the links including the project page
-- Make it engaging and viral-worthy
-- End with link to https://www.sundai.club/projects for more projects
-
-Make there is no fluff, keep it concise, professional and to the point, avoid emojis.
-Generate only the post content, no explanations.`;
-
-      const { GoogleGenAI } = await import("@google/genai");
+      const { GoogleGenAI } = await import('@google/genai');
       const ai = new GoogleGenAI({ apiKey });
       const encoder = new TextEncoder();
       const stream = new ReadableStream({
         async start(controller) {
           try {
             const response = await ai.models.generateContentStream({
-              model: "gemini-2.5-flash",
+              model: SHARE_CONTENT_MODEL,
               contents: prompt,
             });
             for await (const chunk of response) {
@@ -261,18 +204,18 @@ Generate only the post content, no explanations.`;
               if (text) controller.enqueue(encoder.encode(text));
             }
             controller.close();
-          } catch (e) {
-            console.error('[SHARE_STREAM]', e);
-            controller.close();
+          } catch (error) {
+            console.error('[SHARE_STREAM]', error);
+            controller.error(error);
           }
-        }
+        },
       });
 
       return new Response(stream, {
         headers: {
           'Content-Type': 'text/plain; charset=utf-8',
           'Cache-Control': 'no-cache',
-        }
+        },
       });
     }
 
@@ -285,7 +228,7 @@ Generate only the post content, no explanations.`;
 
     return NextResponse.json(shareContent);
   } catch (error) {
-    console.error("[SHARE_CONTENT_GENERATION]", error);
-    return new NextResponse("Internal Error", { status: 500 });
+    console.error('[SHARE_CONTENT_GENERATION]', error);
+    return new NextResponse('Internal Error', { status: 500 });
   }
 }

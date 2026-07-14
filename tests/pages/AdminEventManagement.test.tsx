@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 const mockUseTheme = jest.fn();
 const mockUseUserContext = jest.fn();
+const originalFetch = global.fetch;
 
 jest.mock('../../src/app/contexts/ThemeContext', () => ({
   useTheme: () => mockUseTheme(),
@@ -227,6 +228,10 @@ describe('event-management site-admin pages', () => {
     jest.clearAllMocks();
     mockUseTheme.mockReturnValue({ isDarkMode: false });
     mockAdminFetches();
+  });
+
+  afterEach(() => {
+    global.fetch = originalFetch;
   });
 
   describe('/admin', () => {

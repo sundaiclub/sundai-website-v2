@@ -204,6 +204,22 @@ export async function listVisibleChapters(options: ListVisibleChaptersOptions = 
       heroImage: {
         select: { id: true, url: true, alt: true, filename: true },
       },
+      events: {
+        where: {
+          status: "PUBLISHED",
+          visibility: "PUBLIC",
+          startTime: { gte: now() },
+        },
+        orderBy: { startTime: "asc" },
+        take: 1,
+        select: {
+          id: true,
+          title: true,
+          slug: true,
+          startTime: true,
+          publicLocation: true,
+        },
+      },
       ...(options.includeViewerMembership && viewerId
         ? {
             memberships: {
@@ -215,7 +231,16 @@ export async function listVisibleChapters(options: ListVisibleChaptersOptions = 
     },
   });
 
-  return chapters as Chapter[];
+  return chapters.map((chapter) => {
+    const { events, ...chapterFields } = chapter as Chapter & {
+      events?: Array<Record<string, unknown>>;
+    };
+
+    return {
+      ...chapterFields,
+      nextEvent: events?.[0] ?? null,
+    };
+  }) as Chapter[];
 }
 
 export async function joinOrReactivatePublicMembership(

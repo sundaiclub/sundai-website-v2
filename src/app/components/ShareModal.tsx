@@ -23,14 +23,11 @@ const socialPlatforms = [
   { id: 'reddit', name: 'Reddit', icon: '🤖', color: 'bg-orange-600 hover:bg-orange-700' },
 ];
 
-export default function ShareModal({ showModal, setShowModal, project, userInfo, isDarkMode }: ShareModalProps) {
+export default function ShareModal({ showModal, setShowModal, project, isDarkMode }: ShareModalProps) {
   const [selectedPlatform, setSelectedPlatform] = useState('twitter');
   const [generatedContent, setGeneratedContent] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [customContent, setCustomContent] = useState('');
-
-  const isTeamMember = (Array.isArray(project.participants) && project.participants.some(p => p.hacker?.id === userInfo?.id)) || 
-                      (project.launchLead && project.launchLead.id === userInfo?.id);
 
   const generateContent = async () => {
     setIsGenerating(true);
@@ -52,13 +49,7 @@ export default function ShareModal({ showModal, setShowModal, project, userInfo,
           toast.error('Please sign in to generate shareable content.');
           return; // Do not fallback when unauthorized
         }
-        // Log server-provided error text if available
-        let errorText = response.statusText;
-        try {
-          errorText = await response.text();
-        } catch (_) {
-          // ignore
-        }
+        const errorText = await response.text();
         throw new Error(`Failed to generate content: ${errorText || response.statusText}`);
       }
 
@@ -117,37 +108,7 @@ export default function ShareModal({ showModal, setShowModal, project, userInfo,
       }
     } catch (error) {
       console.error('Error generating content:', error);
-      toast.error('Failed to generate content. Showing a basic template instead.');
-      
-      // Fallback to basic template on error
-      const teamNames = [
-        project.launchLead?.name, 
-        ...project.participants.map(p => p.hacker?.name).filter(Boolean)
-      ].filter(Boolean).join(', ');
-
-      const intro = isTeamMember 
-        ? `🚀 We just built ${project.title}!` 
-        : `🚀 Check out ${project.title} built by the team at Sundai!`;
-
-      const links = [
-        project.demoUrl && `🔗 Demo: ${project.demoUrl}`,
-        project.githubUrl && `💻 Code: ${project.githubUrl}`,
-        `📄 Project: https://www.sundai.club/projects/${project.id}`,
-        `🌟 More projects: https://www.sundai.club/projects`
-      ].filter(Boolean).join('\n');
-
-      const content = `${intro}
-
-${project.preview}
-
-Built by: ${teamNames}
-
-${links}
-
-#Sundai #TechProjects #Innovation #BuildInPublic`;
-
-      setGeneratedContent(content);
-      setCustomContent(content);
+      toast.error('Failed to generate content. Please try again.');
     } finally {
       setIsGenerating(false);
     }
