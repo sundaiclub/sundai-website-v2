@@ -162,6 +162,7 @@ export type ChapterLanding = Pick<
   viewerMembership?: ChapterMembershipSummary | null;
   memberships?: ChapterMembershipSummary[];
   upcomingEvents?: ChapterLandingEvent[];
+  previousEvents?: ChapterLandingEvent[];
   pendingEvents?: ChapterLandingEvent[];
 };
 
@@ -244,7 +245,7 @@ export type TemplateFieldType =
   | 'PHONE'
   | 'URL'
   | 'NUMBER'
-  | 'BOOLEAN'
+  | 'CHECKBOX'
   | 'SELECT'
   | 'MULTI_SELECT'
   | 'DATE'
@@ -268,6 +269,7 @@ export interface TemplateFieldDefinition {
   label: string;
   type: TemplateFieldType;
   required: boolean;
+  reusePreviousAnswer?: boolean;
   siteRequired?: boolean;
   helpText?: string | null;
   placeholder?: string | null;
@@ -486,6 +488,7 @@ export interface PublicEventDetail extends PublicEventCard {
   approvedDetailsVisible: boolean;
   applicationControls: ApplicationControlsState;
   applicationQuestionSet: ApplicationQuestionSet;
+  reusableAnswersJson?: JsonObject | null;
   viewerRegistration?: PublicViewerRegistrationState | null;
   viewerCanManageRegistrations?: boolean;
   viewerCanEditEvent?: boolean;
@@ -669,3 +672,9 @@ export interface HackerOrganizerNoteRevision {
   createdAt: ISODateTimeString | Date;
   editedBy?: EventManagementHackerSummary;
 }
+
+export type OrganizerNoteAccess = {
+  canViewCurrentNote: boolean;
+  canEditCurrentNote: boolean;
+  canViewRevisions: boolean;
+};

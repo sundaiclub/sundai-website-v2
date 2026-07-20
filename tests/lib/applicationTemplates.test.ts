@@ -244,6 +244,20 @@ describe('application template composition', () => {
 
     expectValidationError(
       () =>
+        parseTemplateFieldsJson([
+          {
+            id: 'legacy-checkbox',
+            label: 'Legacy checkbox',
+            type: 'BOOLEAN',
+            required: false,
+          },
+        ]),
+      'FIELD_TYPE_INVALID',
+      'legacy-checkbox'
+    );
+
+    expectValidationError(
+      () =>
         parseTemplateFieldsJson(
           [
             {
@@ -285,7 +299,7 @@ describe('application template composition', () => {
         siteRequiredFields[0],
         field('siteOptIn', {
           label: 'Site opt-in',
-          type: 'BOOLEAN',
+          type: 'CHECKBOX',
           order: 2,
         }),
       ],
@@ -344,7 +358,7 @@ describe('application template composition', () => {
         }),
         field('hasBuiltBefore', {
           label: 'Has built before',
-          type: 'BOOLEAN',
+          type: 'CHECKBOX',
           required: true,
         }),
         field('teamSize', {

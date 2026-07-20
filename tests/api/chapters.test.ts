@@ -307,9 +307,20 @@ describe('/api/chapters', () => {
         publicLocation: 'Seaport',
       }),
     ];
+    const previousEvents = [
+      buildPublishedEvent({
+        id: 'event-boston-spring-demo',
+        title: 'Boston Spring Demo',
+        slug: 'spring-demo',
+        chapterId: chapter.id,
+        startTime: new Date('2026-05-15T22:00:00.000Z'),
+        publicLocation: 'Central Square',
+      }),
+    ];
 
     mockSignedOutClerk();
     mockChapterDetailLookup({ chapter, upcomingEvents });
+    prisma.event.findMany.mockResolvedValue(previousEvents);
 
     const response = await GET_CHAPTER(
       createJsonRequest('/api/chapters/boston') as any,
@@ -347,6 +358,15 @@ describe('/api/chapters', () => {
           publicLocation: 'Seaport',
         },
       ],
+      previousEvents: [
+        {
+          id: 'event-boston-spring-demo',
+          title: 'Boston Spring Demo',
+          slug: 'spring-demo',
+          startTime: previousEvents[0].startTime.toISOString(),
+          publicLocation: 'Central Square',
+        },
+      ],
       viewerMembership: null,
     });
     expect(prisma.chapter.findUnique).toHaveBeenCalledWith(
@@ -376,6 +396,22 @@ describe('/api/chapters', () => {
         }),
       })
     );
+    expect(prisma.event.findMany).toHaveBeenCalledWith({
+      where: {
+        chapterId: chapter.id,
+        status: 'PUBLISHED',
+        visibility: 'PUBLIC',
+        startTime: { lt: expect.any(Date) },
+      },
+      orderBy: { startTime: 'desc' },
+      select: {
+        id: true,
+        title: true,
+        slug: true,
+        startTime: true,
+        publicLocation: true,
+      },
+    });
   });
 
   it('returns manager-only pending events for chapter admins', async () => {
@@ -406,7 +442,9 @@ describe('/api/chapters', () => {
     mockActor(hacker);
     mockMembershipLookup(membership);
     mockChapterDetailLookup({ chapter, adminMemberships: [membership] });
-    prisma.event.findMany.mockResolvedValue([draftEvent]);
+    prisma.event.findMany.mockImplementation(async ({ where }: any) =>
+      where?.startTime?.lt ? [] : [draftEvent]
+    );
 
     const response = await GET_CHAPTER(
       createJsonRequest('/api/chapters/boston') as any,

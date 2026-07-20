@@ -1,4 +1,4 @@
-import { authMiddleware } from "@clerk/nextjs/server";
+import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
 
 type MiddlewareAuth = {
@@ -13,7 +13,7 @@ type ProjectMutationBody = {
 };
 
 function isProjectMutationBody(value: unknown): value is ProjectMutationBody {
-  return value !== null && typeof value === "object";
+  return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
 export async function afterAuthHandler(auth: MiddlewareAuth, req: NextRequest) {
@@ -31,17 +31,13 @@ export async function afterAuthHandler(auth: MiddlewareAuth, req: NextRequest) {
 
       // Get the request body if it exists
       let body: ProjectMutationBody = {};
+      const cloned = req.clone();
       try {
-        const cloned = req.clone();
         const parsedBody: unknown = await cloned.json();
         body = isProjectMutationBody(parsedBody) ? parsedBody : {};
-      } catch (err: unknown) {
-        // If request clone fails entirely, surface 500 for general error case
-        if (err instanceof Error && err.message.includes("Request clone error")) {
-          return NextResponse.json("Internal Server Error", { status: 500 });
-        }
-        // If JSON parsing fails, skip admin checks gracefully
-        body = {};
+      } catch (error: unknown) {
+        console.error("Unable to inspect project mutation body:", error);
+        return NextResponse.json("Invalid JSON body", { status: 400 });
       }
 
       // Allow like/unlike without admin: DELETE /api/projects/:id/like should pass
@@ -74,17 +70,18 @@ export async function afterAuthHandler(auth: MiddlewareAuth, req: NextRequest) {
   }
 }
 
-export default authMiddleware({
-  publicRoutes: [
-    "/",
-    "/events",
-    "/chapters(.*)",
-    "/api/chapters(.*)",
-    "/api/projects(.*)",
-  ],
-  async afterAuth(auth, req) {
-    return afterAuthHandler(auth, req);
-  }
+export const isPublicRoute = createRouteMatcher([
+  "/",
+  "/events(.*)",
+  "/chapters(.*)",
+  "/api/chapters(.*)",
+  "/api/projects(.*)",
+]);
+
+export default clerkMiddleware(async (auth, req) => {
+  const authData = auth();
+  if (!isPublicRoute(req)) await authData.protect();
+  return afterAuthHandler(authData, req);
 });
 
 export const config = {

@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 
 // Mock dependencies
 jest.mock('@clerk/nextjs/server', () => ({
-  authMiddleware: jest.fn(),
+  clerkMiddleware: jest.fn(),
+  createRouteMatcher: jest.fn(() => jest.fn(() => false)),
 }));
 
 jest.mock('next/server', () => ({
@@ -12,8 +13,6 @@ jest.mock('next/server', () => ({
   },
 }));
 
-const mockAuthMiddleware = require('@clerk/nextjs/server').authMiddleware;
-
 describe('middleware comprehensive', () => {
   beforeEach(() => {
     jest.resetModules();
@@ -21,7 +20,7 @@ describe('middleware comprehensive', () => {
     require('../src/middleware');
   });
 
-  it('should configure authMiddleware with correct options', () => {
+  it('should configure Clerk middleware with the project handler', () => {
     const mw = require('../src/middleware');
     expect(typeof mw.afterAuthHandler).toBe('function');
   });
@@ -264,7 +263,7 @@ describe('middleware comprehensive', () => {
       expect(result.status).toBe(500);
     });
 
-    it('should handle JSON parsing errors gracefully', async () => {
+    it('should reject malformed project mutation JSON', async () => {
       const mockAuth = { userId: 'test-user-id' };
       const mockReq = {
         nextUrl: { 
@@ -278,7 +277,8 @@ describe('middleware comprehensive', () => {
       };
 
       const result = await afterAuthFunction(mockAuth, mockReq as any);
-      expect(result).toBeUndefined();
+      expect(result).toEqual({ status: 400, body: 'Invalid JSON body' });
+      expect(mockFetch).not.toHaveBeenCalled();
     });
 
     it('should handle general errors gracefully', async () => {

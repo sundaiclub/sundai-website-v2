@@ -85,6 +85,13 @@ const createNativeEventBody = (overrides: Record<string, unknown> = {}) => ({
       required: true,
       order: 10,
     },
+    {
+      id: 'accept_guidelines',
+      label: 'I accept the event guidelines',
+      type: 'CHECKBOX',
+      required: true,
+      order: 11,
+    },
   ],
   confirmationMessage: 'Your application was submitted.',
   waitlistMessage: 'You are on the waitlist.',

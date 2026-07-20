@@ -72,7 +72,7 @@ const projectIdeaQuestion: TemplateFieldDefinition = {
 const availabilityQuestion: TemplateFieldDefinition = {
   id: 'availability',
   label: 'Can you stay for demos?',
-  type: 'BOOLEAN',
+  type: 'CHECKBOX',
   required: false,
   order: 1,
 };

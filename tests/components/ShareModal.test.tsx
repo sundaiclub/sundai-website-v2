@@ -125,6 +125,7 @@ describe('ShareModal', () => {
   });
 
   it('should handle generate content error', async () => {
+    const toast = require('react-hot-toast').default;
     (global.fetch as jest.Mock).mockRejectedValueOnce(new Error('Network error'));
 
     render(<ShareModal {...defaultProps} />);
@@ -132,11 +133,12 @@ describe('ShareModal', () => {
     const generateButton = screen.getByText('Generate Content');
     fireEvent.click(generateButton);
     
-    // The component falls back to basic template on error
     await waitFor(() => {
-      const el = screen.getByRole('textbox') as HTMLTextAreaElement
-      expect(el.value).toContain('Built by:')
+      expect(toast.error).toHaveBeenCalledWith(
+        'Failed to generate content. Please try again.'
+      );
     });
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
   });
 
   it('should show toast and not fallback on 401 unauthorized', async () => {
@@ -187,14 +189,17 @@ describe('ShareModal', () => {
     fireEvent.click(generateButton)
 
     await waitFor(() => {
-      // Because our component initializes with fallback template on error path,
-      // assert that fetch was called with streaming Accept header instead.
       const calls = (global.fetch as jest.Mock).mock.calls
       expect(calls[0][1].headers['Accept']).toBe('text/plain')
     })
   })
 
   it('should update custom content when textarea changes', async () => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      headers: { get: () => 'application/json' },
+      json: () => Promise.resolve({ content: 'Generated content' }),
+    });
     render(<ShareModal {...defaultProps} />);
     
     // First generate content to show the textarea

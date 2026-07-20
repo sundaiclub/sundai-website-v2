@@ -1,5 +1,6 @@
 jest.mock('@clerk/nextjs/server', () => ({
-  authMiddleware: jest.fn(),
+  clerkMiddleware: jest.fn(),
+  createRouteMatcher: jest.fn(() => jest.fn(() => false)),
 }))
 jest.mock('next/server', () => ({
   NextResponse: {
@@ -23,5 +24,4 @@ describe('Middleware unlike', () => {
     expect(res).toBeUndefined() // no blocking response
   })
 })
-
 

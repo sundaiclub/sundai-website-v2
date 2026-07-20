@@ -46,15 +46,27 @@ function initialAnswers(input: {
   fields: readonly TemplateFieldDefinition[];
   profile?: ProfilePrefillSource | null;
   registration?: PublicViewerRegistrationState | null;
+  reusableAnswers?: JsonObject | null;
 }) {
-  const answers = applyProfilePrefillToAnswers({
+  const profileAnswers = applyProfilePrefillToAnswers({
     fields: input.fields,
     profile: input.profile,
-    existingAnswers: jsonObject(input.registration?.answersJson),
   });
+  const reusableAnswers = jsonObject(input.reusableAnswers);
+  const existingAnswers = jsonObject(input.registration?.answersJson);
+  const answers = input.fields.reduce<JsonObject>((result, field) => {
+    if (
+      field.reusePreviousAnswer === true &&
+      reusableAnswers[field.id] !== undefined
+    ) {
+      result[field.id] = reusableAnswers[field.id];
+    }
+    return result;
+  }, profileAnswers);
+  Object.assign(answers, existingAnswers);
 
   for (const field of input.fields) {
-    if (field.type === 'BOOLEAN' && answers[field.id] === undefined) {
+    if (field.type === 'CHECKBOX' && answers[field.id] === undefined) {
       answers[field.id] = false;
     }
   }
@@ -98,7 +110,7 @@ function FieldInput({
   const inputId = `application-${field.id}`;
   const stringValue = fieldValueToString(value);
 
-  if (field.type === 'BOOLEAN') {
+  if (field.type === 'CHECKBOX') {
     return (
       <div className="grid gap-2">
         <label className="flex items-start gap-3" htmlFor={inputId}>
@@ -185,7 +197,12 @@ export function EventApplicationForm({
   const controls: ApplicationControlsState = event.applicationControls;
   const [isEditing, setIsEditing] = useState(false);
   const [answers, setAnswers] = useState<JsonObject>(() =>
-    initialAnswers({ fields, profile: viewerProfile, registration })
+    initialAnswers({
+      fields,
+      profile: viewerProfile,
+      registration,
+      reusableAnswers: event.reusableAnswersJson,
+    })
   );
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [actionError, setActionError] = useState('');
@@ -195,10 +212,21 @@ export function EventApplicationForm({
 
   useEffect(() => {
     setAnswers(
-      initialAnswers({ fields, profile: viewerProfile, registration })
+      initialAnswers({
+        fields,
+        profile: viewerProfile,
+        registration,
+        reusableAnswers: event.reusableAnswersJson,
+      })
     );
     setIsEditing(false);
-  }, [controls.canSubmit, fields, registration, viewerProfile]);
+  }, [
+    controls.canSubmit,
+    event.reusableAnswersJson,
+    fields,
+    registration,
+    viewerProfile,
+  ]);
 
   const canStartRegistration =
     fields.length > 0 &&

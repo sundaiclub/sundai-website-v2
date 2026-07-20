@@ -329,3 +329,4 @@ Task: "T060 [P] [US4] Create reusable registration review row and action compone
 - [X] T093 Send approval and decline emails through AWS SES according to active chapter-membership notification preferences.
 - [X] T094 Send approval and decline SMS messages through Twilio according to active chapter-membership notification preferences.
 - [X] T095 Keep registration decisions authoritative when a notification provider fails and add focused preference, content, and failure tests.
+- [X] T096 Add per-question previous-answer reuse controls to application templates and event custom questions, load opted-in prior answers for new applications, and add focused validation coverage.

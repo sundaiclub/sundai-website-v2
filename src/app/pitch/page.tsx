@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation';
 import { useUser, SignInButton } from '@clerk/nextjs';
 import { useUserContext } from '../contexts/UserContext';
 import { useTheme } from '../contexts/ThemeContext';
-import { HackerSelector, type Hacker } from '../components/HackerSelector';
+import { HackerSelector } from '../components/HackerSelector';
+import type { HackerSelectionOption } from '@/types/hacker';
 import {
   formatDateTimeLocalValue,
   serializeDateTimeLocalValue,
@@ -94,7 +95,7 @@ export default function PitchPage() {
   });
   const [endTime, setEndTime] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
-  const [hackers, setHackers] = useState<Hacker[]>([]);
+  const [hackers, setHackers] = useState<HackerSelectionOption[]>([]);
   const [selectedMCs, setSelectedMCs] = useState<string[]>([]);
   const [showSelector, setShowSelector] = useState(false);
   const [votingEndTimeManual, setVotingEndTimeManual] = useState(false);

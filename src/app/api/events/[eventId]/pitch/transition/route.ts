@@ -14,11 +14,9 @@ function isPitchSessionPhaseTransition(
   value: unknown
 ): value is PitchSessionPhaseTransition {
   return (
-    typeof value === 'string' &&
-    EVENT_PHASES.includes(value as PitchSessionPhaseTransition)
+    typeof value === 'string' && EVENT_PHASES.some(phase => phase === value)
   );
 }
-
 export async function POST(
   req: Request,
   { params }: { params: { eventId: string } }
@@ -32,10 +30,11 @@ export async function POST(
     if (!pitchSession)
       return new NextResponse('Pitch session not found', { status: 404 });
 
-    const body = (await req.json().catch(() => ({}))) as {
-      targetPhase?: unknown;
-    };
-    const targetPhase = body?.targetPhase;
+    const body: unknown = await req.json().catch(() => ({}));
+    const targetPhase =
+      body !== null && typeof body === 'object' && 'targetPhase' in body
+        ? body.targetPhase
+        : undefined;
 
     if (!isPitchSessionPhaseTransition(targetPhase)) {
       return NextResponse.json(

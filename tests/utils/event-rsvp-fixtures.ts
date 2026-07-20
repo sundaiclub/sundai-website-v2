@@ -1,6 +1,6 @@
-export type FixtureOverrides<T> = Partial<T>;
+type FixtureOverrides<T> = Partial<T>;
 
-export type ChapterTimezoneFixture = {
+type ChapterTimezoneFixture = {
   id: string;
   name: string;
   slug: string;
@@ -8,7 +8,7 @@ export type ChapterTimezoneFixture = {
   timezone: string;
 };
 
-export type EventDateTimeFixture = {
+type EventDateTimeFixture = {
   id: string;
   slug: string;
   title: string;
@@ -16,13 +16,9 @@ export type EventDateTimeFixture = {
   publicLocation: string;
   startTime: string;
   endTime: string;
-  expectedChapterDate: string;
-  expectedChapterTimeRange: string;
-  expectedChapterDateTimeRange: string;
-  expectedUtcCalendarRange: string;
 };
 
-export type CalendarPayloadExpectation = {
+type CalendarPayloadExpectation = {
   title: string;
   description: string;
   location: string;
@@ -31,7 +27,7 @@ export type CalendarPayloadExpectation = {
   timezone: string;
 };
 
-export type CalendarPayloadFixture = {
+type CalendarPayloadFixture = {
   event: EventDateTimeFixture;
   publicDescription: string;
   approvedOnlyDescription: string;
@@ -39,7 +35,7 @@ export type CalendarPayloadFixture = {
   approvedPayload: CalendarPayloadExpectation;
 };
 
-export type CalendarPayloadFixtureOverrides = Omit<
+type CalendarPayloadFixtureOverrides = Omit<
   FixtureOverrides<CalendarPayloadFixture>,
   'publicPayload' | 'approvedPayload'
 > & {
@@ -47,7 +43,7 @@ export type CalendarPayloadFixtureOverrides = Omit<
   approvedPayload?: FixtureOverrides<CalendarPayloadExpectation>;
 };
 
-export const bostonChapterTimezoneFixture: ChapterTimezoneFixture = {
+const bostonChapterTimezoneFixture: ChapterTimezoneFixture = {
   id: 'chapter-boston',
   name: 'Sundai Boston',
   slug: 'boston',
@@ -55,23 +51,7 @@ export const bostonChapterTimezoneFixture: ChapterTimezoneFixture = {
   timezone: 'America/New_York',
 };
 
-export const chicagoChapterTimezoneFixture: ChapterTimezoneFixture = {
-  id: 'chapter-chicago',
-  name: 'Sundai Chicago',
-  slug: 'chicago',
-  city: 'Chicago',
-  timezone: 'America/Chicago',
-};
-
-export const losAngelesChapterTimezoneFixture: ChapterTimezoneFixture = {
-  id: 'chapter-los-angeles',
-  name: 'Sundai Los Angeles',
-  slug: 'los-angeles',
-  city: 'Los Angeles',
-  timezone: 'America/Los_Angeles',
-};
-
-export const buildEventDateTimeFixture = (
+const buildEventDateTimeFixture = (
   overrides: FixtureOverrides<EventDateTimeFixture> = {}
 ): EventDateTimeFixture => ({
   id: 'event-boston-ai-build-night',
@@ -81,44 +61,10 @@ export const buildEventDateTimeFixture = (
   publicLocation: 'Boston, MA',
   startTime: '2026-07-10T22:00:00.000Z',
   endTime: '2026-07-11T01:00:00.000Z',
-  expectedChapterDate: 'Friday, July 10, 2026',
-  expectedChapterTimeRange: '6:00 PM - 9:00 PM EDT',
-  expectedChapterDateTimeRange: 'Friday, July 10, 2026, 6:00 PM - 9:00 PM EDT',
-  expectedUtcCalendarRange: '20260710T220000Z/20260711T010000Z',
   ...overrides,
 });
 
-export const chapterTimezoneDateTimeFixtures: EventDateTimeFixture[] = [
-  buildEventDateTimeFixture(),
-  buildEventDateTimeFixture({
-    id: 'event-chicago-winter-showcase',
-    slug: 'winter-showcase',
-    title: 'Winter Showcase',
-    chapter: chicagoChapterTimezoneFixture,
-    publicLocation: 'Chicago, IL',
-    startTime: '2026-12-05T20:30:00.000Z',
-    endTime: '2026-12-05T23:00:00.000Z',
-    expectedChapterDate: 'Saturday, December 5, 2026',
-    expectedChapterTimeRange: '2:30 PM - 5:00 PM CST',
-    expectedChapterDateTimeRange: 'Saturday, December 5, 2026, 2:30 PM - 5:00 PM CST',
-    expectedUtcCalendarRange: '20261205T203000Z/20261205T230000Z',
-  }),
-  buildEventDateTimeFixture({
-    id: 'event-los-angeles-date-boundary',
-    slug: 'date-boundary-lab',
-    title: 'Date Boundary Lab',
-    chapter: losAngelesChapterTimezoneFixture,
-    publicLocation: 'Los Angeles, CA',
-    startTime: '2026-07-11T01:00:00.000Z',
-    endTime: '2026-07-11T03:30:00.000Z',
-    expectedChapterDate: 'Friday, July 10, 2026',
-    expectedChapterTimeRange: '6:00 PM - 8:30 PM PDT',
-    expectedChapterDateTimeRange: 'Friday, July 10, 2026, 6:00 PM - 8:30 PM PDT',
-    expectedUtcCalendarRange: '20260711T010000Z/20260711T033000Z',
-  }),
-];
-
-export const buildCalendarPayloadFixture = (
+const buildCalendarPayloadFixture = (
   overrides: CalendarPayloadFixtureOverrides = {}
 ): CalendarPayloadFixture => {
   const event = overrides.event ?? buildEventDateTimeFixture();
@@ -155,11 +101,3 @@ export const buildCalendarPayloadFixture = (
 };
 
 export const publicCalendarPayloadFixture = buildCalendarPayloadFixture();
-
-export const approvedCalendarPayloadFixture = buildCalendarPayloadFixture({
-  event: buildEventDateTimeFixture({
-    id: 'event-boston-approved-calendar',
-    slug: 'approved-calendar-night',
-    title: 'Approved Calendar Night',
-  }),
-});

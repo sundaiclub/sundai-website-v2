@@ -38,6 +38,7 @@ export default function ChapterLandingPage({
   const [actionMessage, setActionMessage] = useState('');
   const [actionError, setActionError] = useState('');
   const [isActing, setIsActing] = useState(false);
+  const [isPreferencesOpen, setIsPreferencesOpen] = useState(false);
   const membership = firstMembership(chapter);
   const canManageChapter =
     Boolean(chapter) &&
@@ -135,9 +136,12 @@ export default function ChapterLandingPage({
     setActionMessage('');
     setActionError('');
     try {
-      const response = await fetch(`/api/chapters/${chapter.id}/invites/accept`, {
-        method: 'POST',
-      });
+      const response = await fetch(
+        `/api/chapters/${chapter.id}/invites/accept`,
+        {
+          method: 'POST',
+        }
+      );
       if (!response.ok) {
         throw new Error('Unable to accept this invitation.');
       }
@@ -194,18 +198,20 @@ export default function ChapterLandingPage({
     setActionMessage('');
     setActionError('');
     try {
-      const response = await fetch(`/api/chapters/${chapter.id}/notifications`, {
-        method: 'PATCH',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          notificationsAllowed,
-          emailNotificationsEnabled,
-          smsNotificationsEnabled,
-          smsConsentGranted:
-            smsNotificationsEnabled && smsConsentGranted,
-          smsConsentVersion,
-        }),
-      });
+      const response = await fetch(
+        `/api/chapters/${chapter.id}/notifications`,
+        {
+          method: 'PATCH',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            notificationsAllowed,
+            emailNotificationsEnabled,
+            smsNotificationsEnabled,
+            smsConsentGranted: smsNotificationsEnabled && smsConsentGranted,
+            smsConsentVersion,
+          }),
+        }
+      );
       if (!response.ok) {
         throw new Error('Unable to save notification preferences.');
       }
@@ -216,6 +222,7 @@ export default function ChapterLandingPage({
         memberships: [membership],
       });
       setActionMessage('Notification preferences saved.');
+      setIsPreferencesOpen(false);
     } catch (error) {
       setActionError(
         error instanceof Error
@@ -225,6 +232,29 @@ export default function ChapterLandingPage({
     } finally {
       setIsActing(false);
     }
+  }
+
+  function setAllNotifications(enabled: boolean) {
+    setNotificationsAllowed(enabled);
+    setEmailNotificationsEnabled(enabled);
+    setSmsNotificationsEnabled(enabled && smsConsentAvailable);
+    if (!enabled) setSmsConsentGranted(false);
+  }
+
+  function openPreferences() {
+    setNotificationsAllowed(Boolean(membership?.notificationsAllowed));
+    setEmailNotificationsEnabled(
+      Boolean(membership?.emailNotificationsEnabled)
+    );
+    setSmsNotificationsEnabled(Boolean(membership?.smsNotificationsEnabled));
+    setActionMessage('');
+    setActionError('');
+    setIsPreferencesOpen(true);
+  }
+
+  function closePreferences() {
+    if (isActing) return;
+    setIsPreferencesOpen(false);
   }
 
   if (denied) {
@@ -391,6 +421,50 @@ export default function ChapterLandingPage({
           </div>
         </ManagementSection>
 
+        <ManagementSection title="Previous events">
+          <div className={`divide-y ${classes.divider}`}>
+            {(chapter?.previousEvents ?? []).map(event => (
+              <div
+                key={event.id}
+                className="grid gap-3 rounded-md px-3 py-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
+              >
+                <Link
+                  className="group min-w-0 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-gray-500"
+                  href={`/events/${eventChapterSlug}/${event.slug}`}
+                >
+                  <span className="font-semibold group-hover:underline">
+                    {event.title}
+                  </span>
+                  <div className={`mt-1 text-sm ${classes.mutedText}`}>
+                    {[
+                      event.publicLocation,
+                      event.startTime
+                        ? new Date(event.startTime).toLocaleDateString()
+                        : null,
+                    ]
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </div>
+                </Link>
+                {canManageChapter && (
+                  <Link
+                    aria-label={`Edit ${event.title}`}
+                    className={classes.secondaryButton}
+                    href={`/organizer/events/${event.id}/settings`}
+                  >
+                    Edit
+                  </Link>
+                )}
+              </div>
+            ))}
+            {(chapter?.previousEvents ?? []).length === 0 && (
+              <ManagementEmptyState>
+                No previous events are listed.
+              </ManagementEmptyState>
+            )}
+          </div>
+        </ManagementSection>
+
         {chapter?.mailingListName && (
           <ManagementSection
             title="Mailing list"
@@ -430,32 +504,79 @@ export default function ChapterLandingPage({
               Accept invitation
             </button>
           )}
-          {membership?.status === 'ACTIVE' && membership.role !== 'ADMIN' && (
-            <button
-              className={classes.secondaryButton}
-              disabled={isActing}
-              onClick={leaveChapter}
-              type="button"
-            >
-              Leave chapter
-            </button>
+          {membership?.status === 'ACTIVE' && (
+            <div className="ml-auto flex flex-wrap justify-end gap-3">
+              <button
+                className={classes.secondaryButton}
+                disabled={isActing}
+                onClick={openPreferences}
+                type="button"
+              >
+                Preferences
+              </button>
+              {membership.role !== 'ADMIN' && (
+                <button
+                  className={`${
+                    classes.isDarkMode
+                      ? 'border-red-800 bg-red-950/30 text-red-200 hover:bg-red-950/60'
+                      : 'border-red-300 bg-red-50 text-red-700 hover:bg-red-100'
+                  } inline-flex min-h-10 items-center justify-center gap-2 rounded-md border px-4 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50`}
+                  disabled={isActing}
+                  onClick={leaveChapter}
+                  type="button"
+                >
+                  Leave chapter
+                </button>
+              )}
+            </div>
           )}
         </div>
+      </div>
 
-        {membership?.status === 'ACTIVE' && (
-          <ManagementSection
-            title="Notification preferences"
-            description="Choose how this chapter can contact you."
+      {membership?.status === 'ACTIVE' && isPreferencesOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+          onClick={closePreferences}
+        >
+          <div
+            aria-labelledby="notification-preferences-title"
+            aria-modal="true"
+            className={`${classes.panel} w-full max-w-md p-5`}
+            onClick={event => event.stopPropagation()}
+            role="dialog"
           >
-            <div className="grid max-w-md gap-3">
+            <div className="mb-5 flex items-start justify-between gap-4">
+              <div>
+                <h2
+                  className="text-xl font-bold"
+                  id="notification-preferences-title"
+                >
+                  Notification preferences
+                </h2>
+                <p className={`mt-1 text-sm ${classes.mutedText}`}>
+                  Choose how this chapter can contact you.
+                </p>
+              </div>
+              <button
+                aria-label="Close preferences"
+                className={classes.ghostButton}
+                disabled={isActing}
+                onClick={closePreferences}
+                type="button"
+              >
+                Close
+              </button>
+            </div>
+            <div className="grid gap-3">
+              {actionError && (
+                <ManagementAlert tone="danger">{actionError}</ManagementAlert>
+              )}
               <label className="flex items-center gap-3 text-sm font-semibold">
                 <input
                   aria-label="Allow notifications"
                   className={classes.checkbox}
                   checked={notificationsAllowed}
-                  onChange={event =>
-                    setNotificationsAllowed(event.target.checked)
-                  }
+                  onChange={event => setAllNotifications(event.target.checked)}
                   type="checkbox"
                 />
                 Allow notifications
@@ -465,6 +586,7 @@ export default function ChapterLandingPage({
                   aria-label="Email"
                   className={classes.checkbox}
                   checked={emailNotificationsEnabled}
+                  disabled={!notificationsAllowed}
                   onChange={event =>
                     setEmailNotificationsEnabled(event.target.checked)
                   }
@@ -477,7 +599,7 @@ export default function ChapterLandingPage({
                   aria-label="SMS"
                   className={classes.checkbox}
                   checked={smsNotificationsEnabled}
-                  disabled={!smsConsentAvailable}
+                  disabled={!notificationsAllowed || !smsConsentAvailable}
                   onChange={event => {
                     setSmsNotificationsEnabled(event.target.checked);
                     if (!event.target.checked) setSmsConsentGranted(false);
@@ -488,8 +610,8 @@ export default function ChapterLandingPage({
               </label>
               {!smsConsentAvailable && (
                 <p className={`text-sm ${classes.mutedText}`} role="status">
-                  SMS notifications are unavailable until consent information
-                  is configured.
+                  SMS notifications are unavailable until consent information is
+                  configured.
                 </p>
               )}
               {smsNotificationsEnabled && smsConsentAvailable && (
@@ -511,18 +633,28 @@ export default function ChapterLandingPage({
                   </p>
                 </div>
               )}
-              <button
-                className={classes.primaryButton}
-                disabled={isActing}
-                onClick={updateNotifications}
-                type="button"
-              >
-                Save notification preferences
-              </button>
+              <div className="mt-2 flex justify-end gap-3">
+                <button
+                  className={classes.secondaryButton}
+                  disabled={isActing}
+                  onClick={closePreferences}
+                  type="button"
+                >
+                  Cancel
+                </button>
+                <button
+                  className={classes.primaryButton}
+                  disabled={isActing}
+                  onClick={updateNotifications}
+                  type="button"
+                >
+                  {isActing ? 'Saving...' : 'Save preferences'}
+                </button>
+              </div>
             </div>
-          </ManagementSection>
-        )}
-      </div>
+          </div>
+        </div>
+      )}
     </ManagementPage>
   );
 }

@@ -7,10 +7,10 @@ import {
 } from '@/lib/eventManagementAuth';
 import {
   buildApplicationControlsState,
-  fetchMergedApplicationTemplate,
   getApplicationPublicStatus,
   parseTemplateFieldsJson,
 } from '@/lib/applicationTemplates';
+import { fetchMergedApplicationTemplate } from '@/lib/applicationTemplateQueries';
 import type {
   AddToCalendarPayload,
   ApplicationControlsState,
@@ -203,6 +203,7 @@ export type GetPublicEventBySlugInput = {
 
 export type RedactPublicEventOptions = {
   applicationQuestionSet?: ApplicationQuestionSet;
+  reusableAnswersJson?: JsonObject | null;
   viewerRegistration?: PublicViewerRegistrationState | null;
   viewerCanManageRegistrations?: boolean;
   viewerCanViewApprovedDetails?: boolean;
@@ -367,6 +368,16 @@ export async function getPublicEventBySlug(
       getPublicEventReadPermissionContext(event, viewerHackerId, client),
       fetchMergedApplicationTemplate({ eventId: event.id, prisma: client }),
     ]);
+  const applicationQuestionSet = buildApplicationQuestionSet(
+    event,
+    mergedTemplate
+  );
+  const reusableAnswersJson = await getReusableAnswersForViewer({
+    client,
+    eventId: event.id,
+    fields: applicationQuestionSet.composedFields,
+    viewerHackerId: viewerRegistration ? null : viewerHackerId,
+  });
   const viewerCanViewApprovedDetails =
     canViewApprovedOnlyEventDetailsWithContext({
       ...readPermissionContext,
@@ -378,7 +389,8 @@ export async function getPublicEventBySlug(
   const viewerCanEditEvent = canPublishEventWithContext(readPermissionContext);
 
   return redactPublicEventForViewer(event, {
-    applicationQuestionSet: buildApplicationQuestionSet(event, mergedTemplate),
+    applicationQuestionSet,
+    reusableAnswersJson,
     viewerRegistration,
     viewerCanManageRegistrations,
     viewerCanViewApprovedDetails,
@@ -446,6 +458,7 @@ export function redactPublicEventForViewer(
     applicationControls,
     applicationQuestionSet:
       options.applicationQuestionSet ?? buildApplicationQuestionSet(event),
+    reusableAnswersJson: options.reusableAnswersJson ?? null,
     viewerRegistration: options.viewerRegistration ?? null,
     viewerCanManageRegistrations: options.viewerCanManageRegistrations === true,
     viewerCanEditEvent: options.viewerCanEditEvent === true,
@@ -454,6 +467,51 @@ export function redactPublicEventForViewer(
         approvedDetailsVisible && options.approvedCalendarDetails === true,
     }),
   };
+}
+
+async function getReusableAnswersForViewer(input: {
+  client: PublicEventsPrismaClient;
+  eventId: EntityId;
+  fields: readonly TemplateFieldDefinition[];
+  viewerHackerId?: EntityId | null;
+}): Promise<JsonObject> {
+  const reusableFieldIds = input.fields
+    .filter(field => field.reusePreviousAnswer === true)
+    .map(field => field.id);
+
+  if (!input.viewerHackerId || reusableFieldIds.length === 0) return {};
+
+  const registrations = await input.client.eventRegistration.findMany({
+    where: {
+      hackerId: input.viewerHackerId,
+      eventId: { not: input.eventId },
+    },
+    orderBy: { submittedAt: 'desc' },
+    take: 50,
+  });
+  const answers: JsonObject = {};
+
+  for (const registration of registrations ?? []) {
+    const priorAnswers = asJsonObject(registration.answersJson);
+    if (!priorAnswers) continue;
+
+    for (const fieldId of reusableFieldIds) {
+      if (answers[fieldId] !== undefined) continue;
+      const value = priorAnswers[fieldId];
+      if (isAnsweredValue(value)) answers[fieldId] = value;
+    }
+
+    if (Object.keys(answers).length === reusableFieldIds.length) break;
+  }
+
+  return answers;
+}
+
+function isAnsweredValue(value: JsonValue | undefined): value is JsonValue {
+  if (value === undefined || value === null) return false;
+  if (typeof value === 'string') return value.trim().length > 0;
+  if (Array.isArray(value)) return value.length > 0;
+  return true;
 }
 
 function canViewApprovedDetails(input: {

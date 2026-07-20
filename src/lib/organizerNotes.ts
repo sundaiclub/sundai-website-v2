@@ -4,8 +4,10 @@ import type {
   EventStaffRole,
   HackerOrganizerNote,
   HackerOrganizerNoteRevision,
+  OrganizerNoteAccess,
   Role,
 } from '@/types/event-management';
+import { isSiteAdminRole } from '@/lib/eventManagementAuth';
 
 type HackerRecord = {
   id: EntityId;
@@ -67,12 +69,6 @@ export type OrganizerNoteRelevance = {
   targetEventIds: EntityId[];
 };
 
-export type OrganizerNoteAccess = {
-  canViewCurrentNote: boolean;
-  canEditCurrentNote: boolean;
-  canViewRevisions: boolean;
-};
-
 export type OrganizerNoteRevisionInput = {
   previousBody: string;
   nextBody: string;
@@ -96,10 +92,6 @@ export type OrganizerNoteAccessForActor = {
 };
 
 const client = prisma as unknown as EventManagementPrismaClient;
-
-export function isSiteAdminRole(role?: Role | null): boolean {
-  return role === 'SITE_ADMIN';
-}
 
 export function hasSharedOrganizerNoteChapter(
   relevance: Pick<

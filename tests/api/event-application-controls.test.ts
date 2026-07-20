@@ -455,32 +455,41 @@ describe('T069 event application close/open controls API', () => {
   });
 
   it.each([
-    ['MC', (fixture: ReturnType<typeof buildNativeEventRsvpFixture>) => fixture.mc],
-    ['co-MC', (fixture: ReturnType<typeof buildNativeEventRsvpFixture>) => fixture.coMc],
-  ])('denies %s staff from closing applications', async (_label, staffFixture) => {
-    const { POST } = loadApplicationCloseRoute();
-    const fixture = buildNativeEventRsvpFixture();
-    const assigned = staffFixture(fixture);
-    mockApplicationControlDatabase({
-      actor: assigned.hacker,
-      event: fixture.publishedEvent,
-      staff: assigned.staff,
-    });
+    [
+      'MC',
+      (fixture: ReturnType<typeof buildNativeEventRsvpFixture>) => fixture.mc,
+    ],
+    [
+      'co-MC',
+      (fixture: ReturnType<typeof buildNativeEventRsvpFixture>) => fixture.coMc,
+    ],
+  ])(
+    'denies %s staff from closing applications',
+    async (_label, staffFixture) => {
+      const { POST } = loadApplicationCloseRoute();
+      const fixture = buildNativeEventRsvpFixture();
+      const assigned = staffFixture(fixture);
+      mockApplicationControlDatabase({
+        actor: assigned.hacker,
+        event: fixture.publishedEvent,
+        staff: assigned.staff,
+      });
 
-    const response = await POST(
-      createJsonRequest(
-        `/api/events/${fixture.publishedEvent.id}/applications/close`,
-        {
-          method: 'POST',
-          body: { reason: 'Organizer-only pause.' },
-        }
-      ) as any,
-      createRouteContext({ eventId: fixture.publishedEvent.id })
-    );
+      const response = await POST(
+        createJsonRequest(
+          `/api/events/${fixture.publishedEvent.id}/applications/close`,
+          {
+            method: 'POST',
+            body: { reason: 'Organizer-only pause.' },
+          }
+        ) as any,
+        createRouteContext({ eventId: fixture.publishedEvent.id })
+      );
 
-    expect(response.status).toBe(403);
-    expect(prisma.event.update).not.toHaveBeenCalled();
-  });
+      expect(response.status).toBe(403);
+      expect(prisma.event.update).not.toHaveBeenCalled();
+    }
+  );
 
   it.each(buildAllowedApplicationControlActors())(
     'allows $label to reopen applications and clear closed metadata',
@@ -535,36 +544,45 @@ describe('T069 event application close/open controls API', () => {
   );
 
   it.each([
-    ['MC', (fixture: ReturnType<typeof buildNativeEventRsvpFixture>) => fixture.mc],
-    ['co-MC', (fixture: ReturnType<typeof buildNativeEventRsvpFixture>) => fixture.coMc],
-  ])('denies %s staff from reopening applications', async (_label, staffFixture) => {
-    const { POST } = loadApplicationOpenRoute();
-    const fixture = buildNativeEventRsvpFixture();
-    const assigned = staffFixture(fixture);
-    const closedEvent = {
-      ...fixture.publishedEvent,
-      applicationsOpen: false,
-      applicationsClosedAt: applicationControlNow,
-      applicationsClosedById: fixture.mc.hacker.id,
-      applicationsCloseReason: 'Capacity reached for this format.',
-    };
-    mockApplicationControlDatabase({
-      actor: assigned.hacker,
-      event: closedEvent,
-      staff: assigned.staff,
-    });
+    [
+      'MC',
+      (fixture: ReturnType<typeof buildNativeEventRsvpFixture>) => fixture.mc,
+    ],
+    [
+      'co-MC',
+      (fixture: ReturnType<typeof buildNativeEventRsvpFixture>) => fixture.coMc,
+    ],
+  ])(
+    'denies %s staff from reopening applications',
+    async (_label, staffFixture) => {
+      const { POST } = loadApplicationOpenRoute();
+      const fixture = buildNativeEventRsvpFixture();
+      const assigned = staffFixture(fixture);
+      const closedEvent = {
+        ...fixture.publishedEvent,
+        applicationsOpen: false,
+        applicationsClosedAt: applicationControlNow,
+        applicationsClosedById: fixture.mc.hacker.id,
+        applicationsCloseReason: 'Capacity reached for this format.',
+      };
+      mockApplicationControlDatabase({
+        actor: assigned.hacker,
+        event: closedEvent,
+        staff: assigned.staff,
+      });
 
-    const response = await POST(
-      createJsonRequest(
-        `/api/events/${fixture.publishedEvent.id}/applications/open`,
-        { method: 'POST', body: {} }
-      ) as any,
-      createRouteContext({ eventId: fixture.publishedEvent.id })
-    );
+      const response = await POST(
+        createJsonRequest(
+          `/api/events/${fixture.publishedEvent.id}/applications/open`,
+          { method: 'POST', body: {} }
+        ) as any,
+        createRouteContext({ eventId: fixture.publishedEvent.id })
+      );
 
-    expect(response.status).toBe(403);
-    expect(prisma.event.update).not.toHaveBeenCalled();
-  });
+      expect(response.status).toBe(403);
+      expect(prisma.event.update).not.toHaveBeenCalled();
+    }
+  );
 
   it('returns a public-safe response when closed applications block a new submission', async () => {
     const fixture = buildNativeEventRsvpFixture();
@@ -626,24 +644,27 @@ describe('T069 event application close/open controls API', () => {
     const body = await response.json();
 
     expect(response.status).toBe(200);
-    expect(prisma.eventRegistration.findMany).toHaveBeenCalledWith(
+    expect(prisma.eventRegistration.findMany).toHaveBeenCalledWith({
+      where: {
+        eventId: fixture.publishedEvent.id,
+        status: 'PENDING',
+      },
+      include: expect.objectContaining({ hacker: expect.any(Object) }),
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+      skip: 0,
+    });
+    expect(body).toEqual(
       expect.objectContaining({
-        where: {
-          eventId: fixture.publishedEvent.id,
-          status: 'PENDING',
-        },
-        orderBy: { createdAt: 'desc' },
-        take: 100,
-        skip: 0,
+        statusFilter: 'PENDING',
+        rows: [
+          expect.objectContaining({
+            id: fixture.pendingRegistration.id,
+            status: 'PENDING',
+          }),
+        ],
       })
     );
-    const rows = Array.isArray(body) ? body : body.rows;
-    expect(rows).toEqual([
-      expect.objectContaining({
-        id: fixture.pendingRegistration.id,
-        status: 'PENDING',
-      }),
-    ]);
   });
 });
 

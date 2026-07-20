@@ -2,20 +2,15 @@
 
 import { useMemo, useState } from 'react';
 import { useManagementClasses } from './ManagementSurface';
-
-export type HackerSearchOption = {
-  id: string;
-  name: string;
-  email?: string | null;
-};
+import type { HackerSelectionOption } from '@/types/hacker';
 
 type HackerSearchSelectProps = {
   ariaLabel: string;
-  hackers: HackerSearchOption[];
+  hackers: HackerSelectionOption[];
   query: string;
-  selectedHacker: HackerSearchOption | null;
+  selectedHacker: HackerSelectionOption | null;
   onQueryChange: (query: string) => void;
-  onSelectedHackerChange: (hacker: HackerSearchOption | null) => void;
+  onSelectedHackerChange: (hacker: HackerSelectionOption | null) => void;
   placeholder?: string;
   noResultsText?: string;
   disabled?: boolean;
@@ -55,7 +50,7 @@ export function HackerSearchSelect({
     setIsOpen(true);
   }
 
-  function chooseHacker(hacker: HackerSearchOption) {
+  function chooseHacker(hacker: HackerSelectionOption) {
     onSelectedHackerChange(hacker);
     onQueryChange(hacker.name);
     setIsOpen(false);

@@ -1,6 +1,6 @@
 import prisma from './prisma';
 import { Prisma } from '@prisma/client';
-import { fetchMergedApplicationTemplate } from '@/lib/applicationTemplates';
+import { fetchMergedApplicationTemplate } from '@/lib/applicationTemplateQueries';
 import { BLOCKED_REGISTRATION_MESSAGE } from '@/lib/moderation';
 import { notifyEventDecision } from '@/lib/eventDecisionNotifications';
 import type {
@@ -14,6 +14,7 @@ import type {
   PublicRegistrationResponse,
   RegistrationSource,
   RegistrationStatus,
+  Role,
   TemplateFieldDefinition,
 } from '@/types/event-management';
 
@@ -200,7 +201,7 @@ type EventRegistrationRecord = Omit<
     name: string;
     username?: string | null;
     email: string;
-    role: string;
+    role: Role;
     organizerNote?: { body: string } | null;
     userBans?: Array<{
       id: EntityId;
@@ -1452,7 +1453,7 @@ function isAnswerTypeValid(
   value: JsonValue | undefined
 ): boolean {
   switch (field.type) {
-    case 'BOOLEAN':
+    case 'CHECKBOX':
       return typeof value === 'boolean';
     case 'MULTI_SELECT':
       return (

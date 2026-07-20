@@ -3,7 +3,7 @@ import { auth } from "@clerk/nextjs/server";
 import type { Prisma, ProjectStatus } from "@prisma/client";
 import prisma from "@/lib/prisma";
 
-const PROJECT_STATUSES = new Set<ProjectStatus>(["DRAFT", "PENDING", "APPROVED"]);
+const PROJECT_STATUSES = ["DRAFT", "PENDING", "APPROVED"] as const satisfies readonly ProjectStatus[];
 
 type SubmittedParticipant = {
   role?: string | null;
@@ -13,15 +13,21 @@ type SubmittedParticipant = {
 };
 
 function isProjectStatus(value: FormDataEntryValue): value is ProjectStatus {
-  return typeof value === "string" && PROJECT_STATUSES.has(value as ProjectStatus);
+  return typeof value === "string" && PROJECT_STATUSES.some(status => status === value);
 }
-
 function isSubmittedParticipant(value: unknown): value is SubmittedParticipant {
   return (
     value !== null &&
     typeof value === "object" &&
     "hacker" in value &&
-    typeof (value as { hacker?: { id?: unknown } }).hacker?.id === "string"
+    value.hacker !== null &&
+    typeof value.hacker === "object" &&
+    "id" in value.hacker &&
+    typeof value.hacker.id === "string" &&
+    (!("role" in value) ||
+      value.role === null ||
+      value.role === undefined ||
+      typeof value.role === "string")
   );
 }
 

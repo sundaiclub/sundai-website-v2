@@ -188,35 +188,22 @@ export async function uploadToGCS(
   url: string;
   filename: string;
 }> {
-  let serviceAccount: string | undefined;
-  try {
-    const { bucket, serviceAccount: email } = getBucket();
-    serviceAccount = email;
-    const fileBuffer = await file.arrayBuffer();
-    const filename = `${folder}/${uuidv4()}-${file.name.replace(
-      /[^a-zA-Z0-9.-]/g,
-      '_'
-    )}`;
-    const blob = bucket.file(filename);
+  const { bucket } = getBucket();
+  const fileBuffer = await file.arrayBuffer();
+  const filename = `${folder}/${uuidv4()}-${file.name.replace(
+    /[^a-zA-Z0-9.-]/g,
+    '_'
+  )}`;
+  const blob = bucket.file(filename);
 
-    await blob.save(Buffer.from(fileBuffer), {
-      metadata: {
-        contentType: file.type,
-      },
-    });
+  await blob.save(Buffer.from(fileBuffer), {
+    metadata: {
+      contentType: file.type,
+    },
+  });
 
-    const publicUrl = `https://storage.googleapis.com/${bucket.name}/${filename}`;
-
-    return {
-      url: publicUrl,
-      filename,
-    };
-  } catch (error) {
-    console.error('Detailed upload error:', {
-      error,
-      bucket: process.env.GOOGLE_CLOUD_BUCKET,
-      serviceAccount,
-    });
-    throw error;
-  }
+  return {
+    url: `https://storage.googleapis.com/${bucket.name}/${filename}`,
+    filename,
+  };
 }

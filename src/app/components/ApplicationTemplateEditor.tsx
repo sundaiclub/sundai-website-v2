@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type FormEvent } from 'react';
 import { PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
+import { v4 as uuidv4 } from 'uuid';
 import type {
   ApplicationTemplateListItem,
   TemplateFieldDefinition,
@@ -21,7 +22,7 @@ const FIELD_TYPES: TemplateFieldType[] = [
   'PHONE',
   'URL',
   'NUMBER',
-  'BOOLEAN',
+  'CHECKBOX',
   'SELECT',
   'MULTI_SELECT',
   'DATE',
@@ -81,6 +82,7 @@ function templateFields(template: EditableTemplate): TemplateFieldDefinition[] {
     label: typeof field.label === 'string' ? field.label : '',
     type: isFieldType(field.type) ? field.type : 'TEXT',
     required: typeof field.required === 'boolean' ? field.required : false,
+    reusePreviousAnswer: field.reusePreviousAnswer === true,
     siteRequired:
       template.scope === 'SITE' && typeof field.siteRequired === 'boolean'
         ? field.siteRequired
@@ -99,10 +101,11 @@ function newField(
   index: number
 ): TemplateFieldDefinition {
   return {
-    id: `question_${index + 1}`,
+    id: `question_${uuidv4()}`,
     label: '',
     type: 'TEXT',
     required: false,
+    reusePreviousAnswer: false,
     siteRequired: scope === 'SITE' ? false : undefined,
     order: index,
   };
@@ -118,6 +121,7 @@ function fieldsForSave(
       label: field.label.trim(),
       type: field.type,
       required: field.required,
+      reusePreviousAnswer: field.reusePreviousAnswer === true,
       order: index,
     };
 
@@ -280,7 +284,7 @@ export function ApplicationTemplateEditor({
       <div className="mb-4">
         <h3 className="text-lg font-bold">{template.name}</h3>
         <div className={`mt-1 text-sm ${classes.mutedText}`}>
-          {fields.map(field => field.label || field.id).join(', ') ||
+          {fields.map(field => field.label || 'Untitled field').join(', ') ||
             'No fields configured'}
         </div>
       </div>
@@ -328,21 +332,7 @@ export function ApplicationTemplateEditor({
               key={`${field.id}-${index}`}
               className={`grid gap-3 border-t pt-4 ${classes.isDarkMode ? 'border-gray-800' : 'border-gray-200'}`}
             >
-              <div className="grid gap-3 md:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)_minmax(0,0.8fr)]">
-                <label className="block">
-                  <span className="text-xs font-semibold uppercase tracking-wide">
-                    Field id
-                  </span>
-                  <input
-                    aria-label={`${template.name} field ${index + 1} id`}
-                    className={`${classes.input} mt-1 w-full`}
-                    disabled={!canEdit}
-                    value={field.id}
-                    onChange={event =>
-                      updateField(index, { id: event.target.value })
-                    }
-                  />
-                </label>
+              <div className="grid gap-3 md:grid-cols-[minmax(0,1.4fr)_minmax(0,0.8fr)]">
                 <label className="block">
                   <span className="text-xs font-semibold uppercase tracking-wide">
                     Label
@@ -427,6 +417,21 @@ export function ApplicationTemplateEditor({
                       }
                     />
                     Required
+                  </label>
+                  <label className="flex items-center gap-2 text-sm font-semibold">
+                    <input
+                      aria-label={`${template.name} field ${index + 1} reuse previous answer`}
+                      className={classes.checkbox}
+                      checked={field.reusePreviousAnswer === true}
+                      disabled={!canEdit}
+                      type="checkbox"
+                      onChange={event =>
+                        updateField(index, {
+                          reusePreviousAnswer: event.target.checked,
+                        })
+                      }
+                    />
+                    Reuse previous answer
                   </label>
                   {template.scope === 'SITE' && (
                     <label className="flex items-center gap-2 text-sm font-semibold">

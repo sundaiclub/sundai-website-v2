@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server';
-import {
-  ApplicationTemplateValidationError,
-  fetchMergedApplicationTemplate,
-} from '@/lib/applicationTemplates';
+import { ApplicationTemplateValidationError } from '@/lib/applicationTemplates';
+import { fetchMergedApplicationTemplate } from '@/lib/applicationTemplateQueries';
 import { getCurrentHacker, isSiteAdmin } from '@/lib/eventManagementApi';
 import { canManageChapterSettings, canManageEventSettings } from '@/lib/eventManagementAuth';
 import prisma from '@/lib/prisma';

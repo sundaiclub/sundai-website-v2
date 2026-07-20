@@ -1,10 +1,32 @@
 import type {
   EventApplicationMode,
   EventStaffRole,
+  RegistrationSource,
+  RegistrationStatus,
 } from '@/types/event-management';
 
 const APPLICATION_MODES = ['REQUIRES_APPROVAL', 'OPEN_RSVP'] as const;
 const EVENT_STAFF_ROLES = ['MC', 'CO_MC'] as const;
+const REGISTRATION_STATUSES = [
+  'PENDING',
+  'APPROVED',
+  'WAITLISTED',
+  'DECLINED',
+  'BLOCKED',
+  'CANCELLED',
+] as const satisfies readonly RegistrationStatus[];
+const REGISTRATION_SOURCES = [
+  'INTERNAL',
+  'WEBSITE',
+  'IMPORT',
+] as const satisfies readonly RegistrationSource[];
+
+function includesString<const T extends readonly string[]>(
+  values: T,
+  value: string
+): value is T[number] {
+  return values.some(candidate => candidate === value);
+}
 
 export function slugifyEventValue(value: string) {
   return (
@@ -21,11 +43,8 @@ export function parseEventApplicationMode(
   defaultValue?: EventApplicationMode
 ): EventApplicationMode | undefined | null {
   if (value === undefined) return defaultValue;
-  if (
-    typeof value === 'string' &&
-    APPLICATION_MODES.includes(value as EventApplicationMode)
-  ) {
-    return value as EventApplicationMode;
+  if (typeof value === 'string' && includesString(APPLICATION_MODES, value)) {
+    return value;
   }
 
   return null;
@@ -62,18 +81,40 @@ export function parseEventStaffAssignments(
     if (
       normalizedHackerId.length === 0 ||
       typeof role !== 'string' ||
-      !EVENT_STAFF_ROLES.includes(role as EventStaffRole)
+      !includesString(EVENT_STAFF_ROLES, role)
     ) {
       return null;
     }
 
     assignments.push({
       hackerId: normalizedHackerId,
-      role: role as EventStaffRole,
+      role,
     });
   }
 
   return assignments;
+}
+
+export function parseRegistrationStatus(
+  value: unknown,
+  defaultValue?: RegistrationStatus
+): RegistrationStatus | undefined | null {
+  if (value === undefined) return defaultValue;
+  return typeof value === 'string' &&
+    includesString(REGISTRATION_STATUSES, value)
+    ? value
+    : null;
+}
+
+export function parseRegistrationSource(
+  value: unknown,
+  defaultValue?: RegistrationSource
+): RegistrationSource | undefined | null {
+  if (value === undefined) return defaultValue;
+  return typeof value === 'string' &&
+    includesString(REGISTRATION_SOURCES, value)
+    ? value
+    : null;
 }
 
 export type ParsedOptionalDate =

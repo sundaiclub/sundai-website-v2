@@ -143,7 +143,7 @@ function buildPrismaMock(): MockPublicEventsPrisma {
       ),
     },
     eventRegistration: {
-      findMany: jest.fn(),
+      findMany: jest.fn().mockResolvedValue([]),
       findFirst: jest.fn(),
     },
     hacker: {
@@ -427,6 +427,75 @@ describe('public event helpers', () => {
     expect(
       detail?.applicationQuestionSet.composedFields.map(field => field.id)
     ).toEqual(['name', 'email']);
+  });
+
+  it('returns the latest prior answer only for questions configured for reuse', async () => {
+    const event = buildPublicEvent({
+      applicationQuestionsJson: [
+        {
+          id: 'project',
+          label: 'Project',
+          type: 'TEXT',
+          required: true,
+          reusePreviousAnswer: true,
+        },
+        {
+          id: 'private-note',
+          label: 'Private note',
+          type: 'TEXT',
+          required: false,
+          reusePreviousAnswer: false,
+        },
+      ],
+    });
+    const prisma = buildPrismaMock();
+    prisma.event.findFirst.mockResolvedValue(event);
+    prisma.event.findUnique.mockResolvedValue({
+      id: event.id,
+      chapterId: event.chapterId,
+      applicationQuestionsJson: event.applicationQuestionsJson,
+      hideChapterDefaultQuestions: false,
+    });
+    prisma.eventRegistration.findFirst.mockResolvedValue(null);
+    prisma.eventRegistration.findMany.mockResolvedValue([
+      buildRegistration({
+        eventId: 'event-prior-newer',
+        answersJson: { project: '   ', 'private-note': 'Do not reuse this' },
+      }),
+      buildRegistration({
+        eventId: 'event-prior-older',
+        answersJson: {
+          project: 'Reusable project answer',
+          'private-note': 'Still do not reuse this',
+        },
+      }),
+    ]);
+    prisma.hacker.findUnique.mockResolvedValue({
+      id: 'hacker-1',
+      role: 'HACKER',
+    });
+    prisma.chapterMembership.findFirst.mockResolvedValue(null);
+    prisma.eventStaff.findFirst.mockResolvedValue(null);
+
+    const detail = await getPublicEventBySlug({
+      chapterSlug: 'nyc',
+      eventSlug: 'demo-night',
+      viewer: { hackerId: 'hacker-1' },
+      now,
+      prismaClient: prisma,
+    });
+
+    expect(prisma.eventRegistration.findMany).toHaveBeenCalledWith({
+      where: {
+        hackerId: 'hacker-1',
+        eventId: { not: 'event-1' },
+      },
+      orderBy: { submittedAt: 'desc' },
+      take: 50,
+    });
+    expect(detail?.reusableAnswersJson).toEqual({
+      project: 'Reusable project answer',
+    });
   });
 
   it('marks chapter admins as able to edit public event details', async () => {

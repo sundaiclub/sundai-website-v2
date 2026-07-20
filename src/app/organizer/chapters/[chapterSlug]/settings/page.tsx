@@ -18,10 +18,8 @@ import {
   useManagementClasses,
 } from '../../../../components/ManagementSurface';
 import { ApplicationTemplateEditor } from '../../../../components/ApplicationTemplateEditor';
-import {
-  HackerSearchSelect,
-  type HackerSearchOption,
-} from '../../../../components/HackerSearchSelect';
+import { HackerSearchSelect } from '../../../../components/HackerSearchSelect';
+import type { HackerSelectionOption } from '@/types/hacker';
 import { useUserContext } from '../../../../contexts/UserContext';
 import type {
   AdminBanFlagListItem,
@@ -92,13 +90,13 @@ export default function OrganizerChapterSettingsPage({
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [flagHackerQuery, setFlagHackerQuery] = useState('');
   const [selectedFlagHacker, setSelectedFlagHacker] =
-    useState<HackerSearchOption | null>(null);
+    useState<HackerSelectionOption | null>(null);
   const [flagReason, setFlagReason] = useState('');
   const [flagMessage, setFlagMessage] = useState('');
   const [flagError, setFlagError] = useState('');
   const [isCreatingFlag, setIsCreatingFlag] = useState(false);
 
-  const memberHackerOptions: HackerSearchOption[] = members
+  const memberHackerOptions: HackerSelectionOption[] = members
     .filter(member => member.hacker?.id && member.hacker?.name)
     .map(member => ({
       id: member.hacker!.id,
@@ -346,7 +344,7 @@ export default function OrganizerChapterSettingsPage({
     }
   }
 
-  function handleSelectedFlagHackerChange(hacker: HackerSearchOption | null) {
+  function handleSelectedFlagHackerChange(hacker: HackerSelectionOption | null) {
     setSelectedFlagHacker(hacker);
     setFlagError('');
   }
