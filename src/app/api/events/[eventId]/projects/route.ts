@@ -1,15 +1,10 @@
 import { NextResponse } from 'next/server';
 import { requireEventWorkspaceAccess } from '@/lib/eventManagementApi';
 import { listEventWorkspaceProjects } from '@/lib/eventWorkspaceProjects';
+import { parseNonNegativeInteger } from '@/lib/pagination';
 
 const DEFAULT_PAGE_SIZE = 50;
 const MAX_PAGE_SIZE = 100;
-
-function nonNegativeInteger(value: string | null, fallback: number) {
-  if (value === null) return fallback;
-  const parsed = Number(value);
-  return Number.isInteger(parsed) && parsed >= 0 ? parsed : null;
-}
 
 export async function GET(
   request: Request,
@@ -20,11 +15,11 @@ export async function GET(
     if (access.response) return access.response;
 
     const url = new URL(request.url);
-    const requestedLimit = nonNegativeInteger(
+    const requestedLimit = parseNonNegativeInteger(
       url.searchParams.get('limit'),
       DEFAULT_PAGE_SIZE
     );
-    const offset = nonNegativeInteger(url.searchParams.get('offset'), 0);
+    const offset = parseNonNegativeInteger(url.searchParams.get('offset'), 0);
     if (requestedLimit === null || requestedLimit < 1 || offset === null) {
       return NextResponse.json(
         { error: 'limit and offset must be valid positive integers.' },

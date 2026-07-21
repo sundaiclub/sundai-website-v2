@@ -5,16 +5,10 @@ import {
   getEventCommunicationProviderAvailability,
   validateEventCommunicationDraft,
 } from '@/lib/eventCommunications';
+import { parsePageSize } from '@/lib/pagination';
 
 const HISTORY_PAGE_SIZE = 20;
 const MAX_HISTORY_PAGE_SIZE = 50;
-
-function pageSize(value: string | null) {
-  if (!value) return HISTORY_PAGE_SIZE;
-  const parsed = Number(value);
-  if (!Number.isInteger(parsed) || parsed < 1) return null;
-  return Math.min(parsed, MAX_HISTORY_PAGE_SIZE);
-}
 
 export async function GET(
   request: Request,
@@ -25,7 +19,11 @@ export async function GET(
     if (access.response) return access.response;
 
     const url = new URL(request.url);
-    const limit = pageSize(url.searchParams.get('limit'));
+    const limit = parsePageSize(
+      url.searchParams.get('limit'),
+      HISTORY_PAGE_SIZE,
+      MAX_HISTORY_PAGE_SIZE
+    );
     if (limit === null) {
       return NextResponse.json(
         { error: 'limit must be a positive integer.' },

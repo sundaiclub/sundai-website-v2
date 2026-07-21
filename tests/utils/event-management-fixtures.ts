@@ -216,7 +216,6 @@ export type EventFixture = {
   createdById: string;
   chapterId: string;
   slug: string;
-  slugNeedsCleanup: boolean;
   status: EventStatus;
   visibility: EventVisibility;
   programType: string | null;
@@ -538,7 +537,6 @@ export const buildEvent = (
   createdById: 'hacker-chapter-admin',
   chapterId: 'chapter-boston',
   slug: 'ai-build-night',
-  slugNeedsCleanup: false,
   status: 'PUBLISHED',
   visibility: 'PUBLIC',
   programType: 'BUILD_NIGHT',

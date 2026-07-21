@@ -32,6 +32,7 @@ import type {
   TemplateFieldDefinition,
 } from '@/types/event-management';
 import { DEFAULT_EVENT_MESSAGES } from '@/lib/eventMessageDefaults';
+import { parseTemplateFieldsJson } from '@/lib/applicationTemplates';
 
 type ChapterListPayload = ManageableChapterListItem[] | null;
 type StaffListPayload =
@@ -128,22 +129,8 @@ function nextSundayInputValue(from = new Date()) {
 function fieldsFromJson(
   value: JsonValue | null | undefined
 ): TemplateFieldDefinition[] {
-  if (!Array.isArray(value)) return [];
-
-  return value.flatMap(field => {
-    if (
-      !field ||
-      typeof field !== 'object' ||
-      Array.isArray(field) ||
-      typeof field.id !== 'string' ||
-      typeof field.label !== 'string' ||
-      typeof field.type !== 'string'
-    ) {
-      return [];
-    }
-
-    return [field as unknown as TemplateFieldDefinition];
-  });
+  if (value === null || value === undefined) return [];
+  return parseTemplateFieldsJson(value, 'applicationQuestionsJson');
 }
 
 function dateTimeParts(
@@ -1041,7 +1028,9 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
                   </label>
                   <button
                     className="flex w-fit items-center gap-2 rounded-md bg-purple-600 px-4 py-2 text-sm font-semibold text-white hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-50"
-                    disabled={!chapterId || !title.trim() || !description.trim()}
+                    disabled={
+                      !chapterId || !title.trim() || !description.trim()
+                    }
                     onClick={() => setShowImageGenerationModal(true)}
                     type="button"
                   >

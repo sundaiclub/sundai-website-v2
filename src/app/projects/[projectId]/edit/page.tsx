@@ -38,7 +38,6 @@ type UploadImageResponse = {
   url: string;
 };
 
-/* --- Helper: Upload Image to GCS --- */
 const uploadImage = async (file: File): Promise<string> => {
   const loadingToast = toast.loading("Uploading image...");
   const formData = new FormData();
@@ -111,7 +110,6 @@ function ButtonPanel({ params, router, isDarkMode, handleSave, handlePublish, sa
   );
 }
 
-// Helper to extract image name from URL (if needed)
 function getImageNameFromUrl(url: string): string {
   try {
     const filename = url.split("/").pop() || "";
@@ -259,7 +257,6 @@ export default function ProjectEditPage() {
     prompt: string;
   }) => {
     try {
-      // Download the image and convert it to a File object
       const response = await fetch(url);
       const blob = await response.blob();
       const file = new File([blob], 'ai-generated-thumbnail.webp', { type: 'image/webp' });
@@ -277,7 +274,6 @@ export default function ProjectEditPage() {
   const handleSave = async () => {
     if (!project) return;
 
-    // Trigger form validation
     if (formRef.current && !formRef.current.checkValidity()) {
       formRef.current.reportValidity();
       return;
@@ -306,7 +302,6 @@ export default function ProjectEditPage() {
       formData.append("demoUrl", editableDemoUrl);
       formData.append("blogUrl", editableBlogUrl);
 
-      // Add team members data
       formData.append("participants", JSON.stringify(project.participants));
       formData.append("launchLead", project.launchLead.id);
 
@@ -336,7 +331,6 @@ export default function ProjectEditPage() {
   const handlePublish = async () => {
     if (!project) return;
 
-    // Trigger form validation
     if (formRef.current && !formRef.current.checkValidity()) {
       formRef.current.reportValidity();
       return;
@@ -344,7 +338,6 @@ export default function ProjectEditPage() {
 
     setPublishing(true);
     try {
-      // First save changes
       const formData = new FormData();
       formData.append("title", editableTitle);
       if (thumbnail) {
@@ -378,7 +371,6 @@ export default function ProjectEditPage() {
         throw new Error("Failed to save project");
       }
 
-      // Then publish
       const publishResponse = await fetch(`/api/projects/${params?.projectId}/submit`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -1140,9 +1132,8 @@ export default function ProjectEditPage() {
                 e.preventDefault();
                 e.currentTarget.classList.remove('border-indigo-500');
                 const textarea = e.currentTarget;
-                textarea.focus(); // Ensure textarea is focused before accessing selection
+                textarea.focus();
 
-                // First check for image files
                 const file = e.dataTransfer.files[0];
                 if (file && file.type.startsWith('image/')) {
                   try {
@@ -1181,7 +1172,6 @@ export default function ProjectEditPage() {
                   }
                 }
 
-                // Then check for URLs
                 const urlData = e.dataTransfer.getData('text/uri-list') || e.dataTransfer.getData('text/plain');
                 if (urlData && (urlData.startsWith('http://') || urlData.startsWith('https://'))) {
                   const isImageUrl = /\.(jpg|jpeg|png|gif|webp)$/i.test(urlData);

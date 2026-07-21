@@ -6,7 +6,7 @@ import type { ReactNode } from 'react';
 import { ManagementBadge, useManagementClasses } from './ManagementSurface';
 import type { EventStatus, EventVisibility } from '@/types/event-management';
 
-export type EventSummaryCardData = {
+type EventSummaryCardData = {
   id: string;
   title: string;
   image?: {

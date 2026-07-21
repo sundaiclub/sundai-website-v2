@@ -107,11 +107,6 @@ describe('event management foundation migration', () => {
     const eventModel = readBlock(schema, 'model', 'Event');
 
     expectSchemaLine(eventModel, ['slug', 'String']);
-    expectSchemaLine(eventModel, [
-      'slugNeedsCleanup',
-      'Boolean',
-      '@default(false)',
-    ]);
     expect(eventModel).toContain('@@unique([chapterId, slug])');
     expect(eventModel).toContain('@@index([chapterId, status, startTime])');
     expect(eventModel).toContain('@@index([visibility, status])');

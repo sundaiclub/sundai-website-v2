@@ -214,7 +214,6 @@ export async function GET(
     const pitchEvent = await prisma.event.findUnique({
       where: { id: params.eventId },
       select: {
-        meetingUrl: true,
         staff: {
           select: {
             id: true,
@@ -255,7 +254,6 @@ export async function GET(
 
     return NextResponse.json({
       ...publicEvent,
-      meetingUrl: pitchEvent?.meetingUrl ?? null,
       staff: pitchEvent?.staff ?? [],
       pitchSessions: pitchEvent?.pitchSessions ?? [],
     });

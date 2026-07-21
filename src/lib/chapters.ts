@@ -3,7 +3,7 @@ import type {
   Chapter,
   ChapterAccessMode,
   ChapterMembership,
-  ChapterNotificationPreferenceInput as SharedChapterNotificationPreferenceInput,
+  ChapterNotificationPreferenceInput,
   ChapterMembershipStatus,
   ChapterRole,
   ChapterStatus,
@@ -45,11 +45,6 @@ export type ChapterViewer = {
   id?: EntityId | null;
   role?: Role | null;
 } | null;
-
-export type ChapterNotificationPreferenceInput =
-  SharedChapterNotificationPreferenceInput;
-
-export type ChapterMembershipPreferenceInput = ChapterNotificationPreferenceInput;
 
 export type ListVisibleChaptersOptions = {
   viewer?: ChapterViewer;
@@ -242,7 +237,7 @@ export async function listVisibleChapters(options: ListVisibleChaptersOptions = 
 export async function joinOrReactivatePublicMembership(
   chapterId: EntityId,
   hackerId: EntityId,
-  preferences: ChapterMembershipPreferenceInput = {},
+  preferences: ChapterNotificationPreferenceInput = {},
   prismaClient: PlannedPrismaClient = plannedPrisma
 ): Promise<ChapterMembership> {
   return prismaClient.$transaction(async (tx) => {
@@ -302,7 +297,7 @@ export async function joinOrReactivatePublicMembership(
 export async function acceptPrivateChapterInvite(
   chapterId: EntityId,
   hackerId: EntityId,
-  preferences: ChapterMembershipPreferenceInput = {},
+  preferences: ChapterNotificationPreferenceInput = {},
   prismaClient: PlannedPrismaClient = plannedPrisma
 ): Promise<ChapterMembership> {
   return prismaClient.$transaction(async (tx) => {
@@ -476,7 +471,7 @@ async function assertChapterKeepsActiveAdmin(
 
 function membershipActivationData(
   joinedAt: Date,
-  preferences: ChapterMembershipPreferenceInput,
+  preferences: ChapterNotificationPreferenceInput,
   extraData: LooseWhere = {}
 ): LooseWhere {
   return {

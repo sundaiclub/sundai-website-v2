@@ -68,7 +68,7 @@ export interface EventReportingPreview {
   unavailable: ReportingUnavailableDescriptor[];
 }
 
-export const REPORTING_UNAVAILABLE_METRICS: ReportingUnavailableDescriptor[] = [
+const REPORTING_UNAVAILABLE_METRICS: ReportingUnavailableDescriptor[] = [
   {
     metric: 'checkIn',
     label: 'Check-in',

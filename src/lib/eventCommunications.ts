@@ -1,5 +1,10 @@
 import { createHash } from 'crypto';
+import type { PrismaClient } from '@prisma/client';
 import prisma from '@/lib/prisma';
+import type {
+  EventCommunicationAudience,
+  EventCommunicationChannel,
+} from '@/types/event-workspace';
 
 export const EVENT_COMMUNICATION_AUDIENCES = [
   'ACTIVE_REGISTERED',
@@ -16,9 +21,6 @@ export const EVENT_COMMUNICATION_STATUS_AUDIENCES = [
   'WAITLISTED',
   'DECLINED',
 ] as const;
-
-type AudienceType = (typeof EVENT_COMMUNICATION_AUDIENCES)[number];
-type Channel = 'EMAIL' | 'SMS';
 
 export type EventCommunicationMaterialReference = {
   kind: 'EVENT_MATERIAL';
@@ -71,8 +73,8 @@ export type CommunicationAudienceResolution = {
 
 function isAudienceStatus(
   status: string,
-  audienceType: AudienceType,
-  audienceTypes: AudienceType[],
+  audienceType: EventCommunicationAudience,
+  audienceTypes: EventCommunicationAudience[],
   selected: Set<string>,
   hackerId: string
 ): boolean {
@@ -105,10 +107,10 @@ export function resolveEventCommunicationAudience({
   smsConsentVersion,
 }: {
   registrations: AudienceRegistration[];
-  audienceType: AudienceType;
-  audienceTypes?: AudienceType[];
+  audienceType: EventCommunicationAudience;
+  audienceTypes?: EventCommunicationAudience[];
   selectedHackerIds?: string[];
-  channel: Channel;
+  channel: EventCommunicationChannel;
   smsConsentVersion?: string;
 }): CommunicationAudienceResolution {
   if (!EVENT_COMMUNICATION_AUDIENCES.includes(audienceType)) {
@@ -204,9 +206,9 @@ export function fingerprintEventCommunicationAudience({
   audienceTypes = [],
   recipients,
 }: {
-  channel: Channel;
-  audienceType: AudienceType;
-  audienceTypes?: AudienceType[];
+  channel: EventCommunicationChannel;
+  audienceType: EventCommunicationAudience;
+  audienceTypes?: EventCommunicationAudience[];
   recipients: Array<
     Pick<
       ResolvedCommunicationRecipient,
@@ -251,7 +253,9 @@ export function validateEventCommunicationDraft(input: {
   }
   if (
     typeof input.audienceType !== 'string' ||
-    !EVENT_COMMUNICATION_AUDIENCES.includes(input.audienceType as AudienceType)
+    !EVENT_COMMUNICATION_AUDIENCES.includes(
+      input.audienceType as EventCommunicationAudience
+    )
   ) {
     errors.audienceType = 'Audience is not supported.';
   }
@@ -314,7 +318,7 @@ export function validateEventCommunicationMaterialReferences({
 }: {
   references: unknown;
   materials: ReferencedEventMaterial[];
-  audienceType: AudienceType;
+  audienceType: EventCommunicationAudience;
 }): {
   valid: boolean;
   references: EventCommunicationMaterialReference[];
@@ -406,7 +410,12 @@ export function getEventCommunicationProviderAvailability(
 
 export function aggregateCommunicationFinalState(
   outcomes: Array<{ status: 'SENT' | 'FAILED' }>
-) {
+): {
+  status: 'SENT' | 'FAILED' | 'PARTIAL';
+  recipientCount: number;
+  sentCount: number;
+  failedCount: number;
+} {
   const sentCount = outcomes.filter(
     outcome => outcome.status === 'SENT'
   ).length;
@@ -423,13 +432,13 @@ export async function snapshotEventCommunicationAudience({
   audience,
   previewFingerprint,
 }: {
-  db?: any;
+  db?: Pick<PrismaClient, '$transaction'>;
   communicationId: string;
   senderId: string;
   audience: CommunicationAudienceResolution;
   previewFingerprint: string;
 }) {
-  return db.$transaction(async (tx: any) => {
+  return db.$transaction(async tx => {
     const transitioned = await tx.eventCommunication.updateMany({
       where: { id: communicationId, status: 'DRAFT' },
       data: {
@@ -473,7 +482,7 @@ export async function finalizeEventCommunication({
   communicationId,
   outcomes,
 }: {
-  db?: any;
+  db?: Pick<PrismaClient, '$transaction'>;
   communicationId: string;
   outcomes: Array<{
     recipientId: string;
@@ -486,7 +495,7 @@ export async function finalizeEventCommunication({
   }>;
 }) {
   const aggregate = aggregateCommunicationFinalState(outcomes);
-  return db.$transaction(async (tx: any) => {
+  return db.$transaction(async tx => {
     for (const outcome of outcomes) {
       await tx.eventCommunicationRecipient.update({
         where: { id: outcome.recipientId },

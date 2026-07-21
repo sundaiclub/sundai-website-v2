@@ -197,7 +197,6 @@ export default function ProjectDetailClient() {
   };
 
   useEffect(() => {
-    // Auto-like when coming from email with like=1
     if (!loading && project && userInfo && searchParams?.get('like') === '1') {
       const alreadyLiked = isLiked;
       if (!alreadyLiked) {

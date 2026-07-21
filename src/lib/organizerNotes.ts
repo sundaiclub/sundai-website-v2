@@ -1,4 +1,5 @@
 import prisma from './prisma';
+import type { PrismaClient } from '@prisma/client';
 import type {
   EntityId,
   EventStaffRole,
@@ -9,49 +10,24 @@ import type {
 } from '@/types/event-management';
 import { isSiteAdminRole } from '@/lib/eventManagementAuth';
 
-type HackerRecord = {
-  id: EntityId;
-  role?: Role | null;
-};
+type EventManagementPrismaClient = Pick<
+  PrismaClient,
+  | 'hacker'
+  | 'chapterMembership'
+  | 'eventStaff'
+  | 'eventRegistration'
+  | 'hackerOrganizerNote'
+  | 'hackerOrganizerNoteRevision'
+  | '$transaction'
+>;
 
-type ChapterMembershipRecord = {
-  chapterId: EntityId;
-};
-
-type EventStaffRecord = {
-  eventId: EntityId;
-  role: EventStaffRole;
-  event?: {
-    chapterId?: EntityId | null;
-  } | null;
-};
-
-type EventRegistrationRecord = {
-  eventId: EntityId;
-  event?: {
-    chapterId?: EntityId | null;
-  } | null;
-};
-
-type Delegate<TRecord> = {
-  findUnique(args: Record<string, unknown>): Promise<TRecord | null>;
-  findFirst(args: Record<string, unknown>): Promise<TRecord | null>;
-  findMany(args: Record<string, unknown>): Promise<TRecord[]>;
-  create(args: Record<string, unknown>): Promise<TRecord>;
-  update(args: Record<string, unknown>): Promise<TRecord>;
-};
-
-type EventManagementPrismaClient = {
-  hacker: Pick<Delegate<HackerRecord>, 'findUnique'>;
-  chapterMembership: Pick<Delegate<ChapterMembershipRecord>, 'findMany'>;
-  eventStaff: Pick<Delegate<EventStaffRecord>, 'findMany'>;
-  eventRegistration: Pick<Delegate<EventRegistrationRecord>, 'findMany'>;
-  hackerOrganizerNote: Delegate<HackerOrganizerNote>;
-  hackerOrganizerNoteRevision: Delegate<HackerOrganizerNoteRevision>;
-  $transaction<T>(
-    callback: (tx: EventManagementPrismaClient) => Promise<T>
-  ): Promise<T>;
-};
+type EventScopedOrganizerNotesPrismaClient = EventManagementPrismaClient &
+  Pick<
+    PrismaClient,
+    | 'event'
+    | 'eventProject'
+    | 'userBan'
+  >;
 
 export type OrganizerNoteRelevantEventStaff = {
   eventId: EntityId;
@@ -91,7 +67,8 @@ export type OrganizerNoteAccessForActor = {
   access: OrganizerNoteAccess;
 };
 
-const client = prisma as unknown as EventManagementPrismaClient;
+const client: EventManagementPrismaClient = prisma;
+const eventScopedClient: EventScopedOrganizerNotesPrismaClient = prisma;
 
 export function hasSharedOrganizerNoteChapter(
   relevance: Pick<
@@ -374,7 +351,7 @@ type EventScopedOrganizerNoteInput = {
   eventId: EntityId;
   actorId: EntityId;
   targetHackerId: EntityId;
-  db?: any;
+  db?: EventScopedOrganizerNotesPrismaClient;
 };
 
 type EventScopedOrganizerNoteContext = {
@@ -388,7 +365,7 @@ type EventScopedOrganizerNoteContext = {
 async function getEventScopedOrganizerNoteContext(
   eventId: EntityId,
   actorId: EntityId,
-  db: any
+  db: EventScopedOrganizerNotesPrismaClient
 ): Promise<EventScopedOrganizerNoteContext | null> {
   const [event, actor] = await Promise.all([
     db.event.findUnique({
@@ -445,7 +422,7 @@ async function getEventScopedOrganizerNoteContext(
 async function targetIsRelevantToEvent(
   eventId: EntityId,
   targetHackerId: EntityId,
-  db: any
+  db: EventScopedOrganizerNotesPrismaClient
 ) {
   const registration = await db.eventRegistration.findFirst({
     where: {
@@ -476,7 +453,7 @@ async function targetIsRelevantToEvent(
 async function targetIsHiddenByGlobalBan(
   targetHackerId: EntityId,
   context: EventScopedOrganizerNoteContext,
-  db: any
+  db: EventScopedOrganizerNotesPrismaClient
 ) {
   if (context.isSiteAdmin) return false;
   const ban = await db.userBan.findFirst({
@@ -488,7 +465,7 @@ async function targetIsHiddenByGlobalBan(
 
 async function canAccessEventScopedTarget(
   input: EventScopedOrganizerNoteInput,
-  db: any
+  db: EventScopedOrganizerNotesPrismaClient
 ) {
   const context = await getEventScopedOrganizerNoteContext(
     input.eventId,
@@ -509,7 +486,7 @@ async function canAccessEventScopedTarget(
 }
 
 export async function getCurrentOrganizerNoteForEventActor({
-  db = client,
+  db = eventScopedClient,
   ...input
 }: EventScopedOrganizerNoteInput) {
   if (!(await canAccessEventScopedTarget(input, db))) return null;
@@ -519,7 +496,7 @@ export async function getCurrentOrganizerNoteForEventActor({
 }
 
 export async function updateCurrentOrganizerNoteForEventActor({
-  db = client,
+  db = eventScopedClient,
   body,
   ...input
 }: EventScopedOrganizerNoteInput & { body: string }) {
@@ -535,14 +512,14 @@ export async function updateCurrentOrganizerNoteForEventActor({
 }
 
 export async function listEventOrganizerNoteTargets({
-  db = client,
+  db = eventScopedClient,
   eventId,
   actorId,
   search,
   take = 50,
   skip = 0,
 }: {
-  db?: any;
+  db?: EventScopedOrganizerNotesPrismaClient;
   eventId: EntityId;
   actorId: EntityId;
   search?: string;
@@ -606,7 +583,7 @@ export async function listEventOrganizerNoteTargets({
 }
 
 export async function listOrganizerNoteRevisionsForEventActor({
-  db = client,
+  db = eventScopedClient,
   take = 50,
   skip = 0,
   ...input

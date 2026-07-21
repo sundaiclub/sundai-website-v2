@@ -6,12 +6,7 @@ import {
   getChapterMembershipForPermissions,
 } from '@/lib/eventManagementAuth';
 import { listOrganizerNoteRevisionsForEventActor } from '@/lib/organizerNotes';
-
-function positiveInteger(value: string | null, fallback: number) {
-  if (value === null) return fallback;
-  const parsed = Number(value);
-  return Number.isInteger(parsed) && parsed >= 0 ? parsed : null;
-}
+import { parseNonNegativeInteger } from '@/lib/pagination';
 
 export async function GET(
   request: Request,
@@ -41,8 +36,8 @@ export async function GET(
     }
 
     const url = new URL(request.url);
-    const take = positiveInteger(url.searchParams.get('take'), 50);
-    const skip = positiveInteger(url.searchParams.get('skip'), 0);
+    const take = parseNonNegativeInteger(url.searchParams.get('take'), 50);
+    const skip = parseNonNegativeInteger(url.searchParams.get('skip'), 0);
     if (take === null || take === 0 || skip === null) {
       return NextResponse.json(
         { error: 'take must be positive and skip must be non-negative.' },

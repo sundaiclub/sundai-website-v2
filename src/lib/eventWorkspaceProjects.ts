@@ -1,4 +1,5 @@
 import prisma from '@/lib/prisma';
+import type { Prisma, PrismaClient } from '@prisma/client';
 import type { EventProjectCardStatus } from '@/types/event-workspace';
 
 const CARD_STATUSES = new Set<EventProjectCardStatus>([
@@ -8,6 +9,11 @@ const CARD_STATUSES = new Set<EventProjectCardStatus>([
   'APPROVED',
 ]);
 const MAX_PITCH_SESSIONS_IN_SUMMARY = 100;
+
+type EventWorkspaceProjectDb = Pick<
+  PrismaClient,
+  'eventProject' | 'pitchProject' | 'pitchSession' | '$transaction'
+>;
 
 function projectInclude(eventId: string, includeBanned: boolean) {
   const banSafeHackerWhere = includeBanned
@@ -43,16 +49,25 @@ function projectInclude(eventId: string, includeBanned: boolean) {
               select: { value: true },
             },
           },
-          orderBy: [{ pitchSession: { startTime: 'asc' } }, { position: 'asc' }],
+          orderBy: [
+            { pitchSession: { startTime: 'asc' } },
+            { position: 'asc' },
+          ],
         },
       },
     },
-  };
+  } satisfies Prisma.EventProjectInclude;
 }
 
-export function projectEventWorkspacePitchProject(participation: any) {
+type EventWorkspaceProjectRow = Prisma.EventProjectGetPayload<{
+  include: ReturnType<typeof projectInclude>;
+}>;
+
+export function projectEventWorkspacePitchProject(
+  participation: EventWorkspaceProjectRow
+) {
   const entry = participation.project.pitchEntries.find(
-    (candidate: any) => candidate.pitchSession.eventId === participation.eventId
+    candidate => candidate.pitchSession.eventId === participation.eventId
   );
   const votes = entry?.pitchVotes ?? [];
   const likes = votes.filter(
@@ -78,28 +93,32 @@ export function projectEventWorkspacePitchProject(participation: any) {
       thumbnail: participation.project.thumbnail ?? null,
       launchLead: participation.project.launchLead,
       participants: participation.project.participants.map(
-        (participant: { hacker: unknown }) => participant.hacker
+        participant => participant.hacker
       ),
       techTags: participation.project.techTags,
       domainTags: participation.project.domainTags,
     },
-    queue: entry ? {
-      status: entry.status,
-      position: entry.position,
-      approved: entry.approved,
-    } : null,
-    pitch: entry ? {
-      phase: entry.pitchPhase,
-      sessionPhase: entry.pitchSession.phase,
-      presentingStartedAt: entry.presentingStartedAt ?? null,
-      questionsStartedAt: entry.questionsStartedAt ?? null,
-      completedAt: entry.completedAt ?? null,
-      pausedAt: entry.pausedAt ?? null,
-      allottedPresentingSec: entry.allottedPresentingSec ?? null,
-      allottedQuestionsSec: entry.allottedQuestionsSec ?? null,
-      isTopProject: entry.isTopProject,
-      votes: { likes, dislikes, total: likes + dislikes },
-    } : null,
+    queue: entry
+      ? {
+          status: entry.status,
+          position: entry.position,
+          approved: entry.approved,
+        }
+      : null,
+    pitch: entry
+      ? {
+          phase: entry.pitchPhase,
+          sessionPhase: entry.pitchSession.phase,
+          presentingStartedAt: entry.presentingStartedAt ?? null,
+          questionsStartedAt: entry.questionsStartedAt ?? null,
+          completedAt: entry.completedAt ?? null,
+          pausedAt: entry.pausedAt ?? null,
+          allottedPresentingSec: entry.allottedPresentingSec ?? null,
+          allottedQuestionsSec: entry.allottedQuestionsSec ?? null,
+          isTopProject: entry.isTopProject,
+          votes: { likes, dislikes, total: likes + dislikes },
+        }
+      : null,
   };
 }
 
@@ -110,7 +129,7 @@ export async function listEventWorkspaceProjects({
   take = 50,
   skip = 0,
 }: {
-  db?: any;
+  db?: EventWorkspaceProjectDb;
   eventId: string;
   includeBanned?: boolean;
   take?: number;
@@ -147,7 +166,7 @@ export async function updateEventProjectCardStatus({
   eventProjectId,
   cardStatus,
 }: {
-  db?: any;
+  db?: EventWorkspaceProjectDb;
   eventId: string;
   eventProjectId: string;
   cardStatus: EventProjectCardStatus;
@@ -172,7 +191,7 @@ export async function getEventWorkspacePitchSummary({
   eventId,
   includeBanned = false,
 }: {
-  db?: any;
+  db?: EventWorkspaceProjectDb;
   eventId: string;
   includeBanned?: boolean;
 }) {

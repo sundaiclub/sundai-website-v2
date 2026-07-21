@@ -2,16 +2,11 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { requireEventNotesManager } from '@/lib/eventManagementApi';
 import { listEventOrganizerNoteTargets } from '@/lib/organizerNotes';
+import { parseNonNegativeInteger } from '@/lib/pagination';
 
 const DEFAULT_PAGE_SIZE = 50;
 const MAX_PAGE_SIZE = 100;
 const MAX_SEARCH_LENGTH = 100;
-
-function positiveInteger(value: string | null, fallback: number) {
-  if (value === null) return fallback;
-  const parsed = Number(value);
-  return Number.isInteger(parsed) && parsed >= 0 ? parsed : null;
-}
 
 export async function GET(
   request: Request,
@@ -22,11 +17,11 @@ export async function GET(
     if (access.response) return access.response;
 
     const url = new URL(request.url);
-    const requestedLimit = positiveInteger(
+    const requestedLimit = parseNonNegativeInteger(
       url.searchParams.get('limit'),
       DEFAULT_PAGE_SIZE
     );
-    const offset = positiveInteger(url.searchParams.get('offset'), 0);
+    const offset = parseNonNegativeInteger(url.searchParams.get('offset'), 0);
     if (requestedLimit === null || requestedLimit < 1 || offset === null) {
       return NextResponse.json(
         { error: 'limit and offset must be valid positive integers.' },
@@ -42,21 +37,13 @@ export async function GET(
       );
     }
 
-    const db = new Proxy(prisma as any, {
-      get(target, property) {
-        if (property === 'userBan' && !target.userBan) {
-          return { findFirst: async () => null };
-        }
-        return target[property];
-      },
-    });
     const projected = await listEventOrganizerNoteTargets({
       eventId: params.eventId,
       actorId: access.hacker!.id,
       search: search || undefined,
       take: limit + 1,
       skip: offset,
-      db,
+      db: prisma,
     });
     const hasMore = projected.length > limit;
     const page = hasMore ? projected.slice(0, limit) : projected;

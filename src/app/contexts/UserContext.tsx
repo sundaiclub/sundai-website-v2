@@ -41,12 +41,10 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     const fetchUserInfo = async () => {
       if (user?.id) {
         try {
-          // Get the hacker using clerkId
           const hackerResponse = await fetch(`/api/hackers?clerkId=${user.id}`);
           if (!hackerResponse.ok) throw new Error("Failed to fetch hacker ID");
           const hackerData = await hackerResponse.json();
 
-          // Get the full hacker profile using the Prisma ID
           const profileResponse = await fetch(`/api/hackers/${hackerData.id}`);
           if (!profileResponse.ok)
             throw new Error("Failed to fetch hacker profile");

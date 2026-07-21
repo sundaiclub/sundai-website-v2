@@ -10,27 +10,27 @@ import {
   useManagementClasses,
 } from '../../../../components/ManagementSurface';
 import type { HackerSelectionOption } from '@/types/hacker';
+import type { EventStaffRole } from '@/types/event-management';
 
-type StaffRole = 'MC' | 'CO_MC';
 type StaffMember = {
   id: string;
   hackerId: string;
   name?: string;
-  role: StaffRole;
+  role: EventStaffRole;
   hacker?: { id: string; name: string; email?: string | null };
 };
 type StaffAudit = {
   id: string;
   action: 'ASSIGNED' | 'ROLE_CHANGED' | 'REMOVED';
-  fromRole?: StaffRole | null;
-  toRole?: StaffRole | null;
+  fromRole?: EventStaffRole | null;
+  toRole?: EventStaffRole | null;
   createdAt: string;
   staffHacker?: { id: string; name: string };
   actor?: { id: string; name: string };
 };
 type PendingStaffAssignment = {
   hacker: HackerSelectionOption;
-  role: StaffRole;
+  role: EventStaffRole;
 };
 
 export default function EventStaffPanel({
@@ -116,7 +116,10 @@ export default function EventStaffPanel({
     }
   }
 
-  async function saveAssignment(targetHackerId: string, targetRole: StaffRole) {
+  async function saveAssignment(
+    targetHackerId: string,
+    targetRole: EventStaffRole
+  ) {
     setNotice('');
     setSavingHackerId(targetHackerId);
     try {
@@ -243,7 +246,7 @@ export default function EventStaffPanel({
                       current
                         ? {
                             ...current,
-                            role: event.target.value as StaffRole,
+                            role: event.target.value as EventStaffRole,
                           }
                         : null
                     )
@@ -297,7 +300,7 @@ export default function EventStaffPanel({
                       onChange={event =>
                         saveAssignment(
                           member.hackerId,
-                          event.target.value as StaffRole
+                          event.target.value as EventStaffRole
                         )
                       }
                       value={member.role}

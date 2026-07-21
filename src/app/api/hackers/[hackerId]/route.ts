@@ -110,7 +110,6 @@ export async function PATCH(
       return NextResponse.json("Unauthorized", { status: 401 });
     }
 
-    // Get the hacker making the request
     const requestingHacker = await prisma.hacker.findUnique({
       where: { clerkId: userId },
     });
@@ -119,14 +118,12 @@ export async function PATCH(
       return NextResponse.json({ error: "Builder not found" }, { status: 404 });
     }
 
-    // Check if the hacker is updating their own profile
     if (requestingHacker.id !== params.hackerId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const data: unknown = await request.json();
 
-    // Filter out any fields that aren't allowed to be updated
     const sanitizedData: Prisma.HackerUpdateInput = {};
 
     if (isRecord(data)) {

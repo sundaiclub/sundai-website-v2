@@ -1,4 +1,9 @@
 import prisma from '@/lib/prisma';
+import type {
+  EventMaterialVisibility,
+  Prisma,
+  PrismaClient,
+} from '@prisma/client';
 import {
   createPrivateMaterialUploadIntent,
   deletePrivateObject,
@@ -23,7 +28,7 @@ const MIME_BY_EXTENSION: Record<string, string> = {
   pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
 };
 
-const VISIBILITIES = new Set([
+const VISIBILITIES: ReadonlySet<string> = new Set([
   'PUBLIC',
   'APPROVED_ATTENDEES',
   'ORGANIZERS_ONLY',
@@ -42,12 +47,27 @@ type MaterialViewer = {
 };
 
 type MaterialStorage = {
-  inspectPrivateObject: (token: string) => Promise<any>;
+  inspectPrivateObject: (token: string) => Promise<InspectedMaterialObject>;
   deletePrivateObject: (reference: {
     bucket: string;
     objectKey: string;
   }) => Promise<void>;
 };
+
+type InspectedMaterialObject = {
+  bucket: string;
+  objectKey: string;
+  size: number;
+  filename?: string;
+  originalFilename?: string;
+  mimeType?: string | null;
+  contentType?: string | null;
+};
+
+type EventMaterialDb = Pick<
+  PrismaClient,
+  'eventMaterial' | 'eventMaterialAudit' | '$transaction'
+>;
 
 type UploadTokenData = {
   bucket: string;
@@ -56,6 +76,22 @@ type UploadTokenData = {
   mimeType: string;
   size: number;
 };
+
+function isUploadTokenData(value: unknown): value is UploadTokenData {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  return (
+    'bucket' in value &&
+    typeof value.bucket === 'string' &&
+    'objectKey' in value &&
+    typeof value.objectKey === 'string' &&
+    'filename' in value &&
+    typeof value.filename === 'string' &&
+    'mimeType' in value &&
+    typeof value.mimeType === 'string' &&
+    'size' in value &&
+    typeof value.size === 'number'
+  );
+}
 
 function result(valid: boolean, error?: string) {
   return error ? { valid, error } : { valid };
@@ -131,15 +167,15 @@ export function filterVisibleEventMaterials<T extends MaterialLike>(
   });
 }
 
-function validateCommonInput(input: Record<string, any>) {
+function validateCommonInput(input: Record<string, unknown>) {
   if (typeof input.title !== 'string' || !input.title.trim()) {
     throw new Error('Material title is required.');
   }
-  if (!VISIBILITIES.has(input.visibility)) {
+  if (!isEventMaterialVisibility(input.visibility)) {
     throw new Error('Material visibility is invalid.');
   }
-  const from = input.availableFrom ? new Date(input.availableFrom) : null;
-  const until = input.availableUntil ? new Date(input.availableUntil) : null;
+  const from = materialDate(input.availableFrom);
+  const until = materialDate(input.availableUntil);
   if (
     (from && Number.isNaN(from.getTime())) ||
     (until && Number.isNaN(until.getTime())) ||
@@ -147,7 +183,26 @@ function validateCommonInput(input: Record<string, any>) {
   ) {
     throw new Error('Material availability window is invalid.');
   }
-  return { from, until };
+  return {
+    from,
+    until,
+    title: input.title.trim(),
+    visibility: input.visibility,
+  };
+}
+
+function isEventMaterialVisibility(
+  value: unknown
+): value is EventMaterialVisibility {
+  return typeof value === 'string' && VISIBILITIES.has(value);
+}
+
+function materialDate(value: unknown): Date | null {
+  if (value === undefined || value === null || value === '') return null;
+  if (typeof value !== 'string' && !(value instanceof Date)) {
+    return new Date(Number.NaN);
+  }
+  return new Date(value);
 }
 
 function changeJson(data: Record<string, unknown>) {
@@ -183,9 +238,13 @@ function defaultStorage(): MaterialStorage {
     async inspectPrivateObject(token: string) {
       let expected: UploadTokenData;
       try {
-        expected = JSON.parse(
+        const parsed: unknown = JSON.parse(
           Buffer.from(token, 'base64url').toString('utf8')
-        ) as UploadTokenData;
+        );
+        if (!isUploadTokenData(parsed)) {
+          throw new Error('Upload token has invalid fields.');
+        }
+        expected = parsed;
       } catch {
         throw new Error('Upload token is invalid.');
       }
@@ -212,27 +271,35 @@ export async function createEventMaterialLink({
   actorId,
   input,
 }: {
-  db?: any;
+  db?: EventMaterialDb;
   eventId: string;
   actorId: string;
-  input: Record<string, any>;
+  input: Record<string, unknown>;
 }) {
-  const link = validateEventMaterialLink(input.externalUrl);
+  if (typeof input.externalUrl !== 'string') {
+    throw new Error('Material link is required.');
+  }
+  const externalUrl = input.externalUrl;
+  const link = validateEventMaterialLink(externalUrl);
   if (!link.valid) throw new Error(link.error);
-  const { from, until } = validateCommonInput(input);
+  const { from, until, title, visibility } = validateCommonInput(input);
 
-  return db.$transaction(async (tx: any) => {
+  return db.$transaction(async tx => {
     const material = await tx.eventMaterial.create({
       data: {
         eventId,
         createdById: actorId,
         kind: 'LINK',
-        visibility: input.visibility,
-        title: input.title.trim(),
-        description: input.description?.trim() || null,
-        externalUrl: input.externalUrl,
-        position: input.position ?? 0,
-        isAvailable: input.isAvailable ?? true,
+        visibility,
+        title,
+        description:
+          typeof input.description === 'string'
+            ? input.description.trim() || null
+            : null,
+        externalUrl,
+        position: typeof input.position === 'number' ? input.position : 0,
+        isAvailable:
+          typeof input.isAvailable === 'boolean' ? input.isAvailable : true,
         availableFrom: from,
         availableUntil: until,
       },
@@ -257,19 +324,22 @@ export async function finalizeEventMaterialUpload({
   actorId,
   input,
 }: {
-  db?: any;
+  db?: EventMaterialDb;
   storage?: MaterialStorage;
   eventId: string;
   actorId: string;
-  input: Record<string, any>;
+  input: Record<string, unknown>;
 }) {
-  const { from, until } = validateCommonInput(input);
+  const { from, until, title, visibility } = validateCommonInput(input);
   if (typeof input.uploadToken !== 'string' || !input.uploadToken) {
     throw new Error('Upload token is required.');
   }
   const metadata = await storage.inspectPrivateObject(input.uploadToken);
   const filename = metadata.filename ?? metadata.originalFilename;
   const mimeType = metadata.mimeType ?? metadata.contentType;
+  if (!filename || !mimeType) {
+    throw new Error('Uploaded file metadata is incomplete.');
+  }
   const validation = validateEventMaterialUpload({
     filename,
     mimeType,
@@ -284,23 +354,27 @@ export async function finalizeEventMaterialUpload({
   }
 
   try {
-    return await db.$transaction(async (tx: any) => {
+    return await db.$transaction(async tx => {
       const material = await tx.eventMaterial.create({
         data: {
           eventId,
           createdById: actorId,
           kind: 'FILE',
-          visibility: input.visibility,
-          title: input.title.trim(),
-          description: input.description?.trim() || null,
+          visibility,
+          title,
+          description:
+            typeof input.description === 'string'
+              ? input.description.trim() || null
+              : null,
           externalUrl: null,
           objectKey: metadata.objectKey,
           bucket: metadata.bucket,
           originalFilename: filename,
           mimeType,
           size: metadata.size,
-          position: input.position ?? 0,
-          isAvailable: input.isAvailable ?? true,
+          position: typeof input.position === 'number' ? input.position : 0,
+          isAvailable:
+            typeof input.isAvailable === 'boolean' ? input.isAvailable : true,
           availableFrom: from,
           availableUntil: until,
         },
@@ -339,7 +413,7 @@ export async function listVisibleEventMaterials({
   take = MAX_EVENT_MATERIAL_PAGE_SIZE,
   skip = 0,
 }: {
-  db?: any;
+  db?: EventMaterialDb;
   eventId: string;
   viewer: MaterialViewer;
   now?: Date;
@@ -363,28 +437,46 @@ export async function updateEventMaterial({
   actorId,
   input,
 }: {
-  db?: any;
+  db?: EventMaterialDb;
   eventId: string;
   materialId: string;
   actorId: string;
-  input: Record<string, any>;
+  input: Record<string, unknown>;
 }) {
-  const { from, until } = validateCommonInput({
+  const { from, until, title, visibility } = validateCommonInput({
     title: input.title ?? 'unchanged',
     visibility: input.visibility ?? 'PUBLIC',
     availableFrom: input.availableFrom,
     availableUntil: input.availableUntil,
   });
-  return db.$transaction(async (tx: any) => {
+  const data: Prisma.EventMaterialUpdateInput = {};
+  if (input.title !== undefined) data.title = title;
+  if (input.visibility !== undefined) data.visibility = visibility;
+  if (input.description !== undefined) {
+    if (input.description !== null && typeof input.description !== 'string') {
+      throw new Error('Material description is invalid.');
+    }
+    data.description = input.description?.trim() || null;
+  }
+  if (input.position !== undefined) {
+    if (!Number.isSafeInteger(input.position) || Number(input.position) < 0) {
+      throw new Error('Material position is invalid.');
+    }
+    data.position = Number(input.position);
+  }
+  if (input.isAvailable !== undefined) {
+    if (typeof input.isAvailable !== 'boolean') {
+      throw new Error('Material availability is invalid.');
+    }
+    data.isAvailable = input.isAvailable;
+  }
+  if (input.availableFrom !== undefined) data.availableFrom = from;
+  if (input.availableUntil !== undefined) data.availableUntil = until;
+
+  return db.$transaction(async tx => {
     const material = await tx.eventMaterial.update({
       where: { id: materialId, eventId },
-      data: {
-        ...input,
-        ...(input.availableFrom !== undefined ? { availableFrom: from } : {}),
-        ...(input.availableUntil !== undefined
-          ? { availableUntil: until }
-          : {}),
-      },
+      data,
     });
     await tx.eventMaterialAudit.create({
       data: {
@@ -405,7 +497,7 @@ export async function reorderEventMaterials({
   actorId,
   materialIds,
 }: {
-  db?: any;
+  db?: EventMaterialDb;
   eventId: string;
   actorId: string;
   materialIds: string[];
@@ -413,7 +505,7 @@ export async function reorderEventMaterials({
   if (new Set(materialIds).size !== materialIds.length) {
     throw new Error('Material ordering contains duplicate ids.');
   }
-  return db.$transaction(async (tx: any) =>
+  return db.$transaction(async tx =>
     Promise.all(
       materialIds.map(async (materialId, position) => {
         const row = await tx.eventMaterial.update({
@@ -442,13 +534,13 @@ export async function deleteEventMaterial({
   materialId,
   actorId,
 }: {
-  db?: any;
+  db?: EventMaterialDb;
   storage?: MaterialStorage;
   eventId: string;
   materialId: string;
   actorId: string;
 }) {
-  const removed = await db.$transaction(async (tx: any) => {
+  const removed = await db.$transaction(async tx => {
     const current = await tx.eventMaterial.findFirst({
       where: { id: materialId, eventId },
     });

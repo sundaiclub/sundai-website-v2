@@ -408,7 +408,6 @@ model Event {
   chapter                     Chapter                  @relation(fields: [chapterId], references: [id])
   chapterId                   String
   slug                        String
-  slugNeedsCleanup            Boolean                  @default(false)
   status                      EventStatus              @default(DRAFT)
   visibility                  EventVisibility          @default(PUBLIC)
   programType                 String?

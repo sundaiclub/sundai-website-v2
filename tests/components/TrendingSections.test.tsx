@@ -150,68 +150,6 @@ describe('TrendingSections Component', () => {
     expect(likeButtons[0]).toBeInTheDocument();
   });
 
-  it('renders project links in trending cards', async () => {
-    await act(async () => {
-      render(
-        <TrendingSections
-          projects={[mockProject]}
-          userInfo={mockHacker}
-          handleLike={mockHandleLike}
-          isDarkMode={false}
-        />
-      );
-    });
-
-    // Check if links are present (they might not be rendered in this component)
-    const githubLinks = screen.queryAllByRole('link', { name: /github/i });
-    const demoLinks = screen.queryAllByRole('link', { name: /demo/i });
-
-    // If links are not rendered, skip this test or check for alternative elements
-    if (githubLinks.length === 0) {
-      // Check if the component renders project information instead
-      expect(screen.getAllByText('Test Project')[0]).toBeInTheDocument();
-    } else {
-      expect(githubLinks[0]).toHaveAttribute(
-        'href',
-        'https://github.com/test/project'
-      );
-      expect(demoLinks[0]).toHaveAttribute('href', 'https://demo.example.com');
-    }
-  });
-
-  it('renders tech and domain tags in trending cards', async () => {
-    await act(async () => {
-      render(
-        <TrendingSections
-          projects={[mockProject]}
-          userInfo={mockHacker}
-          handleLike={mockHandleLike}
-          isDarkMode={false}
-        />
-      );
-    });
-
-    expect(screen.getAllByText('React')[0]).toBeInTheDocument();
-    // Domain tags might not be rendered in this component, check for tech tags only
-    expect(screen.getAllByText('React')[0]).toBeInTheDocument();
-  });
-
-  it('renders launch lead information', async () => {
-    await act(async () => {
-      render(
-        <TrendingSections
-          projects={[mockProject]}
-          userInfo={mockHacker}
-          handleLike={mockHandleLike}
-          isDarkMode={false}
-        />
-      );
-    });
-
-    // Launch lead name might not be rendered in this component, check for project info instead
-    expect(screen.getAllByText('Test Project')[0]).toBeInTheDocument();
-  });
-
   it('renders project thumbnail when available', async () => {
     await act(async () => {
       render(
@@ -344,7 +282,6 @@ describe('TrendingSections Component', () => {
     });
 
     expect(screen.getAllByText('Test Project')[0]).toBeInTheDocument();
-    // Test Hacker name might not be rendered in this component, check for project description instead
     expect(
       screen.getAllByText('A test project description')[0]
     ).toBeInTheDocument();

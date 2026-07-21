@@ -24,7 +24,6 @@ export async function GET(req: Request) {
     const safeLimit = hasPagination ? Math.min(limit, 50) : undefined;
     const safeOffset = Number.isFinite(offset) && offset >= 0 ? offset : 0;
 
-    // Determine hack_type based on environment
     const isResearchSite = process.env.IS_RESEARCH_SITE === 'true';
     const hack_type: HackType = isResearchSite
       ? HackType.RESEARCH
@@ -171,7 +170,6 @@ export async function POST(req: Request) {
       );
     }
 
-    // Get the hacker using clerkId
     const hacker = await prisma.hacker.findUnique({
       where: { clerkId: userId },
     });
@@ -209,11 +207,9 @@ export async function POST(req: Request) {
       select: { id: true },
     });
 
-    // Determine hack_type based on environment
     const isResearchSite = process.env.IS_RESEARCH_SITE === 'true';
     const hack_type = isResearchSite ? 'RESEARCH' : 'REGULAR';
 
-    // Create project with participants and thumbnail
     const project = await prisma.project.create({
       data: {
         title,

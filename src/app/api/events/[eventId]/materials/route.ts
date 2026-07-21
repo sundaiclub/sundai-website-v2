@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import type { EventMaterial } from '@prisma/client';
 import prisma from '@/lib/prisma';
 import {
   canManageEventMaterialsWithContext,
@@ -48,7 +49,7 @@ async function getMaterialViewer(eventId: string) {
   };
 }
 
-function materialProjection(material: Record<string, any>) {
+function materialProjection(material: EventMaterial) {
   const { bucket: _bucket, objectKey: _objectKey, ...safe } = material;
   return {
     ...safe,
@@ -58,6 +59,10 @@ function materialProjection(material: Record<string, any>) {
         }
       : {}),
   };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
 export async function GET(_request: Request, { params }: RouteContext) {
@@ -100,7 +105,13 @@ export async function POST(request: Request, { params }: RouteContext) {
       return new NextResponse('Forbidden', { status: 403 });
     }
 
-    const input = (await request.json()) as Record<string, any>;
+    const input: unknown = await request.json();
+    if (!isRecord(input)) {
+      return NextResponse.json(
+        { error: 'Request body must be a JSON object.' },
+        { status: 400 }
+      );
+    }
     let material;
     if (input.kind === 'LINK') {
       material = await createEventMaterialLink({

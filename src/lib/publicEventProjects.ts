@@ -1,22 +1,37 @@
 import prisma from '@/lib/prisma';
+import type { Prisma, PrismaClient } from '@prisma/client';
 import type { PublicEventProject } from '@/types/event-management';
 
-type EventProjectRow = {
-  createdAt: Date | string;
-  project: {
-    id: string;
-    title: string;
-    preview?: string | null;
-    thumbnail?: {
-      url: string;
-      alt?: string | null;
-    } | null;
-    launchLead: { name: string };
-    pitchEntries: Array<{
-      pitchVotes: Array<{ id: string }>;
-    }>;
-  };
-};
+function publicEventProjectSelect(eventId: string) {
+  return {
+    createdAt: true,
+    project: {
+      select: {
+        id: true,
+        title: true,
+        preview: true,
+        thumbnail: { select: { url: true, alt: true } },
+        launchLead: { select: { name: true } },
+        pitchEntries: {
+          where: { pitchSession: { eventId } },
+          select: {
+            pitchVotes: {
+              where: {
+                value: 'LIKE',
+                hacker: { userBans: { none: { revokedAt: null } } },
+              },
+              select: { id: true },
+            },
+          },
+        },
+      },
+    },
+  } satisfies Prisma.EventProjectSelect;
+}
+
+type EventProjectRow = Prisma.EventProjectGetPayload<{
+  select: ReturnType<typeof publicEventProjectSelect>;
+}>;
 
 export function rankPublicEventProjects(
   rows: EventProjectRow[]
@@ -50,9 +65,9 @@ export async function listPublicEventProjects({
   db = prisma,
 }: {
   eventId: string;
-  db?: any;
+  db?: Pick<PrismaClient, 'eventProject'>;
 }): Promise<PublicEventProject[]> {
-  const rows = (await db.eventProject.findMany({
+  const rows = await db.eventProject.findMany({
     where: {
       eventId,
       project: {
@@ -60,32 +75,9 @@ export async function listPublicEventProjects({
         launchLead: { userBans: { none: { revokedAt: null } } },
       },
     },
-    select: {
-      createdAt: true,
-      project: {
-        select: {
-          id: true,
-          title: true,
-          preview: true,
-          thumbnail: { select: { url: true, alt: true } },
-          launchLead: { select: { name: true } },
-          pitchEntries: {
-            where: { pitchSession: { eventId } },
-            select: {
-              pitchVotes: {
-                where: {
-                  value: 'LIKE',
-                  hacker: { userBans: { none: { revokedAt: null } } },
-                },
-                select: { id: true },
-              },
-            },
-          },
-        },
-      },
-    },
+    select: publicEventProjectSelect(eventId),
     orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
-  })) as EventProjectRow[];
+  });
 
   return rankPublicEventProjects(rows);
 }

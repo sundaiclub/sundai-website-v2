@@ -203,7 +203,6 @@ describe('/api/projects/[projectId]/share', () => {
             }),
           ]),
         }),
-        userInfo: mockUser,
         platform: 'twitter',
         isTeamMember: true,
       });
@@ -286,7 +285,6 @@ describe('/api/projects/[projectId]/share', () => {
           id: mockProjectId,
           title: 'Test Project',
         }),
-        userInfo: mockUser,
         platform: 'linkedin',
         isTeamMember: false,
       });

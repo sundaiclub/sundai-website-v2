@@ -112,7 +112,7 @@ export default function NewsClient() {
     return lines.join("\n");
   }, [topProjects]);
 
-  const buildEmailHtml = useCallback((projects: WeeklyTopProject[], aiNewsHtml?: string) => {
+  const buildEmailHtml = useCallback((projects: WeeklyTopProject[], aiNewsHtml: string) => {
     const projectsItems = projects.map((p, idx) => {
       const likeUrl = `${p.projectUrl}?like=1`;
       const people = [
@@ -203,21 +203,10 @@ export default function NewsClient() {
         </ul>
       </section>`;
 
-    const fallbackAiNews = `
-        <ul style="margin:8px 0 0 18px;color:#374151;padding:0">
-          <li>GLM Coding plan is 10% off if you use the Vector Lab signup code</li>
-          <li>OpenAI releases Chat with Apps, Agentkit, and more at Dev Day</li>
-          <li>Qwen3 VL gets a small variant</li>
-          <li>Can you give an LLM a gambling addiction</li>
-          <li>And more in this week's news</li>
-        </ul>
-        <p style="margin:10px 0 0;color:#374151">Shoutout to Andrew for leading Sundai News.</p>
-        <p style="margin:6px 0 0;color:#374151">Audio version available <a href="https://open.spotify.com/show/7LKYxvGAGSj1pso4aklh9O" style="color:#111827;text-decoration:underline">on Spotify</a>. Join the <a href="https://discord.gg/HrNXgwpVzd" style="color:#111827;text-decoration:underline">Discord</a>. Read the <a href="https://vectorlab.dev/weekly-10-6-to-10-12" style="color:#111827;text-decoration:underline">full article on the VectorLab website</a>.</p>`;
-
     const newsTLDR = `
       <section id="ai-news" style="padding:20px 16px;border-bottom:1px solid #e5e7eb">
         <h2 style="margin:0 0 8px;font-size:18px;line-height:26px;color:#111827">Weekly AI News · TL;DR</h2>
-        ${aiNewsHtml && aiNewsHtml.trim().length > 0 ? aiNewsHtml : fallbackAiNews}
+        ${aiNewsHtml}
       </section>`;
 
     const projectsBlock = `
@@ -282,6 +271,9 @@ export default function NewsClient() {
         throw new Error(`TLDR request failed with status ${tldrResp.status}`);
       }
       const aiNewsHtml = await tldrResp.text();
+      if (!aiNewsHtml.trim()) {
+        throw new Error('TLDR request returned no content');
+      }
 
       let built = buildEmailHtml(freshTop, aiNewsHtml);
       if (instruction.trim().length > 0) {

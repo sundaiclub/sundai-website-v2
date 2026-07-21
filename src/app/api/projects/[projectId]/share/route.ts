@@ -45,7 +45,6 @@ export async function POST(
       return new NextResponse('Invalid platform', { status: 400 });
     }
 
-    // Get the current user's hacker record
     const currentUser = await prisma.hacker.findUnique({
       where: { clerkId: userId },
     });
@@ -54,7 +53,6 @@ export async function POST(
       return new NextResponse('User not found', { status: 404 });
     }
 
-    // Get the project with all necessary data
     const project = await prisma.project.findUnique({
       where: { id: params.projectId },
       include: {
@@ -121,12 +119,10 @@ export async function POST(
       return new NextResponse('Project not found', { status: 404 });
     }
 
-    // Check if user is a team member
     const isTeamMember =
       project.participants.some(p => p.hacker.id === currentUser.id) ||
       project.launchLeadId === currentUser.id;
 
-    // Generate content using Gemini API
     const projectData: Project = {
       id: project.id,
       title: project.title,
@@ -221,7 +217,6 @@ export async function POST(
 
     const shareContent = await generateShareContent({
       project: projectData,
-      userInfo: currentUser,
       platform,
       isTeamMember,
     });

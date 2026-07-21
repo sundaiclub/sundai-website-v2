@@ -40,7 +40,6 @@ export function useAutoLike(projectId: string | null) {
         const res = await fetch(`/api/projects/${projectId}/like`, { method: "POST" });
         if (res.ok) {
           sessionStorage.setItem(likeOnceKey, "1");
-          // Remove like=1 in URL after applying
           const params = new URLSearchParams(Array.from(searchParams?.entries() || []));
           params.delete("like");
           router.replace(`?${params.toString()}`);

@@ -39,7 +39,7 @@ export function getAvailableWorkspaceSections(
     : AVAILABLE_SECTIONS.filter(section => section !== 'registrations');
 }
 
-export const WORKSPACE_UNAVAILABLE_METRICS: EventWorkspaceOverview['unavailable'] =
+const WORKSPACE_UNAVAILABLE_METRICS: EventWorkspaceOverview['unavailable'] =
   ['checkIn', 'attendance', 'noShows'];
 
 function projectCapabilities(
@@ -247,5 +247,3 @@ export async function loadEventWorkspace(
     unavailable: [...WORKSPACE_UNAVAILABLE_METRICS],
   };
 }
-
-export const getEventWorkspace = loadEventWorkspace;

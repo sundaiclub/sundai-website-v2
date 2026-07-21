@@ -2,16 +2,10 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { requireEventCommunicationsManager } from '@/lib/eventManagementApi';
 import { validateEventCommunicationDraft } from '@/lib/eventCommunications';
+import { parsePageSize } from '@/lib/pagination';
 
 const DEFAULT_RECIPIENT_PAGE_SIZE = 50;
 const MAX_RECIPIENT_PAGE_SIZE = 100;
-
-function recipientPageSize(value: string | null) {
-  if (!value) return DEFAULT_RECIPIENT_PAGE_SIZE;
-  const parsed = Number(value);
-  if (!Number.isInteger(parsed) || parsed < 1) return null;
-  return Math.min(parsed, MAX_RECIPIENT_PAGE_SIZE);
-}
 
 async function findCommunication(eventId: string, blastId: string) {
   const communication = await prisma.eventCommunication.findUnique({
@@ -37,7 +31,11 @@ export async function GET(
     }
 
     const url = new URL(request.url);
-    const limit = recipientPageSize(url.searchParams.get('limit'));
+    const limit = parsePageSize(
+      url.searchParams.get('limit'),
+      DEFAULT_RECIPIENT_PAGE_SIZE,
+      MAX_RECIPIENT_PAGE_SIZE
+    );
     if (limit === null) {
       return NextResponse.json(
         { error: 'limit must be a positive integer.' },

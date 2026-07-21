@@ -365,26 +365,6 @@ describe('ShareModal', () => {
     });
   });
 
-  it('should show team member message for team members', () => {
-    render(<ShareModal {...defaultProps} />);
-    
-    // The component doesn't show this message, it shows project info instead
-    expect(screen.getByText('Test Project')).toBeInTheDocument();
-  });
-
-  it('should show different message for non-team members', () => {
-    const nonTeamMemberProject = {
-      ...mockProject,
-      participants: [],
-      launchLead: { id: 'other-user', name: 'Other User' },
-    };
-
-    render(<ShareModal {...defaultProps} project={nonTeamMemberProject} />);
-    
-    // The component doesn't show this message, it shows project info instead
-    expect(screen.getByText('Test Project')).toBeInTheDocument();
-  });
-
   it('should handle different platforms correctly', async () => {
     const mockResponse = {
       content: 'Generated content for LinkedIn',

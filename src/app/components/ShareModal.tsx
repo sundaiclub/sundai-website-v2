@@ -44,10 +44,9 @@ export default function ShareModal({ showModal, setShowModal, project, isDarkMod
       });
 
       if (!response.ok) {
-        // Explicit handling for unauthorized
         if (response.status === 401) {
           toast.error('Please sign in to generate shareable content.');
-          return; // Do not fallback when unauthorized
+          return;
         }
         const errorText = await response.text();
         throw new Error(`Failed to generate content: ${errorText || response.statusText}`);
@@ -55,7 +54,6 @@ export default function ShareModal({ showModal, setShowModal, project, isDarkMod
 
       const contentType = response.headers.get('Content-Type') || '';
 
-      // Helper: letter-by-letter animation from a queued buffer
       const pendingRef = { current: '' } as React.MutableRefObject<string>;
       const animatingRef = { current: false } as React.MutableRefObject<boolean>;
       const rafRef = { current: 0 } as React.MutableRefObject<number>;
@@ -65,7 +63,6 @@ export default function ShareModal({ showModal, setShowModal, project, isDarkMod
           return;
         }
         animatingRef.current = true;
-        // Append a few characters per frame for smoothness
         const chunk = pendingRef.current.slice(0, 3);
         pendingRef.current = pendingRef.current.slice(3);
         setGeneratedContent(prev => (prev || '') + chunk);
@@ -95,7 +92,6 @@ export default function ShareModal({ showModal, setShowModal, project, isDarkMod
           finalAll += txt;
           enqueueText(txt);
         }
-        // flush any remaining decoder buffer
         const tail = decoder.decode();
         if (tail) {
           finalAll += tail;

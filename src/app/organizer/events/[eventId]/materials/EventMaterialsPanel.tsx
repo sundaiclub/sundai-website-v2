@@ -10,11 +10,10 @@ import {
 } from '../../../../components/ManagementSurface';
 import type {
   EventMaterial,
+  EventMaterialKind,
   EventMaterialUploadIntent,
   EventMaterialVisibility,
 } from '@/types/event-workspace';
-
-type MaterialKind = 'LINK' | 'FILE';
 
 const visibilityLabels: Record<EventMaterialVisibility, string> = {
   PUBLIC: 'Public',
@@ -34,7 +33,7 @@ export default function EventMaterialsPanel({ eventId }: { eventId: string }) {
   const [materials, setMaterials] = useState<EventMaterial[]>([]);
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
   const [showEditor, setShowEditor] = useState(false);
-  const [kind, setKind] = useState<MaterialKind>('LINK');
+  const [kind, setKind] = useState<EventMaterialKind>('LINK');
   const [title, setTitle] = useState('');
   const [externalUrl, setExternalUrl] = useState('');
   const [visibility, setVisibility] =
