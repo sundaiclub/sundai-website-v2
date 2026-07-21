@@ -8,9 +8,13 @@ import {
   unauthorized,
 } from '@/lib/eventManagementApi';
 import {
+  canDecideRegistrationsWithContext,
   canEditRegistrationNotes,
+  canEditRegistrationNotesWithContext,
   canManageRegistrations,
   canDecideRegistrations,
+  canManageRegistrationsWithContext,
+  getEventPermissionContext,
 } from '@/lib/eventManagementAuth';
 import {
   countEventRegistrationsByStatus,
@@ -125,12 +129,21 @@ export async function GET(
     const hacker = await getCurrentHacker();
     if (!hacker) return unauthorized();
 
-    const [allowed, canDecide, canEditNotes] = await Promise.all([
-      canManageRegistrations(prisma, hacker.id, params.eventId),
-      canDecideRegistrations(prisma, hacker.id, params.eventId),
-      canEditRegistrationNotes(prisma, hacker.id, params.eventId),
-    ]);
-    if (!allowed) return forbidden();
+    const permissionContext = await getEventPermissionContext(
+      prisma,
+      hacker.id,
+      params.eventId
+    );
+    if (
+      !permissionContext ||
+      !canManageRegistrationsWithContext(permissionContext)
+    ) {
+      return forbidden();
+    }
+
+    const canDecide = canDecideRegistrationsWithContext(permissionContext);
+    const canEditNotes =
+      canEditRegistrationNotesWithContext(permissionContext);
 
     const siteAdmin = isSiteAdmin(hacker);
     const capabilities: OrganizerRegistrationReviewCapabilities = {

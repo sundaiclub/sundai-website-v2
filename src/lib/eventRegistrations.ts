@@ -522,22 +522,22 @@ export async function countEventRegistrationsByStatus(
   isSiteAdmin: boolean,
   db: EventManagementPrismaClient = client
 ): Promise<Partial<Record<RegistrationStatus, number>>> {
-  const entries = await Promise.all(
-    ORGANIZER_REVIEW_STATUSES.map(async status => {
-      const count = await db.eventRegistration.count({
-        where: {
-          eventId,
-          status,
-          ...(!isSiteAdmin && {
-            hacker: {
-              userBans: { none: { revokedAt: null } },
-            },
-          }),
-        },
-      });
-      return [status, count] as const;
-    })
-  );
+  const entries: Array<readonly [RegistrationStatus, number]> = [];
+
+  for (const status of ORGANIZER_REVIEW_STATUSES) {
+    const count = await db.eventRegistration.count({
+      where: {
+        eventId,
+        status,
+        ...(!isSiteAdmin && {
+          hacker: {
+            userBans: { none: { revokedAt: null } },
+          },
+        }),
+      },
+    });
+    entries.push([status, count]);
+  }
 
   return Object.fromEntries(entries);
 }

@@ -515,7 +515,7 @@ export async function getEventStaffForPermissions(
   });
 }
 
-async function getEventPermissionContext(
+export async function getEventPermissionContext(
   prisma: EventManagementAuthPrisma,
   hackerId: NullableHackerId,
   eventId: EntityId
