@@ -25,6 +25,14 @@ describe('middleware comprehensive', () => {
     expect(typeof mw.afterAuthHandler).toBe('function');
   });
 
+  it('should keep the Clerk webhook public', () => {
+    const { createRouteMatcher } = require('@clerk/nextjs/server');
+
+    expect(createRouteMatcher).toHaveBeenCalledWith(
+      expect.arrayContaining(['/api/webhooks/clerk'])
+    );
+  });
+
   it('should have correct config matcher', () => {
     const middleware = require('../src/middleware');
     
