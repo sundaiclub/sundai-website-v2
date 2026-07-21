@@ -18,7 +18,6 @@ import type {
   TemplateFieldDefinition,
 } from '@/types/event-management';
 
-
 function templateList(payload: unknown): ApplicationTemplateListItem[] {
   const templates = Array.isArray(payload)
     ? (payload as ApplicationTemplateListItem[])
