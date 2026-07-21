@@ -170,6 +170,8 @@ Site admins and chapter admins can manage event staff and lifecycle actions with
 - **FR-042**: Phase 3 check-in and attendance functionality from issue #144 MUST NOT be implemented as part of this feature; it is intentionally deferred for redesign.
 - **FR-043**: Until the redesigned phase 3 is specified and delivered, the workspace MUST NOT offer a check-in workflow or checked-in/no-show communication audiences and MUST NOT treat legacy week-based attendance as event attendance.
 - **FR-044**: This phase MUST NOT rebuild pitch behavior, automate social or newsletter publication, add guest workflows, expose ban management to MCs or co-MCs, automate rejection from organizer notes, import historical external-event data, or add sponsor access.
+- **FR-045**: Creating a project while a published event is in progress MUST attach it to each relevant event where the creator has active chapter membership or an approved, non-cancelled registration.
+- **FR-046**: Adding a project to a pitch session linked to an event MUST also attach the project to that event, atomically and without duplicating project identity.
 
 ### Key Entities *(include if feature involves data)*
 

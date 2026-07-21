@@ -137,11 +137,23 @@ export type ChapterLandingEvent = {
   id: EntityId;
   title: string;
   slug: string;
+  applicationCount: number;
   startTime?: Date | string;
   publicLocation?: string | null;
   status?: EventStatus;
   visibility?: EventVisibility;
   image?: Pick<EventManagementImageSummary, 'id' | 'url' | 'alt'> | null;
+};
+
+export type ChapterLandingProject = {
+  id: EntityId;
+  title: string;
+  preview?: string | null;
+  thumbnail?: Pick<EventManagementImageSummary, 'id' | 'url' | 'alt'> | null;
+  launchLead: Pick<EventManagementHackerSummary, 'id' | 'name'>;
+  techTags?: Array<{ id: EntityId; name: string }>;
+  domainTags?: Array<{ id: EntityId; name: string }>;
+  likeCount: number;
 };
 
 export type ChapterLanding = Pick<
@@ -165,6 +177,8 @@ export type ChapterLanding = Pick<
   upcomingEvents?: ChapterLandingEvent[];
   previousEvents?: ChapterLandingEvent[];
   pendingEvents?: ChapterLandingEvent[];
+  topProjectsThisWeek?: ChapterLandingProject[];
+  topProjectsAllTime?: ChapterLandingProject[];
 };
 
 export type SiteAdminChapterListItem = Pick<
@@ -441,6 +455,7 @@ export interface PublicEventCard {
   publicLocation?: string | null;
   startTime: ISODateTimeString | Date;
   endTime?: ISODateTimeString | Date | null;
+  applicationCount?: number;
   publicStatus: PublicEventStatus;
   viewerRegistrationStatus?: RegistrationStatus | null;
 }
@@ -496,6 +511,7 @@ export interface PublicEventDetail extends PublicEventCard {
   viewerCanManageRegistrations?: boolean;
   viewerCanEditEvent?: boolean;
   viewerCanManageEvent?: boolean;
+  pitchSession?: { phase: PitchSessionPhase } | null;
   addToCalendar: AddToCalendarPayload;
 }
 

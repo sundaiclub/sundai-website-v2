@@ -76,6 +76,7 @@ describe('Navbar Component', () => {
     expect(screen.getAllByText('All Projects')[0]).toBeInTheDocument()
     expect(screen.getAllByText('Events')[0]).toBeInTheDocument()
     expect(screen.getAllByText('Get Involved')[0]).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Pitch' })).not.toBeInTheDocument()
   })
 
   it('renders user button when signed in', async () => {

@@ -79,7 +79,7 @@ const mockHackerLookup = (...hackers: HackerFixture[]) => {
   prisma.hacker.findUnique.mockImplementation(async ({ where }: any) => {
     return (
       hackers.find(
-        (hacker) => where?.id === hacker.id || where?.clerkId === hacker.clerkId
+        hacker => where?.id === hacker.id || where?.clerkId === hacker.clerkId
       ) ?? null
     );
   });
@@ -107,20 +107,22 @@ const matchesMembershipStatus = (actual: unknown, expected: string) => {
 };
 
 const mockMembershipLookup = (...memberships: ChapterMembershipFixture[]) => {
-  prisma.chapterMembership.findFirst.mockImplementation(async ({ where }: any) => {
-    return (
-      memberships.find((membership) => {
-        if (where?.chapterId && membership.chapterId !== where.chapterId) {
-          return false;
-        }
-        if (where?.hackerId && membership.hackerId !== where.hackerId) {
-          return false;
-        }
-        if (where?.role && membership.role !== where.role) return false;
-        return matchesMembershipStatus(where?.status, membership.status);
-      }) ?? null
-    );
-  });
+  prisma.chapterMembership.findFirst.mockImplementation(
+    async ({ where }: any) => {
+      return (
+        memberships.find(membership => {
+          if (where?.chapterId && membership.chapterId !== where.chapterId) {
+            return false;
+          }
+          if (where?.hackerId && membership.hackerId !== where.hackerId) {
+            return false;
+          }
+          if (where?.role && membership.role !== where.role) return false;
+          return matchesMembershipStatus(where?.status, membership.status);
+        }) ?? null
+      );
+    }
+  );
 };
 
 const mockChapterDetailLookup = ({
@@ -132,22 +134,24 @@ const mockChapterDetailLookup = ({
   upcomingEvents?: EventFixture[];
   adminMemberships?: ChapterMembershipFixture[];
 }) => {
-  prisma.chapter.findUnique.mockImplementation(async ({ where, include }: any) => {
-    if (where?.id === chapter.slug) return null;
-    if (where?.slug === chapter.slug) return { id: chapter.id };
-    if (where?.id !== chapter.id) return null;
+  prisma.chapter.findUnique.mockImplementation(
+    async ({ where, include }: any) => {
+      if (where?.id === chapter.slug) return null;
+      if (where?.slug === chapter.slug) return { id: chapter.id };
+      if (where?.id !== chapter.id) return null;
 
-    if (include) {
-      return {
-        ...chapter,
-        heroImage: null,
-        memberships: adminMemberships,
-        events: upcomingEvents,
-      };
+      if (include) {
+        return {
+          ...chapter,
+          heroImage: null,
+          memberships: adminMemberships,
+          events: upcomingEvents,
+        };
+      }
+
+      return chapter;
     }
-
-    return chapter;
-  });
+  );
 };
 
 describe('/api/chapters', () => {
@@ -297,6 +301,7 @@ describe('/api/chapters', () => {
         chapterId: chapter.id,
         startTime: new Date('2026-07-18T22:00:00.000Z'),
         publicLocation: 'Kendall Square',
+        _count: { registrations: 18 },
       }),
       buildPublishedEvent({
         id: 'event-boston-build-night',
@@ -305,6 +310,7 @@ describe('/api/chapters', () => {
         chapterId: chapter.id,
         startTime: new Date('2026-08-01T22:00:00.000Z'),
         publicLocation: 'Seaport',
+        _count: { registrations: 1 },
       }),
     ];
     const previousEvents = [
@@ -315,6 +321,7 @@ describe('/api/chapters', () => {
         chapterId: chapter.id,
         startTime: new Date('2026-05-15T22:00:00.000Z'),
         publicLocation: 'Central Square',
+        _count: { registrations: 24 },
       }),
     ];
 
@@ -349,6 +356,7 @@ describe('/api/chapters', () => {
           slug: 'demo-night',
           startTime: upcomingEvents[0].startTime.toISOString(),
           publicLocation: 'Kendall Square',
+          applicationCount: 18,
         },
         {
           id: 'event-boston-build-night',
@@ -356,6 +364,7 @@ describe('/api/chapters', () => {
           slug: 'build-night',
           startTime: upcomingEvents[1].startTime.toISOString(),
           publicLocation: 'Seaport',
+          applicationCount: 1,
         },
       ],
       previousEvents: [
@@ -365,6 +374,7 @@ describe('/api/chapters', () => {
           slug: 'spring-demo',
           startTime: previousEvents[0].startTime.toISOString(),
           publicLocation: 'Central Square',
+          applicationCount: 24,
         },
       ],
       viewerMembership: null,
@@ -385,14 +395,21 @@ describe('/api/chapters', () => {
               visibility: 'PUBLIC',
               startTime: { gte: expect.any(Date) },
             },
-            select: {
+            select: expect.objectContaining({
               id: true,
               title: true,
               slug: true,
               startTime: true,
               publicLocation: true,
               image: { select: { id: true, url: true, alt: true } },
-            },
+              _count: {
+                select: {
+                  registrations: {
+                    where: { status: { not: 'BLOCKED' } },
+                  },
+                },
+              },
+            }),
           }),
         }),
       })
@@ -405,15 +422,82 @@ describe('/api/chapters', () => {
         startTime: { lt: expect.any(Date) },
       },
       orderBy: { startTime: 'desc' },
-      select: {
+      select: expect.objectContaining({
         id: true,
         title: true,
         slug: true,
         startTime: true,
         publicLocation: true,
         image: { select: { id: true, url: true, alt: true } },
-      },
+        _count: {
+          select: {
+            registrations: { where: { status: { not: 'BLOCKED' } } },
+          },
+        },
+      }),
     });
+  });
+
+  it('ranks chapter projects by recent and all-time likes', async () => {
+    const chapter = buildChapter({ id: 'chapter-boston', slug: 'boston' });
+    const recentLike = { createdAt: new Date() };
+    const oldLike = { createdAt: new Date('2025-01-01T12:00:00.000Z') };
+    const project = (
+      id: string,
+      title: string,
+      likes: (typeof recentLike)[]
+    ) => ({
+      id,
+      title,
+      preview: `${title} preview`,
+      thumbnail: null,
+      launchLead: { id: `${id}-lead`, name: `${title} Lead` },
+      techTags: [],
+      domainTags: [],
+      likes,
+    });
+    const recentFavorite = project('project-recent', 'Recent Favorite', [
+      recentLike,
+      recentLike,
+    ]);
+    const allTimeFavorite = project('project-all-time', 'All Time Favorite', [
+      oldLike,
+      oldLike,
+      oldLike,
+    ]);
+
+    mockSignedOutClerk();
+    mockChapterDetailLookup({
+      chapter,
+      upcomingEvents: [
+        {
+          ...buildPublishedEvent({
+            id: 'event-project-ranking',
+            chapterId: chapter.id,
+          }),
+          _count: { registrations: 0 },
+          projects: [{ project: allTimeFavorite }, { project: recentFavorite }],
+        } as any,
+      ],
+    });
+    prisma.event.findMany.mockResolvedValue([]);
+
+    const response = await GET_CHAPTER(
+      createJsonRequest('/api/chapters/boston') as any,
+      createRouteContext({ chapterId: chapter.slug }) as any
+    );
+    const body = await response.json();
+
+    expect(body.topProjectsThisWeek.map((item: any) => item.id)).toEqual([
+      'project-recent',
+      'project-all-time',
+    ]);
+    expect(body.topProjectsAllTime.map((item: any) => item.id)).toEqual([
+      'project-all-time',
+      'project-recent',
+    ]);
+    expect(body.topProjectsAllTime[0]).toMatchObject({ likeCount: 3 });
+    expect(body.topProjectsAllTime[0]).not.toHaveProperty('likes');
   });
 
   it('returns manager-only pending events for chapter admins', async () => {

@@ -173,7 +173,7 @@
 
 - [X] T065 [US5] Implement event-linked `PitchProject` projections, event-specific card-status updates, and pitch summaries without a duplicate participation model in `src/lib/eventWorkspaceProjects.ts`
 - [X] T066 [US5] Implement authorized event project listing in `src/app/api/events/[eventId]/projects/route.ts`
-- [X] T067 [US5] Implement non-blocking card-status updates in `src/app/api/events/[eventId]/projects/[pitchProjectId]/route.ts`
+- [X] T067 [US5] Implement non-blocking card-status updates in `src/app/api/events/[eventId]/projects/[eventProjectId]/route.ts`
 - [X] T068 [US5] Cut existing pitch controller routes over to the shared event-pitch capability guard in `src/app/api/events/[eventId]/pitch/`
 - [X] T069 [P] [US5] Build the workspace Projects section with global project identity and event-specific card/queue/pitch state in `src/app/organizer/events/[eventId]/projects/page.tsx`
 - [X] T070 [P] [US5] Build the workspace Pitch summary and `Open pitch controller` link to `/pitch/[eventId]` in `src/app/organizer/events/[eventId]/pitch/page.tsx`
@@ -217,6 +217,11 @@
 - [X] T083 [P] Document private material storage, provider availability, SMS consent versioning, and operational setup in `README.md`
 - [X] T084 Run every focused verification command and record any necessary corrections in `specs/003-organizer-event-workspace/quickstart.md`
 - [X] T085 Run the complete Jest suite and production build, resolving feature-related regressions in `tests/` and `src/`
+- [X] T086 Add explicit event-project participation and migrate existing pitch-linked projects in `prisma/schema.prisma` and `prisma/migrations/20260720020000_event_project_participation/migration.sql`
+- [X] T087 Attach newly created projects to currently running relevant chapter events in `src/app/api/projects/route.ts`
+- [X] T088 Atomically attach pitch-session projects to their event in `src/app/api/events/[eventId]/pitch/queue/route.ts`
+- [X] T089 Cut workspace project cards, counts, reporting, and note relevance over to `EventProject` in `src/lib/`
+- [X] T090 Add focused creation, pitch attachment, standalone event-project, and workspace regressions in `tests/`
 
 ---
 

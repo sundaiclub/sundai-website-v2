@@ -16,10 +16,9 @@ jest.mock('../../src/lib/prisma', () => ({
     event: { findUnique: jest.fn() },
     eventStaff: { findFirst: jest.fn() },
     chapterMembership: { findFirst: jest.fn() },
-    pitchProject: {
+    eventProject: {
       findMany: jest.fn(),
       findFirst: jest.fn(),
-      findUnique: jest.fn(),
       update: jest.fn(),
     },
   },
@@ -66,6 +65,23 @@ function pitchEntry(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function eventParticipation(
+  entry: ReturnType<typeof pitchEntry> | null = pitchEntry(),
+  overrides: Record<string, unknown> = {}
+) {
+  return {
+    id: 'event-project-boston',
+    eventId,
+    projectId,
+    cardStatus: 'NEEDS_INFO',
+    project: {
+      ...globalProject,
+      pitchEntries: entry ? [entry] : [],
+    },
+    ...overrides,
+  };
+}
+
 function loadRoute<T>(path: string): T {
   try {
     return require(path) as T;
@@ -102,7 +118,7 @@ describe('/api/events/[eventId]/projects', () => {
   });
 
   it('projects global project/team/link data with event-specific card, queue, and pitch state', async () => {
-    prisma.pitchProject.findMany.mockResolvedValue([pitchEntry()]);
+    prisma.eventProject.findMany.mockResolvedValue([eventParticipation()]);
     const { GET } = loadRoute<{ GET: Function }>(
       '../../src/app/api/events/[eventId]/projects/route'
     );
@@ -117,7 +133,8 @@ describe('/api/events/[eventId]/projects', () => {
     expect(response.status).toBe(200);
     expect(rows).toEqual([
       expect.objectContaining({
-        id: 'pitch-project-boston',
+        id: 'event-project-boston',
+        pitchProjectId: 'pitch-project-boston',
         cardStatus: 'NEEDS_INFO',
         project: expect.objectContaining({
           id: projectId,
@@ -139,15 +156,40 @@ describe('/api/events/[eventId]/projects', () => {
     ]);
   });
 
+  it('lists an event project that has not been added to a pitch session', async () => {
+    prisma.eventProject.findMany.mockResolvedValue([
+      eventParticipation(null, { cardStatus: 'DRAFT' }),
+    ]);
+    const { GET } = loadRoute<{ GET: Function }>(
+      '../../src/app/api/events/[eventId]/projects/route'
+    );
+
+    const response = await GET(
+      createJsonRequest(`/api/events/${eventId}/projects`),
+      createRouteContext({ eventId })
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.items[0]).toEqual(
+      expect.objectContaining({
+        id: 'event-project-boston',
+        pitchProjectId: null,
+        queue: null,
+        pitch: null,
+      })
+    );
+  });
+
   it('updates only the non-blocking event card status', async () => {
-    const entry = pitchEntry();
-    prisma.pitchProject.findFirst.mockResolvedValue(entry);
-    prisma.pitchProject.update.mockResolvedValue({
+    const entry = eventParticipation();
+    prisma.eventProject.findFirst.mockResolvedValue(entry);
+    prisma.eventProject.update.mockResolvedValue({
       ...entry,
       cardStatus: 'SUBMITTED',
     });
     const { PATCH } = loadRoute<{ PATCH: Function }>(
-      '../../src/app/api/events/[eventId]/projects/[pitchProjectId]/route'
+      '../../src/app/api/events/[eventId]/projects/[eventProjectId]/route'
     );
 
     const response = await PATCH(
@@ -155,17 +197,17 @@ describe('/api/events/[eventId]/projects', () => {
         method: 'PATCH',
         body: { cardStatus: 'SUBMITTED' },
       }),
-      createRouteContext({ eventId, pitchProjectId: entry.id })
+      createRouteContext({ eventId, eventProjectId: entry.id })
     );
 
     expect(response.status).toBe(200);
-    expect(prisma.pitchProject.update).toHaveBeenCalledWith(
+    expect(prisma.eventProject.update).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: entry.id },
         data: { cardStatus: 'SUBMITTED' },
       })
     );
-    expect(prisma.pitchProject.update).not.toHaveBeenCalledWith(
+    expect(prisma.eventProject.update).not.toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
           status: expect.anything(),
@@ -188,7 +230,7 @@ describe('/api/events/[eventId]/projects', () => {
     );
 
     expect([403, 404]).toContain(response.status);
-    expect(prisma.pitchProject.findMany).not.toHaveBeenCalled();
+    expect(prisma.eventProject.findMany).not.toHaveBeenCalled();
     expect(JSON.stringify(await response.text())).not.toContain(
       globalProject.title
     );
@@ -203,9 +245,9 @@ describe('/api/events/[eventId]/projects', () => {
         phase: 'PITCHING',
       },
     });
-    prisma.pitchProject.findFirst.mockResolvedValue(null);
+    prisma.eventProject.findFirst.mockResolvedValue(null);
     const { PATCH } = loadRoute<{ PATCH: Function }>(
-      '../../src/app/api/events/[eventId]/projects/[pitchProjectId]/route'
+      '../../src/app/api/events/[eventId]/projects/[eventProjectId]/route'
     );
 
     const response = await PATCH(
@@ -213,16 +255,16 @@ describe('/api/events/[eventId]/projects', () => {
         method: 'PATCH',
         body: { cardStatus: 'APPROVED' },
       }),
-      createRouteContext({ eventId, pitchProjectId: otherEntry.id })
+      createRouteContext({ eventId, eventProjectId: otherEntry.id })
     );
 
     expect(response.status).toBe(404);
-    expect(prisma.pitchProject.update).not.toHaveBeenCalled();
+    expect(prisma.eventProject.update).not.toHaveBeenCalled();
   });
 
   it('keeps one global project identity with independent participation state in multiple events', async () => {
-    const boston = pitchEntry();
-    const cambridge = pitchEntry({
+    const boston = eventParticipation();
+    const cambridgePitch = pitchEntry({
       id: 'pitch-project-cambridge',
       pitchSessionId: 'pitch-session-cambridge',
       cardStatus: 'APPROVED',
@@ -236,7 +278,12 @@ describe('/api/events/[eventId]/projects', () => {
         phase: 'FINISHED',
       },
     });
-    prisma.pitchProject.findMany
+    const cambridge = eventParticipation(cambridgePitch, {
+      id: 'event-project-cambridge',
+      eventId: otherEventId,
+      cardStatus: 'APPROVED',
+    });
+    prisma.eventProject.findMany
       .mockResolvedValueOnce([boston])
       .mockResolvedValueOnce([cambridge]);
     const { GET } = loadRoute<{ GET: Function }>(

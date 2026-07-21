@@ -6,6 +6,7 @@ import {
   ApplicationTemplateValidationError,
   parseTemplateFieldsJson,
 } from '@/lib/applicationTemplates';
+import { sanitizeApprovedDetailsJson } from '@/lib/approvedEventDetails';
 import {
   parseApplicationsOpen,
   parseEventApplicationMode,
@@ -165,7 +166,6 @@ export async function POST(req: Request) {
       checkInClosesAt,
       staff = [],
       mcIds = [],
-      createPitchSession = false,
       audienceCanReorder = true,
       votingEndTime,
       topProjectCount,
@@ -265,7 +265,10 @@ export async function POST(req: Request) {
         }),
         applicationMode: parsedApplicationMode,
         autoPromoteWaitlist: Boolean(autoPromoteWaitlist),
-        ...(approvedDetailsJson !== undefined && { approvedDetailsJson }),
+        ...(approvedDetailsJson !== undefined && {
+          approvedDetailsJson:
+            sanitizeApprovedDetailsJson(approvedDetailsJson),
+        }),
         ...(applicationQuestionsJson !== undefined && {
           applicationQuestionsJson,
         }),
@@ -309,30 +312,28 @@ export async function POST(req: Request) {
                   role: 'MC' as const,
                 })),
         },
-        ...(createPitchSession && {
-          pitchSessions: {
-            create: {
-              chapterId,
-              title,
-              description: description || null,
-              startTime: new Date(startTime),
-              meetingUrl: meetingUrl || null,
-              location: location || null,
-              createdById: user.id,
-              audienceCanReorder,
-              votingEndTime: votingEndTime
-                ? new Date(votingEndTime)
-                : new Date(new Date(startTime).getTime() + 15 * 60 * 1000),
-              ...(topProjectCount !== undefined && { topProjectCount }),
-              ...(topPresentingSec !== undefined && { topPresentingSec }),
-              ...(topQuestionsSec !== undefined && { topQuestionsSec }),
-              ...(defaultPresentingSec !== undefined && {
-                defaultPresentingSec,
-              }),
-              ...(defaultQuestionsSec !== undefined && { defaultQuestionsSec }),
-            },
+        pitchSessions: {
+          create: {
+            chapterId,
+            title,
+            description: description || null,
+            startTime: new Date(startTime),
+            meetingUrl: meetingUrl || null,
+            location: location || null,
+            createdById: user.id,
+            audienceCanReorder,
+            votingEndTime: votingEndTime
+              ? new Date(votingEndTime)
+              : new Date(new Date(startTime).getTime() + 15 * 60 * 1000),
+            ...(topProjectCount !== undefined && { topProjectCount }),
+            ...(topPresentingSec !== undefined && { topPresentingSec }),
+            ...(topQuestionsSec !== undefined && { topQuestionsSec }),
+            ...(defaultPresentingSec !== undefined && {
+              defaultPresentingSec,
+            }),
+            ...(defaultQuestionsSec !== undefined && { defaultQuestionsSec }),
           },
-        }),
+        },
       },
       include: {
         pitchSessions: true,

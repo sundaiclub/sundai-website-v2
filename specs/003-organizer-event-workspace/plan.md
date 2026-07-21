@@ -12,7 +12,7 @@ Cut over organizer event operations to `/organizer/events/[eventId]`, providing 
 
 - Phase 1 and Phase 2 event models, chapter roles, `EventStaff`, public event pages, native registrations, waitlists, global-ban filtering, organizer notes, and shared permission helpers exist locally.
 - Staff create/delete routes, organizer registration review, and event settings surfaces exist but are not yet assembled under one workspace.
-- `Project` is global and `PitchProject` links it to a `PitchSession`, whose `eventId` provides the event-specific participation boundary.
+- `Project` is global; `EventProject` is the event-participation boundary, while `PitchProject` links optional pitch-session state. Project creation during a relevant running event and pitch-queue entry both ensure `EventProject` exists.
 - `/pitch/[eventId]` already implements the pitch controller and recognizes MC and co-MC access.
 - AWS SES and Twilio adapters already exist in `src/lib/eventDecisionNotifications.ts`; Google Cloud Storage upload support exists in `src/lib/gcp-storage.ts`.
 - The current `canManageEventSettingsWithContext` grants MCs broader settings access than this specification allows, and `GET /api/events/[eventId]/staff` does not currently authorize reads. Both are required permission cutovers, not compatibility cases.
@@ -36,7 +36,7 @@ Cut over organizer event operations to `/organizer/events/[eventId]`, providing 
 
 **Constraints**: Cutover only. No legacy organizer workspace, duplicate project participation model, check-in, attendance/no-show claims, pitch rewrite, guest workflow, ban disclosure, automated social/newsletter publishing, historical import, or sponsor portal. Uploaded materials are limited to 25 MiB and a documented passive-file allowlist. Restricted objects must not have durable public URLs. Message sends must recalculate and snapshot recipients at confirmation time and never expose global-ban signals to non-site-admin organizers.
 
-**Scale/Scope**: One organizer route shell with eight operational sections; new material, communication, recipient, staff-audit, and material-audit records; additions to event project participation and notification-consent metadata; expanded event-scoped APIs and shared authorization helpers; focused migrations and Jest coverage.
+**Scale/Scope**: One organizer route shell with eight operational sections; new material, communication, recipient, staff-audit, material-audit, and event-project participation records; notification-consent metadata; expanded event-scoped APIs and shared authorization helpers; focused migrations and Jest coverage.
 
 ## Constitution Check
 

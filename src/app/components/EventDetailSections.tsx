@@ -1,5 +1,6 @@
 'use client';
 
+import { sanitizeApprovedDetailsJson } from '@/lib/approvedEventDetails';
 import type {
   AddToCalendarPayload,
   JsonObject,
@@ -50,7 +51,7 @@ function humanizeKey(key: string) {
 }
 
 function detailEntries(details: JsonObject) {
-  return Object.entries(details).filter(
+  return Object.entries(sanitizeApprovedDetailsJson(details)).filter(
     (entry): entry is [string, string | number | boolean] =>
       ['string', 'number', 'boolean'].includes(typeof entry[1])
   );
@@ -166,7 +167,11 @@ function ViewerRegistrationPanel({
   );
 }
 
-function AddToCalendarAction({ payload }: { payload: AddToCalendarPayload }) {
+export function AddToCalendarAction({
+  payload,
+}: {
+  payload: AddToCalendarPayload;
+}) {
   const classes = useManagementClasses();
 
   return (
@@ -192,9 +197,6 @@ export function EventDetailSections({
       />
       <EventApplicationForm event={event} viewerProfile={viewerProfile} />
       <ApprovedOnlyDetails event={event} />
-      <div>
-        <AddToCalendarAction payload={event.addToCalendar} />
-      </div>
     </div>
   );
 }

@@ -8,7 +8,7 @@ import prisma from '@/lib/prisma';
 
 type EventReportingPrisma = Pick<
   PrismaClient,
-  'eventRegistration' | 'pitchProject' | 'eventMaterial' | 'eventCommunication'
+  'eventRegistration' | 'eventProject' | 'pitchProject' | 'eventMaterial' | 'eventCommunication'
 >;
 
 const REGISTRATION_FUNNEL_STATUSES = [
@@ -91,7 +91,14 @@ export async function getEventReportingPreview(
   isSiteAdmin: boolean,
   db: EventReportingPrisma = prisma
 ): Promise<EventReportingPreview> {
-  const pitchProjectWhere = { pitchSession: { eventId } } as const;
+  const projectVisibilityWhere = !isSiteAdmin
+    ? { project: { launchLead: { userBans: { none: { revokedAt: null } } } } }
+    : {};
+  const eventProjectWhere = { eventId, ...projectVisibilityWhere };
+  const pitchProjectWhere = {
+    pitchSession: { eventId },
+    ...projectVisibilityWhere,
+  };
   const completedCommunicationWhere: Prisma.EventCommunicationWhereInput = {
     eventId,
     status: { in: ['SENT', 'PARTIAL', 'FAILED'] },
@@ -118,12 +125,12 @@ export async function getEventReportingPreview(
       },
       _count: { _all: true },
     }),
-    db.pitchProject.groupBy({
+    db.eventProject.groupBy({
       by: ['cardStatus'],
-      where: pitchProjectWhere,
+      where: eventProjectWhere,
       _count: { _all: true },
     }),
-    db.pitchProject.count({ where: pitchProjectWhere }),
+    db.eventProject.count({ where: eventProjectWhere }),
     db.pitchProject.count({
       where: { ...pitchProjectWhere, status: 'QUEUED' },
     }),

@@ -10,6 +10,7 @@ jest.mock('../../src/lib/prisma', () => ({
     eventStaff: { findFirst: jest.fn() },
     event: { findUnique: jest.fn() },
     pitchSession: { findFirst: jest.fn() },
+    eventProject: { upsert: jest.fn() },
     project: { findUnique: jest.fn() },
     pitchProject: {
       findFirst: jest.fn(),
@@ -18,7 +19,7 @@ jest.mock('../../src/lib/prisma', () => ({
       create: jest.fn(),
       update: jest.fn(),
     },
-    $transaction: jest.fn(),
+    $transaction: jest.fn((operations: Promise<unknown>[]) => Promise.all(operations)),
   },
 }));
 
@@ -40,6 +41,7 @@ describe('queue endpoints', () => {
       defaultPresentingSec: 60,
       defaultQuestionsSec: 120,
     });
+    prisma.eventProject.upsert.mockResolvedValue({ id: 'event-project-1' });
   });
 
   it('join requires auth', async () => {
@@ -148,6 +150,11 @@ describe('queue endpoints', () => {
     const res = await POST_JOIN(request as any, { params: { eventId: 'e1' } } as any);
 
     expect(res.status).toBe(200);
+    expect(prisma.eventProject.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { eventId_projectId: { eventId: 'e1', projectId: 'p1' } },
+      })
+    );
   });
 
   it('join queue works in both VOTING and PITCHING phases', async () => {

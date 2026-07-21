@@ -156,6 +156,18 @@ export async function loadEventWorkspace(
   if (!isSiteAdminActor(actor)) {
     registrationWhere.hacker = { userBans: { none: { revokedAt: null } } };
   }
+  const projectWhere = {
+    eventId,
+    ...(!isSiteAdminActor(actor) && {
+      project: { launchLead: { userBans: { none: { revokedAt: null } } } },
+    }),
+  };
+  const pitchProjectWhere = {
+    pitchSession: { eventId },
+    ...(!isSiteAdminActor(actor) && {
+      project: { launchLead: { userBans: { none: { revokedAt: null } } } },
+    }),
+  };
 
   const [
     registrationGroups,
@@ -173,24 +185,24 @@ export async function loadEventWorkspace(
       orderBy: { status: 'asc' },
       _count: { _all: true },
     }),
-    prisma.pitchProject.count({ where: { pitchSession: { eventId } } }),
-    prisma.pitchProject.count({
+    prisma.eventProject.count({ where: projectWhere }),
+    prisma.eventProject.count({
       where: {
-        pitchSession: { eventId },
+        ...projectWhere,
         cardStatus: { in: ['SUBMITTED', 'APPROVED'] },
       },
     }),
     prisma.pitchProject.count({
       where: {
-        pitchSession: { eventId },
+        ...pitchProjectWhere,
         status: { in: ['QUEUED', 'APPROVED', 'CURRENT'] },
       },
     }),
     prisma.pitchProject.count({
-      where: { pitchSession: { eventId }, status: 'DONE' },
+      where: { ...pitchProjectWhere, status: 'DONE' },
     }),
     prisma.pitchProject.count({
-      where: { pitchSession: { eventId }, isTopProject: true },
+      where: { ...pitchProjectWhere, isTopProject: true },
     }),
     prisma.eventMaterial.count({ where: { eventId } }),
     prisma.eventCommunication.count({ where: { eventId } }),

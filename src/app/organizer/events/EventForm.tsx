@@ -203,8 +203,6 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
   const [autoPromoteWaitlist, setAutoPromoteWaitlist] = useState(false);
   const [approvedAddress, setApprovedAddress] = useState('');
   const [approvedDetails, setApprovedDetails] = useState('');
-  const [doorCode, setDoorCode] = useState('');
-  const [toolkitUrl, setToolkitUrl] = useState('');
   const [applicationsOpen, setApplicationsOpen] = useState(true);
   const [applicationsCloseReason, setApplicationsCloseReason] = useState('');
   const [selectedMcs, setSelectedMcs] = useState<HackerSelectionOption[]>([]);
@@ -249,6 +247,10 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
   const [message, setMessage] = useState('');
   const [savedEventId, setSavedEventId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [savedSettingsFingerprint, setSavedSettingsFingerprint] = useState<
+    string | null
+  >(null);
   const [authStatus, setAuthStatus] = useState<AuthStatus | null>(null);
   const [isCheckingAccess, setIsCheckingAccess] = useState(true);
 
@@ -350,16 +352,6 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
           setApprovedDetails(
             typeof approvedDetails?.details === 'string'
               ? approvedDetails.details
-              : ''
-          );
-          setDoorCode(
-            typeof approvedDetails?.doorCode === 'string'
-              ? approvedDetails.doorCode
-              : ''
-          );
-          setToolkitUrl(
-            typeof approvedDetails?.toolkitUrl === 'string'
-              ? approvedDetails.toolkitUrl
               : ''
           );
           setSelectedMcs(
@@ -677,7 +669,6 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
       approvedDetailsJson: {
         address: approvedAddress,
         details: approvedDetails,
-        ...(isEditing && { doorCode, toolkitUrl }),
       },
       staff,
       applicationQuestionsJson,
@@ -693,17 +684,54 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
     };
   }
 
+  function settingsFingerprint(
+    payload = buildEventPayload(),
+    imageFile = eventImageFile
+  ) {
+    return JSON.stringify({
+      payload,
+      imageFile: imageFile
+        ? {
+            name: imageFile.name,
+            size: imageFile.size,
+            lastModified: imageFile.lastModified,
+          }
+        : null,
+    });
+  }
+
+  const currentSettingsFingerprint = settingsFingerprint();
+  const hasUnsavedChanges = Boolean(
+    isEditing &&
+      savedSettingsFingerprint &&
+      currentSettingsFingerprint !== savedSettingsFingerprint
+  );
+
+  useEffect(() => {
+    if (isEditing && loadedEvent && savedSettingsFingerprint === null) {
+      setSavedSettingsFingerprint(currentSettingsFingerprint);
+    }
+  }, [
+    currentSettingsFingerprint,
+    isEditing,
+    loadedEvent,
+    savedSettingsFingerprint,
+  ]);
+
   async function saveEvent(shouldPublish: boolean) {
     setMessage('');
     setSavedEventId(null);
+    setIsSaving(true);
+    const eventPayload = buildEventPayload();
+    const savedFingerprint = settingsFingerprint(eventPayload, null);
     const response = await fetch(
       isEditing ? `/api/events/${eventId}` : '/api/events',
       {
         method: isEditing ? 'PATCH' : 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(buildEventPayload()),
+        body: JSON.stringify(eventPayload),
       }
-    );
+    ).finally(() => setIsSaving(false));
     const nextAuthStatus = authStatusFromResponse(response);
     if (nextAuthStatus) {
       setAuthStatus(nextAuthStatus);
@@ -737,6 +765,7 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
         setLoadedEvent(current => (current ? { ...current, image } : current));
       }
     }
+    if (isEditing) setSavedSettingsFingerprint(savedFingerprint);
     if (shouldPublish && savedEvent?.id) {
       const publishResponse = await fetch(
         `/api/events/${savedEvent.id}/publish`,
@@ -855,6 +884,21 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
         actions={
           isEditing ? (
             <>
+              <div className="flex items-center gap-2">
+                <button
+                  className={classes.primaryButton}
+                  disabled={!canSubmit || isSaving}
+                  form="event-settings-form"
+                  type="submit"
+                >
+                  {isSaving ? 'Saving...' : 'Save settings'}
+                </button>
+                {hasUnsavedChanges && (
+                  <span className={`text-sm ${classes.mutedText}`}>
+                    You have unsaved changes
+                  </span>
+                )}
+              </div>
               {loadedEvent?.status && (
                 <ManagementBadge>{loadedEvent.status}</ManagementBadge>
               )}
@@ -867,6 +911,7 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
       />
       <form
         className="grid gap-5"
+        id="event-settings-form"
         onSubmit={event => {
           event.preventDefault();
           void saveEvent(false);
@@ -1045,28 +1090,6 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
                 value={approvedDetails}
               />
             </label>
-            {isEditing && (
-              <>
-                <label className="grid gap-2">
-                  <span className="text-sm font-semibold">Door code</span>
-                  <input
-                    aria-label="Door code"
-                    className={classes.input}
-                    onChange={event => setDoorCode(event.target.value)}
-                    value={doorCode}
-                  />
-                </label>
-                <label className="grid gap-2">
-                  <span className="text-sm font-semibold">Toolkit URL</span>
-                  <input
-                    aria-label="Toolkit"
-                    className={classes.input}
-                    onChange={event => setToolkitUrl(event.target.value)}
-                    value={toolkitUrl}
-                  />
-                </label>
-              </>
-            )}
           </div>
         </ManagementSection>
 
@@ -1443,7 +1466,7 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <button
             className={classes.primaryButton}
-            disabled={!canSubmit}
+            disabled={!canSubmit || isSaving}
             type="submit"
           >
             {isEditing ? 'Save settings' : 'Save draft'}

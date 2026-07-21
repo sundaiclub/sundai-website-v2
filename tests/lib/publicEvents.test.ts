@@ -228,7 +228,6 @@ describe('public event helpers', () => {
     expect(approvedDetail.approvedDetailsVisible).toBe(true);
     expect(approvedDetail.approvedDetailsJson).toEqual({
       calendarDescription: 'Check in at suite 400.',
-      doorCode: '1234',
     });
     expect(approvedDetail.addToCalendar.description).toBe(
       'Public event description.\n\nCheck in at suite 400.'
@@ -298,6 +297,11 @@ describe('public event helpers', () => {
             },
           },
         },
+        pitchSessions: {
+          select: { phase: true },
+          orderBy: { createdAt: 'asc' },
+          take: 1,
+        },
       },
       orderBy: [{ startTime: 'asc' }, { title: 'asc' }],
       take: 10,
@@ -359,7 +363,9 @@ describe('public event helpers', () => {
   });
 
   it('loads public event detail by public chapter and event slug with viewer registration state', async () => {
-    const event = buildPublicEvent();
+    const event = buildPublicEvent({
+      pitchSessions: [{ phase: 'VOTING' }],
+    });
     const registration = buildRegistration({ status: 'APPROVED' });
     const prisma = buildPrismaMock();
     prisma.event.findFirst.mockResolvedValue(event);
@@ -407,6 +413,7 @@ describe('public event helpers', () => {
         approvedDetailsVisible: true,
         viewerCanManageRegistrations: false,
         viewerCanEditEvent: false,
+        pitchSession: { phase: 'VOTING' },
         viewerRegistration: expect.objectContaining({
           id: 'registration-1',
           status: 'APPROVED',

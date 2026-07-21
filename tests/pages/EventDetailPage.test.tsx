@@ -8,6 +8,7 @@ import type {
 } from '../../src/types/event-management';
 import { publicCalendarPayloadFixture } from '../utils/event-rsvp-fixtures';
 import { getPublicEventBySlug } from '@/lib/publicEvents';
+import { listVisibleEventMaterials } from '@/lib/eventMaterials';
 
 const mockUseTheme = jest.fn();
 const mockUseUserContext = jest.fn();
@@ -59,11 +60,16 @@ jest.mock('@/lib/publicEvents', () => ({
   getPublicEventBySlug: jest.fn(),
 }));
 
+jest.mock('@/lib/eventMaterials', () => ({
+  listVisibleEventMaterials: jest.fn(),
+}));
+
 type PageComponent = React.ComponentType<{
   params?: { chapterSlug: string; eventSlug: string };
 }>;
 
 const mockGetPublicEventBySlug = getPublicEventBySlug as jest.Mock;
+const mockListVisibleEventMaterials = listVisibleEventMaterials as jest.Mock;
 const routeParams = { chapterSlug: 'boston', eventSlug: 'ai-build-night' };
 const eventFixture = publicCalendarPayloadFixture.event;
 const approvedOnlyDetails = {
@@ -71,6 +77,8 @@ const approvedOnlyDetails = {
   arrivalInstructions: 'Use the loading dock entrance.',
   calendarDescription:
     'Approved attendees should enter through the side door and check in with the host.',
+  doorCode: 'retired access value',
+  toolkitUrl: 'https://example.com/retired-resource',
 };
 
 const publicMaterial = {
@@ -393,6 +401,10 @@ function mockEventFetches(event: PublicEventDetail | null) {
 
 async function renderDetailPage(event: PublicEventDetail | null) {
   mockGetPublicEventBySlug.mockResolvedValue(event);
+  mockListVisibleEventMaterials.mockResolvedValue(
+    (event as (PublicEventDetail & { materials?: unknown[] }) | null)
+      ?.materials ?? []
+  );
   mockEventFetches(event);
   mockUseParams.mockReturnValue(routeParams);
 
@@ -627,6 +639,10 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
     await expectSomeText(/42 private lane/i);
     await expectSomeText(/loading dock entrance/i);
     await expectSomeText(/you are approved for this event/i);
+    expect(screen.queryByText(/retired access value/i)).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/example\.com\/retired-resource/i)
+    ).not.toBeInTheDocument();
   });
 
   it('renders only public material links for anonymous and non-approved viewers', async () => {
@@ -665,6 +681,30 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
     expect(
       screen.getByRole('link', { name: /approved attendee brief/i })
     ).toHaveAttribute('href', approvedMaterial.contentUrl);
+    expect(mockListVisibleEventMaterials).toHaveBeenCalledWith({
+      eventId: eventFixture.id,
+      viewer: { registrationStatus: 'APPROVED' },
+    });
+  });
+
+  it('links approved attendees to the attached pitch event', async () => {
+    mockSignedIn();
+
+    await renderDetailPage(
+      buildEventDetail({
+        viewerRegistrationStatus: 'APPROVED',
+        viewerRegistration: registrationState('APPROVED'),
+        approvedDetailsVisible: true,
+        pitchSession: { phase: 'VOTING' },
+      })
+    );
+
+    expect(
+      screen.getByRole('heading', { name: /^pitch$/i })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: /open pitch event/i })
+    ).toHaveAttribute('href', `/pitch/${eventFixture.id}`);
   });
 
   it('never renders organizer-only rows or private storage metadata on the public event surface', async () => {
@@ -815,10 +855,17 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
   });
 
   it('provides an add-to-calendar action using the public calendar payload', async () => {
-    await renderDetailPage(buildEventDetail());
+    await renderDetailPage(
+      buildEventDetail({ viewerRegistrationStatus: 'APPROVED' })
+    );
 
     const calendarAction = await findCalendarAction();
     expect(calendarAction).toBeInTheDocument();
+    expect(screen.getAllByRole('link', { name: /add.*calendar/i })).toHaveLength(
+      1
+    );
+    expect(calendarAction.parentElement).toHaveTextContent(/open/i);
+    expect(calendarAction.parentElement).toHaveTextContent(/registered/i);
 
     if (calendarAction.tagName.toLowerCase() === 'a') {
       expect(calendarAction).toHaveAttribute(

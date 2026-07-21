@@ -9,18 +9,11 @@ const CARD_STATUSES = new Set<EventProjectCardStatus>([
 ]);
 const MAX_PITCH_SESSIONS_IN_SUMMARY = 100;
 
-function projectInclude(includeBanned: boolean) {
+function projectInclude(eventId: string, includeBanned: boolean) {
   const banSafeHackerWhere = includeBanned
     ? undefined
     : { userBans: { none: { revokedAt: null } } };
   return {
-    pitchSession: {
-      select: { id: true, eventId: true, phase: true, title: true },
-    },
-    pitchVotes: {
-      ...(banSafeHackerWhere ? { where: { hacker: banSafeHackerWhere } } : {}),
-      select: { value: true },
-    },
     project: {
       include: {
         thumbnail: true,
@@ -37,45 +30,65 @@ function projectInclude(includeBanned: boolean) {
         },
         techTags: { select: { id: true, name: true } },
         domainTags: { select: { id: true, name: true } },
+        pitchEntries: {
+          where: { pitchSession: { eventId } },
+          include: {
+            pitchSession: {
+              select: { id: true, eventId: true, phase: true, title: true },
+            },
+            pitchVotes: {
+              ...(banSafeHackerWhere
+                ? { where: { hacker: banSafeHackerWhere } }
+                : {}),
+              select: { value: true },
+            },
+          },
+          orderBy: [{ pitchSession: { startTime: 'asc' } }, { position: 'asc' }],
+        },
       },
     },
   };
 }
 
-export function projectEventWorkspacePitchProject(entry: any) {
-  const likes = entry.pitchVotes.filter(
+export function projectEventWorkspacePitchProject(participation: any) {
+  const entry = participation.project.pitchEntries.find(
+    (candidate: any) => candidate.pitchSession.eventId === participation.eventId
+  );
+  const votes = entry?.pitchVotes ?? [];
+  const likes = votes.filter(
     (vote: { value: string }) => vote.value === 'LIKE'
   ).length;
-  const dislikes = entry.pitchVotes.filter(
+  const dislikes = votes.filter(
     (vote: { value: string }) => vote.value === 'DISLIKE'
   ).length;
 
   return {
-    id: entry.id,
-    pitchSessionId: entry.pitchSessionId,
-    cardStatus: entry.cardStatus,
+    id: participation.id,
+    pitchProjectId: entry?.id ?? null,
+    pitchSessionId: entry?.pitchSessionId ?? null,
+    cardStatus: participation.cardStatus,
     project: {
-      id: entry.project.id,
-      title: entry.project.title,
-      preview: entry.project.preview ?? null,
-      description: entry.project.description ?? null,
-      githubUrl: entry.project.githubUrl ?? null,
-      demoUrl: entry.project.demoUrl ?? null,
-      blogUrl: entry.project.blogUrl ?? null,
-      thumbnail: entry.project.thumbnail ?? null,
-      launchLead: entry.project.launchLead,
-      participants: entry.project.participants.map(
+      id: participation.project.id,
+      title: participation.project.title,
+      preview: participation.project.preview ?? null,
+      description: participation.project.description ?? null,
+      githubUrl: participation.project.githubUrl ?? null,
+      demoUrl: participation.project.demoUrl ?? null,
+      blogUrl: participation.project.blogUrl ?? null,
+      thumbnail: participation.project.thumbnail ?? null,
+      launchLead: participation.project.launchLead,
+      participants: participation.project.participants.map(
         (participant: { hacker: unknown }) => participant.hacker
       ),
-      techTags: entry.project.techTags,
-      domainTags: entry.project.domainTags,
+      techTags: participation.project.techTags,
+      domainTags: participation.project.domainTags,
     },
-    queue: {
+    queue: entry ? {
       status: entry.status,
       position: entry.position,
       approved: entry.approved,
-    },
-    pitch: {
+    } : null,
+    pitch: entry ? {
       phase: entry.pitchPhase,
       sessionPhase: entry.pitchSession.phase,
       presentingStartedAt: entry.presentingStartedAt ?? null,
@@ -86,7 +99,7 @@ export function projectEventWorkspacePitchProject(entry: any) {
       allottedQuestionsSec: entry.allottedQuestionsSec ?? null,
       isTopProject: entry.isTopProject,
       votes: { likes, dislikes, total: likes + dislikes },
-    },
+    } : null,
   };
 }
 
@@ -104,9 +117,9 @@ export async function listEventWorkspaceProjects({
   skip?: number;
 }) {
   const boundedTake = Math.min(Math.max(take, 1), 100);
-  const rows = await db.pitchProject.findMany({
+  const rows = await db.eventProject.findMany({
     where: {
-      pitchSession: { eventId },
+      eventId,
       ...(includeBanned
         ? {}
         : {
@@ -115,12 +128,8 @@ export async function listEventWorkspaceProjects({
             },
           }),
     },
-    include: projectInclude(includeBanned),
-    orderBy: [
-      { pitchSession: { startTime: 'asc' } },
-      { position: 'asc' },
-      { id: 'asc' },
-    ],
+    include: projectInclude(eventId, includeBanned),
+    orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
     take: boundedTake + 1,
     skip: Math.max(skip, 0),
   });
@@ -135,25 +144,25 @@ export async function listEventWorkspaceProjects({
 export async function updateEventProjectCardStatus({
   db = prisma,
   eventId,
-  pitchProjectId,
+  eventProjectId,
   cardStatus,
 }: {
   db?: any;
   eventId: string;
-  pitchProjectId: string;
+  eventProjectId: string;
   cardStatus: EventProjectCardStatus;
 }) {
   if (!CARD_STATUSES.has(cardStatus)) {
     throw new Error('Project card status is invalid.');
   }
-  const existing = await db.pitchProject.findFirst({
-    where: { id: pitchProjectId, pitchSession: { eventId } },
+  const existing = await db.eventProject.findFirst({
+    where: { id: eventProjectId, eventId },
     select: { id: true },
   });
   if (!existing) return null;
 
-  return db.pitchProject.update({
-    where: { id: pitchProjectId },
+  return db.eventProject.update({
+    where: { id: eventProjectId },
     data: { cardStatus },
   });
 }
@@ -175,9 +184,17 @@ export async function getEventWorkspacePitchSummary({
           project: { launchLead: { userBans: { none: { revokedAt: null } } } },
         }),
   };
+  const participationWhere = {
+    eventId,
+    ...(includeBanned
+      ? {}
+      : {
+          project: { launchLead: { userBans: { none: { revokedAt: null } } } },
+        }),
+  };
   const [total, queued, pitched, highlighted, submittedCards, sessions] =
     await db.$transaction([
-      db.pitchProject.count({ where }),
+      db.eventProject.count({ where: participationWhere }),
       db.pitchProject.count({
         where: {
           ...where,
@@ -186,9 +203,9 @@ export async function getEventWorkspacePitchSummary({
       }),
       db.pitchProject.count({ where: { ...where, status: 'DONE' } }),
       db.pitchProject.count({ where: { ...where, isTopProject: true } }),
-      db.pitchProject.count({
+      db.eventProject.count({
         where: {
-          ...where,
+          ...participationWhere,
           cardStatus: { in: ['SUBMITTED', 'APPROVED'] },
         },
       }),

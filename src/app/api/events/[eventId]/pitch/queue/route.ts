@@ -76,8 +76,20 @@ export async function POST(
     });
     const nextPos = (last?.position || 0) + 1;
 
-    const item = await prisma.pitchProject.create({
-      data: {
+    const [, item] = await prisma.$transaction([
+      prisma.eventProject.upsert({
+        where: {
+          eventId_projectId: { eventId: params.eventId, projectId },
+        },
+        create: {
+          eventId: params.eventId,
+          projectId,
+          addedById: user.id,
+        },
+        update: {},
+      }),
+      prisma.pitchProject.create({
+        data: {
         pitchSessionId: pitchSession.id,
         projectId,
         addedById: user.id,
@@ -87,8 +99,9 @@ export async function POST(
           allottedPresentingSec: pitchSession.defaultPresentingSec,
           allottedQuestionsSec: pitchSession.defaultQuestionsSec,
         }),
-      },
-    });
+        },
+      }),
+    ]);
 
     return NextResponse.json(item);
   } catch (error) {

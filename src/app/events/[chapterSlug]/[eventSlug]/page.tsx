@@ -1,6 +1,9 @@
 import { notFound } from 'next/navigation';
 import { auth, currentUser } from '@clerk/nextjs/server';
-import { EventDetailSections } from '@/app/components/EventDetailSections';
+import {
+  AddToCalendarAction,
+  EventDetailSections,
+} from '@/app/components/EventDetailSections';
 import { EventHeroImage } from '@/app/components/EventHeroImage';
 import {
   ManagementHeader,
@@ -12,6 +15,7 @@ import {
   PublicEventStatusBadge,
   ViewerRegistrationStatusBadge,
 } from '@/app/components/PublicEventCard';
+import { listVisibleEventMaterials } from '@/lib/eventMaterials';
 import { getPublicEventBySlug } from '@/lib/publicEvents';
 
 type PublicMaterial = {
@@ -75,8 +79,24 @@ export default async function PublicEventDetailPage({
         username: viewer.username,
       }
     : null;
+  const visibleMaterials = (await listVisibleEventMaterials({
+    eventId: event.id,
+    viewer: {
+      registrationStatus: event.viewerRegistrationStatus ?? null,
+    },
+  })) as PublicMaterial[];
   const materials = publicMaterials(
-    (event as typeof event & { materials?: PublicMaterial[] }).materials ?? [],
+    visibleMaterials.map(material => ({
+      id: material.id,
+      kind: material.kind,
+      visibility: material.visibility,
+      title: material.title,
+      description: material.description,
+      externalUrl: material.externalUrl,
+      isAvailable: material.isAvailable,
+      availableFrom: material.availableFrom,
+      availableUntil: material.availableUntil,
+    })),
     event.viewerRegistrationStatus === 'APPROVED'
   );
 
@@ -114,6 +134,7 @@ export default async function PublicEventDetailPage({
                 status={event.viewerRegistrationStatus}
               />
             )}
+            <AddToCalendarAction payload={event.addToCalendar} />
           </>
         }
       />
@@ -138,6 +159,28 @@ export default async function PublicEventDetailPage({
       <div className="mt-5">
         <EventDetailSections event={event} viewerProfile={viewerProfile} />
       </div>
+
+      {event.pitchSession && (
+        <div className="mt-5">
+          <ManagementSection
+            title="Pitch"
+            actions={
+              <ManagementLinkButton
+                href={`/pitch/${event.id}`}
+                variant="primary"
+              >
+                Open pitch event
+              </ManagementLinkButton>
+            }
+          >
+            <p className="text-sm leading-6">
+              Pitching is currently {event.pitchSession.phase.toLowerCase()}.
+              Open the pitch event to add an eligible project, follow the queue,
+              and participate in voting.
+            </p>
+          </ManagementSection>
+        </div>
+      )}
 
       {materials.length > 0 && (
         <div className="mt-5">

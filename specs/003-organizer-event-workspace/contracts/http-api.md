@@ -230,7 +230,7 @@ Existing `/api/hackers/[hackerId]/organizer-note` routes are cut over to require
 
 Requires workspace access. Returns projects through the event's pitch session(s), including global project/team/link/tag data and event-specific card status, queue position/status, pitch completion, vote-derived/top-project state, and highlight state.
 
-### `PATCH /api/events/[eventId]/projects/[pitchProjectId]`
+### `PATCH /api/events/[eventId]/projects/[eventProjectId]`
 
 Authorized organizers may update `cardStatus` for reporting hygiene. It cannot block or mutate pitch eligibility.
 

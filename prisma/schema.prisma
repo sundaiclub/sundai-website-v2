@@ -50,6 +50,7 @@ model Hacker {
   invitedChapterMemberships ChapterMembership[]           @relation("ChapterMembershipInviter")
   eventStaffAssignments     EventStaff[]
   addedPitchProjects        PitchProject[]
+  addedEventProjects        EventProject[]                @relation("EventProjectAdder")
   applicationTemplates      ApplicationTemplate[]         @relation("ApplicationTemplateCreator")
   eventRegistrations        EventRegistration[]           @relation("EventRegistrationHacker")
   decidedRegistrations      EventRegistration[]           @relation("EventRegistrationDecider")
@@ -100,34 +101,35 @@ model DomainTag {
 }
 
 model Project {
-  id           String                 @id @default(uuid())
-  title        String
-  preview      String?                @db.VarChar(120)
-  description  String?
-  githubUrl    String?
-  demoUrl      String?
-  blogUrl      String?
-  thumbnail    Image?                 @relation("ProjectThumbnail", fields: [thumbnailId], references: [id])
-  thumbnailId  String?                @unique
-  launchLead   Hacker                 @relation("LaunchLead", fields: [launchLeadId], references: [id])
-  launchLeadId String
-  participants ProjectToParticipant[]
-  images       Image[]                @relation("ProjectImages")
-  startDate    DateTime               @default(now())
-  endDate      DateTime?
-  status       ProjectStatus          @default(PENDING)
-  hack_type    HackType?              @default(REGULAR)
-  likes        ProjectLike[]
-  weeks        Week[] // Many-to-many as projects can span multiple weeks
-  createdAt    DateTime               @default(now())
-  updatedAt    DateTime               @updatedAt
-  is_starred   Boolean                @default(false)
-  is_broken    Boolean                @default(false)
-  techTags     TechTag[]              @relation("ProjectTechnologies")
-  domainTags   DomainTag[]            @relation("ProjectDomains")
-  attendance   Attendance[]
+  id                  String                 @id @default(uuid())
+  title               String
+  preview             String?                @db.VarChar(120)
+  description         String?
+  githubUrl           String?
+  demoUrl             String?
+  blogUrl             String?
+  thumbnail           Image?                 @relation("ProjectThumbnail", fields: [thumbnailId], references: [id])
+  thumbnailId         String?                @unique
+  launchLead          Hacker                 @relation("LaunchLead", fields: [launchLeadId], references: [id])
+  launchLeadId        String
+  participants        ProjectToParticipant[]
+  images              Image[]                @relation("ProjectImages")
+  startDate           DateTime               @default(now())
+  endDate             DateTime?
+  status              ProjectStatus          @default(PENDING)
+  hack_type           HackType?              @default(REGULAR)
+  likes               ProjectLike[]
+  weeks               Week[] // Many-to-many as projects can span multiple weeks
+  createdAt           DateTime               @default(now())
+  updatedAt           DateTime               @updatedAt
+  is_starred          Boolean                @default(false)
+  is_broken           Boolean                @default(false)
+  techTags            TechTag[]              @relation("ProjectTechnologies")
+  domainTags          DomainTag[]            @relation("ProjectDomains")
+  attendance          Attendance[]
   // Pitch queue entries linking this project to events
-  pitchEntries PitchProject[]
+  pitchEntries        PitchProject[]
+  eventParticipations EventProject[]
 
   @@index([launchLeadId])
 }
@@ -431,6 +433,7 @@ model Event {
   imageId                     String?                  @unique
   staff                       EventStaff[]
   pitchSessions               PitchSession[]
+  projects                    EventProject[]
   registrations               EventRegistration[]
   registrationAudits          EventRegistrationAudit[]
   materials                   EventMaterial[]
@@ -444,6 +447,24 @@ model Event {
   @@index([startTime])
   @@index([chapterId, status, startTime])
   @@index([visibility, status])
+}
+
+model EventProject {
+  id         String                 @id @default(uuid())
+  event      Event                  @relation(fields: [eventId], references: [id])
+  eventId    String
+  project    Project                @relation(fields: [projectId], references: [id])
+  projectId  String
+  addedBy    Hacker                 @relation("EventProjectAdder", fields: [addedById], references: [id])
+  addedById  String
+  cardStatus EventProjectCardStatus @default(DRAFT)
+  createdAt  DateTime               @default(now())
+  updatedAt  DateTime               @updatedAt
+
+  @@unique([eventId, projectId])
+  @@index([eventId, cardStatus])
+  @@index([projectId])
+  @@index([addedById])
 }
 
 model PitchSession {
@@ -800,20 +821,19 @@ model HackerOrganizerNoteRevision {
 }
 
 model PitchProject {
-  id             String                 @id @default(uuid())
-  pitchSession   PitchSession           @relation(fields: [pitchSessionId], references: [id])
+  id             String             @id @default(uuid())
+  pitchSession   PitchSession       @relation(fields: [pitchSessionId], references: [id])
   pitchSessionId String
-  project        Project                @relation(fields: [projectId], references: [id])
+  project        Project            @relation(fields: [projectId], references: [id])
   projectId      String
-  addedBy        Hacker                 @relation(fields: [addedById], references: [id])
+  addedBy        Hacker             @relation(fields: [addedById], references: [id])
   addedById      String
-  position       Int                    @default(0)
-  status         PitchProjectStatus     @default(QUEUED)
-  cardStatus     EventProjectCardStatus @default(DRAFT)
-  approved       Boolean                @default(false)
-  isTopProject   Boolean                @default(false)
-  createdAt      DateTime               @default(now())
-  updatedAt      DateTime               @updatedAt
+  position       Int                @default(0)
+  status         PitchProjectStatus @default(QUEUED)
+  approved       Boolean            @default(false)
+  isTopProject   Boolean            @default(false)
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
 
   // Timer fields
   pitchPhase            PitchPhase         @default(WAITING)

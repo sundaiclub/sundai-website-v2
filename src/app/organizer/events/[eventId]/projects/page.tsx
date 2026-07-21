@@ -36,7 +36,7 @@ type WorkspaceProject = {
       blog?: string | null;
     };
   };
-  queue: { status: string; position: number };
+  queue: { status: string; position: number } | null;
   pitch?: { phase?: string; isTopProject?: boolean };
   pitched?: boolean;
   isTopProject?: boolean;
@@ -162,7 +162,7 @@ export default function OrganizerEventProjectsPage({
           const pitched =
             entry.pitched ??
             (entry.pitch?.phase === 'COMPLETED' ||
-              entry.queue.status === 'DONE');
+              entry.queue?.status === 'DONE');
           const highlighted =
             entry.isHighlighted ??
             entry.isTopProject ??
@@ -238,7 +238,9 @@ export default function OrganizerEventProjectsPage({
                   </label>
                   <p>
                     <span className="font-bold">Queue:</span>{' '}
-                    {entry.queue.status} · Position {entry.queue.position}
+                    {entry.queue
+                      ? `${entry.queue.status} · Position ${entry.queue.position}`
+                      : 'Not added to pitch'}
                   </p>
                   <p>{pitched ? 'Pitched' : 'Not yet pitched'}</p>
                   <p>{highlighted ? 'Highlighted' : 'Not highlighted'}</p>

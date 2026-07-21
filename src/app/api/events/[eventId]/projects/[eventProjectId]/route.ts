@@ -4,7 +4,7 @@ import { updateEventProjectCardStatus } from '@/lib/eventWorkspaceProjects';
 import type { EventProjectCardStatus } from '@/types/event-workspace';
 
 type RouteContext = {
-  params: { eventId: string; pitchProjectId: string };
+  params: { eventId: string; eventProjectId: string };
 };
 
 const CARD_STATUSES = new Set<EventProjectCardStatus>([
@@ -44,15 +44,12 @@ export async function PATCH(request: Request, { params }: RouteContext) {
 
     const project = await updateEventProjectCardStatus({
       eventId: params.eventId,
-      pitchProjectId: params.pitchProjectId,
+      eventProjectId: params.eventProjectId,
       cardStatus: input.cardStatus as EventProjectCardStatus,
     });
     if (!project) return jsonError('Project participation not found.', 404);
 
-    return NextResponse.json({
-      id: project.id,
-      cardStatus: project.cardStatus,
-    });
+    return NextResponse.json({ id: project.id, cardStatus: project.cardStatus });
   } catch (error) {
     if (
       error instanceof Error &&

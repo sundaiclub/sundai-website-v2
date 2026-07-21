@@ -457,10 +457,10 @@ async function targetIsRelevantToEvent(
   });
   if (registration) return true;
 
-  if (!db.pitchProject?.findFirst) return false;
-  const projectParticipation = await db.pitchProject.findFirst({
+  if (!db.eventProject?.findFirst) return false;
+  const projectParticipation = await db.eventProject.findFirst({
     where: {
-      pitchSession: { eventId },
+      eventId,
       project: {
         OR: [
           { launchLeadId: targetHackerId },

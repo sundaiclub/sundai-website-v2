@@ -675,17 +675,22 @@ describe('chapter public directory and landing pages', () => {
       renderLandingPage('boston');
 
       await expectSomeText(/active member|membership active/i);
-      expect(
-        screen.queryByRole('dialog', { name: /notification preferences/i })
-      ).not.toBeInTheDocument();
-
-      fireEvent.click(
-        await screen.findByRole('button', { name: /^preferences$/i })
+      expect(screen.getByRole('tab', { name: /events/i })).toHaveAttribute(
+        'aria-selected',
+        'true'
       );
 
+      fireEvent.click(
+        await screen.findByRole('tab', { name: /^preferences$/i })
+      );
+
+      expect(screen.getByRole('tab', { name: /preferences/i })).toHaveAttribute(
+        'aria-selected',
+        'true'
+      );
       expect(
-        screen.getByRole('dialog', { name: /notification preferences/i })
-      ).toHaveClass('!bg-white');
+        screen.getByRole('button', { name: /leave chapter/i })
+      ).toBeInTheDocument();
 
       const notificationsControl = await screen.findByRole('checkbox', {
         name: /notifications|allow notifications/i,
@@ -749,7 +754,7 @@ describe('chapter public directory and landing pages', () => {
       renderLandingPage('boston');
 
       fireEvent.click(
-        await screen.findByRole('button', { name: /^preferences$/i })
+        await screen.findByRole('tab', { name: /^preferences$/i })
       );
 
       const smsControl = await screen.findByRole('checkbox', {

@@ -44,12 +44,15 @@ Existing chapter-scoped notification preference and consent boundary.
 - SMS eligibility requires active membership, `notificationsAllowed`, `smsNotificationsEnabled`, both consent fields, a usable E.164 phone, and configured Twilio delivery.
 - Email eligibility requires active membership, `notificationsAllowed`, `emailNotificationsEnabled`, a usable email, and configured SES delivery.
 
-### PitchProject
+### EventProject
 
-Physical event-specific project participation through `PitchSession.eventId`.
+Physical event-specific project participation, independent of optional pitching.
 
-**New field**
+**Fields**
 
+- `eventId String`
+- `projectId String`
+- `addedById String`
 - `cardStatus EventProjectCardStatus @default(DRAFT)`
 
 **Card states**
@@ -61,9 +64,15 @@ Physical event-specific project participation through `PitchSession.eventId`.
 
 **Rules**
 
-- Unique project participation remains `(pitchSessionId, projectId)`.
+- Unique event participation is `(eventId, projectId)`.
 - Card status is reporting hygiene only and never blocks queue, voting, or pitching.
-- A global `Project` may have entries in pitch sessions belonging to many events.
+- A global `Project` may participate in many events.
+- Project creation attaches to every currently running published event for which the creator has an active chapter membership or approved registration.
+- Creating a `PitchProject` for an event atomically upserts its `EventProject`.
+
+### PitchProject
+
+Optional pitch-session queue, voting, timer, and outcome state. Unique queue participation remains `(pitchSessionId, projectId)`.
 
 ### HackerOrganizerNote / HackerOrganizerNoteRevision
 
@@ -252,7 +261,7 @@ Immutable history for staff assignment, role change, and removal.
 - Organizer-visible settings and current capability flags.
 - Staff list.
 - Registration counts after role-appropriate global-ban filtering.
-- Project/card and pitch counts from event pitch sessions.
+- Project/card counts from event participation and pitch counts from event pitch sessions.
 - Material and communication counts.
 - No attendance/check-in/no-show count.
 

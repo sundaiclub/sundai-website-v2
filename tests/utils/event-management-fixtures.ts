@@ -346,7 +346,6 @@ export const buildApprovedOnlyDetails = (
   address: '123 Builder Lane, Boston, MA 02110',
   arrivalInstructions: 'Use the side entrance and check in with Sundai staff.',
   virtualUrl: 'https://example.com/events/boston-ai-build-night/stream',
-  toolkitUrl: 'https://example.com/events/boston-ai-build-night/toolkit',
   onsiteContact: 'Sundai event team',
   ...overrides,
 });

@@ -26,11 +26,11 @@
 
 ## Event Project Participation
 
-**Decision**: Treat the existing `PitchProject -> PitchSession.eventId -> Event` chain as the physical event-participation model and add `cardStatus` to `PitchProject`. Keep `Project` global. Do not create a parallel `EventProject` table.
+**Decision**: Use `EventProject` as the event-participation source of truth and keep `PitchProject` solely for pitch-session queue and outcome state. Keep `Project` global. Creating a project during a relevant chapter event creates `EventProject`; adding a project to an event pitch session upserts the same participation atomically.
 
-**Rationale**: The same `Project` can already occur in pitch sessions for multiple events, and pitch state is already stored per entry. A second event/project relation would create two sources of truth and reconciliation work.
+**Rationale**: Event participation must exist even when an event has no pitch session. Separating participation/card readiness from optional pitch state avoids manufacturing pitch sessions while the unique `(eventId, projectId)` record prevents duplicate event membership.
 
-**Alternatives considered**: Introducing `EventProject` alongside `PitchProject` was rejected because participation and pitch state could diverge. Renaming the established Prisma model was rejected because it would churn the working pitch implementation without changing behavior.
+**Alternatives considered**: Using only `PitchProject` was rejected because non-pitching events cannot own projects. Creating a synthetic pitch session was rejected because it would misrepresent event operations.
 
 ## Material Storage And Access
 

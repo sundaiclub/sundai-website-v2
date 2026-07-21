@@ -3,11 +3,10 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Pitch | Sundai Club",
-  description: "Pitch events: join the queue, see current and upcoming projects.",
+  description: "Join an event's live pitch queue and follow project pitches.",
 };
 
 export default function PitchLayout({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
-
 
