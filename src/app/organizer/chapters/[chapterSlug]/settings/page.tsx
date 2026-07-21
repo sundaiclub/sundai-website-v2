@@ -38,14 +38,16 @@ function firstChapter(payload: unknown): OrganizerChapterSettings | null {
 function templateList(payload: unknown): ApplicationTemplateListItem[] {
   if (!Array.isArray(payload)) return [];
 
-  return (payload as ApplicationTemplateListItem[]).map(template => ({
-    ...template,
-    isActive:
-      typeof template.isActive === 'boolean'
-        ? template.isActive
-        : (template as ApplicationTemplateListItem & { status?: string })
-            .status === 'ACTIVE',
-  }));
+  return (payload as ApplicationTemplateListItem[])
+    .filter(template => template.scope === 'CHAPTER')
+    .map(template => ({
+      ...template,
+      isActive:
+        typeof template.isActive === 'boolean'
+          ? template.isActive
+          : (template as ApplicationTemplateListItem & { status?: string })
+              .status === 'ACTIVE',
+    }));
 }
 
 function replaceTemplate(
@@ -65,7 +67,6 @@ function replaceTemplate(
         : template
   );
 }
-
 export default function OrganizerChapterSettingsPage({
   params,
 }: {
@@ -468,7 +469,7 @@ export default function OrganizerChapterSettingsPage({
 
         <ManagementSection
           title="Application template"
-          description="The active site template is the base. Chapter templates add local questions without changing site-required fields."
+          description="Add local application questions for this chapter."
           actions={
             !templates.some(template => template.scope === 'CHAPTER') ? (
               <button

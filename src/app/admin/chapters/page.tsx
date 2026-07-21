@@ -239,9 +239,6 @@ export default function AdminChaptersPage() {
                       >
                         Settings
                       </ManagementLinkButton>
-                      <ManagementLinkButton href="/organizer/events">
-                        Events
-                      </ManagementLinkButton>
                     </div>
                   </div>
                 ))}

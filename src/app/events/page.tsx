@@ -1,7 +1,11 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import PublicEventCard from '../components/PublicEventCard';
+import EventSummaryCard from '../components/EventSummaryCard';
+import {
+  PublicEventStatusBadge,
+  ViewerRegistrationStatusBadge,
+} from '../components/PublicEventCard';
 import {
   ManagementAlert,
   ManagementEmptyState,
@@ -119,9 +123,25 @@ export default function EventsPage() {
           No upcoming events are available.
         </ManagementEmptyState>
       ) : (
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className="flex flex-wrap gap-4">
           {events.map(event => (
-            <PublicEventCard event={event} key={event.id} />
+            <div className="w-full sm:w-80" key={event.id}>
+              <EventSummaryCard
+                badges={
+                  <>
+                    <PublicEventStatusBadge status={event.publicStatus} />
+                    {event.viewerRegistrationStatus && (
+                      <ViewerRegistrationStatusBadge
+                        status={event.viewerRegistrationStatus}
+                      />
+                    )}
+                  </>
+                }
+                event={event}
+                eyebrow={event.chapterName}
+                href={`/events/${event.chapterSlug}/${event.slug}`}
+              />
+            </div>
           ))}
         </div>
       )}

@@ -1,6 +1,8 @@
 import prisma from '@/lib/prisma';
 import type { Prisma } from '@prisma/client';
+import { sanitizeApprovedDetailsJson } from '@/lib/approvedEventDetails';
 import {
+  canAccessEventWorkspaceWithContext,
   canDecideRegistrationsWithContext,
   canPublishEventWithContext,
   canViewApprovedOnlyEventDetailsWithContext,
@@ -61,6 +63,13 @@ type PublicEventsChapterRecord = {
 };
 
 const PUBLIC_EVENT_INCLUDE = {
+  image: {
+    select: {
+      id: true,
+      url: true,
+      alt: true,
+    },
+  },
   chapter: {
     select: {
       id: true,
@@ -81,6 +90,15 @@ const PUBLIC_EVENT_INCLUDE = {
       },
     },
   },
+  pitchSessions: {
+    select: {
+      phase: true,
+    },
+    orderBy: {
+      createdAt: 'asc',
+    },
+    take: 1,
+  },
 } satisfies Prisma.EventInclude;
 
 type PublicEventsRegistrationRecord = {
@@ -98,6 +116,11 @@ type PublicEventsEventRecord = {
   id: EntityId;
   slug: string;
   title: string;
+  image?: {
+    id: EntityId;
+    url: string;
+    alt?: string | null;
+  } | null;
   description?: string | null;
   startTime: Date | string;
   endTime?: Date | string | null;
@@ -120,6 +143,9 @@ type PublicEventsEventRecord = {
   _count?: {
     registrations?: number;
   };
+  pitchSessions?: Array<{
+    phase: 'VOTING' | 'PITCHING' | 'FINISHED';
+  }>;
 };
 type PublicEventsEventFindManyArgs = Omit<
   Prisma.EventFindManyArgs,
@@ -208,6 +234,7 @@ export type RedactPublicEventOptions = {
   viewerCanManageRegistrations?: boolean;
   viewerCanViewApprovedDetails?: boolean;
   viewerCanEditEvent?: boolean;
+  viewerCanManageEvent?: boolean;
   viewerIsSignedIn?: boolean;
   approvedCalendarDetails?: boolean;
   approvedCount?: number;
@@ -387,6 +414,9 @@ export async function getPublicEventBySlug(
     readPermissionContext
   );
   const viewerCanEditEvent = canPublishEventWithContext(readPermissionContext);
+  const viewerCanManageEvent = canAccessEventWorkspaceWithContext(
+    readPermissionContext
+  );
 
   return redactPublicEventForViewer(event, {
     applicationQuestionSet,
@@ -395,6 +425,7 @@ export async function getPublicEventBySlug(
     viewerCanManageRegistrations,
     viewerCanViewApprovedDetails,
     viewerCanEditEvent,
+    viewerCanManageEvent,
     viewerIsSignedIn: Boolean(input.viewer?.hackerId || input.viewer?.clerkId),
     approvedCalendarDetails: input.includeApprovedCalendarDetails,
     now,
@@ -431,7 +462,7 @@ export function redactPublicEventForViewer(
     viewerCanManageRegistrations: options.viewerCanManageRegistrations,
   });
   const approvedDetails = approvedDetailsVisible
-    ? asJsonObject(event.approvedDetailsJson)
+    ? sanitizeApprovedDetailsJson(asJsonObject(event.approvedDetailsJson))
     : null;
   const applicationControls = buildApplicationControls({
     event,
@@ -462,6 +493,10 @@ export function redactPublicEventForViewer(
     viewerRegistration: options.viewerRegistration ?? null,
     viewerCanManageRegistrations: options.viewerCanManageRegistrations === true,
     viewerCanEditEvent: options.viewerCanEditEvent === true,
+    viewerCanManageEvent: options.viewerCanManageEvent === true,
+    pitchSession: approvedDetailsVisible
+      ? (event.pitchSessions?.[0] ?? null)
+      : null,
     addToCalendar: buildAddToCalendarPayload(event, {
       includeApprovedDetails:
         approvedDetailsVisible && options.approvedCalendarDetails === true,
@@ -618,9 +653,11 @@ function buildPublicEventCard(
     chapterName: event.chapter.name,
     chapter,
     title: event.title,
+    image: event.image ?? null,
     publicLocation: event.publicLocation ?? null,
     startTime: event.startTime,
     endTime: event.endTime ?? null,
+    applicationCount: event._count?.registrations ?? 0,
     publicStatus: getPublicEventStatus(event, approvedCount, now),
     viewerRegistrationStatus: viewerRegistration?.status,
   };
@@ -772,7 +809,9 @@ function joinDescriptionParts(
 function approvedDetailsToCalendarText(
   approvedDetailsJson: JsonValue | null | undefined
 ): string | null {
-  const details = asJsonObject(approvedDetailsJson);
+  const details = sanitizeApprovedDetailsJson(
+    asJsonObject(approvedDetailsJson)
+  );
   if (!details) return null;
 
   const preferredText = getStringValue(

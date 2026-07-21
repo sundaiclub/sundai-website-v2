@@ -10,7 +10,6 @@ export function usePullToRefresh() {
 
       const touchStart = (e: TouchEvent) => {
         startY = e.touches[0].pageY;
-        // Reset transforms
         if (isPWA) {
           document
             .querySelector("#__next")
@@ -29,7 +28,6 @@ export function usePullToRefresh() {
           const translateY = Math.min(pullDistance / 2, threshold);
 
           if (isPWA) {
-            // In PWA mode, transform the Next.js root element
             const nextRoot = document.querySelector("#__next");
             if (nextRoot) {
               nextRoot.setAttribute(
@@ -41,7 +39,6 @@ export function usePullToRefresh() {
               );
             }
           } else {
-            // In browser mode, transform the html element
             document.documentElement.style.transform = `translateY(${translateY}px)`;
             document.documentElement.style.transition = "none";
           }
@@ -76,7 +73,6 @@ export function usePullToRefresh() {
         }, 300);
 
         if (pullDistance > threshold && window.scrollY === 0) {
-          // Force browser refresh
           window.location.reload();
         }
       };

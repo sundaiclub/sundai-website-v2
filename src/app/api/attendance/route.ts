@@ -10,7 +10,6 @@ export async function POST(req: Request) {
       return new NextResponse('Unauthorized', { status: 401 });
     }
 
-    // Get the hacker using clerkId
     const hacker = await prisma.hacker.findUnique({
       where: { clerkId: userId },
     });
@@ -22,7 +21,6 @@ export async function POST(req: Request) {
     const now = new Date();
     const currentWeek = await getOrCreateCurrentWeek();
 
-    // Check if already checked in for this week
     const existingAttendance = await prisma.attendance.findUnique({
       where: {
         hackerId_weekId: {
@@ -38,7 +36,6 @@ export async function POST(req: Request) {
       });
     }
 
-    // Create attendance record
     const attendance = await prisma.attendance.create({
       data: {
         hackerId: hacker.id,
@@ -46,7 +43,6 @@ export async function POST(req: Request) {
       },
     });
 
-    // Update hacker's last attendance
     await prisma.hacker.update({
       where: { id: hacker.id },
       data: { lastAttendance: now },

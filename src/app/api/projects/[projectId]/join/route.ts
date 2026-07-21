@@ -12,7 +12,6 @@ export async function POST(
       return new NextResponse("Unauthorized", { status: 401 });
     }
 
-    // Get the hacker using clerkId
     const hacker = await prisma.hacker.findUnique({
       where: { clerkId: userId },
     });
@@ -23,7 +22,6 @@ export async function POST(
 
     const { role } = await request.json();
 
-    // Check if user is already a participant
     const existingParticipant = await prisma.projectToParticipant.findUnique({
       where: {
         hackerId_projectId: {
@@ -40,7 +38,6 @@ export async function POST(
       );
     }
 
-    // Add user as participant
     const participant = await prisma.projectToParticipant.create({
       data: {
         hackerId: hacker.id,
@@ -76,7 +73,6 @@ export async function DELETE(
       return new NextResponse("Unauthorized", { status: 401 });
     }
 
-    // Get the hacker using clerkId
     const hacker = await prisma.hacker.findUnique({
       where: { clerkId: userId },
     });
@@ -85,7 +81,6 @@ export async function DELETE(
       return new NextResponse("Hacker not found", { status: 404 });
     }
 
-    // Remove user from project
     await prisma.projectToParticipant.delete({
       where: {
         hackerId_projectId: {

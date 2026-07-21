@@ -1,11 +1,19 @@
 import {
+  canAccessEventWorkspaceWithContext,
+  canAdministerEventWithContext,
   canDecideEventRegistrationWithContext,
+  canDecideEventApplicantsWithContext,
   canDecideRegistrationsWithContext,
   canEditRegistrationNotesWithContext,
   canEditOrganizerNoteWithContext,
   canIncludeBannedUsersInReviewWithContext,
   canManageChapterSettingsWithContext,
   canManageEventSettingsWithContext,
+  canManageEventCommunicationsWithContext,
+  canManageEventMaterialsWithContext,
+  canManageEventNotesWithContext,
+  canManageEventOperationsWithContext,
+  canManageEventPitchWithContext,
   canManagePitchWithContext,
   canManageRegistrationsWithContext,
   canPublishEventWithContext,
@@ -200,7 +208,7 @@ describe('event management permission contexts', () => {
         canViewPublicChapter: true,
         canViewPrivateChapter: false,
         canManageChapterSettings: false,
-        canManageEventSettings: true,
+        canManageEventSettings: false,
         canManagePitch: true,
         canManageRegistrations: true,
         canDecideRegistrations: true,
@@ -330,6 +338,156 @@ describe('event management permission contexts', () => {
             chapter: privateChapter,
           })
         ).toBe(expected.canViewPrivateChapter);
+      }
+    );
+
+    it.each([
+      {
+        label: 'site admin',
+        eventContext: permissionCases[0].eventContext,
+        expected: {
+          workspace: true,
+          administration: true,
+          operations: true,
+          communications: true,
+          materials: true,
+          notes: true,
+          pitch: true,
+          applicantDecisions: true,
+        },
+      },
+      {
+        label: 'active chapter admin in the event chapter',
+        eventContext: permissionCases[1].eventContext,
+        expected: {
+          workspace: true,
+          administration: true,
+          operations: true,
+          communications: true,
+          materials: true,
+          notes: true,
+          pitch: true,
+          applicantDecisions: true,
+        },
+      },
+      {
+        label: 'active chapter member without an event assignment',
+        eventContext: permissionCases[2].eventContext,
+        expected: {
+          workspace: false,
+          administration: false,
+          operations: false,
+          communications: false,
+          materials: false,
+          notes: false,
+          pitch: false,
+          applicantDecisions: false,
+        },
+      },
+      {
+        label: 'revoked chapter admin without an event assignment',
+        eventContext: {
+          actor: actorContext(chapterAdmin.hacker),
+          chapterMembership: chapterMembershipContext({
+            ...chapterAdmin.membership,
+            status: 'REVOKED',
+          }),
+          staff: null,
+        },
+        expected: {
+          workspace: false,
+          administration: false,
+          operations: false,
+          communications: false,
+          materials: false,
+          notes: false,
+          pitch: false,
+          applicantDecisions: false,
+        },
+      },
+      {
+        label: 'assigned event MC',
+        eventContext: permissionCases[3].eventContext,
+        expected: {
+          workspace: true,
+          administration: false,
+          operations: true,
+          communications: true,
+          materials: true,
+          notes: true,
+          pitch: true,
+          applicantDecisions: true,
+        },
+      },
+      {
+        label: 'assigned event co-MC',
+        eventContext: permissionCases[4].eventContext,
+        expected: {
+          workspace: true,
+          administration: false,
+          operations: true,
+          communications: true,
+          materials: true,
+          notes: true,
+          pitch: true,
+          applicantDecisions: false,
+        },
+      },
+      {
+        label: 'regular signed-in user',
+        eventContext: permissionCases[5].eventContext,
+        expected: {
+          workspace: false,
+          administration: false,
+          operations: false,
+          communications: false,
+          materials: false,
+          notes: false,
+          pitch: false,
+          applicantDecisions: false,
+        },
+      },
+      {
+        label: 'signed-out user',
+        eventContext: permissionCases[6].eventContext,
+        expected: {
+          workspace: false,
+          administration: false,
+          operations: false,
+          communications: false,
+          materials: false,
+          notes: false,
+          pitch: false,
+          applicantDecisions: false,
+        },
+      },
+    ])(
+      'evaluates organizer workspace capabilities for $label',
+      ({ eventContext, expected }) => {
+        expect(canAccessEventWorkspaceWithContext(eventContext)).toBe(
+          expected.workspace
+        );
+        expect(canAdministerEventWithContext(eventContext)).toBe(
+          expected.administration
+        );
+        expect(canManageEventOperationsWithContext(eventContext)).toBe(
+          expected.operations
+        );
+        expect(canManageEventCommunicationsWithContext(eventContext)).toBe(
+          expected.communications
+        );
+        expect(canManageEventMaterialsWithContext(eventContext)).toBe(
+          expected.materials
+        );
+        expect(canManageEventNotesWithContext(eventContext)).toBe(
+          expected.notes
+        );
+        expect(canManageEventPitchWithContext(eventContext)).toBe(
+          expected.pitch
+        );
+        expect(canDecideEventApplicantsWithContext(eventContext)).toBe(
+          expected.applicantDecisions
+        );
       }
     );
 

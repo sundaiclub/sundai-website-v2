@@ -135,6 +135,10 @@ function mockEventFetch(event = eventSettings) {
   global.fetch = jest.fn((input: RequestInfo | URL) => {
     const url = requestUrl(input);
 
+    if (url === `/api/events/${event.id}/workspace`) {
+      return jsonResponse({ capabilities: { administerEvent: true } });
+    }
+
     if (url === `/api/events/${event.id}?management=true`) {
       return jsonResponse(event);
     }
@@ -171,6 +175,12 @@ function patchBodyForEvent(eventId = eventSettings.id) {
 
   const body = patchCall[1]?.body;
   return typeof body === 'string' ? JSON.parse(body) : null;
+}
+
+function topSaveSettingsButton() {
+  return screen
+    .getAllByRole('button', { name: /save settings/i })
+    .find(button => button.getAttribute('form') === 'event-settings-form');
 }
 
 async function expectSomeText(...patterns: RegExp[]) {
@@ -224,6 +234,10 @@ describe('/organizer/events/[eventId]/settings', () => {
     global.fetch = jest.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = requestUrl(input);
 
+      if (url === `/api/events/${draftEventSettings.id}/workspace`) {
+        return jsonResponse({ capabilities: { administerEvent: true } });
+      }
+
       if (url === `/api/events/${draftEventSettings.id}?management=true`) {
         return jsonResponse(draftEventSettings);
       }
@@ -251,7 +265,7 @@ describe('/organizer/events/[eventId]/settings', () => {
         `/api/events/${draftEventSettings.id}`,
         { method: 'DELETE' }
       );
-      expect(mockPush).toHaveBeenCalledWith('/organizer/events');
+      expect(mockPush).toHaveBeenCalledWith('/events');
       expect(mockRefresh).toHaveBeenCalled();
     });
   });
@@ -265,9 +279,47 @@ describe('/organizer/events/[eventId]/settings', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('shows a header save action and only flags settings after they change', async () => {
+    renderSettingsPage();
+
+    const titleInput = await screen.findByLabelText(/title/i);
+    expect(topSaveSettingsButton()).toBeInTheDocument();
+    expect(
+      screen.queryByText(/you have unsaved changes/i)
+    ).not.toBeInTheDocument();
+
+    fireEvent.change(titleInput, {
+      target: { value: 'Updated AI Build Night' },
+    });
+
+    expect(screen.getByText(/you have unsaved changes/i)).toBeInTheDocument();
+
+    fireEvent.change(titleInput, {
+      target: { value: eventSettings.title },
+    });
+    expect(
+      screen.queryByText(/you have unsaved changes/i)
+    ).not.toBeInTheDocument();
+
+    fireEvent.change(titleInput, {
+      target: { value: 'Updated AI Build Night' },
+    });
+    fireEvent.click(topSaveSettingsButton()!);
+
+    await waitFor(() => {
+      expect(
+        screen.queryByText(/you have unsaved changes/i)
+      ).not.toBeInTheDocument();
+    });
+  });
+
   it('saves close controls and auto-promote waitlist toggle changes from organizer settings', async () => {
     global.fetch = jest.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = requestUrl(input);
+
+      if (url === `/api/events/${eventSettings.id}/workspace`) {
+        return jsonResponse({ capabilities: { administerEvent: true } });
+      }
 
       if (url === `/api/events/${eventSettings.id}?management=true`) {
         return jsonResponse(eventSettings);
@@ -300,7 +352,7 @@ describe('/organizer/events/[eventId]/settings', () => {
         name: /auto-promote waitlist|waitlist auto-promotion/i,
       })
     );
-    fireEvent.click(screen.getByRole('button', { name: /save settings/i }));
+    fireEvent.click(topSaveSettingsButton()!);
 
     await waitFor(() => {
       expect(patchBodyForEvent()).toEqual(
@@ -315,6 +367,10 @@ describe('/organizer/events/[eventId]/settings', () => {
   it('shows close reason and saves reopen controls with auto-promote disabled', async () => {
     global.fetch = jest.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = requestUrl(input);
+
+      if (url === `/api/events/${closedEventSettings.id}/workspace`) {
+        return jsonResponse({ capabilities: { administerEvent: true } });
+      }
 
       if (url === `/api/events/${closedEventSettings.id}?management=true`) {
         return jsonResponse(closedEventSettings);
@@ -350,7 +406,7 @@ describe('/organizer/events/[eventId]/settings', () => {
         name: /auto-promote waitlist|waitlist auto-promotion/i,
       })
     );
-    fireEvent.click(screen.getByRole('button', { name: /save settings/i }));
+    fireEvent.click(topSaveSettingsButton()!);
 
     await waitFor(() => {
       expect(patchBodyForEvent(closedEventSettings.id)).toEqual(
@@ -377,12 +433,8 @@ describe('/organizer/events/[eventId]/settings', () => {
     expect(
       screen.getByLabelText(/approved-only address|private address/i)
     ).toHaveValue('123 Private Lab Street');
-    expect(screen.getByLabelText(/door code/i)).toHaveValue(
-      'Blue door code 2468'
-    );
-    expect(screen.getByLabelText(/toolkit/i)).toHaveValue(
-      'https://example.com/private-toolkit'
-    );
+    expect(screen.queryByLabelText(/door code/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/toolkit/i)).not.toBeInTheDocument();
   });
 
   it('uses the new-event form for event timing, capacity, staff, questions, and messages', async () => {
@@ -440,6 +492,10 @@ describe('/organizer/events/[eventId]/settings', () => {
     global.fetch = jest.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = requestUrl(input);
 
+      if (url === `/api/events/${eventSettings.id}/workspace`) {
+        return jsonResponse({ capabilities: { administerEvent: true } });
+      }
+
       if (url === `/api/events/${eventSettings.id}?management=true`) {
         return jsonResponse(eventSettings);
       }
@@ -482,7 +538,7 @@ describe('/organizer/events/[eventId]/settings', () => {
       }
     );
 
-    fireEvent.click(screen.getByRole('button', { name: /save settings/i }));
+    fireEvent.click(topSaveSettingsButton()!);
 
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith(
@@ -517,6 +573,10 @@ describe('/organizer/events/[eventId]/settings', () => {
         startTime: '2026-07-12T10:00',
         endTime: '2026-07-12T22:00',
         capacity: 40,
+        approvedDetailsJson: {
+          address: '456 Approved Attendee Way',
+          details: 'Bring a laptop and use the side entrance.',
+        },
         staff: [{ hackerId: 'hacker-mc', role: 'MC' }],
         applicationQuestionsJson: [
           expect.objectContaining({

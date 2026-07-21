@@ -32,7 +32,13 @@ const revisions = [
 const defaultProps = {
   hackerId: 'hacker-ada',
   title: 'Organizer note for Ada Lovelace',
+  eventId: 'event-boston-demo-night',
 };
+
+const noteUrl =
+  '/api/hackers/hacker-ada/organizer-note?eventId=event-boston-demo-night';
+const revisionsUrl =
+  '/api/hackers/hacker-ada/organizer-note/revisions?eventId=event-boston-demo-night';
 
 const editableAccess = {
   canViewCurrentNote: true,
@@ -69,7 +75,9 @@ describe('OrganizerNotePanel', () => {
 
     renderOrganizerNotePanel();
 
-    expect(screen.getByText('Organizer note for Ada Lovelace')).toBeInTheDocument();
+    expect(
+      screen.getByText('Organizer note for Ada Lovelace')
+    ).toBeInTheDocument();
 
     const noteEditor = await screen.findByLabelText(/organizer note/i);
     await waitFor(() => {
@@ -77,10 +85,10 @@ describe('OrganizerNotePanel', () => {
     });
     expect(noteEditor).not.toBeDisabled();
     expect(screen.getByRole('button', { name: /save note/i })).toBeEnabled();
-    expect(screen.getByRole('button', { name: /view revisions/i })).toBeEnabled();
-    expect(global.fetch).toHaveBeenCalledWith(
-      '/api/hackers/hacker-ada/organizer-note'
-    );
+    expect(
+      screen.getByRole('button', { name: /view revisions/i })
+    ).toBeEnabled();
+    expect(global.fetch).toHaveBeenCalledWith(noteUrl);
   });
 
   it('saves edits with the current note endpoint and confirms the save', async () => {
@@ -113,17 +121,16 @@ describe('OrganizerNotePanel', () => {
     await user.click(screen.getByRole('button', { name: /save note/i }));
 
     await waitFor(() => {
-      expect(global.fetch).toHaveBeenLastCalledWith(
-        '/api/hackers/hacker-ada/organizer-note',
-        {
-          method: 'PUT',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ body: nextBody }),
-        }
-      );
+      expect(global.fetch).toHaveBeenLastCalledWith(noteUrl, {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ body: nextBody }),
+      });
     });
 
-    expect(await screen.findByText(/organizer note saved/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/organizer note saved/i)
+    ).toBeInTheDocument();
   });
 
   it('renders a read-only surface when the actor cannot edit the note', async () => {
@@ -164,17 +171,16 @@ describe('OrganizerNotePanel', () => {
 
     renderOrganizerNotePanel();
 
-    await user.click(await screen.findByRole('button', { name: /view revisions/i }));
+    await user.click(
+      await screen.findByRole('button', { name: /view revisions/i })
+    );
 
     expect(await screen.findByText('Revision history')).toBeInTheDocument();
     expect(
       screen.getAllByText(/presentation accessibility needs before demo night/i)
         .length
     ).toBeGreaterThan(0);
-    expect(global.fetch).toHaveBeenNthCalledWith(
-      2,
-      '/api/hackers/hacker-ada/organizer-note/revisions'
-    );
+    expect(global.fetch).toHaveBeenNthCalledWith(2, revisionsUrl);
   });
 
   it('does not request revision history for MC-level current-note access', async () => {
@@ -194,9 +200,7 @@ describe('OrganizerNotePanel', () => {
     await screen.findByLabelText(/organizer note/i);
 
     expect(global.fetch).toHaveBeenCalledTimes(1);
-    expect(global.fetch).not.toHaveBeenCalledWith(
-      '/api/hackers/hacker-ada/organizer-note/revisions'
-    );
+    expect(global.fetch).not.toHaveBeenCalledWith(revisionsUrl);
     expect(screen.queryByText('Revision history')).not.toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: /view revisions/i })

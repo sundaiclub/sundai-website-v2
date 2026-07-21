@@ -104,6 +104,8 @@ export type ChapterMembershipSummary = Pick<
   | 'notificationsAllowed'
   | 'emailNotificationsEnabled'
   | 'smsNotificationsEnabled'
+  | 'smsConsentAt'
+  | 'smsConsentVersion'
 > & {
   hacker?: Pick<EventManagementHackerSummary, 'id' | 'name' | 'email' | 'role'>;
   invitedBy?: Pick<
@@ -131,14 +133,27 @@ export type ChapterDirectoryItem = Pick<
   memberships?: Array<Pick<ChapterMembership, 'role' | 'status'>>;
 };
 
-type ChapterLandingEvent = {
+export type ChapterLandingEvent = {
   id: EntityId;
   title: string;
   slug: string;
+  applicationCount: number;
   startTime?: Date | string;
   publicLocation?: string | null;
   status?: EventStatus;
   visibility?: EventVisibility;
+  image?: Pick<EventManagementImageSummary, 'id' | 'url' | 'alt'> | null;
+};
+
+export type ChapterLandingProject = {
+  id: EntityId;
+  title: string;
+  preview?: string | null;
+  thumbnail?: Pick<EventManagementImageSummary, 'id' | 'url' | 'alt'> | null;
+  launchLead: Pick<EventManagementHackerSummary, 'id' | 'name'>;
+  techTags?: Array<{ id: EntityId; name: string }>;
+  domainTags?: Array<{ id: EntityId; name: string }>;
+  likeCount: number;
 };
 
 export type ChapterLanding = Pick<
@@ -162,6 +177,8 @@ export type ChapterLanding = Pick<
   upcomingEvents?: ChapterLandingEvent[];
   previousEvents?: ChapterLandingEvent[];
   pendingEvents?: ChapterLandingEvent[];
+  topProjectsThisWeek?: ChapterLandingProject[];
+  topProjectsAllTime?: ChapterLandingProject[];
 };
 
 export type SiteAdminChapterListItem = Pick<
@@ -209,11 +226,21 @@ export interface ChapterMembership {
   notificationsAllowed: boolean;
   emailNotificationsEnabled: boolean;
   smsNotificationsEnabled: boolean;
+  smsConsentAt?: ISODateTimeString | Date | null;
+  smsConsentVersion?: string | null;
   notificationPreferencesJson?: JsonObject | null;
   createdAt: ISODateTimeString | Date;
   updatedAt: ISODateTimeString | Date;
   hacker?: EventManagementHackerSummary;
   chapter?: Pick<Chapter, 'id' | 'name' | 'slug' | 'accessMode' | 'status'>;
+}
+
+export interface ChapterNotificationPreferenceInput {
+  notificationsAllowed?: boolean;
+  emailNotificationsEnabled?: boolean;
+  smsNotificationsEnabled?: boolean;
+  smsConsentGranted?: boolean;
+  notificationPreferencesJson?: JsonObject | null;
 }
 
 interface EventStaff {
@@ -390,6 +417,7 @@ export type OrganizerEventSettings = {
   waitlistMessage?: string | null;
   declineMessage?: string | null;
   canDelete?: boolean;
+  image?: Pick<EventManagementImageSummary, 'id' | 'url' | 'alt'> | null;
   chapter?: Pick<Chapter, 'id' | 'name' | 'slug' | 'timezone'>;
   staff?: Array<
     Pick<EventStaff, 'id' | 'role'> & {
@@ -423,9 +451,11 @@ export interface PublicEventCard {
   chapterName: string;
   chapter: PublicEventChapterSummary;
   title: string;
+  image?: Pick<EventManagementImageSummary, 'id' | 'url' | 'alt'> | null;
   publicLocation?: string | null;
   startTime: ISODateTimeString | Date;
   endTime?: ISODateTimeString | Date | null;
+  applicationCount?: number;
   publicStatus: PublicEventStatus;
   viewerRegistrationStatus?: RegistrationStatus | null;
 }
@@ -480,7 +510,21 @@ export interface PublicEventDetail extends PublicEventCard {
   viewerRegistration?: PublicViewerRegistrationState | null;
   viewerCanManageRegistrations?: boolean;
   viewerCanEditEvent?: boolean;
+  viewerCanManageEvent?: boolean;
+  pitchSession?: { phase: PitchSessionPhase } | null;
   addToCalendar: AddToCalendarPayload;
+}
+
+export interface PublicEventProject {
+  id: EntityId;
+  title: string;
+  preview?: string | null;
+  thumbnail?: {
+    url: string;
+    alt?: string | null;
+  } | null;
+  launchLeadName: string;
+  pitchVoteCount: number;
 }
 
 export interface PublicEventDetailState {

@@ -189,7 +189,13 @@ describe('public event helpers', () => {
   const now = new Date('2026-06-23T12:00:00.000Z');
 
   it('redacts approved-only details and approved calendar text from unapproved viewers', () => {
-    const event = buildPublicEvent();
+    const event = buildPublicEvent({
+      image: {
+        id: 'event-image',
+        url: 'https://cdn.example.com/demo-night.webp',
+        alt: 'Demo Night artwork',
+      },
+    });
 
     const publicDetail = redactPublicEventForViewer(event, {
       approvedCalendarDetails: true,
@@ -198,6 +204,7 @@ describe('public event helpers', () => {
 
     expect(publicDetail.approvedDetailsVisible).toBe(false);
     expect(publicDetail.approvedDetailsJson).toBeNull();
+    expect(publicDetail.image).toEqual(event.image);
     expect(publicDetail.addToCalendar).toEqual({
       title: 'Demo Night',
       description: 'Public event description.',
@@ -221,7 +228,6 @@ describe('public event helpers', () => {
     expect(approvedDetail.approvedDetailsVisible).toBe(true);
     expect(approvedDetail.approvedDetailsJson).toEqual({
       calendarDescription: 'Check in at suite 400.',
-      doorCode: '1234',
     });
     expect(approvedDetail.addToCalendar.description).toBe(
       'Public event description.\n\nCheck in at suite 400.'
@@ -264,6 +270,13 @@ describe('public event helpers', () => {
         startTime: { gte: now },
       },
       include: {
+        image: {
+          select: {
+            id: true,
+            url: true,
+            alt: true,
+          },
+        },
         chapter: {
           select: {
             id: true,
@@ -283,6 +296,11 @@ describe('public event helpers', () => {
               },
             },
           },
+        },
+        pitchSessions: {
+          select: { phase: true },
+          orderBy: { createdAt: 'asc' },
+          take: 1,
         },
       },
       orderBy: [{ startTime: 'asc' }, { title: 'asc' }],
@@ -345,7 +363,9 @@ describe('public event helpers', () => {
   });
 
   it('loads public event detail by public chapter and event slug with viewer registration state', async () => {
-    const event = buildPublicEvent();
+    const event = buildPublicEvent({
+      pitchSessions: [{ phase: 'VOTING' }],
+    });
     const registration = buildRegistration({ status: 'APPROVED' });
     const prisma = buildPrismaMock();
     prisma.event.findFirst.mockResolvedValue(event);
@@ -393,6 +413,7 @@ describe('public event helpers', () => {
         approvedDetailsVisible: true,
         viewerCanManageRegistrations: false,
         viewerCanEditEvent: false,
+        pitchSession: { phase: 'VOTING' },
         viewerRegistration: expect.objectContaining({
           id: 'registration-1',
           status: 'APPROVED',
@@ -523,6 +544,7 @@ describe('public event helpers', () => {
     expect(detail).toEqual(
       expect.objectContaining({
         viewerCanEditEvent: true,
+        viewerCanManageEvent: true,
         viewerCanManageRegistrations: true,
       })
     );
@@ -555,6 +577,7 @@ describe('public event helpers', () => {
       expect(detail).toEqual(
         expect.objectContaining({
           viewerCanEditEvent: false,
+          viewerCanManageEvent: true,
           viewerCanManageRegistrations: expected,
         })
       );

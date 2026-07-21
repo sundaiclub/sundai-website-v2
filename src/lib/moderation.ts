@@ -9,47 +9,33 @@ import type {
 export const BLOCKED_REGISTRATION_MESSAGE =
   "You are unable to register for this event at this time.";
 
-export type ActiveBanCheck = {
-  isBanned: boolean;
-  ban: UserBan | null;
-  blockedMessage: typeof BLOCKED_REGISTRATION_MESSAGE;
-};
-
-export type BanFilteredRegistration = {
-  hackerId: EntityId;
-};
-
-export type BanFilteredHacker = {
-  id: EntityId;
-};
-
-export type CreateGlobalBanInput = {
+type CreateGlobalBanInput = {
   hackerId: EntityId;
   createdById: EntityId;
   publicSafeReason?: string;
   internalNote?: string | null;
 };
 
-export type RevokeGlobalBanInput = {
+type RevokeGlobalBanInput = {
   banId: EntityId;
   revokedById: EntityId;
   revocationReason?: string | null;
   revokedAt?: Date;
 };
 
-export type CreateBanFlagInput = {
+type CreateBanFlagInput = {
   chapterId: EntityId;
   hackerId: EntityId;
   createdById: EntityId;
   reason: string;
 };
 
-export type BanFlagResolutionStatus = Extract<
+type BanFlagResolutionStatus = Extract<
   BanFlagStatus,
   "RESOLVED_NO_ACTION" | "RESOLVED_BANNED" | "DISMISSED"
 >;
 
-export type ResolveBanFlagInput = {
+type ResolveBanFlagInput = {
   flagId: EntityId;
   resolvedById: EntityId;
   status: BanFlagResolutionStatus;
@@ -98,148 +84,6 @@ type ModerationPrismaClient = typeof prisma & {
 };
 
 const moderationPrisma = prisma as ModerationPrismaClient;
-
-const uniqueIds = (ids: readonly EntityId[]): EntityId[] =>
-  Array.from(new Set(ids.filter(Boolean)));
-
-export const activeUserBanWhere = (hackerId: EntityId): QueryWhere => ({
-  hackerId,
-  revokedAt: null,
-});
-
-export const activeUserBanListWhere = (
-  hackerIds: readonly EntityId[]
-): QueryWhere => ({
-  hackerId: {
-    in: uniqueIds(hackerIds),
-  },
-  revokedAt: null,
-});
-
-export async function getActiveGlobalBanForHacker(
-  hackerId: EntityId
-): Promise<UserBan | null> {
-  return moderationPrisma.userBan.findFirst({
-    where: activeUserBanWhere(hackerId),
-    orderBy: {
-      createdAt: "desc",
-    },
-  });
-}
-
-export async function checkActiveGlobalBan(
-  hackerId: EntityId
-): Promise<ActiveBanCheck> {
-  const ban = await getActiveGlobalBanForHacker(hackerId);
-
-  return {
-    isBanned: ban !== null,
-    ban,
-    blockedMessage: BLOCKED_REGISTRATION_MESSAGE,
-  };
-}
-
-export async function isHackerGloballyBanned(
-  hackerId: EntityId
-): Promise<boolean> {
-  const ban = await getActiveGlobalBanForHacker(hackerId);
-  return ban !== null;
-}
-
-export async function getActiveGlobalBanMap(
-  hackerIds: readonly EntityId[]
-): Promise<Map<EntityId, UserBan>> {
-  const ids = uniqueIds(hackerIds);
-
-  if (ids.length === 0) {
-    return new Map();
-  }
-
-  const bans = await moderationPrisma.userBan.findMany({
-    where: activeUserBanListWhere(ids),
-    orderBy: {
-      createdAt: "desc",
-    },
-  });
-
-  const bansByHackerId = new Map<EntityId, UserBan>();
-
-  for (const ban of bans) {
-    if (!bansByHackerId.has(ban.hackerId)) {
-      bansByHackerId.set(ban.hackerId, ban);
-    }
-  }
-
-  return bansByHackerId;
-}
-
-export async function getActiveGloballyBannedHackerIds(
-  hackerIds: readonly EntityId[]
-): Promise<Set<EntityId>> {
-  const banMap = await getActiveGlobalBanMap(hackerIds);
-  return new Set(banMap.keys());
-}
-
-export async function filterRegistrationsForBanVisibility<
-  TRegistration extends BanFilteredRegistration,
->(
-  registrations: readonly TRegistration[],
-  options: { isSiteAdmin: boolean }
-): Promise<TRegistration[]> {
-  if (options.isSiteAdmin || registrations.length === 0) {
-    return [...registrations];
-  }
-
-  const bannedHackerIds = await getActiveGloballyBannedHackerIds(
-    registrations.map((registration) => registration.hackerId)
-  );
-
-  return registrations.filter(
-    (registration) => !bannedHackerIds.has(registration.hackerId)
-  );
-}
-
-export async function filterHackersForBanVisibility<
-  THacker extends BanFilteredHacker,
->(
-  hackers: readonly THacker[],
-  options: { isSiteAdmin: boolean }
-): Promise<THacker[]> {
-  if (options.isSiteAdmin || hackers.length === 0) {
-    return [...hackers];
-  }
-
-  const bannedHackerIds = await getActiveGloballyBannedHackerIds(
-    hackers.map((hacker) => hacker.id)
-  );
-
-  return hackers.filter((hacker) => !bannedHackerIds.has(hacker.id));
-}
-
-export function buildActiveBanExclusionWhere(
-  isSiteAdmin: boolean,
-  options: { hackerRelation?: string | null } = {}
-): QueryWhere {
-  if (isSiteAdmin) {
-    return {};
-  }
-
-  const banRelationWhere = {
-    userBans: {
-      none: {
-        revokedAt: null,
-      },
-    },
-  };
-
-  if (options.hackerRelation === null) {
-    return banRelationWhere;
-  }
-
-  return {
-    [options.hackerRelation ?? "hacker"]: banRelationWhere,
-  };
-}
 
 export async function createGlobalBan(
   input: CreateGlobalBanInput

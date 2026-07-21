@@ -180,13 +180,62 @@ export function canManageChapterMembersWithContext(
 export function canManageEventSettingsWithContext({
   actor,
   chapterMembership,
+}: EventPermissionContext): boolean {
+  return isSiteAdminActor(actor) || isChapterAdminMembership(chapterMembership);
+}
+
+export function canAdministerEventWithContext(
+  context: EventPermissionContext
+): boolean {
+  return canManageEventSettingsWithContext(context);
+}
+
+export function canAccessEventWorkspaceWithContext({
+  actor,
+  chapterMembership,
   staff,
 }: EventPermissionContext): boolean {
   return (
     isSiteAdminActor(actor) ||
     isChapterAdminMembership(chapterMembership) ||
-    isEventMcStaff(staff)
+    isEventPitchStaff(staff)
   );
+}
+
+export function canManageEventOperationsWithContext(
+  context: EventPermissionContext
+): boolean {
+  return canAccessEventWorkspaceWithContext(context);
+}
+
+export function canManageEventCommunicationsWithContext(
+  context: EventPermissionContext
+): boolean {
+  return canManageEventOperationsWithContext(context);
+}
+
+export function canManageEventMaterialsWithContext(
+  context: EventPermissionContext
+): boolean {
+  return canManageEventOperationsWithContext(context);
+}
+
+export function canManageEventNotesWithContext(
+  context: EventPermissionContext
+): boolean {
+  return canManageEventOperationsWithContext(context);
+}
+
+export function canManageEventPitchWithContext(
+  context: EventPermissionContext
+): boolean {
+  return canManageEventOperationsWithContext(context);
+}
+
+export function canDecideEventApplicantsWithContext(
+  context: EventPermissionContext
+): boolean {
+  return canDecideRegistrationsWithContext(context);
 }
 
 export function canPublishEventWithContext({

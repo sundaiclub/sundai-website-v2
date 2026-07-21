@@ -3,9 +3,6 @@
 import { useEffect, useState } from 'react';
 import {
   ManagementAlert,
-  ManagementBackButton,
-  ManagementHeader,
-  ManagementPage,
   ManagementSection,
 } from '../../../../components/ManagementSurface';
 import {
@@ -14,12 +11,12 @@ import {
 } from '../../../../components/RegistrationReviewQueue';
 import { useUserContext } from '../../../../contexts/UserContext';
 import type {
-  OrganizerEventSettings,
   OrganizerRegistrationReviewRow,
   OrganizerRegistrationReviewState,
   OrganizerReviewRole,
   RegistrationStatus,
 } from '@/types/event-management';
+import type { EventWorkspacePayload } from '../WorkspaceShell';
 
 type OrganizerRegistrationsPayload =
   | OrganizerRegistrationReviewRow[]
@@ -49,7 +46,7 @@ function normalizeReviewState(
     eventId,
     statusFilter,
     includeBannedUsers,
-    viewerRole,
+    viewerRole: value?.viewerRole ?? viewerRole,
     counts: value?.counts ?? {},
     rows: value?.rows ?? [],
   };
@@ -61,7 +58,9 @@ export default function OrganizerEventRegistrationsPage({
   params: { eventId: string };
 }) {
   const { isAdmin } = useUserContext();
-  const [event, setEvent] = useState<OrganizerEventSettings | null>(null);
+  const [workspace, setWorkspace] = useState<EventWorkspacePayload | null>(
+    null
+  );
   const [state, setState] = useState<OrganizerRegistrationReviewState | null>(
     null
   );
@@ -76,23 +75,23 @@ export default function OrganizerEventRegistrationsPage({
 
     async function load() {
       try {
-        const [eventResponse, registrationsResponse] = await Promise.all([
-          fetch(`/api/events/${params.eventId}?management=true`),
+        const [workspaceResponse, registrationsResponse] = await Promise.all([
+          fetch(`/api/events/${params.eventId}/workspace`),
           fetch(
             `/api/events/${params.eventId}/registrations?status=${statusFilter}${
               includeBannedUsers ? '&includeBannedUsers=true' : ''
             }`
           ),
         ]);
-        if (!eventResponse.ok || !registrationsResponse.ok) {
+        if (!workspaceResponse.ok || !registrationsResponse.ok) {
           throw new Error('Unable to load registrations.');
         }
-        const [eventPayload, registrationsPayload] = await Promise.all([
-          eventResponse.json() as Promise<OrganizerEventSettings>,
+        const [workspacePayload, registrationsPayload] = await Promise.all([
+          workspaceResponse.json() as Promise<EventWorkspacePayload>,
           registrationsResponse.json() as Promise<OrganizerRegistrationsPayload>,
         ]);
         if (!isCurrent) return;
-        setEvent(eventPayload);
+        setWorkspace(workspacePayload);
         setState(
           normalizeReviewState(
             registrationsPayload,
@@ -118,6 +117,8 @@ export default function OrganizerEventRegistrationsPage({
     row: OrganizerRegistrationReviewRow,
     status: RegistrationStatus
   ) {
+    if (!workspace?.capabilities.decideApplicants) return;
+
     const response = await fetch(
       `/api/events/${params.eventId}/registrations/${row.id}`,
       {
@@ -156,46 +157,39 @@ export default function OrganizerEventRegistrationsPage({
   }
 
   return (
-    <ManagementPage maxWidth="max-w-6xl">
-      <div className="mb-4">
-        <ManagementBackButton />
-      </div>
-      <ManagementHeader
-        eyebrow="Organizer"
-        title={`${event?.title ?? 'Event'} registrations`}
-        description="Review applications, organizer-only context, and registration decisions."
-        actions={
-          isAdmin ? (
-            <label className="flex items-center gap-2 text-sm font-semibold">
-              <input
-                checked={includeBannedUsers}
-                onChange={event => setIncludeBannedUsers(event.target.checked)}
-                type="checkbox"
-              />
-              Include banned users
-            </label>
-          ) : null
-        }
-      />
+    <ManagementSection
+      title="Registration queue"
+      description="Review applications, organizer-only context, and registration decisions."
+      actions={
+        isAdmin ? (
+          <label className="flex items-center gap-2 text-sm font-semibold">
+            <input
+              checked={includeBannedUsers}
+              onChange={event => setIncludeBannedUsers(event.target.checked)}
+              type="checkbox"
+            />
+            Include banned users
+          </label>
+        ) : null
+      }
+    >
       {loadError && (
         <div className="mb-5">
           <ManagementAlert tone="danger">{loadError}</ManagementAlert>
         </div>
       )}
-      <ManagementSection title="Registration queue">
-        <div className="mb-5">
-          <RegistrationReviewTabs
-            activeStatus={statusFilter}
-            counts={state?.counts ?? {}}
-            onChange={setStatusFilter}
-          />
-        </div>
-        <RegistrationReviewQueue
-          onDecision={decide}
-          onSaveNotes={saveNotes}
-          rows={state?.rows ?? []}
+      <div className="mb-5">
+        <RegistrationReviewTabs
+          activeStatus={statusFilter}
+          counts={state?.counts ?? {}}
+          onChange={setStatusFilter}
         />
-      </ManagementSection>
-    </ManagementPage>
+      </div>
+      <RegistrationReviewQueue
+        onDecision={decide}
+        onSaveNotes={saveNotes}
+        rows={state?.rows ?? []}
+      />
+    </ManagementSection>
   );
 }

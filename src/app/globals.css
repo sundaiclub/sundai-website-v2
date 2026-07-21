@@ -83,7 +83,8 @@ body {
       scrollbar-track-transparent 
       hover:scrollbar-thumb-gray-400 
       -mx-2 
-      px-2;
+      px-2
+      scroll-pl-2;
     -webkit-overflow-scrolling: touch;
     scroll-snap-type: x mandatory;
   }

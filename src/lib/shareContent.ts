@@ -3,11 +3,6 @@ import { GoogleGenAI } from '@google/genai';
 
 export type SharePlatform = 'twitter' | 'linkedin' | 'reddit';
 
-type ShareUserInfo = {
-  id: string;
-  name?: string | null;
-};
-
 type ShareTeamMember = {
   name: string;
   twitterUrl?: string | null;
@@ -21,7 +16,6 @@ type SharePromptRequest = Pick<
 
 export interface ShareContentRequest {
   project: Project;
-  userInfo: ShareUserInfo;
   platform: SharePlatform;
   isTeamMember: boolean;
 }
@@ -48,7 +42,6 @@ const PLATFORM_STYLES: Record<SharePlatform, string> = {
 
 export const SHARE_CONTENT_MODEL = 'gemini-2.5-flash';
 
-// Platform-specific team tagging helper
 function formatTeamNames(
   teamMembers: ShareTeamMember[],
   platform: SharePlatform
@@ -57,7 +50,6 @@ function formatTeamNames(
     switch (platform) {
       case 'twitter':
         if (person.twitterUrl) {
-          // Extract username from Twitter URL (twitter.com/username or x.com/username)
           const match = person.twitterUrl.match(
             /(?:twitter\.com|x\.com)\/([^/?]+)/
           );
@@ -69,7 +61,6 @@ function formatTeamNames(
 
       case 'linkedin':
         if (person.linkedinUrl) {
-          // Extract username from LinkedIn URL (linkedin.com/in/username)
           const match = person.linkedinUrl.match(/linkedin\.com\/in\/([^/?]+)/);
           return match
             ? `@${match[1]}`
@@ -78,7 +69,6 @@ function formatTeamNames(
         return `@${person.name.toLowerCase().replace(/\s+/g, '-')}`;
 
       case 'reddit':
-        // Reddit doesn't have URLs in our schema, use name-based format
         return `u/${person.name.split(' ')[0].toLowerCase()}`;
 
       default:
@@ -145,94 +135,27 @@ Generate only the post content, no explanations.`;
 
 export async function generateShareContent({
   project,
-  userInfo,
   platform,
   isTeamMember,
 }: ShareContentRequest): Promise<ShareContentResponse> {
   const prompt = buildShareContentPrompt({ project, platform, isTeamMember });
 
-  try {
-    const ai = new GoogleGenAI({
-      apiKey: process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY,
-    });
-    const response = await ai.models.generateContent({
-      model: SHARE_CONTENT_MODEL,
-      contents: prompt,
-    });
-
-    const generatedContent = response.text || '';
-
-    if (!generatedContent) {
-      throw new Error('No content generated from Gemini API');
-    }
-
-    // Extract hashtags from the content
-    const hashtagMatches = generatedContent.match(/#[\w]+/g) || [];
-    const hashtags = hashtagMatches.map((tag: string) => tag.replace('#', ''));
-
-    return {
-      content: generatedContent,
-      hashtags,
-      characterCount: generatedContent.length,
-    };
-  } catch (error) {
-    console.error('Error generating content with Gemini:', error);
-    // Fallback to template-based content if API fails
-    return generateFallbackContent({
-      project,
-      userInfo,
-      platform,
-      isTeamMember,
-    });
-  }
-}
-
-function generateFallbackContent({
-  project,
-  userInfo,
-  platform,
-  isTeamMember,
-}: ShareContentRequest): ShareContentResponse {
-  const teamMembers = [
-    project.launchLead,
-    ...project.participants.map(p => p.hacker),
-  ];
-
-  const formattedTeamNames = formatTeamNames(teamMembers, platform);
-  const intro = isTeamMember
-    ? `🚀 We just built ${project.title}!`
-    : `🚀 Check out ${project.title} built by the team at Sundai!`;
-
-  const links = [
-    project.demoUrl && `🔗 Demo: ${project.demoUrl}`,
-    project.githubUrl && `💻 Code: ${project.githubUrl}`,
-    `📄 Project: https://www.sundai.club/projects/${project.id}`,
-    `🌟 More projects: https://www.sundai.club/projects`,
-  ]
-    .filter(Boolean)
-    .join('\n');
-
-  const hashtags = ['Sundai', 'TechProjects', 'Innovation', 'BuildInPublic'];
-  const hashtagString = hashtags.map(tag => `#${tag}`).join(' ');
-
-  let content;
-  switch (platform) {
-    case 'twitter':
-      content = `${intro}\n\n${project.preview}\n\nBuilt by: ${formattedTeamNames}\n\n${links}\n\n${hashtagString}`;
-      break;
-    case 'linkedin':
-      content = `${intro}\n\n${project.preview}\n\nOur amazing team (${formattedTeamNames}) worked together to create something special. This project showcases the innovative spirit at Sundai.\n\n${links}\n\n${hashtagString} #TeamWork #Innovation`;
-      break;
-    case 'reddit':
-      content = `${intro}\n\n${project.preview}\n\nTechnical Details:\n${project.description.substring(0, 500)}...\n\nTeam: ${formattedTeamNames}\n\n${links}\n\nCheck out more projects at https://www.sundai.club/projects`;
-      break;
-    default:
-      content = `${intro}\n\n${project.preview}\n\nBuilt by: ${formattedTeamNames}\n\n${links}\n\n${hashtagString}`;
+  const ai = new GoogleGenAI({
+    apiKey: process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY,
+  });
+  const response = await ai.models.generateContent({
+    model: SHARE_CONTENT_MODEL,
+    contents: prompt,
+  });
+  const generatedContent = response.text;
+  if (!generatedContent) {
+    throw new Error('Gemini returned no share content.');
   }
 
+  const hashtagMatches = generatedContent.match(/#[\w]+/g) ?? [];
   return {
-    content,
-    hashtags: platform === 'reddit' ? [] : hashtags,
-    characterCount: content.length,
+    content: generatedContent,
+    hashtags: hashtagMatches.map(tag => tag.slice(1)),
+    characterCount: generatedContent.length,
   };
 }

@@ -144,6 +144,38 @@ describe('/news page', () => {
     expect(calls2.some((args: any[]) => String(args[0]).includes('vectorlab.dev/api/tldr'))).toBe(true)
   })
 
+  it('does not generate an email when the current news feed is empty', async () => {
+    ;(global.fetch as any) = jest.fn().mockImplementation((url: string) => {
+      if (url.includes('/api/projects')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve([]) })
+      }
+      if (url.includes('vectorlab.dev/api/tldr')) {
+        return Promise.resolve({ ok: true, text: () => Promise.resolve('   ') })
+      }
+      return Promise.resolve({ ok: true })
+    })
+
+    const userCtx = require('../../src/app/contexts/UserContext')
+    userCtx.useUserContext.mockReturnValue({ isAdmin: true })
+    const themeCtx = require('../../src/app/contexts/ThemeContext')
+    themeCtx.useTheme.mockReturnValue({ isDarkMode: false })
+    const Comp = require('../../src/app/news/NewsClient').default
+
+    render(<Comp />)
+    fireEvent.click(screen.getByRole('button', { name: 'Generate' }))
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        'https://vectorlab.dev/api/tldr',
+        { cache: 'no-store' }
+      )
+    })
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Generate' })).toBeEnabled()
+    )
+    expect(screen.queryByText('Email HTML')).not.toBeInTheDocument()
+  })
+
   it('is publicly visible (no admin gate)', async () => {
     const userCtx = require('../../src/app/contexts/UserContext')
     userCtx.useUserContext.mockReturnValue({ isAdmin: false })
@@ -156,4 +188,3 @@ describe('/news page', () => {
     expect(screen.getByText('Weekly News')).toBeInTheDocument()
   })
 })
-

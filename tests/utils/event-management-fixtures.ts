@@ -14,6 +14,16 @@ import type {
   RegistrationStatus,
   Role,
 } from '../../src/types/event-management';
+import type {
+  EventCommunicationAudience,
+  EventCommunicationChannel,
+  EventCommunicationRecipientStatus,
+  EventCommunicationStatus,
+  EventMaterialAuditAction,
+  EventMaterialKind,
+  EventMaterialVisibility,
+  EventProjectCardStatus,
+} from '../../src/types/event-workspace';
 
 export type FixtureOverrides<T> = Partial<T>;
 
@@ -81,6 +91,8 @@ export type ChapterMembershipFixture = {
   notificationsAllowed: boolean;
   emailNotificationsEnabled: boolean;
   smsNotificationsEnabled: boolean;
+  smsConsentAt: Date | null;
+  smsConsentVersion: string | null;
   notificationPreferencesJson: JsonValue;
   createdAt: Date;
   updatedAt: Date;
@@ -91,6 +103,100 @@ export type EventStaffFixture = {
   eventId: string;
   hackerId: string;
   role: EventStaffRole;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type EventStaffAuditFixture = {
+  id: string;
+  eventId: string;
+  staffHackerId: string;
+  actorId: string;
+  action: 'ASSIGNED' | 'ROLE_CHANGED' | 'REMOVED';
+  fromRole: EventStaffRole | null;
+  toRole: EventStaffRole | null;
+  createdAt: Date;
+};
+
+export type EventMaterialFixture = {
+  id: string;
+  eventId: string;
+  kind: EventMaterialKind;
+  visibility: EventMaterialVisibility;
+  title: string;
+  description: string | null;
+  externalUrl: string | null;
+  objectKey: string | null;
+  bucket: string | null;
+  originalFilename: string | null;
+  mimeType: string | null;
+  size: number | null;
+  position: number;
+  isAvailable: boolean;
+  availableFrom: Date | null;
+  availableUntil: Date | null;
+  createdById: string;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type EventMaterialAuditFixture = {
+  id: string;
+  eventId: string;
+  materialId: string | null;
+  actorId: string;
+  action: EventMaterialAuditAction;
+  changeJson: JsonValue;
+  createdAt: Date;
+};
+
+export type EventCommunicationFixture = {
+  id: string;
+  eventId: string;
+  createdById: string;
+  sentById: string | null;
+  channel: EventCommunicationChannel;
+  status: EventCommunicationStatus;
+  subject: string | null;
+  body: string;
+  audienceType: EventCommunicationAudience;
+  audienceDefinitionJson: JsonValue;
+  previewFingerprint: string | null;
+  recipientCount: number;
+  sentCount: number;
+  failedCount: number;
+  sentAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type EventCommunicationRecipientFixture = {
+  id: string;
+  communicationId: string;
+  hackerId: string;
+  registrationId: string;
+  contactValue: string;
+  displayName: string;
+  status: EventCommunicationRecipientStatus;
+  providerMessageId: string | null;
+  errorCode: string | null;
+  errorMessage: string | null;
+  attemptedAt: Date | null;
+  deliveredAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type PitchProjectFixture = {
+  id: string;
+  pitchSessionId: string;
+  projectId: string;
+  addedById: string;
+  position: number;
+  status: 'QUEUED' | 'APPROVED' | 'CURRENT' | 'DONE' | 'SKIPPED';
+  cardStatus: EventProjectCardStatus;
+  approved: boolean;
+  isTopProject: boolean;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -110,7 +216,6 @@ export type EventFixture = {
   createdById: string;
   chapterId: string;
   slug: string;
-  slugNeedsCleanup: boolean;
   status: EventStatus;
   visibility: EventVisibility;
   programType: string | null;
@@ -240,7 +345,6 @@ export const buildApprovedOnlyDetails = (
   address: '123 Builder Lane, Boston, MA 02110',
   arrivalInstructions: 'Use the side entrance and check in with Sundai staff.',
   virtualUrl: 'https://example.com/events/boston-ai-build-night/stream',
-  toolkitUrl: 'https://example.com/events/boston-ai-build-night/toolkit',
   onsiteContact: 'Sundai event team',
   ...overrides,
 });
@@ -345,6 +449,8 @@ export const buildChapterMembership = (
   notificationsAllowed: true,
   emailNotificationsEnabled: true,
   smsNotificationsEnabled: false,
+  smsConsentAt: null,
+  smsConsentVersion: null,
   notificationPreferencesJson: {},
   createdAt: fixtureNow(),
   updatedAt: fixtureNow(),
@@ -431,7 +537,6 @@ export const buildEvent = (
   createdById: 'hacker-chapter-admin',
   chapterId: 'chapter-boston',
   slug: 'ai-build-night',
-  slugNeedsCleanup: false,
   status: 'PUBLISHED',
   visibility: 'PUBLIC',
   programType: 'BUILD_NIGHT',
@@ -497,6 +602,20 @@ export const buildEventStaff = (
   role: 'MC',
   createdAt: fixtureNow(),
   updatedAt: fixtureNow(),
+  ...overrides,
+});
+
+export const buildEventStaffAudit = (
+  overrides: FixtureOverrides<EventStaffAuditFixture> = {}
+): EventStaffAuditFixture => ({
+  id: 'event-staff-audit-assigned',
+  eventId: 'event-boston-ai-build-night',
+  staffHackerId: 'hacker-event-mc',
+  actorId: 'hacker-chapter-admin',
+  action: 'ASSIGNED',
+  fromRole: null,
+  toRole: 'MC',
+  createdAt: fixtureNow(),
   ...overrides,
 });
 
@@ -805,5 +924,124 @@ export const buildOrganizerNoteRevision = (
   editedById: 'hacker-chapter-admin',
   patchText: 'Initial note body',
   createdAt: fixtureNow(),
+  ...overrides,
+});
+
+export const buildEventMaterial = (
+  overrides: FixtureOverrides<EventMaterialFixture> = {}
+): EventMaterialFixture => ({
+  id: 'event-material-sponsor-brief',
+  eventId: 'event-boston-ai-build-night',
+  kind: 'FILE',
+  visibility: 'ORGANIZERS_ONLY',
+  title: 'Sponsor brief',
+  description: 'Private organizer reference material.',
+  externalUrl: null,
+  objectKey: 'events/event-boston-ai-build-night/materials/material-object-1',
+  bucket: 'sundai-private-event-materials',
+  originalFilename: 'sponsor-brief.pdf',
+  mimeType: 'application/pdf',
+  size: 481230,
+  position: 10,
+  isAvailable: true,
+  availableFrom: null,
+  availableUntil: null,
+  createdById: 'hacker-event-mc',
+  createdAt: fixtureNow(),
+  updatedAt: fixtureNow(),
+  ...overrides,
+});
+
+export const buildLinkEventMaterial = (
+  overrides: FixtureOverrides<EventMaterialFixture> = {}
+): EventMaterialFixture =>
+  buildEventMaterial({
+    id: 'event-material-brainstorming-board',
+    kind: 'LINK',
+    visibility: 'APPROVED_ATTENDEES',
+    title: 'Brainstorming board',
+    description: null,
+    externalUrl: 'https://example.com/board',
+    objectKey: null,
+    bucket: null,
+    originalFilename: null,
+    mimeType: null,
+    size: null,
+    ...overrides,
+  });
+
+export const buildEventMaterialAudit = (
+  overrides: FixtureOverrides<EventMaterialAuditFixture> = {}
+): EventMaterialAuditFixture => ({
+  id: 'event-material-audit-created',
+  eventId: 'event-boston-ai-build-night',
+  materialId: 'event-material-sponsor-brief',
+  actorId: 'hacker-event-mc',
+  action: 'CREATED',
+  changeJson: {
+    title: 'Sponsor brief',
+    visibility: 'ORGANIZERS_ONLY',
+  },
+  createdAt: fixtureNow(),
+  ...overrides,
+});
+
+export const buildEventCommunication = (
+  overrides: FixtureOverrides<EventCommunicationFixture> = {}
+): EventCommunicationFixture => ({
+  id: 'event-communication-approved-email',
+  eventId: 'event-boston-ai-build-night',
+  createdById: 'hacker-event-mc',
+  sentById: null,
+  channel: 'EMAIL',
+  status: 'DRAFT',
+  subject: "Tomorrow's build night",
+  body: 'Doors open at 9:30.',
+  audienceType: 'APPROVED',
+  audienceDefinitionJson: {},
+  previewFingerprint: null,
+  recipientCount: 0,
+  sentCount: 0,
+  failedCount: 0,
+  sentAt: null,
+  createdAt: fixtureNow(),
+  updatedAt: fixtureNow(),
+  ...overrides,
+});
+
+export const buildEventCommunicationRecipient = (
+  overrides: FixtureOverrides<EventCommunicationRecipientFixture> = {}
+): EventCommunicationRecipientFixture => ({
+  id: 'event-communication-recipient-approved',
+  communicationId: 'event-communication-approved-email',
+  hackerId: 'hacker-approved-applicant',
+  registrationId: 'registration-applicant-approved',
+  contactValue: 'approved-applicant@example.com',
+  displayName: 'Approved Applicant',
+  status: 'PENDING',
+  providerMessageId: null,
+  errorCode: null,
+  errorMessage: null,
+  attemptedAt: null,
+  deliveredAt: null,
+  createdAt: fixtureNow(),
+  updatedAt: fixtureNow(),
+  ...overrides,
+});
+
+export const buildPitchProject = (
+  overrides: FixtureOverrides<PitchProjectFixture> = {}
+): PitchProjectFixture => ({
+  id: 'pitch-project-event-entry',
+  pitchSessionId: 'pitch-session-boston-ai-build-night',
+  projectId: 'project-ai-demo',
+  addedById: 'hacker-member',
+  position: 1,
+  status: 'QUEUED',
+  cardStatus: 'DRAFT',
+  approved: false,
+  isTopProject: false,
+  createdAt: fixtureNow(),
+  updatedAt: fixtureNow(),
   ...overrides,
 });

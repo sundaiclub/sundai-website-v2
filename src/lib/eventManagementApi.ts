@@ -3,12 +3,22 @@ import { auth } from '@clerk/nextjs/server';
 import type { Prisma } from '@prisma/client';
 import prisma from '@/lib/prisma';
 import {
+  canAccessEventWorkspaceWithContext,
+  canAdministerEventWithContext,
+  canManageEventCommunicationsWithContext,
+  canManageEventMaterialsWithContext,
+  canManageEventNotesWithContext,
+  canManageEventOperationsWithContext,
+  canManageEventPitchWithContext,
   canManagePitchWithContext,
   canManageChapterMembers,
   canManageChapterSettings,
   canManageEventSettings,
   getChapterMembershipForPermissions,
 } from '@/lib/eventManagementAuth';
+import type { EventPermissionContext } from '@/lib/eventManagementAuth';
+
+type EventCapabilityCheck = (context: EventPermissionContext) => boolean;
 
 type EventPitchManagerEvent = Prisma.EventGetPayload<{
   include: { staff: { select: { hackerId: true; role: true } } };
@@ -123,6 +133,78 @@ export async function requireEventSettingsManager(eventId: string) {
   if (!allowed) return { hacker, event, response: forbidden() };
 
   return { hacker, event, response: null };
+}
+
+async function requireCurrentEventCapability(
+  eventId: string,
+  canAccess: EventCapabilityCheck
+) {
+  const hacker = await getCurrentHacker();
+  if (!hacker) return { hacker: null, event: null, response: unauthorized() };
+
+  const event = await prisma.event.findUnique({
+    where: { id: eventId },
+    include: {
+      staff: {
+        where: { hackerId: hacker.id },
+        select: { role: true },
+      },
+    },
+  });
+  if (!event) return { hacker, event: null, response: notFound() };
+
+  const chapterMembership = await getChapterMembershipForPermissions(
+    prisma,
+    hacker.id,
+    event.chapterId
+  );
+  const staff = event.staff[0] ?? null;
+
+  if (!canAccess({ actor: hacker, chapterMembership, staff })) {
+    return { hacker, event: null, response: forbidden() };
+  }
+
+  return { hacker, event, response: null };
+}
+
+export function requireEventWorkspaceAccess(eventId: string) {
+  return requireCurrentEventCapability(
+    eventId,
+    canAccessEventWorkspaceWithContext
+  );
+}
+
+export function requireEventAdministrator(eventId: string) {
+  return requireCurrentEventCapability(eventId, canAdministerEventWithContext);
+}
+
+export function requireEventOperationsManager(eventId: string) {
+  return requireCurrentEventCapability(
+    eventId,
+    canManageEventOperationsWithContext
+  );
+}
+
+export function requireEventCommunicationsManager(eventId: string) {
+  return requireCurrentEventCapability(
+    eventId,
+    canManageEventCommunicationsWithContext
+  );
+}
+
+export function requireEventMaterialsManager(eventId: string) {
+  return requireCurrentEventCapability(
+    eventId,
+    canManageEventMaterialsWithContext
+  );
+}
+
+export function requireEventNotesManager(eventId: string) {
+  return requireCurrentEventCapability(eventId, canManageEventNotesWithContext);
+}
+
+export function requireEventPitchAccess(eventId: string) {
+  return requireCurrentEventCapability(eventId, canManageEventPitchWithContext);
 }
 
 export async function requireEventPitchManager(eventId: string) {

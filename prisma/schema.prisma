@@ -50,6 +50,7 @@ model Hacker {
   invitedChapterMemberships ChapterMembership[]           @relation("ChapterMembershipInviter")
   eventStaffAssignments     EventStaff[]
   addedPitchProjects        PitchProject[]
+  addedEventProjects        EventProject[]                @relation("EventProjectAdder")
   applicationTemplates      ApplicationTemplate[]         @relation("ApplicationTemplateCreator")
   eventRegistrations        EventRegistration[]           @relation("EventRegistrationHacker")
   decidedRegistrations      EventRegistration[]           @relation("EventRegistrationDecider")
@@ -66,6 +67,13 @@ model Hacker {
   updatedOrganizerNotes     HackerOrganizerNote[]         @relation("OrganizerNoteUpdater")
   organizerNoteRevisions    HackerOrganizerNoteRevision[] @relation("OrganizerNoteRevisionHacker")
   editedOrganizerRevisions  HackerOrganizerNoteRevision[] @relation("OrganizerNoteRevisionEditor")
+  createdEventMaterials     EventMaterial[]               @relation("EventMaterialCreator")
+  eventMaterialAudits       EventMaterialAudit[]          @relation("EventMaterialAuditActor")
+  createdCommunications     EventCommunication[]          @relation("EventCommunicationCreator")
+  sentCommunications        EventCommunication[]          @relation("EventCommunicationSender")
+  communicationRecipients   EventCommunicationRecipient[] @relation("EventCommunicationRecipientHacker")
+  staffAuditSubjects        EventStaffAudit[]             @relation("EventStaffAuditSubject")
+  staffAuditActions         EventStaffAudit[]             @relation("EventStaffAuditActor")
 
   @@index([clerkId])
 }
@@ -93,34 +101,35 @@ model DomainTag {
 }
 
 model Project {
-  id           String                 @id @default(uuid())
-  title        String
-  preview      String?                @db.VarChar(120)
-  description  String?
-  githubUrl    String?
-  demoUrl      String?
-  blogUrl      String?
-  thumbnail    Image?                 @relation("ProjectThumbnail", fields: [thumbnailId], references: [id])
-  thumbnailId  String?                @unique
-  launchLead   Hacker                 @relation("LaunchLead", fields: [launchLeadId], references: [id])
-  launchLeadId String
-  participants ProjectToParticipant[]
-  images       Image[]                @relation("ProjectImages")
-  startDate    DateTime               @default(now())
-  endDate      DateTime?
-  status       ProjectStatus          @default(PENDING)
-  hack_type    HackType?              @default(REGULAR)
-  likes        ProjectLike[]
-  weeks        Week[] // Many-to-many as projects can span multiple weeks
-  createdAt    DateTime               @default(now())
-  updatedAt    DateTime               @updatedAt
-  is_starred   Boolean                @default(false)
-  is_broken    Boolean                @default(false)
-  techTags     TechTag[]              @relation("ProjectTechnologies")
-  domainTags   DomainTag[]            @relation("ProjectDomains")
-  attendance   Attendance[]
+  id                  String                 @id @default(uuid())
+  title               String
+  preview             String?                @db.VarChar(120)
+  description         String?
+  githubUrl           String?
+  demoUrl             String?
+  blogUrl             String?
+  thumbnail           Image?                 @relation("ProjectThumbnail", fields: [thumbnailId], references: [id])
+  thumbnailId         String?                @unique
+  launchLead          Hacker                 @relation("LaunchLead", fields: [launchLeadId], references: [id])
+  launchLeadId        String
+  participants        ProjectToParticipant[]
+  images              Image[]                @relation("ProjectImages")
+  startDate           DateTime               @default(now())
+  endDate             DateTime?
+  status              ProjectStatus          @default(PENDING)
+  hack_type           HackType?              @default(REGULAR)
+  likes               ProjectLike[]
+  weeks               Week[] // Many-to-many as projects can span multiple weeks
+  createdAt           DateTime               @default(now())
+  updatedAt           DateTime               @updatedAt
+  is_starred          Boolean                @default(false)
+  is_broken           Boolean                @default(false)
+  techTags            TechTag[]              @relation("ProjectTechnologies")
+  domainTags          DomainTag[]            @relation("ProjectDomains")
+  attendance          Attendance[]
   // Pitch queue entries linking this project to events
-  pitchEntries PitchProject[]
+  pitchEntries        PitchProject[]
+  eventParticipations EventProject[]
 
   @@index([launchLeadId])
 }
@@ -160,6 +169,7 @@ model Image {
   projectImages    Project? @relation("ProjectImages", fields: [projectId], references: [id])
   projectId        String?
   chapterHeroImage Chapter? @relation("ChapterHeroImage")
+  eventImage       Event?   @relation("EventImage")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -275,6 +285,66 @@ enum EventStaffRole {
   CO_MC
 }
 
+enum EventMaterialKind {
+  LINK
+  FILE
+}
+
+enum EventMaterialVisibility {
+  PUBLIC
+  APPROVED_ATTENDEES
+  ORGANIZERS_ONLY
+}
+
+enum EventMaterialAuditAction {
+  CREATED
+  UPDATED
+  REORDERED
+  REMOVED
+}
+
+enum EventCommunicationChannel {
+  EMAIL
+  SMS
+}
+
+enum EventCommunicationStatus {
+  DRAFT
+  SENDING
+  SENT
+  PARTIAL
+  FAILED
+}
+
+enum EventCommunicationAudience {
+  ACTIVE_REGISTERED
+  PENDING
+  APPROVED
+  WAITLISTED
+  DECLINED
+  SELECTED
+}
+
+enum EventCommunicationRecipientStatus {
+  PENDING
+  SENDING
+  SENT
+  FAILED
+}
+
+enum EventStaffAuditAction {
+  ASSIGNED
+  ROLE_CHANGED
+  REMOVED
+}
+
+enum EventProjectCardStatus {
+  DRAFT
+  NEEDS_INFO
+  SUBMITTED
+  APPROVED
+}
+
 enum ApplicationTemplateScope {
   SITE
   CHAPTER
@@ -338,7 +408,6 @@ model Event {
   chapter                     Chapter                  @relation(fields: [chapterId], references: [id])
   chapterId                   String
   slug                        String
-  slugNeedsCleanup            Boolean                  @default(false)
   status                      EventStatus              @default(DRAFT)
   visibility                  EventVisibility          @default(PUBLIC)
   programType                 String?
@@ -359,10 +428,17 @@ model Event {
   applicationsCloseReason     String?
   checkInOpensAt              DateTime?
   checkInClosesAt             DateTime?
+  image                       Image?                   @relation("EventImage", fields: [imageId], references: [id])
+  imageId                     String?                  @unique
   staff                       EventStaff[]
   pitchSessions               PitchSession[]
+  projects                    EventProject[]
   registrations               EventRegistration[]
   registrationAudits          EventRegistrationAudit[]
+  materials                   EventMaterial[]
+  materialAudits              EventMaterialAudit[]
+  communications              EventCommunication[]
+  staffAudits                 EventStaffAudit[]
   createdAt                   DateTime                 @default(now())
   updatedAt                   DateTime                 @updatedAt
 
@@ -370,6 +446,24 @@ model Event {
   @@index([startTime])
   @@index([chapterId, status, startTime])
   @@index([visibility, status])
+}
+
+model EventProject {
+  id         String                 @id @default(uuid())
+  event      Event                  @relation(fields: [eventId], references: [id])
+  eventId    String
+  project    Project                @relation(fields: [projectId], references: [id])
+  projectId  String
+  addedBy    Hacker                 @relation("EventProjectAdder", fields: [addedById], references: [id])
+  addedById  String
+  cardStatus EventProjectCardStatus @default(DRAFT)
+  createdAt  DateTime               @default(now())
+  updatedAt  DateTime               @updatedAt
+
+  @@unique([eventId, projectId])
+  @@index([eventId, cardStatus])
+  @@index([projectId])
+  @@index([addedById])
 }
 
 model PitchSession {
@@ -447,6 +541,8 @@ model ChapterMembership {
   notificationsAllowed        Boolean                 @default(false)
   emailNotificationsEnabled   Boolean                 @default(false)
   smsNotificationsEnabled     Boolean                 @default(false)
+  smsConsentAt                DateTime?
+  smsConsentVersion           String?
   notificationPreferencesJson Json?
   createdAt                   DateTime                @default(now())
   updatedAt                   DateTime                @updatedAt
@@ -466,7 +562,7 @@ model EventStaff {
   createdAt DateTime       @default(now())
   updatedAt DateTime       @updatedAt
 
-  @@unique([eventId, hackerId, role])
+  @@unique([eventId, hackerId])
   @@index([eventId, role])
   @@index([hackerId])
 }
@@ -489,28 +585,29 @@ model ApplicationTemplate {
 }
 
 model EventRegistration {
-  id                   String                   @id @default(uuid())
-  event                Event                    @relation(fields: [eventId], references: [id])
-  eventId              String
-  hacker               Hacker                   @relation("EventRegistrationHacker", fields: [hackerId], references: [id])
-  hackerId             String
-  status               EventRegistrationStatus  @default(PENDING)
-  source               EventRegistrationSource  @default(INTERNAL)
-  answersJson          Json?
-  templateSnapshotJson Json?
-  publicSafeMessage    String?
-  internalReviewNotes  String?
-  submittedAt          DateTime                 @default(now())
-  decidedBy            Hacker?                  @relation("EventRegistrationDecider", fields: [decidedById], references: [id])
-  decidedById          String?
-  decidedAt            DateTime?
-  cancelledBy          Hacker?                  @relation("EventRegistrationCanceller", fields: [cancelledById], references: [id])
-  cancelledById        String?
-  cancelledAt          DateTime?
-  waitlistedAt         DateTime?
-  createdAt            DateTime                 @default(now())
-  updatedAt            DateTime                 @updatedAt
-  audits               EventRegistrationAudit[]
+  id                      String                        @id @default(uuid())
+  event                   Event                         @relation(fields: [eventId], references: [id])
+  eventId                 String
+  hacker                  Hacker                        @relation("EventRegistrationHacker", fields: [hackerId], references: [id])
+  hackerId                String
+  status                  EventRegistrationStatus       @default(PENDING)
+  source                  EventRegistrationSource       @default(INTERNAL)
+  answersJson             Json?
+  templateSnapshotJson    Json?
+  publicSafeMessage       String?
+  internalReviewNotes     String?
+  submittedAt             DateTime                      @default(now())
+  decidedBy               Hacker?                       @relation("EventRegistrationDecider", fields: [decidedById], references: [id])
+  decidedById             String?
+  decidedAt               DateTime?
+  cancelledBy             Hacker?                       @relation("EventRegistrationCanceller", fields: [cancelledById], references: [id])
+  cancelledById           String?
+  cancelledAt             DateTime?
+  waitlistedAt            DateTime?
+  createdAt               DateTime                      @default(now())
+  updatedAt               DateTime                      @updatedAt
+  audits                  EventRegistrationAudit[]
+  communicationRecipients EventCommunicationRecipient[]
 
   @@unique([eventId, hackerId])
   @@index([eventId, status])
@@ -535,6 +632,121 @@ model EventRegistrationAudit {
   @@index([registrationId, createdAt])
   @@index([eventId, createdAt])
   @@index([actorId])
+}
+
+model EventMaterial {
+  id               String                  @id @default(uuid())
+  event            Event                   @relation(fields: [eventId], references: [id])
+  eventId          String
+  kind             EventMaterialKind
+  visibility       EventMaterialVisibility
+  title            String
+  description      String?
+  externalUrl      String?
+  objectKey        String?                 @unique
+  bucket           String?
+  originalFilename String?
+  mimeType         String?
+  size             Int?
+  position         Int                     @default(0)
+  isAvailable      Boolean                 @default(true)
+  availableFrom    DateTime?
+  availableUntil   DateTime?
+  createdBy        Hacker                  @relation("EventMaterialCreator", fields: [createdById], references: [id])
+  createdById      String
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
+  audits           EventMaterialAudit[]
+
+  @@index([eventId, visibility, isAvailable, position])
+}
+
+model EventMaterialAudit {
+  id         String                   @id @default(uuid())
+  event      Event                    @relation(fields: [eventId], references: [id])
+  eventId    String
+  material   EventMaterial?           @relation(fields: [materialId], references: [id], onDelete: SetNull)
+  materialId String?
+  actor      Hacker                   @relation("EventMaterialAuditActor", fields: [actorId], references: [id])
+  actorId    String
+  action     EventMaterialAuditAction
+  changeJson Json
+  createdAt  DateTime                 @default(now())
+
+  @@index([eventId, createdAt])
+  @@index([materialId, createdAt])
+  @@index([actorId, createdAt])
+}
+
+model EventCommunication {
+  id                     String                        @id @default(uuid())
+  event                  Event                         @relation(fields: [eventId], references: [id])
+  eventId                String
+  createdBy              Hacker                        @relation("EventCommunicationCreator", fields: [createdById], references: [id])
+  createdById            String
+  sentBy                 Hacker?                       @relation("EventCommunicationSender", fields: [sentById], references: [id])
+  sentById               String?
+  channel                EventCommunicationChannel
+  status                 EventCommunicationStatus      @default(DRAFT)
+  subject                String?
+  body                   String
+  audienceType           EventCommunicationAudience
+  audienceDefinitionJson Json
+  previewFingerprint     String?
+  recipientCount         Int                           @default(0)
+  sentCount              Int                           @default(0)
+  failedCount            Int                           @default(0)
+  sentAt                 DateTime?
+  createdAt              DateTime                      @default(now())
+  updatedAt              DateTime                      @updatedAt
+  recipients             EventCommunicationRecipient[]
+
+  @@index([eventId, createdAt])
+  @@index([eventId, status, createdAt])
+  @@index([createdById, createdAt])
+}
+
+model EventCommunicationRecipient {
+  id                String                            @id @default(uuid())
+  communication     EventCommunication                @relation(fields: [communicationId], references: [id])
+  communicationId   String
+  hacker            Hacker                            @relation("EventCommunicationRecipientHacker", fields: [hackerId], references: [id])
+  hackerId          String
+  registration      EventRegistration                 @relation(fields: [registrationId], references: [id])
+  registrationId    String
+  contactValue      String
+  displayName       String
+  status            EventCommunicationRecipientStatus @default(PENDING)
+  providerMessageId String?
+  errorCode         String?
+  errorMessage      String?
+  attemptedAt       DateTime?
+  deliveredAt       DateTime?
+  createdAt         DateTime                          @default(now())
+  updatedAt         DateTime                          @updatedAt
+
+  @@unique([communicationId, hackerId])
+  @@index([communicationId, status])
+  @@index([hackerId, createdAt])
+  @@index([registrationId])
+}
+
+model EventStaffAudit {
+  id            String                @id @default(uuid())
+  event         Event                 @relation(fields: [eventId], references: [id])
+  eventId       String
+  staffHacker   Hacker                @relation("EventStaffAuditSubject", fields: [staffHackerId], references: [id])
+  staffHackerId String
+  actor         Hacker                @relation("EventStaffAuditActor", fields: [actorId], references: [id])
+  actorId       String
+  action        EventStaffAuditAction
+  fromRole      EventStaffRole?
+  toRole        EventStaffRole?
+  createdAt     DateTime              @default(now())
+
+  @@index([eventId, createdAt])
+  @@index([staffHackerId, createdAt])
+  @@index([actorId, createdAt])
 }
 
 model UserBan {

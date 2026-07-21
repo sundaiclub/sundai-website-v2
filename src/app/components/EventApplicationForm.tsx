@@ -186,10 +186,12 @@ export function EventApplicationForm({
   event,
   viewerProfile,
   onRegistrationChange,
+  embedded = false,
 }: {
   event: PublicEventDetail;
   viewerProfile?: ProfilePrefillSource | null;
   onRegistrationChange?: (registration: PublicRegistrationResponse) => void;
+  embedded?: boolean;
 }) {
   const classes = useManagementClasses();
   const fields = event.applicationQuestionSet.composedFields;
@@ -296,75 +298,77 @@ export function EventApplicationForm({
 
   if (fields.length === 0 && !registration) return null;
 
-  return (
-    <ManagementSection title="Application">
-      <div className="grid gap-4">
-        {submittedAt && (
-          <p className={`text-sm ${classes.mutedText}`}>
-            Submitted {submittedAt}
-          </p>
-        )}
-        {actionMessage && (
-          <ManagementAlert tone="success">{actionMessage}</ManagementAlert>
-        )}
-        {actionError && (
-          <ManagementAlert tone="danger">{actionError}</ManagementAlert>
-        )}
+  const content = (
+    <div className="grid gap-4">
+      {submittedAt && (
+        <p className={`text-sm ${classes.mutedText}`}>
+          Submitted {submittedAt}
+        </p>
+      )}
+      {actionMessage && (
+        <ManagementAlert tone="success">{actionMessage}</ManagementAlert>
+      )}
+      {actionError && (
+        <ManagementAlert tone="danger">{actionError}</ManagementAlert>
+      )}
 
-        {canStartRegistration && (
-          <div>
-            <button
-              aria-controls="event-registration-form"
-              aria-expanded="false"
-              className={classes.primaryButton}
-              onClick={() => setIsEditing(true)}
-              type="button"
-            >
-              Register
-            </button>
-          </div>
-        )}
-
-        {!isEditing && registration?.canEditAnswers && (
+      {canStartRegistration && (
+        <div>
           <button
-            className={classes.secondaryButton}
+            aria-controls="event-registration-form"
+            aria-expanded="false"
+            className={classes.primaryButton}
             onClick={() => setIsEditing(true)}
             type="button"
           >
-            Edit application
+            Register
           </button>
-        )}
+        </div>
+      )}
 
-        {canShowForm && (
-          <form
-            className="grid gap-4"
-            id="event-registration-form"
-            onSubmit={event => {
-              event.preventDefault();
-              void submit();
-            }}
-          >
-            {fields.map(field => (
-              <FieldInput
-                error={fieldErrors[field.id]}
-                field={field}
-                key={field.id}
-                onChange={value => updateAnswer(field, value)}
-                value={answers[field.id]}
-              />
-            ))}
-            <div>
-              <button
-                className={classes.primaryButton}
-                disabled={isSubmitting}
-                type="submit"
-              >
-                {isSubmitting ? 'Saving' : submitLabel}
-              </button>
-            </div>
-          </form>
-        )}
-      </div>
-    </ManagementSection>
+      {!isEditing && registration?.canEditAnswers && (
+        <button
+          className={classes.secondaryButton}
+          onClick={() => setIsEditing(true)}
+          type="button"
+        >
+          Edit application
+        </button>
+      )}
+
+      {canShowForm && (
+        <form
+          className="grid gap-4"
+          id="event-registration-form"
+          onSubmit={event => {
+            event.preventDefault();
+            void submit();
+          }}
+        >
+          {fields.map(field => (
+            <FieldInput
+              error={fieldErrors[field.id]}
+              field={field}
+              key={field.id}
+              onChange={value => updateAnswer(field, value)}
+              value={answers[field.id]}
+            />
+          ))}
+          <div>
+            <button
+              className={classes.primaryButton}
+              disabled={isSubmitting}
+              type="submit"
+            >
+              {isSubmitting ? 'Saving' : submitLabel}
+            </button>
+          </div>
+        </form>
+      )}
+    </div>
   );
+
+  if (embedded) return content;
+
+  return <ManagementSection title="Application">{content}</ManagementSection>;
 }

@@ -210,7 +210,7 @@ function StageBadge({ phase }: { phase: PitchSessionPhase }) {
   );
 }
 
-// ── Swipe Card ──────────────────────────────────────────
+// Swipe card
 function SwipeCard({
   project,
   onSwipeRight,
@@ -343,7 +343,7 @@ function SwipeCard({
   );
 }
 
-// ── Voting Phase ────────────────────────────────────────
+// Voting phase
 function VotingPhase({
   event,
   setEvent,
@@ -469,7 +469,6 @@ function VotingPhase({
     }
   }, [currentCard, event, setEvent, userId]);
 
-  // Keyboard shortcuts
   useEffect(() => {
     if (!votingStarted) return;
     const handler = (e: KeyboardEvent) => {
@@ -881,7 +880,7 @@ function VotingQueuePanel({
   );
 }
 
-// ── Timer helpers ────────────────────────────────────────
+// Timer helpers
 function formatTime(seconds: number): string {
   const mins = Math.floor(Math.abs(seconds) / 60);
   const secs = Math.floor(Math.abs(seconds) % 60);
@@ -1158,7 +1157,7 @@ function PitchTimer({
   );
 }
 
-// ── Pitching Phase (existing presentation UI) ───────────
+// Pitching phase
 function PitchingPhase({
   event,
   setEvent,
@@ -1191,7 +1190,6 @@ function PitchingPhase({
     [allOrdered]
   );
 
-  // Compute top-group
   const { topGroupIds } = useMemo(() => {
     const ids = new Set(
       allOrdered.filter(ep => ep.isTopProject).map(ep => ep.id)
@@ -1355,7 +1353,6 @@ function PitchingPhase({
     }
   };
 
-  // Find first non-top item index for the divider
   const firstNonTopIndex = allOrdered.findIndex(ep => !topGroupIds.has(ep.id));
   const hasTopGroup = topGroupIds.size > 0;
 
@@ -1412,7 +1409,6 @@ function PitchingPhase({
               const isPast = ep.status === 'DONE' || ep.status === 'SKIPPED';
               const isTopGroup = topGroupIds.has(ep.id);
 
-              // Compute relative index label
               const curIdx = allOrdered.findIndex(x => x.status === 'CURRENT');
               let relLabel = '';
               if (curIdx === -1) {
@@ -1432,7 +1428,6 @@ function PitchingPhase({
                   delta === 0 ? '0' : delta > 0 ? `+${delta}` : `${delta}`;
               }
 
-              // Determine if up/down should be enabled
               const movable = new Set(['QUEUED', 'APPROVED']);
               let canUp = false,
                 canDown = false;
@@ -1457,7 +1452,6 @@ function PitchingPhase({
                 }
               }
 
-              // Insert "Top Projects" divider before first non-top item
               const showDivider = hasTopGroup && idx === firstNonTopIndex;
 
               return (
@@ -1704,7 +1698,7 @@ function PitchingPhase({
   );
 }
 
-// ── Main Page ───────────────────────────────────────────
+// Page
 export default function PitchEventPage() {
   const { isDarkMode } = useTheme();
   const { isSignedIn, isLoaded } = useUser();
@@ -1714,7 +1708,6 @@ export default function PitchEventPage() {
   const [event, setEvent] = useState<EventDetail | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Edit event modal state
   const [showEdit, setShowEdit] = useState(false);
   const [editTitle, setEditTitle] = useState('');
   const [editStartTime, setEditStartTime] = useState('');
@@ -1734,7 +1727,6 @@ export default function PitchEventPage() {
   const [editDefaultPresentingSec, setEditDefaultPresentingSec] = useState(60);
   const [editDefaultQuestionsSec, setEditDefaultQuestionsSec] = useState(120);
 
-  // Join modal state
   const [showJoin, setShowJoin] = useState(false);
   const [myProjects, setMyProjects] = useState<Project[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<string>('');

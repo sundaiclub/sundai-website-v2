@@ -1,4 +1,5 @@
 import prisma from './prisma';
+import type { PrismaClient } from '@prisma/client';
 import type {
   EntityId,
   EventStaffRole,
@@ -9,49 +10,24 @@ import type {
 } from '@/types/event-management';
 import { isSiteAdminRole } from '@/lib/eventManagementAuth';
 
-type HackerRecord = {
-  id: EntityId;
-  role?: Role | null;
-};
+type EventManagementPrismaClient = Pick<
+  PrismaClient,
+  | 'hacker'
+  | 'chapterMembership'
+  | 'eventStaff'
+  | 'eventRegistration'
+  | 'hackerOrganizerNote'
+  | 'hackerOrganizerNoteRevision'
+  | '$transaction'
+>;
 
-type ChapterMembershipRecord = {
-  chapterId: EntityId;
-};
-
-type EventStaffRecord = {
-  eventId: EntityId;
-  role: EventStaffRole;
-  event?: {
-    chapterId?: EntityId | null;
-  } | null;
-};
-
-type EventRegistrationRecord = {
-  eventId: EntityId;
-  event?: {
-    chapterId?: EntityId | null;
-  } | null;
-};
-
-type Delegate<TRecord> = {
-  findUnique(args: Record<string, unknown>): Promise<TRecord | null>;
-  findFirst(args: Record<string, unknown>): Promise<TRecord | null>;
-  findMany(args: Record<string, unknown>): Promise<TRecord[]>;
-  create(args: Record<string, unknown>): Promise<TRecord>;
-  update(args: Record<string, unknown>): Promise<TRecord>;
-};
-
-type EventManagementPrismaClient = {
-  hacker: Pick<Delegate<HackerRecord>, 'findUnique'>;
-  chapterMembership: Pick<Delegate<ChapterMembershipRecord>, 'findMany'>;
-  eventStaff: Pick<Delegate<EventStaffRecord>, 'findMany'>;
-  eventRegistration: Pick<Delegate<EventRegistrationRecord>, 'findMany'>;
-  hackerOrganizerNote: Delegate<HackerOrganizerNote>;
-  hackerOrganizerNoteRevision: Delegate<HackerOrganizerNoteRevision>;
-  $transaction<T>(
-    callback: (tx: EventManagementPrismaClient) => Promise<T>
-  ): Promise<T>;
-};
+type EventScopedOrganizerNotesPrismaClient = EventManagementPrismaClient &
+  Pick<
+    PrismaClient,
+    | 'event'
+    | 'eventProject'
+    | 'userBan'
+  >;
 
 export type OrganizerNoteRelevantEventStaff = {
   eventId: EntityId;
@@ -84,13 +60,15 @@ export type OrganizerNoteRevisionListOptions = {
   take?: number;
   skip?: number;
 };
+const MAX_ORGANIZER_NOTE_REVISION_PAGE_SIZE = 100;
 
 export type OrganizerNoteAccessForActor = {
   relevance: OrganizerNoteRelevance;
   access: OrganizerNoteAccess;
 };
 
-const client = prisma as unknown as EventManagementPrismaClient;
+const client: EventManagementPrismaClient = prisma;
+const eventScopedClient: EventScopedOrganizerNotesPrismaClient = prisma;
 
 export function hasSharedOrganizerNoteChapter(
   relevance: Pick<
@@ -369,16 +347,273 @@ export async function updateCurrentOrganizerNoteForActor(
   );
 }
 
+type EventScopedOrganizerNoteInput = {
+  eventId: EntityId;
+  actorId: EntityId;
+  targetHackerId: EntityId;
+  db?: EventScopedOrganizerNotesPrismaClient;
+};
+
+type EventScopedOrganizerNoteContext = {
+  event: { id: EntityId; chapterId: EntityId };
+  actor: { id: EntityId; role?: Role | null };
+  isSiteAdmin: boolean;
+  isChapterAdmin: boolean;
+  isEventStaff: boolean;
+};
+
+async function getEventScopedOrganizerNoteContext(
+  eventId: EntityId,
+  actorId: EntityId,
+  db: EventScopedOrganizerNotesPrismaClient
+): Promise<EventScopedOrganizerNoteContext | null> {
+  const [event, actor] = await Promise.all([
+    db.event.findUnique({
+      where: { id: eventId },
+      select: { id: true, chapterId: true },
+    }),
+    db.hacker.findUnique({
+      where: { id: actorId },
+      select: { id: true, role: true },
+    }),
+  ]);
+  if (!event || !actor) return null;
+
+  if (isSiteAdminRole(actor.role)) {
+    return {
+      event,
+      actor,
+      isSiteAdmin: true,
+      isChapterAdmin: false,
+      isEventStaff: false,
+    };
+  }
+
+  const [membership, staff] = await Promise.all([
+    db.chapterMembership.findFirst({
+      where: {
+        chapterId: event.chapterId,
+        hackerId: actorId,
+        role: 'ADMIN',
+        status: 'ACTIVE',
+      },
+      select: { role: true, status: true },
+    }),
+    db.eventStaff.findFirst({
+      where: { eventId, hackerId: actorId },
+      select: { role: true },
+    }),
+  ]);
+
+  const isChapterAdmin =
+    membership?.role === 'ADMIN' && membership.status === 'ACTIVE';
+  const isEventStaff = staff?.role === 'MC' || staff?.role === 'CO_MC';
+  if (!isChapterAdmin && !isEventStaff) return null;
+
+  return {
+    event,
+    actor,
+    isSiteAdmin: false,
+    isChapterAdmin,
+    isEventStaff,
+  };
+}
+
+async function targetIsRelevantToEvent(
+  eventId: EntityId,
+  targetHackerId: EntityId,
+  db: EventScopedOrganizerNotesPrismaClient
+) {
+  const registration = await db.eventRegistration.findFirst({
+    where: {
+      eventId,
+      hackerId: targetHackerId,
+      status: { not: 'CANCELLED' },
+    },
+    select: { id: true, eventId: true },
+  });
+  if (registration) return true;
+
+  if (!db.eventProject?.findFirst) return false;
+  const projectParticipation = await db.eventProject.findFirst({
+    where: {
+      eventId,
+      project: {
+        OR: [
+          { launchLeadId: targetHackerId },
+          { participants: { some: { hackerId: targetHackerId } } },
+        ],
+      },
+    },
+    select: { id: true },
+  });
+  return !!projectParticipation;
+}
+
+async function targetIsHiddenByGlobalBan(
+  targetHackerId: EntityId,
+  context: EventScopedOrganizerNoteContext,
+  db: EventScopedOrganizerNotesPrismaClient
+) {
+  if (context.isSiteAdmin) return false;
+  const ban = await db.userBan.findFirst({
+    where: { hackerId: targetHackerId, revokedAt: null },
+    select: { id: true },
+  });
+  return !!ban;
+}
+
+async function canAccessEventScopedTarget(
+  input: EventScopedOrganizerNoteInput,
+  db: EventScopedOrganizerNotesPrismaClient
+) {
+  const context = await getEventScopedOrganizerNoteContext(
+    input.eventId,
+    input.actorId,
+    db
+  );
+  if (!context) return null;
+  const relevant = await targetIsRelevantToEvent(
+    input.eventId,
+    input.targetHackerId,
+    db
+  );
+  if (!relevant) return null;
+  if (await targetIsHiddenByGlobalBan(input.targetHackerId, context, db)) {
+    return null;
+  }
+  return context;
+}
+
+export async function getCurrentOrganizerNoteForEventActor({
+  db = eventScopedClient,
+  ...input
+}: EventScopedOrganizerNoteInput) {
+  if (!(await canAccessEventScopedTarget(input, db))) return null;
+  return db.hackerOrganizerNote.findUnique({
+    where: { hackerId: input.targetHackerId },
+  });
+}
+
+export async function updateCurrentOrganizerNoteForEventActor({
+  db = eventScopedClient,
+  body,
+  ...input
+}: EventScopedOrganizerNoteInput & { body: string }) {
+  if (!(await canAccessEventScopedTarget(input, db))) return null;
+  return updateCurrentOrganizerNote(
+    {
+      hackerId: input.targetHackerId,
+      actorId: input.actorId,
+      body,
+    },
+    db
+  );
+}
+
+export async function listEventOrganizerNoteTargets({
+  db = eventScopedClient,
+  eventId,
+  actorId,
+  search,
+  take = 50,
+  skip = 0,
+}: {
+  db?: EventScopedOrganizerNotesPrismaClient;
+  eventId: EntityId;
+  actorId: EntityId;
+  search?: string;
+  take?: number;
+  skip?: number;
+}) {
+  const context = await getEventScopedOrganizerNoteContext(
+    eventId,
+    actorId,
+    db
+  );
+  if (!context) return [];
+
+  const registrations = await db.eventRegistration.findMany({
+    where: {
+      eventId,
+      status: { not: 'CANCELLED' },
+      ...(search?.trim()
+        ? {
+            hacker: {
+              name: { contains: search.trim(), mode: 'insensitive' },
+            },
+          }
+        : {}),
+    },
+    select: {
+      hacker: {
+        select: {
+          id: true,
+          name: true,
+          organizerNote: {
+            select: {
+              id: true,
+              body: true,
+              updatedAt: true,
+              updatedById: true,
+            },
+          },
+        },
+      },
+    },
+    orderBy: [{ hacker: { name: 'asc' } }, { hackerId: 'asc' }],
+    take: Math.min(Math.max(take, 1), 100),
+    skip: Math.max(skip, 0),
+  });
+
+  const rows = [];
+  const seen = new Set<string>();
+  for (const registration of registrations) {
+    const hacker = registration.hacker;
+    if (!hacker || seen.has(hacker.id)) continue;
+    seen.add(hacker.id);
+    if (await targetIsHiddenByGlobalBan(hacker.id, context, db)) continue;
+    rows.push({
+      hackerId: hacker.id,
+      name: hacker.name,
+      note: hacker.organizerNote ?? null,
+    });
+  }
+  return rows;
+}
+
+export async function listOrganizerNoteRevisionsForEventActor({
+  db = eventScopedClient,
+  take = 50,
+  skip = 0,
+  ...input
+}: EventScopedOrganizerNoteInput & { take?: number; skip?: number }) {
+  const context = await canAccessEventScopedTarget(input, db);
+  if (!context || (!context.isSiteAdmin && !context.isChapterAdmin)) {
+    return null;
+  }
+  return db.hackerOrganizerNoteRevision.findMany({
+    where: { hackerId: input.targetHackerId },
+    orderBy: { createdAt: 'desc' },
+    take: Math.min(Math.max(take, 1), 100),
+    skip: Math.max(skip, 0),
+  });
+}
+
 export async function listOrganizerNoteRevisions(
   hackerId: EntityId,
   options: OrganizerNoteRevisionListOptions = {},
   db: EventManagementPrismaClient = client
 ): Promise<HackerOrganizerNoteRevision[]> {
+  const take = Math.min(
+    Math.max(options.take ?? 50, 1),
+    MAX_ORGANIZER_NOTE_REVISION_PAGE_SIZE
+  );
   return db.hackerOrganizerNoteRevision.findMany({
     where: { hackerId },
     orderBy: { createdAt: 'desc' },
-    take: options.take,
-    skip: options.skip,
+    take,
+    skip: Math.max(options.skip ?? 0, 0),
   });
 }
 

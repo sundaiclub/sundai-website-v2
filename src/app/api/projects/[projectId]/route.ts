@@ -90,7 +90,22 @@ export async function DELETE(
       return new NextResponse("Unauthorized", { status: 401 });
     }
 
+    const pitchEntries = await prisma.pitchProject.findMany({
+      where: { projectId: params.projectId },
+      select: { id: true },
+    });
+    const pitchProjectIds = pitchEntries.map(entry => entry.id);
+
     await prisma.$transaction([
+      prisma.pitchProjectVote.deleteMany({
+        where: { pitchProjectId: { in: pitchProjectIds } },
+      }),
+      prisma.pitchProject.deleteMany({
+        where: { projectId: params.projectId },
+      }),
+      prisma.eventProject.deleteMany({
+        where: { projectId: params.projectId },
+      }),
       prisma.projectLike.deleteMany({
         where: { projectId: params.projectId },
       }),

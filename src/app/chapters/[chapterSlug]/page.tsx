@@ -3,6 +3,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import EventSummaryCard from '../../components/EventSummaryCard';
 import {
   ManagementAlert,
   ManagementBadge,
@@ -16,6 +17,7 @@ import {
 import { useUserContext } from '../../contexts/UserContext';
 import type {
   ChapterLanding,
+  ChapterLandingProject,
   ChapterMembershipSummary,
 } from '@/types/event-management';
 
@@ -38,7 +40,9 @@ export default function ChapterLandingPage({
   const [actionMessage, setActionMessage] = useState('');
   const [actionError, setActionError] = useState('');
   const [isActing, setIsActing] = useState(false);
-  const [isPreferencesOpen, setIsPreferencesOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<
+    'events' | 'projects' | 'preferences'
+  >('events');
   const membership = firstMembership(chapter);
   const canManageChapter =
     Boolean(chapter) &&
@@ -50,6 +54,11 @@ export default function ChapterLandingPage({
   const [emailNotificationsEnabled, setEmailNotificationsEnabled] =
     useState(false);
   const [smsNotificationsEnabled, setSmsNotificationsEnabled] = useState(false);
+  const [smsConsentGranted, setSmsConsentGranted] = useState(false);
+  const smsConsentCopy = process.env.NEXT_PUBLIC_SMS_CONSENT_COPY?.trim() ?? '';
+  const smsConsentVersion =
+    process.env.NEXT_PUBLIC_SMS_CONSENT_VERSION?.trim() ?? '';
+  const smsConsentAvailable = Boolean(smsConsentCopy && smsConsentVersion);
 
   useEffect(() => {
     setDenied(false);
@@ -76,9 +85,16 @@ export default function ChapterLandingPage({
         setSmsNotificationsEnabled(
           Boolean(nextMembership?.smsNotificationsEnabled)
         );
+        setSmsConsentGranted(
+          Boolean(
+            nextMembership?.smsNotificationsEnabled &&
+              nextMembership.smsConsentAt &&
+              nextMembership.smsConsentVersion === smsConsentVersion
+          )
+        );
       })
       .catch(() => setLoadError('Unable to load chapter.'));
-  }, [params.chapterSlug]);
+  }, [params.chapterSlug, smsConsentVersion]);
 
   async function join() {
     if (!chapter) return;
@@ -124,9 +140,12 @@ export default function ChapterLandingPage({
     setActionMessage('');
     setActionError('');
     try {
-      const response = await fetch(`/api/chapters/${chapter.id}/invites/accept`, {
-        method: 'POST',
-      });
+      const response = await fetch(
+        `/api/chapters/${chapter.id}/invites/accept`,
+        {
+          method: 'POST',
+        }
+      );
       if (!response.ok) {
         throw new Error('Unable to accept this invitation.');
       }
@@ -183,15 +202,20 @@ export default function ChapterLandingPage({
     setActionMessage('');
     setActionError('');
     try {
-      const response = await fetch(`/api/chapters/${chapter.id}/notifications`, {
-        method: 'PATCH',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          notificationsAllowed,
-          emailNotificationsEnabled,
-          smsNotificationsEnabled,
-        }),
-      });
+      const response = await fetch(
+        `/api/chapters/${chapter.id}/notifications`,
+        {
+          method: 'PATCH',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            notificationsAllowed,
+            emailNotificationsEnabled,
+            smsNotificationsEnabled,
+            smsConsentGranted: smsNotificationsEnabled && smsConsentGranted,
+            smsConsentVersion,
+          }),
+        }
+      );
       if (!response.ok) {
         throw new Error('Unable to save notification preferences.');
       }
@@ -202,7 +226,6 @@ export default function ChapterLandingPage({
         memberships: [membership],
       });
       setActionMessage('Notification preferences saved.');
-      setIsPreferencesOpen(false);
     } catch (error) {
       setActionError(
         error instanceof Error
@@ -217,7 +240,8 @@ export default function ChapterLandingPage({
   function setAllNotifications(enabled: boolean) {
     setNotificationsAllowed(enabled);
     setEmailNotificationsEnabled(enabled);
-    setSmsNotificationsEnabled(enabled);
+    setSmsNotificationsEnabled(enabled && smsConsentAvailable);
+    if (!enabled) setSmsConsentGranted(false);
   }
 
   function openPreferences() {
@@ -228,17 +252,12 @@ export default function ChapterLandingPage({
     setSmsNotificationsEnabled(Boolean(membership?.smsNotificationsEnabled));
     setActionMessage('');
     setActionError('');
-    setIsPreferencesOpen(true);
-  }
-
-  function closePreferences() {
-    if (isActing) return;
-    setIsPreferencesOpen(false);
+    setActiveTab('preferences');
   }
 
   if (denied) {
     return (
-      <ManagementPage maxWidth="max-w-4xl">
+      <ManagementPage maxWidth="max-w-6xl">
         <ManagementAlert tone="danger">
           You do not have permission to view this chapter.
         </ManagementAlert>
@@ -248,23 +267,110 @@ export default function ChapterLandingPage({
 
   const eventChapterSlug = chapter?.slug ?? params.chapterSlug;
   const pendingEvents = chapter?.pendingEvents ?? [];
+  const placeholderLogo = classes.isDarkMode
+    ? '/images/logos/sundai_logo_dark_horizontal.svg'
+    : '/images/logos/sundai_logo_light_horizontal.svg';
+  const tabs = [
+    { id: 'events' as const, label: 'Events' },
+    { id: 'projects' as const, label: 'Projects' },
+    { id: 'preferences' as const, label: 'Preferences' },
+  ];
+  const canJoinChapter =
+    chapter?.accessMode === 'PUBLIC' && membership?.status !== 'ACTIVE';
+  const canAcceptInvite = membership?.status === 'INVITED';
+
+  function projectRankingSection(
+    title: string,
+    description: string,
+    projects: ChapterLandingProject[]
+  ) {
+    return (
+      <ManagementSection title={title} description={description}>
+        {projects.length > 0 ? (
+          <div className="grid max-w-4xl gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {projects.map(project => (
+              <article
+                className={`${classes.panel} overflow-hidden transition hover:-translate-y-0.5 hover:shadow-md`}
+                key={project.id}
+              >
+                <Link
+                  aria-label={`View project ${project.title}`}
+                  className="group block h-full"
+                  href={`/projects/${project.id}`}
+                >
+                  <div
+                    className={`${classes.subtlePanel} relative aspect-[16/9] overflow-hidden rounded-none border-x-0 border-t-0`}
+                  >
+                    <Image
+                      alt={project.thumbnail?.alt || project.title}
+                      className={
+                        project.thumbnail?.url
+                          ? 'object-cover'
+                          : 'object-contain p-8'
+                      }
+                      fill
+                      sizes="(min-width: 1024px) 280px, (min-width: 640px) 420px, 100vw"
+                      src={
+                        project.thumbnail?.url ||
+                        (classes.isDarkMode
+                          ? '/images/default_project_thumbnail_dark.svg'
+                          : '/images/default_project_thumbnail_light.svg')
+                      }
+                      unoptimized={Boolean(project.thumbnail?.url)}
+                    />
+                  </div>
+                  <div className="p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <h2 className="font-bold group-hover:underline">
+                        {project.title}
+                      </h2>
+                      <span className={`shrink-0 text-xs ${classes.mutedText}`}>
+                        {project.likeCount}{' '}
+                        {project.likeCount === 1 ? 'like' : 'likes'}
+                      </span>
+                    </div>
+                    {project.preview && (
+                      <p className={`mt-2 text-sm ${classes.mutedText}`}>
+                        {project.preview}
+                      </p>
+                    )}
+                    <p className={`mt-3 text-xs ${classes.mutedText}`}>
+                      Led by {project.launchLead.name}
+                    </p>
+                  </div>
+                </Link>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <ManagementEmptyState>
+            No projects are listed for this chapter yet.
+          </ManagementEmptyState>
+        )}
+      </ManagementSection>
+    );
+  }
 
   return (
-    <ManagementPage maxWidth="max-w-4xl">
+    <ManagementPage maxWidth="max-w-6xl">
       {loadError && (
         <div className="mb-5">
           <ManagementAlert tone="danger">{loadError}</ManagementAlert>
         </div>
       )}
-      {chapter?.heroImage?.url && (
-        <div className="relative mb-6 aspect-[16/7] overflow-hidden rounded-lg">
+      {chapter && (
+        <div
+          className={`${classes.subtlePanel} relative mb-6 aspect-[16/7] overflow-hidden rounded-lg`}
+        >
           <Image
-            alt={chapter.heroImage.alt || `${chapter.name} chapter`}
-            className="object-cover"
+            alt={chapter.heroImage?.alt || `${chapter.name} chapter`}
+            className={
+              chapter.heroImage?.url ? 'object-cover' : 'object-contain p-10'
+            }
             fill
-            src={chapter.heroImage.url}
+            src={chapter.heroImage?.url || placeholderLogo}
             sizes="(min-width: 1024px) 896px, 100vw"
-            unoptimized
+            unoptimized={Boolean(chapter.heroImage?.url)}
           />
         </div>
       )}
@@ -309,171 +415,26 @@ export default function ChapterLandingPage({
           </>
         }
       />
-      <div className="grid gap-5">
-        {canManageChapter && (
-          <ManagementSection
-            title="Pending events"
-            description="Draft, paused, private, and unlisted events for this chapter."
-          >
-            <div className={`divide-y ${classes.divider}`}>
-              {pendingEvents.map(event => (
-                <Link
-                  key={event.id}
-                  className="group grid gap-3 rounded-md px-3 py-3 outline-none transition hover:bg-gray-500/5 focus-visible:ring-2 focus-visible:ring-gray-500 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
-                  href={`/organizer/events/${event.id}/settings`}
-                >
-                  <div className="min-w-0">
-                    <span className="font-semibold group-hover:underline">
-                      {event.title}
-                    </span>
-                    <div className={`mt-1 text-sm ${classes.mutedText}`}>
-                      {[
-                        event.publicLocation,
-                        event.startTime
-                          ? new Date(event.startTime).toLocaleDateString()
-                          : null,
-                      ]
-                        .filter(Boolean)
-                        .join(' · ')}
-                    </div>
-                  </div>
-                  <div className="flex flex-wrap gap-2 sm:justify-end">
-                    {event.status && (
-                      <ManagementBadge>{event.status}</ManagementBadge>
-                    )}
-                    {event.visibility && (
-                      <ManagementBadge>{event.visibility}</ManagementBadge>
-                    )}
-                  </div>
-                </Link>
-              ))}
-              {pendingEvents.length === 0 && (
-                <ManagementEmptyState>
-                  No pending events are listed.
-                </ManagementEmptyState>
-              )}
-            </div>
-          </ManagementSection>
-        )}
-
-        <ManagementSection title="Upcoming events">
-          <div className={`divide-y ${classes.divider}`}>
-            {(chapter?.upcomingEvents ?? []).map(event => (
-              <div
-                key={event.id}
-                className="grid gap-3 rounded-md px-3 py-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
-              >
-                <Link
-                  className="group min-w-0 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-gray-500"
-                  href={`/events/${eventChapterSlug}/${event.slug}`}
-                >
-                  <span className="font-semibold group-hover:underline">
-                    {event.title}
-                  </span>
-                  <div className={`mt-1 text-sm ${classes.mutedText}`}>
-                    {[
-                      event.publicLocation,
-                      event.startTime
-                        ? new Date(event.startTime).toLocaleDateString()
-                        : null,
-                    ]
-                      .filter(Boolean)
-                      .join(' · ')}
-                  </div>
-                </Link>
-                {canManageChapter && (
-                  <Link
-                    aria-label={`Edit ${event.title}`}
-                    className={classes.secondaryButton}
-                    href={`/organizer/events/${event.id}/settings`}
-                  >
-                    Edit
-                  </Link>
-                )}
-              </div>
-            ))}
-            {(chapter?.upcomingEvents ?? []).length === 0 && (
-              <ManagementEmptyState>
-                No upcoming events are listed.
-              </ManagementEmptyState>
-            )}
-          </div>
-        </ManagementSection>
-
-        <ManagementSection title="Previous events">
-          <div className={`divide-y ${classes.divider}`}>
-            {(chapter?.previousEvents ?? []).map(event => (
-              <div
-                key={event.id}
-                className="grid gap-3 rounded-md px-3 py-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
-              >
-                <Link
-                  className="group min-w-0 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-gray-500"
-                  href={`/events/${eventChapterSlug}/${event.slug}`}
-                >
-                  <span className="font-semibold group-hover:underline">
-                    {event.title}
-                  </span>
-                  <div className={`mt-1 text-sm ${classes.mutedText}`}>
-                    {[
-                      event.publicLocation,
-                      event.startTime
-                        ? new Date(event.startTime).toLocaleDateString()
-                        : null,
-                    ]
-                      .filter(Boolean)
-                      .join(' · ')}
-                  </div>
-                </Link>
-                {canManageChapter && (
-                  <Link
-                    aria-label={`Edit ${event.title}`}
-                    className={classes.secondaryButton}
-                    href={`/organizer/events/${event.id}/settings`}
-                  >
-                    Edit
-                  </Link>
-                )}
-              </div>
-            ))}
-            {(chapter?.previousEvents ?? []).length === 0 && (
-              <ManagementEmptyState>
-                No previous events are listed.
-              </ManagementEmptyState>
-            )}
-          </div>
-        </ManagementSection>
-
-        {chapter?.mailingListName && (
-          <ManagementSection
-            title="Mailing list"
-            description={`${chapter.mailingListName} shares chapter updates and event announcements.`}
-          >
-            <button className={classes.secondaryButton} type="button">
-              Join mailing list
-            </button>
-          </ManagementSection>
-        )}
-
-        {(actionMessage || actionError) && (
+      {(actionMessage || actionError) && (
+        <div className="mb-5">
           <ManagementAlert tone={actionError ? 'danger' : 'success'}>
             {actionError || actionMessage}
           </ManagementAlert>
-        )}
-
-        <div className="flex flex-wrap gap-3">
-          {chapter?.accessMode === 'PUBLIC' &&
-            membership?.status !== 'ACTIVE' && (
-              <button
-                className={classes.primaryButton}
-                disabled={isActing}
-                onClick={join}
-                type="button"
-              >
-                Join chapter
-              </button>
-            )}
-          {membership?.status === 'INVITED' && (
+        </div>
+      )}
+      {canJoinChapter || canAcceptInvite ? (
+        <div className="mb-5 flex flex-wrap gap-3">
+          {canJoinChapter && (
+            <button
+              className={classes.primaryButton}
+              disabled={isActing}
+              onClick={join}
+              type="button"
+            >
+              Join chapter
+            </button>
+          )}
+          {canAcceptInvite && (
             <button
               className={classes.primaryButton}
               disabled={isActing}
@@ -483,129 +444,251 @@ export default function ChapterLandingPage({
               Accept invitation
             </button>
           )}
-          {membership?.status === 'ACTIVE' && (
-            <div className="ml-auto flex flex-wrap justify-end gap-3">
-              <button
-                className={classes.secondaryButton}
-                disabled={isActing}
-                onClick={openPreferences}
-                type="button"
-              >
-                Preferences
-              </button>
-              {membership.role !== 'ADMIN' && (
-                <button
-                  className={`${
-                    classes.isDarkMode
-                      ? 'border-red-800 bg-red-950/30 text-red-200 hover:bg-red-950/60'
-                      : 'border-red-300 bg-red-50 text-red-700 hover:bg-red-100'
-                  } inline-flex min-h-10 items-center justify-center gap-2 rounded-md border px-4 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50`}
-                  disabled={isActing}
-                  onClick={leaveChapter}
-                  type="button"
-                >
-                  Leave chapter
-                </button>
-              )}
-            </div>
-          )}
         </div>
+      ) : null}
+      <div
+        aria-label="Chapter information"
+        className={`mb-5 flex gap-1 border-b ${
+          classes.isDarkMode ? 'border-gray-800' : 'border-gray-300'
+        }`}
+        role="tablist"
+      >
+        {tabs.map(tab => (
+          <button
+            aria-controls={`chapter-${tab.id}-panel`}
+            aria-selected={activeTab === tab.id}
+            className={`border-b-2 px-4 py-3 text-sm font-semibold transition ${
+              activeTab === tab.id
+                ? classes.isDarkMode
+                  ? 'border-gray-100 text-gray-100'
+                  : 'border-gray-900 text-gray-900'
+                : `border-transparent ${classes.mutedText} hover:border-gray-400`
+            }`}
+            id={`chapter-${tab.id}-tab`}
+            key={tab.id}
+            onClick={() => {
+              if (tab.id === 'preferences') openPreferences();
+              else setActiveTab(tab.id);
+            }}
+            role="tab"
+            type="button"
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
 
-      {membership?.status === 'ACTIVE' && isPreferencesOpen && (
+      {activeTab === 'events' && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
-          onClick={closePreferences}
+          aria-labelledby="chapter-events-tab"
+          className="grid gap-5"
+          id="chapter-events-panel"
+          role="tabpanel"
         >
-          <div
-            aria-labelledby="notification-preferences-title"
-            aria-modal="true"
-            className={`${classes.panel} w-full max-w-md p-5`}
-            onClick={event => event.stopPropagation()}
-            role="dialog"
-          >
-            <div className="mb-5 flex items-start justify-between gap-4">
-              <div>
-                <h2
-                  className="text-xl font-bold"
-                  id="notification-preferences-title"
-                >
-                  Notification preferences
-                </h2>
-                <p className={`mt-1 text-sm ${classes.mutedText}`}>
-                  Choose how this chapter can contact you.
-                </p>
+          {canManageChapter && (
+            <ManagementSection
+              title="Pending events"
+              description="Draft, paused, private, and unlisted events for this chapter."
+            >
+              <div className="grid max-w-2xl gap-4 sm:grid-cols-2">
+                {pendingEvents.map(event => (
+                  <EventSummaryCard
+                    event={event}
+                    href={`/organizer/events/${event.id}/settings`}
+                    key={event.id}
+                    showState
+                  />
+                ))}
+                {pendingEvents.length === 0 && (
+                  <div className="sm:col-span-2">
+                    <ManagementEmptyState>
+                      No pending events are listed.
+                    </ManagementEmptyState>
+                  </div>
+                )}
               </div>
-              <button
-                aria-label="Close preferences"
-                className={classes.ghostButton}
-                disabled={isActing}
-                onClick={closePreferences}
-                type="button"
-              >
-                Close
-              </button>
-            </div>
-            <div className="grid gap-3">
-              {actionError && (
-                <ManagementAlert tone="danger">{actionError}</ManagementAlert>
+            </ManagementSection>
+          )}
+
+          <ManagementSection title="Upcoming events">
+            <div className="grid max-w-2xl gap-4 sm:grid-cols-2">
+              {(chapter?.upcomingEvents ?? []).map(event => (
+                <EventSummaryCard
+                  event={event}
+                  href={`/events/${eventChapterSlug}/${event.slug}`}
+                  key={event.id}
+                  showEdit={canManageChapter}
+                />
+              ))}
+              {(chapter?.upcomingEvents ?? []).length === 0 && (
+                <div className="sm:col-span-2">
+                  <ManagementEmptyState>
+                    No upcoming events are listed.
+                  </ManagementEmptyState>
+                </div>
               )}
-              <label className="flex items-center gap-3 text-sm font-semibold">
-                <input
-                  aria-label="Allow notifications"
-                  className={classes.checkbox}
-                  checked={notificationsAllowed}
-                  onChange={event => setAllNotifications(event.target.checked)}
-                  type="checkbox"
-                />
-                Allow notifications
-              </label>
-              <label className="flex items-center gap-3 text-sm font-semibold">
-                <input
-                  aria-label="Email"
-                  className={classes.checkbox}
-                  checked={emailNotificationsEnabled}
-                  disabled={!notificationsAllowed}
-                  onChange={event =>
-                    setEmailNotificationsEnabled(event.target.checked)
-                  }
-                  type="checkbox"
-                />
-                Email
-              </label>
-              <label className="flex items-center gap-3 text-sm font-semibold">
-                <input
-                  aria-label="SMS"
-                  className={classes.checkbox}
-                  checked={smsNotificationsEnabled}
-                  disabled={!notificationsAllowed}
-                  onChange={event =>
-                    setSmsNotificationsEnabled(event.target.checked)
-                  }
-                  type="checkbox"
-                />
-                SMS
-              </label>
-              <div className="mt-2 flex justify-end gap-3">
-                <button
-                  className={classes.secondaryButton}
-                  disabled={isActing}
-                  onClick={closePreferences}
-                  type="button"
-                >
-                  Cancel
-                </button>
-                <button
-                  className={classes.primaryButton}
-                  disabled={isActing}
-                  onClick={updateNotifications}
-                  type="button"
-                >
-                  {isActing ? 'Saving...' : 'Save preferences'}
-                </button>
-              </div>
             </div>
+          </ManagementSection>
+
+          <ManagementSection title="Previous events">
+            <div className="grid max-w-2xl gap-4 sm:grid-cols-2">
+              {(chapter?.previousEvents ?? []).map(event => (
+                <EventSummaryCard
+                  event={event}
+                  href={`/events/${eventChapterSlug}/${event.slug}`}
+                  key={event.id}
+                  showEdit={canManageChapter}
+                />
+              ))}
+              {(chapter?.previousEvents ?? []).length === 0 && (
+                <div className="sm:col-span-2">
+                  <ManagementEmptyState>
+                    No previous events are listed.
+                  </ManagementEmptyState>
+                </div>
+              )}
+            </div>
+          </ManagementSection>
+        </div>
+      )}
+
+      {activeTab === 'projects' && (
+        <div
+          aria-labelledby="chapter-projects-tab"
+          className="grid gap-5"
+          id="chapter-projects-panel"
+          role="tabpanel"
+        >
+          {projectRankingSection(
+            'Top this week',
+            'The most-liked projects from this chapter over the last seven days.',
+            chapter?.topProjectsThisWeek ?? []
+          )}
+          {projectRankingSection(
+            'Top all time',
+            'The most-liked projects from this chapter overall.',
+            chapter?.topProjectsAllTime ?? []
+          )}
+        </div>
+      )}
+
+      {activeTab === 'preferences' && (
+        <div
+          aria-labelledby="chapter-preferences-tab"
+          className="grid gap-5"
+          id="chapter-preferences-panel"
+          role="tabpanel"
+        >
+          <div className="flex flex-wrap gap-3">
+            {membership?.status === 'ACTIVE' && (
+              <div className="ml-auto flex flex-wrap justify-end gap-3">
+                {membership.role !== 'ADMIN' && (
+                  <button
+                    className={`${
+                      classes.isDarkMode
+                        ? 'border-red-800 bg-red-950/30 text-red-200 hover:bg-red-950/60'
+                        : 'border-red-300 bg-red-50 text-red-700 hover:bg-red-100'
+                    } inline-flex min-h-10 items-center justify-center gap-2 rounded-md border px-4 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50`}
+                    disabled={isActing}
+                    onClick={leaveChapter}
+                    type="button"
+                  >
+                    Leave chapter
+                  </button>
+                )}
+              </div>
+            )}
           </div>
+          {membership?.status === 'ACTIVE' ? (
+            <ManagementSection
+              title="Notification preferences"
+              description="Choose how this chapter can contact you."
+            >
+              <div className="grid max-w-md gap-3">
+                {actionError && (
+                  <ManagementAlert tone="danger">{actionError}</ManagementAlert>
+                )}
+                <label className="flex items-center gap-3 text-sm font-semibold">
+                  <input
+                    aria-label="Allow notifications"
+                    className={classes.checkbox}
+                    checked={notificationsAllowed}
+                    onChange={event =>
+                      setAllNotifications(event.target.checked)
+                    }
+                    type="checkbox"
+                  />
+                  Allow notifications
+                </label>
+                <label className="flex items-center gap-3 text-sm font-semibold">
+                  <input
+                    aria-label="Email"
+                    className={classes.checkbox}
+                    checked={emailNotificationsEnabled}
+                    disabled={!notificationsAllowed}
+                    onChange={event =>
+                      setEmailNotificationsEnabled(event.target.checked)
+                    }
+                    type="checkbox"
+                  />
+                  Email
+                </label>
+                <label className="flex items-center gap-3 text-sm font-semibold">
+                  <input
+                    aria-label="SMS"
+                    className={classes.checkbox}
+                    checked={smsNotificationsEnabled}
+                    disabled={!notificationsAllowed || !smsConsentAvailable}
+                    onChange={event => {
+                      setSmsNotificationsEnabled(event.target.checked);
+                      if (!event.target.checked) setSmsConsentGranted(false);
+                    }}
+                    type="checkbox"
+                  />
+                  SMS
+                </label>
+                {!smsConsentAvailable && (
+                  <p className={`text-sm ${classes.mutedText}`} role="status">
+                    SMS notifications are unavailable until consent information
+                    is configured.
+                  </p>
+                )}
+                {smsNotificationsEnabled && smsConsentAvailable && (
+                  <div className={`${classes.subtlePanel} grid gap-2 p-3`}>
+                    <label className="flex items-start gap-3 text-sm">
+                      <input
+                        aria-label={smsConsentCopy}
+                        checked={smsConsentGranted}
+                        className={`${classes.checkbox} mt-0.5`}
+                        onChange={event =>
+                          setSmsConsentGranted(event.target.checked)
+                        }
+                        type="checkbox"
+                      />
+                      <span>{smsConsentCopy}</span>
+                    </label>
+                    <p className={`text-xs ${classes.mutedText}`}>
+                      Consent version {smsConsentVersion}
+                    </p>
+                  </div>
+                )}
+                <div className="mt-2 flex justify-end gap-3">
+                  <button
+                    className={classes.primaryButton}
+                    disabled={isActing}
+                    onClick={updateNotifications}
+                    type="button"
+                  >
+                    {isActing ? 'Saving...' : 'Save preferences'}
+                  </button>
+                </div>
+              </div>
+            </ManagementSection>
+          ) : (
+            <ManagementEmptyState>
+              Join this chapter to manage notification preferences.
+            </ManagementEmptyState>
+          )}
         </div>
       )}
     </ManagementPage>

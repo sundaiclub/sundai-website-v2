@@ -1,5 +1,11 @@
 import React from 'react';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 
 import ChapterLandingPage from '../../src/app/chapters/[chapterSlug]/page';
 
@@ -37,6 +43,7 @@ const bostonChapter = {
       chapterSlug: 'boston',
       status: 'PUBLISHED',
       visibility: 'PUBLIC',
+      applicationCount: 18,
       startTime: '2026-07-10T22:00:00.000Z',
       publicLocation: 'Kendall Square',
     },
@@ -47,6 +54,7 @@ const bostonChapter = {
       chapterSlug: 'boston',
       status: 'PUBLISHED',
       visibility: 'PUBLIC',
+      applicationCount: 1,
       startTime: '2026-07-17T22:00:00.000Z',
       publicLocation: 'The Foundry',
     },
@@ -57,6 +65,7 @@ const bostonChapter = {
       title: 'Boston Spring Demo',
       slug: 'spring-demo',
       chapterSlug: 'boston',
+      applicationCount: 24,
       startTime: '2026-05-15T22:00:00.000Z',
       publicLocation: 'Central Square',
     },
@@ -107,17 +116,6 @@ function renderChapterPage() {
   render(<ChapterLandingPage params={{ chapterSlug: 'boston' }} />);
 }
 
-function findMailingListAction() {
-  return (
-    screen.queryByRole('link', {
-      name: /join.*mailing|subscribe|mailing list/i,
-    }) ??
-    screen.queryByRole('button', {
-      name: /join.*mailing|subscribe|mailing list/i,
-    })
-  );
-}
-
 describe('/chapters/[chapterSlug] public chapter page', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -126,7 +124,7 @@ describe('/chapters/[chapterSlug] public chapter page', () => {
     mockChapterFetch();
   });
 
-  it('renders the public chapter description and mailing-list CTA without exposing provider internals', async () => {
+  it('renders the public chapter description without exposing provider internals', async () => {
     renderChapterPage();
 
     expect(
@@ -136,11 +134,122 @@ describe('/chapters/[chapterSlug] public chapter page', () => {
       screen.getByText(/public builds and demos for boston hackers/i)
     ).toBeInTheDocument();
 
-    await waitFor(() => {
-      expect(screen.getByText(/boston builders list/i)).toBeInTheDocument();
-      expect(findMailingListAction()).toBeInTheDocument();
+    expect(
+      screen.getByRole('tab', { name: /preferences/i })
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(/mailchimp-audience-42/i)
+    ).not.toBeInTheDocument();
+    expect(screen.getByAltText(/sundai boston chapter/i)).toHaveAttribute(
+      'src',
+      expect.stringContaining('sundai_logo_light_horizontal.svg')
+    );
+  });
+
+  it('shows chapter and event artwork with a Sundai fallback for missing images', async () => {
+    mockChapterFetch({
+      ...bostonChapter,
+      heroImage: {
+        id: 'chapter-image',
+        url: 'https://cdn.example.com/chapter.webp',
+        alt: 'Boston chapter mark',
+      },
+      upcomingEvents: [
+        {
+          ...bostonChapter.upcomingEvents[0],
+          image: {
+            id: 'event-image',
+            url: 'https://cdn.example.com/event.webp',
+            alt: 'Demo Night artwork',
+          },
+        },
+        bostonChapter.upcomingEvents[1],
+      ],
     });
-    expect(screen.queryByText(/mailchimp-audience-42/i)).not.toBeInTheDocument();
+
+    renderChapterPage();
+
+    expect(await screen.findByAltText('Boston chapter mark')).toHaveAttribute(
+      'src',
+      'https://cdn.example.com/chapter.webp'
+    );
+    expect(screen.getByAltText('Demo Night artwork')).toHaveAttribute(
+      'src',
+      'https://cdn.example.com/event.webp'
+    );
+    expect(screen.getByAltText('Boston Agent Jam event')).toHaveAttribute(
+      'src',
+      expect.stringContaining('sundai_logo_light_horizontal.svg')
+    );
+  });
+
+  it('switches between Events, Projects, and Preferences tabs', async () => {
+    mockChapterFetch({
+      ...bostonChapter,
+      viewerMembership: {
+        id: 'membership-active',
+        chapterId: 'chapter-boston',
+        hackerId: 'hacker-member',
+        role: 'MEMBER',
+        status: 'ACTIVE',
+        notificationsAllowed: true,
+        emailNotificationsEnabled: true,
+        smsNotificationsEnabled: false,
+      },
+      topProjectsThisWeek: [
+        {
+          id: 'project-boston-agent',
+          title: 'Boston Agent Toolkit',
+          preview: 'A toolkit built at Demo Night.',
+          launchLead: { id: 'hacker-lead', name: 'Alex Builder' },
+          thumbnail: null,
+          likeCount: 8,
+        },
+      ],
+      topProjectsAllTime: [
+        {
+          id: 'project-boston-classic',
+          title: 'Boston Build Classic',
+          preview: 'A longtime chapter favorite.',
+          launchLead: { id: 'hacker-classic', name: 'Sam Maker' },
+          thumbnail: null,
+          likeCount: 32,
+        },
+      ],
+    });
+
+    renderChapterPage();
+
+    const eventsTab = await screen.findByRole('tab', { name: 'Events' });
+    const projectsTab = screen.getByRole('tab', { name: 'Projects' });
+    const preferencesTab = screen.getByRole('tab', { name: 'Preferences' });
+    expect(eventsTab).toHaveAttribute('aria-selected', 'true');
+
+    fireEvent.click(projectsTab);
+    expect(projectsTab).toHaveAttribute('aria-selected', 'true');
+    expect(screen.queryByText(/upcoming events/i)).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: /top this week/i })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: /top all time/i })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: /view project boston agent toolkit/i })
+    ).toHaveAttribute('href', '/projects/project-boston-agent');
+    expect(
+      screen.getByRole('link', { name: /view project boston build classic/i })
+    ).toHaveAttribute('href', '/projects/project-boston-classic');
+
+    fireEvent.click(preferencesTab);
+    expect(preferencesTab).toHaveAttribute('aria-selected', 'true');
+    expect(screen.queryByText(/top this week/i)).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: /notification preferences/i })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /leave chapter/i })
+    ).toBeInTheDocument();
   });
 
   it('links each upcoming event to its native public event detail page', async () => {
@@ -172,6 +281,11 @@ describe('/chapters/[chapterSlug] public chapter page', () => {
         ).toLocaleDateString()}`
       )
     ).toBeInTheDocument();
+    expect(
+      within(demoNight).getByText('18 people applied')
+    ).toBeInTheDocument();
+    expect(within(agentJam).getByText('1 person applied')).toBeInTheDocument();
+    expect(demoNight.closest('div.grid')).toHaveClass('max-w-2xl');
   });
 
   it('shows previous events beneath upcoming events with native event links', async () => {
@@ -191,10 +305,7 @@ describe('/chapters/[chapterSlug] public chapter page', () => {
     const previousEvent = await screen.findByRole('link', {
       name: /boston spring demo/i,
     });
-    expect(previousEvent).toHaveAttribute(
-      'href',
-      '/events/boston/spring-demo'
-    );
+    expect(previousEvent).toHaveAttribute('href', '/events/boston/spring-demo');
     expect(
       within(previousEvent).getByText(
         `Central Square · ${new Date(

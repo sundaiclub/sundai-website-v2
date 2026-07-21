@@ -57,7 +57,7 @@ Creates an event. Site admins can create for any chapter; chapter admins can cre
   "publicLocation": "Boston, MA",
   "approvedDetailsJson": {
     "address": "Exact address",
-    "toolkitUrl": "https://example.com/toolkit"
+    "details": "Arrival instructions for approved attendees"
   },
   "startTime": "2026-07-10T22:00:00.000Z",
   "endTime": "2026-07-11T01:00:00.000Z",

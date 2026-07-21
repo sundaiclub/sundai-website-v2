@@ -5,10 +5,10 @@ import {
   ApplicationTemplateValidationError,
   parseTemplateFieldsJson,
 } from '@/lib/applicationTemplates';
+import { sanitizeApprovedDetailsJson } from '@/lib/approvedEventDetails';
 import {
   canDecideRegistrationsWithContext,
   canManageChapterSettings,
-  canManageEventSettings,
   canViewApprovedOnlyEventDetailsWithContext,
 } from '@/lib/eventManagementAuth';
 import {
@@ -22,6 +22,7 @@ import {
   getViewerRegistrationState,
   redactPublicEventForViewer,
 } from '@/lib/publicEvents';
+import { requireEventSettingsManager } from '@/lib/eventManagementApi';
 
 export async function GET(
   req: Request,
@@ -34,10 +35,14 @@ export async function GET(
       searchParams.get('manageable') === 'true';
 
     if (managementRead) {
+      const access = await requireEventSettingsManager(params.eventId);
+      if (access.response) return access.response;
+
       const event = await prisma.event.findUnique({
         where: { id: params.eventId },
         include: {
           chapter: true,
+          image: true,
           staff: { include: { hacker: { include: { avatar: true } } } },
           pitchSessions: {
             include: {
@@ -68,27 +73,21 @@ export async function GET(
 
       if (!event) return new NextResponse('Not Found', { status: 404 });
 
-      const { userId } = auth();
-      if (!userId) return new NextResponse('Unauthorized', { status: 401 });
-
-      const user = await prisma.hacker.findUnique({
-        where: { clerkId: userId },
-        select: { id: true, role: true },
-      });
-      if (!user) return new NextResponse('Unauthorized', { status: 401 });
-
-      const canManage = await canManageEventSettings(
-        prisma,
-        user.id,
-        params.eventId
-      );
-      if (!canManage) return new NextResponse('Forbidden', { status: 403 });
-
       const canDelete =
-        user.role === 'SITE_ADMIN' ||
-        (await canManageChapterSettings(prisma, user.id, event.chapterId));
+        access.hacker!.role === 'SITE_ADMIN' ||
+        (await canManageChapterSettings(
+          prisma,
+          access.hacker!.id,
+          event.chapterId
+        ));
 
-      return NextResponse.json({ ...event, canDelete });
+      return NextResponse.json({
+        ...event,
+        approvedDetailsJson: sanitizeApprovedDetailsJson(
+          event.approvedDetailsJson
+        ),
+        canDelete,
+      });
     }
 
     const event = await prisma.event.findFirst({
@@ -105,6 +104,7 @@ export async function GET(
         id: true,
         slug: true,
         title: true,
+        image: { select: { id: true, url: true, alt: true } },
         description: true,
         startTime: true,
         endTime: true,
@@ -142,6 +142,11 @@ export async function GET(
               },
             },
           },
+        },
+        pitchSessions: {
+          select: { phase: true },
+          orderBy: { createdAt: 'asc' },
+          take: 1,
         },
       },
     });
@@ -195,14 +200,63 @@ export async function GET(
       staff,
     });
 
-    return NextResponse.json(
-      redactPublicEventForViewer(event, {
-        viewerRegistration,
-        viewerCanManageRegistrations,
-        viewerCanViewApprovedDetails,
-        viewerIsSignedIn: Boolean(viewer),
-      })
-    );
+    const publicEvent = redactPublicEventForViewer(event, {
+      viewerRegistration,
+      viewerCanManageRegistrations,
+      viewerCanViewApprovedDetails,
+      viewerIsSignedIn: Boolean(viewer),
+    });
+
+    if (!viewerCanViewApprovedDetails) {
+      return NextResponse.json(publicEvent);
+    }
+
+    const pitchEvent = await prisma.event.findUnique({
+      where: { id: params.eventId },
+      select: {
+        staff: {
+          select: {
+            id: true,
+            role: true,
+            hacker: {
+              select: { id: true, name: true },
+            },
+          },
+        },
+        pitchSessions: {
+          orderBy: { createdAt: 'asc' },
+          take: 1,
+          include: {
+            projects: {
+              orderBy: { position: 'asc' },
+              include: {
+                pitchVotes: {
+                  select: { hackerId: true, value: true, createdAt: true },
+                },
+                project: {
+                  include: {
+                    thumbnail: true,
+                    launchLead: { include: { avatar: true } },
+                    participants: {
+                      include: { hacker: { include: { avatar: true } } },
+                    },
+                    techTags: true,
+                    domainTags: true,
+                    likes: { select: { hackerId: true, createdAt: true } },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    return NextResponse.json({
+      ...publicEvent,
+      staff: pitchEvent?.staff ?? [],
+      pitchSessions: pitchEvent?.pitchSessions ?? [],
+    });
   } catch (error) {
     console.error('[EVENT_GET]', error);
     return new NextResponse('Internal Error', { status: 500 });
@@ -214,21 +268,9 @@ export async function PATCH(
   { params }: { params: { eventId: string } }
 ) {
   try {
-    const { userId } = auth();
-    if (!userId) return new NextResponse('Unauthorized', { status: 401 });
-
-    const user = await prisma.hacker.findUnique({
-      where: { clerkId: userId },
-      select: { id: true, role: true },
-    });
-    if (!user) return new NextResponse('Unauthorized', { status: 401 });
-
-    const canManage = await canManageEventSettings(
-      prisma,
-      user.id,
-      params.eventId
-    );
-    if (!canManage) return new NextResponse('Forbidden', { status: 403 });
+    const access = await requireEventSettingsManager(params.eventId);
+    if (access.response) return access.response;
+    const user = access.hacker!;
 
     const existingEvent = await prisma.event.findUnique({
       where: { id: params.eventId },
@@ -369,7 +411,9 @@ export async function PATCH(
         ...(autoPromoteWaitlist !== undefined && {
           autoPromoteWaitlist: Boolean(autoPromoteWaitlist),
         }),
-        ...(approvedDetailsJson !== undefined && { approvedDetailsJson }),
+        ...(approvedDetailsJson !== undefined && {
+          approvedDetailsJson: sanitizeApprovedDetailsJson(approvedDetailsJson),
+        }),
         ...(applicationQuestionsJson !== undefined && {
           applicationQuestionsJson,
         }),
@@ -513,6 +557,7 @@ export async function PATCH(
     const event = await prisma.event.findUnique({
       where: { id: params.eventId },
       include: {
+        image: true,
         staff: { include: { hacker: { include: { avatar: true } } } },
         pitchSessions: {
           include: {
@@ -607,6 +652,7 @@ export async function DELETE(
         where: { pitchSessionId: { in: pitchSessionIds } },
       }),
       prisma.pitchSession.deleteMany({ where: { eventId: event.id } }),
+      prisma.eventProject.deleteMany({ where: { eventId: event.id } }),
       prisma.eventRegistrationAudit.deleteMany({
         where: { eventId: event.id },
       }),

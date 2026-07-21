@@ -148,22 +148,33 @@ export function ManagementSection({
   title,
   description,
   actions,
+  size = 'default',
 }: {
   children: ReactNode;
   title?: ReactNode;
   description?: ReactNode;
   actions?: ReactNode;
+  size?: 'default' | 'large';
 }) {
   const classes = useManagementClasses();
+  const isLarge = size === 'large';
 
   return (
-    <section className={`${classes.panel} p-4 sm:p-5`}>
+    <section
+      className={`${classes.panel} ${isLarge ? 'p-5 sm:p-7' : 'p-4 sm:p-5'}`}
+    >
       {(title || description || actions) && (
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            {title && <h2 className="text-xl font-bold">{title}</h2>}
+            {title && (
+              <h2 className={`${isLarge ? 'text-2xl' : 'text-xl'} font-bold`}>
+                {title}
+              </h2>
+            )}
             {description && (
-              <p className={`mt-1 text-sm leading-6 ${classes.mutedText}`}>
+              <p
+                className={`mt-1 ${isLarge ? 'text-base leading-7' : 'text-sm leading-6'} ${classes.mutedText}`}
+              >
                 {description}
               </p>
             )}

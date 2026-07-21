@@ -573,4 +573,29 @@ describe('GET /api/events/[eventId] public detail redaction', () => {
       fixture.publishedEvent.approvedDetailsJson
     );
   });
+
+  it('never serializes organizer notes or revision history on public event responses', async () => {
+    const fixture = buildNativeEventRsvpFixture();
+    const eventWithPrivateNotes = {
+      ...withChapter(fixture.publishedEvent, fixture.publicChapter),
+      organizerNote: { body: 'PRIVATE EVENT NOTE SENTINEL' },
+      organizerNoteRevisions: [
+        { patchText: 'PRIVATE EVENT REVISION SENTINEL' },
+      ],
+    } as EventRecord;
+
+    mockSignedOutClerk();
+    mockPublicEventDatabase({ events: [eventWithPrivateNotes] });
+
+    const response = await GET_EVENT(
+      createJsonRequest(`/api/events/${fixture.publishedEvent.id}`) as any,
+      createRouteContext({ eventId: fixture.publishedEvent.id })
+    );
+    const serialized = JSON.stringify(await response.json());
+
+    expect(response.status).toBe(200);
+    expect(serialized).not.toContain('PRIVATE EVENT NOTE SENTINEL');
+    expect(serialized).not.toContain('PRIVATE EVENT REVISION SENTINEL');
+    expect(serialized).not.toMatch(/organizerNote|noteRevisions/i);
+  });
 });

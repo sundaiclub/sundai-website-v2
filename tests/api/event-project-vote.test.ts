@@ -150,6 +150,50 @@ describe('/api/events/[eventId]/queue/[pitchProjectId]/vote', () => {
     expect(prisma.pitchProjectVote.upsert).toHaveBeenCalled()
   })
 
+  it.each(['DRAFT', 'NEEDS_INFO', 'SUBMITTED', 'APPROVED'])(
+    'preserves hacker voting when project card status is %s',
+    async cardStatus => {
+      mockAuth.mockReturnValue({ userId: 'clerk-voter' })
+      prisma.hacker.findUnique.mockResolvedValue({ id: 'h-voter' })
+      prisma.pitchProject.findUnique.mockResolvedValue({
+        id: 'ep-card-status',
+        pitchSessionId: 'ps1',
+        projectId: 'p1',
+        cardStatus,
+        pitchSession: { eventId: 'e1', phase: 'VOTING' },
+      })
+      prisma.projectLike.upsert.mockResolvedValue({ id: 'like-card-status' })
+      prisma.pitchProjectVote.upsert.mockResolvedValue({
+        id: 'vote-card-status',
+        pitchProjectId: 'ep-card-status',
+        hackerId: 'h-voter',
+        value: 'LIKE',
+      })
+      prisma.$transaction.mockResolvedValue([
+        { id: 'like-card-status' },
+        {
+          id: 'vote-card-status',
+          pitchProjectId: 'ep-card-status',
+          hackerId: 'h-voter',
+          value: 'LIKE',
+        },
+      ])
+
+      const request = new NextRequest(
+        'http://localhost:3000/api/events/e1/pitch/queue/ep-card-status/vote',
+        { method: 'PUT' }
+      )
+      request.json = jest.fn().mockResolvedValue({ value: 'LIKE' })
+
+      const response = await PUT(request, {
+        params: { eventId: 'e1', pitchProjectId: 'ep-card-status' },
+      } as any)
+
+      expect(response.status).toBe(200)
+      expect(prisma.pitchProjectVote.upsert).toHaveBeenCalled()
+    }
+  )
+
   it('rejects pitch-vote changes after the event is finished', async () => {
     mockAuth.mockReturnValue({ userId: 'clerk-1' })
     prisma.hacker.findUnique.mockResolvedValue({ id: 'h1' })

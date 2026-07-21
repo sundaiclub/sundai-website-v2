@@ -10,6 +10,17 @@ import {
   canViewChapter as canViewChapterWithAuth,
 } from '@/lib/eventManagementAuth';
 
+const chapterProjectSelect = {
+  id: true,
+  title: true,
+  preview: true,
+  thumbnail: { select: { id: true, url: true, alt: true } },
+  launchLead: { select: { id: true, name: true } },
+  techTags: { select: { id: true, name: true } },
+  domainTags: { select: { id: true, name: true } },
+  likes: { select: { createdAt: true } },
+} as const;
+
 function chapterInclude(now: Date) {
   return {
     heroImage: { select: { id: true, url: true, alt: true, filename: true } },
@@ -30,6 +41,18 @@ function chapterInclude(now: Date) {
         slug: true,
         startTime: true,
         publicLocation: true,
+        image: { select: { id: true, url: true, alt: true } },
+        _count: {
+          select: {
+            registrations: { where: { status: { not: 'BLOCKED' as const } } },
+          },
+        },
+        projects: {
+          where: { cardStatus: 'APPROVED' as const },
+          select: {
+            project: { select: chapterProjectSelect },
+          },
+        },
       },
     },
   } as const;
@@ -43,6 +66,12 @@ const eventSummarySelect = {
   publicLocation: true,
   status: true,
   visibility: true,
+  image: { select: { id: true, url: true, alt: true } },
+  _count: {
+    select: {
+      registrations: { where: { status: { not: 'BLOCKED' as const } } },
+    },
+  },
 } as const;
 
 const publicEventSummarySelect = {
@@ -51,7 +80,29 @@ const publicEventSummarySelect = {
   slug: true,
   startTime: true,
   publicLocation: true,
+  image: { select: { id: true, url: true, alt: true } },
+  _count: {
+    select: {
+      registrations: { where: { status: { not: 'BLOCKED' as const } } },
+    },
+  },
+  projects: {
+    where: { cardStatus: 'APPROVED' as const },
+    select: {
+      project: { select: chapterProjectSelect },
+    },
+  },
 } as const;
+
+function withApplicationCount<
+  T extends { _count?: { registrations?: number } | null },
+>(event: T): Omit<T, '_count'> & { applicationCount: number } {
+  const { _count, ...summary } = event;
+  return {
+    ...summary,
+    applicationCount: _count?.registrations ?? 0,
+  };
+}
 
 async function resolveChapterIdentifier(chapterIdOrSlug: string) {
   return (
@@ -129,13 +180,60 @@ export async function GET(
         })
       : undefined;
 
-    const { events, ...chapterDetails } = chapter;
+    const { events = [], ...chapterDetails } = chapter;
+    const projectsById = new Map<
+      string,
+      (typeof events)[number]['projects'][number]['project']
+    >();
+    for (const event of [...events, ...previousEvents]) {
+      for (const participation of event.projects ?? []) {
+        projectsById.set(participation.project.id, participation.project);
+      }
+    }
+
+    const publicEvent = <T extends { projects?: unknown }>(event: T) => {
+      const { projects: _projects, ...summary } = event;
+      return withApplicationCount(summary);
+    };
+    const projectLikeCutoff = new Date(now);
+    projectLikeCutoff.setDate(projectLikeCutoff.getDate() - 7);
+    const rankedProjects = Array.from(projectsById.values()).map(project => ({
+      ...project,
+      likeCount: project.likes.length,
+      recentLikeCount: project.likes.filter(
+        like => like.createdAt >= projectLikeCutoff && like.createdAt <= now
+      ).length,
+    }));
+    const byAllTimeLikes = (
+      left: (typeof rankedProjects)[number],
+      right: (typeof rankedProjects)[number]
+    ) =>
+      right.likeCount - left.likeCount || left.title.localeCompare(right.title);
+    const serializeProject = ({
+      likes: _likes,
+      recentLikeCount: _recentLikeCount,
+      ...project
+    }: (typeof rankedProjects)[number]) => project;
 
     return NextResponse.json({
       ...chapterDetails,
-      upcomingEvents: events,
-      previousEvents,
-      ...(pendingEvents ? { pendingEvents } : {}),
+      upcomingEvents: events.map(publicEvent),
+      previousEvents: previousEvents.map(publicEvent),
+      topProjectsThisWeek: [...rankedProjects]
+        .sort(
+          (left, right) =>
+            right.recentLikeCount - left.recentLikeCount ||
+            byAllTimeLikes(left, right)
+        )
+        .slice(0, 5)
+        .map(serializeProject),
+      topProjectsAllTime: [...rankedProjects]
+        .sort(byAllTimeLikes)
+        .slice(0, 5)
+        .map(serializeProject),
+      ...(pendingEvents
+        ? { pendingEvents: pendingEvents.map(withApplicationCount) }
+        : {}),
       viewerMembership,
     });
   } catch (error) {

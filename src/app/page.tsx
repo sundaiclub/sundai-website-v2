@@ -1,20 +1,29 @@
-"use client";
-import Link from "next/link";
-import Image from "next/image";
-import { motion } from "framer-motion";
-import ProjectGrid from "./components/Project";
-import TrendingSections from "./components/TrendingSections";
-import Typewriter from "typewriter-effect";
-import { useState, useEffect } from "react";
-import { usePullToRefresh } from "./hooks/usePullToRefresh";
-import { useTheme } from "./contexts/ThemeContext";
-import { useUser } from "@clerk/nextjs";
-import { useUserContext } from "./contexts/UserContext";
-import type { Project } from "@/types/project";
+'use client';
+import Link from 'next/link';
+import Image from 'next/image';
+import { motion } from 'framer-motion';
+import TrendingSections from './components/TrendingSections';
+import Typewriter from 'typewriter-effect';
+import { useState, useEffect } from 'react';
+import { usePullToRefresh } from './hooks/usePullToRefresh';
+import { useTheme } from './contexts/ThemeContext';
+import { useUser } from '@clerk/nextjs';
+import { useUserContext } from './contexts/UserContext';
+import type { Project } from '@/types/project';
+import type { PublicEventCard } from '@/types/event-management';
+
+function getEndOfCurrentWeek(now: Date) {
+  const endOfWeek = new Date(now);
+  const daysUntilSunday = (7 - now.getDay()) % 7;
+  endOfWeek.setDate(now.getDate() + daysUntilSunday);
+  endOfWeek.setHours(23, 59, 59, 999);
+  return endOfWeek;
+}
 
 export default function Home() {
   const [isTypingDone, setIsTypingDone] = useState(false);
   const [projects, setProjects] = useState<Project[]>([]);
+  const [events, setEvents] = useState<PublicEventCard[]>([]);
   const [loading, setLoading] = useState(true);
   const { isDarkMode } = useTheme();
   const { user } = useUser();
@@ -22,21 +31,59 @@ export default function Home() {
 
   usePullToRefresh();
 
-  // Fetch projects for trending sections
   useEffect(() => {
-    async function fetchProjects() {
-      try {
-        const response = await fetch('/api/projects?status=APPROVED');
-        const data = await response.json();
-        setProjects(data);
-      } catch (error) {
-        console.error("Error fetching projects:", error);
-      } finally {
-        setLoading(false);
+    async function fetchHomepageContent() {
+      const [projectsResult, eventsResult] = await Promise.allSettled([
+        fetch('/api/projects?status=APPROVED').then(async response => {
+          if (!response.ok)
+            throw new Error(`Projects request failed with ${response.status}`);
+          return response.json() as Promise<Project[]>;
+        }),
+        fetch('/api/events').then(async response => {
+          if (!response.ok)
+            throw new Error(`Events request failed with ${response.status}`);
+          return response.json() as Promise<PublicEventCard[]>;
+        }),
+      ]);
+
+      if (
+        projectsResult.status === 'fulfilled' &&
+        Array.isArray(projectsResult.value)
+      ) {
+        setProjects(projectsResult.value);
+      } else {
+        console.error(
+          'Error fetching projects:',
+          projectsResult.status === 'rejected'
+            ? projectsResult.reason
+            : 'Unexpected response'
+        );
       }
+
+      if (
+        eventsResult.status === 'fulfilled' &&
+        Array.isArray(eventsResult.value)
+      ) {
+        const endOfWeek = getEndOfCurrentWeek(new Date());
+        setEvents(
+          eventsResult.value.filter(event => {
+            const startTime = new Date(event.startTime);
+            return !Number.isNaN(startTime.getTime()) && startTime <= endOfWeek;
+          })
+        );
+      } else {
+        console.error(
+          'Error fetching events:',
+          eventsResult.status === 'rejected'
+            ? eventsResult.reason
+            : 'Unexpected response'
+        );
+      }
+
+      setLoading(false);
     }
 
-    fetchProjects();
+    fetchHomepageContent();
   }, []);
 
   const handleLike = async (
@@ -46,25 +93,23 @@ export default function Home() {
   ) => {
     e.preventDefault();
     if (!user) {
-      alert("Please sign in to like projects");
+      alert('Please sign in to like projects');
       return;
     }
 
     try {
       const response = await fetch(`/api/projects/${projectId}/like`, {
-        method: isLiked ? "DELETE" : "POST",
+        method: isLiked ? 'DELETE' : 'POST',
       });
 
       if (response.ok) {
         setProjects(
-          projects.map((project) => {
+          projects.map(project => {
             if (project.id === projectId) {
               return {
                 ...project,
                 likes: isLiked
-                  ? project.likes.filter(
-                      (like) => like.hackerId !== userInfo?.id
-                    )
+                  ? project.likes.filter(like => like.hackerId !== userInfo?.id)
                   : [
                       ...project.likes,
                       {
@@ -79,7 +124,7 @@ export default function Home() {
         );
       }
     } catch (error) {
-      console.error("Error toggling like:", error);
+      console.error('Error toggling like:', error);
     }
   };
 
@@ -90,7 +135,7 @@ export default function Home() {
       opacity: 1,
       y: 0,
       transition: {
-        type: "spring",
+        type: 'spring',
         stiffness: 300,
         damping: 20,
         duration: 0.5,
@@ -102,21 +147,23 @@ export default function Home() {
     <div
       className={`min-h-screen ${
         isDarkMode
-          ? "bg-gradient-to-b from-gray-900 to-black text-gray-100"
-          : "bg-gradient-to-b from-[#E5E5E5] to-[#F0F0F0] text-gray-800"
+          ? 'bg-gradient-to-b from-gray-900 to-black text-gray-100'
+          : 'bg-gradient-to-b from-[#E5E5E5] to-[#F0F0F0] text-gray-800'
       } font-space-mono`}
     >
-      {" "}
+      {' '}
       <section className="relative py-16 md:py-24 lg:py-26 px-4 md:px-8 overflow-hidden">
         <div className="container mx-auto relative z-10 h-[400px] overflow-hidden">
           <div
             className="absolute inset-0 animate-scroll-vertical"
             style={{
               backgroundImage: "url('/images/background_sundai.svg')",
-              backgroundSize: "300px auto",
-              backgroundRepeat: "repeat",
-              WebkitMaskImage: "linear-gradient(to bottom, transparent, black 50%, transparent)",
-              maskImage: "linear-gradient(to bottom, transparent, black 50%, transparent)"
+              backgroundSize: '300px auto',
+              backgroundRepeat: 'repeat',
+              WebkitMaskImage:
+                'linear-gradient(to bottom, transparent, black 50%, transparent)',
+              maskImage:
+                'linear-gradient(to bottom, transparent, black 50%, transparent)',
             }}
           />
 
@@ -130,14 +177,14 @@ export default function Home() {
             >
               <h1
                 className={`font-semibold text-2xl sm:text-3xl md:text-4xl lg:text-5xl mb-6 font-space-mono tracking-tight ${
-                  isDarkMode ? "text-gray-100" : "text-gray-900"
+                  isDarkMode ? 'text-gray-100' : 'text-gray-900'
                 }`}
               >
                 Sundai
               </h1>
               <p
                 className={`text-base sm:text-lg md:text-xl mb-8 max-w-xl mx-auto font-fira-code ${
-                  isDarkMode ? "text-gray-300" : "text-gray-700"
+                  isDarkMode ? 'text-gray-300' : 'text-gray-700'
                 }`}
               >
                 Building & Launching AI Prototypes Every Sunday.
@@ -146,20 +193,20 @@ export default function Home() {
               <div
                 className={`grid grid-cols-1 sm:grid-cols-3 gap-4 items-center max-w-lg mx-auto mb-12 ${
                   isDarkMode
-                    ? "bg-gray-800 shadow-[inset_0_2px_4px_rgba(0,0,0,0.3)]"
-                    : "bg-gray-100 shadow-[inset_0_2px_4px_rgba(0,0,0,0.1)]"
+                    ? 'bg-gray-800 shadow-[inset_0_2px_4px_rgba(0,0,0,0.3)]'
+                    : 'bg-gray-100 shadow-[inset_0_2px_4px_rgba(0,0,0,0.1)]'
                 } rounded-xl p-4 sm:p-6`}
               >
                 <motion.div
                   className="flex justify-center items-center relative rounded-lg p-2 sm:p-4"
                   variants={stompVariants}
                   initial="hidden"
-                  animate={isTypingDone ? "visible" : "hidden"}
+                  animate={isTypingDone ? 'visible' : 'hidden'}
                   transition={{ delay: 0.2 }}
                 >
                   <Image
                     src="/images/affiliations/mit_logo_std_rgb_silver-gray.svg"
-                    style={{ filter: "brightness(1.2)" }}
+                    style={{ filter: 'brightness(1.2)' }}
                     className="w-16 h-16 sm:w-24 sm:h-24 opacity-90"
                     alt="Logo MIT"
                     width={96}
@@ -168,14 +215,14 @@ export default function Home() {
                 </motion.div>
                 <div
                   className={`text-base sm:text-xl font-mono h-full mt-2 sm:mt-8 text-center px-2 sm:px-4 py-1 sm:py-2 rounded-lg ${
-                    isDarkMode ? "text-gray-200" : "text-gray-800"
+                    isDarkMode ? 'text-gray-200' : 'text-gray-800'
                   }`}
                 >
                   <Typewriter
-                    onInit={(typewriter) => {
+                    onInit={typewriter => {
                       typewriter
                         .changeDelay(70)
-                        .typeString("We are builders from")
+                        .typeString('We are builders from')
                         .callFunction(() => {
                           setIsTypingDone(true);
                         })
@@ -187,13 +234,13 @@ export default function Home() {
                   className="flex justify-center items-center relative rounded-lg p-2 sm:p-4"
                   variants={stompVariants}
                   initial="hidden"
-                  animate={isTypingDone ? "visible" : "hidden"}
+                  animate={isTypingDone ? 'visible' : 'hidden'}
                   transition={{ delay: 0.4 }}
                 >
                   <Image
                     src="/images/affiliations/harvard-university-seeklogo.svg"
                     className="w-14 h-14 sm:w-20 sm:h-20 opacity-90"
-                    style={{ filter: "grayscale(100%)" }}
+                    style={{ filter: 'grayscale(100%)' }}
                     alt="Logo Harvard"
                     width={80}
                     height={80}
@@ -251,7 +298,7 @@ export default function Home() {
           <div className="flex justify-center items-center py-20">
             <div
               className={`animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 ${
-                isDarkMode ? "border-purple-400" : "border-indigo-600"
+                isDarkMode ? 'border-purple-400' : 'border-indigo-600'
               }`}
             ></div>
           </div>
@@ -261,7 +308,8 @@ export default function Home() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 1.3 }}
           >
-            <TrendingSections 
+            <TrendingSections
+              events={events}
               projects={projects}
               userInfo={userInfo}
               handleLike={handleLike}
@@ -276,8 +324,8 @@ export default function Home() {
         transition={{ delay: 0.5, duration: 0.8 }}
         className={`${
           isDarkMode
-            ? "bg-gradient-to-r from-gray-900 to-gray-800 text-gray-200"
-            : "bg-gradient-to-r from-gray-100 to-gray-200 text-gray-700"
+            ? 'bg-gradient-to-r from-gray-900 to-gray-800 text-gray-200'
+            : 'bg-gradient-to-r from-gray-100 to-gray-200 text-gray-700'
         } py-6 md:py-2`}
       >
         <div className="container mx-auto px-4">
@@ -289,14 +337,14 @@ export default function Home() {
 
             {/* Foundation link - Center aligned */}
             <p className="text-sm md:text-base order-1 md:order-2 mb-4 md:mb-0">
-              <a 
-                href="https://sundai.foundation" 
-                target="_blank" 
+              <a
+                href="https://sundai.foundation"
+                target="_blank"
                 rel="noopener noreferrer"
                 className={`${
-                  isDarkMode 
-                    ? "text-gray-200 hover:text-indigo-400" 
-                    : "text-gray-700 hover:text-indigo-600"
+                  isDarkMode
+                    ? 'text-gray-200 hover:text-indigo-400'
+                    : 'text-gray-700 hover:text-indigo-600'
                 } transition duration-300`}
               >
                 More about Sundai
@@ -311,8 +359,8 @@ export default function Home() {
                   href="https://github.com/sundai-club"
                   className={`flex justify-center items-center w-8 h-8 ${
                     isDarkMode
-                      ? "text-gray-200 hover:text-purple-400"
-                      : "text-gray-700 hover:text-purple-600"
+                      ? 'text-gray-200 hover:text-purple-400'
+                      : 'text-gray-700 hover:text-purple-600'
                   } rounded-full transition duration-150 ease-in-out`}
                   aria-label="Github"
                 >
@@ -331,8 +379,8 @@ export default function Home() {
                   href="https://twitter.com/sundai_club"
                   className={`flex justify-center items-center w-8 h-8 ${
                     isDarkMode
-                      ? "text-gray-200 hover:text-purple-400"
-                      : "text-gray-700 hover:text-purple-600"
+                      ? 'text-gray-200 hover:text-purple-400'
+                      : 'text-gray-700 hover:text-purple-600'
                   } rounded-full transition duration-150 ease-in-out`}
                   aria-label="Twitter"
                 >
@@ -351,8 +399,8 @@ export default function Home() {
                   href="https://www.linkedin.com/company/sundaiclub"
                   className={`flex justify-center items-center w-8 h-8 ${
                     isDarkMode
-                      ? "text-gray-200 hover:text-purple-400"
-                      : "text-gray-700 hover:text-purple-600"
+                      ? 'text-gray-200 hover:text-purple-400'
+                      : 'text-gray-700 hover:text-purple-600'
                   } rounded-full transition duration-150 ease-in-out`}
                   aria-label="LinkedIn"
                 >
@@ -371,8 +419,8 @@ export default function Home() {
                   href="https://instagram.com/sundai_club"
                   className={`flex justify-center items-center w-8 h-8 ${
                     isDarkMode
-                      ? "text-gray-200 hover:text-purple-400"
-                      : "text-gray-700 hover:text-purple-600"
+                      ? 'text-gray-200 hover:text-purple-400'
+                      : 'text-gray-700 hover:text-purple-600'
                   } rounded-full transition duration-150 ease-in-out`}
                   aria-label="Instagram"
                 >

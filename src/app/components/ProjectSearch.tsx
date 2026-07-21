@@ -218,28 +218,23 @@ export default function ProjectSearch({
         ).length
       }
     }))
-    .sort((a, b) => b._count.projects - a._count.projects); // Sort by count descending
+    .sort((a, b) => b._count.projects - a._count.projects);
 
-  // Filter and sort projects
   const filteredProjects = useMemo(() => {
     return projects
       .filter(project => {
-        // Filter by search term
         const searchMatch = 
           project.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
           project.preview.toLowerCase().includes(searchTerm.toLowerCase());
 
-        // Filter by status
         const statusMatch = selectedStatus.length === 0 || 
           selectedStatus.includes(project.status);
 
-        // Filter by tech tags
         const techTagMatch = selectedTechTags.length === 0 ||
           selectedTechTags.every(tag => 
             project.techTags.some(t => t.name === tag)
           );
 
-        // Filter by domain tags
         const domainTagMatch = selectedDomainTags.length === 0 ||
           selectedDomainTags.every(tag => 
             project.domainTags.some(t => t.name === tag)
@@ -252,7 +247,6 @@ export default function ProjectSearch({
         const dateMatch = (!fromDate || projectDateStr >= fromDate) &&
                          (!toDate || projectDateStr <= toDate);
 
-        // Filter broken projects
         const brokenMatch = showBroken || !project.is_broken;
 
         return searchMatch && statusMatch && techTagMatch && domainTagMatch && dateMatch && brokenMatch;
@@ -292,7 +286,6 @@ export default function ProjectSearch({
     );
   }, [searchTerm, selectedStatus, selectedTechTags, selectedDomainTags, fromDate, toDate, showBroken]);
 
-  // Update parent component with filtered projects
   useEffect(() => {
     onFilteredProjectsChange(filteredProjects);
   }, [filteredProjects, onFilteredProjectsChange]);
@@ -301,7 +294,6 @@ export default function ProjectSearch({
     onSearchStateChange?.(hasActiveFilters);
   }, [hasActiveFilters, onSearchStateChange]);
 
-  // Update URL when filters change
   useEffect(() => {
     const timeoutId = setTimeout(() => {
       updateURL({
@@ -515,7 +507,6 @@ export default function ProjectSearch({
   );
 }
 
-// Helper MultiSelect Component
 function MultiSelect({ 
   options, 
   selected, 

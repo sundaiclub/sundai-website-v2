@@ -47,6 +47,9 @@ jobs:
     - name: Run type checking
       run: npx tsc --noEmit
 
+    - name: Check for circular dependencies
+      run: npm run check:cycles
+
     - name: Run tests
       run: npm run test:ci
 

@@ -49,7 +49,7 @@ describe('/api/events/[eventId]/transition', () => {
     prisma.event.findUnique.mockResolvedValue({ id: 'e1', phase: 'VOTING', staff: [], ...eventTimingConfig });
 
     const res = await POST_TRANSITION(makeRequest({ targetPhase: 'PITCHING' }) as any, { params: { eventId: 'e1' } } as any);
-    expect(res.status).toBe(401);
+    expect(res.status).toBe(403);
   });
 
   it('allows assigned EventStaff MCs to transition phases', async () => {
@@ -84,6 +84,42 @@ describe('/api/events/[eventId]/transition', () => {
     const res = await POST_TRANSITION(makeRequest({ targetPhase: 'FINISHED' }) as any, { params: { eventId: 'e1' } } as any);
 
     expect(res.status).toBe(200);
+  });
+
+  it.each([
+    {
+      label: 'site admin',
+      hacker: { id: 'h-site-admin', role: 'SITE_ADMIN' },
+      membership: null,
+    },
+    {
+      label: 'in-scope chapter admin',
+      hacker: { id: 'h-chapter-admin', role: 'HACKER' },
+      membership: { role: 'ADMIN', status: 'ACTIVE' },
+    },
+  ])('allows $label pitch control', async ({ hacker, membership }) => {
+    mockAuth.mockReturnValue({ userId: `clerk-${hacker.id}` });
+    prisma.hacker.findUnique.mockResolvedValue(hacker);
+    prisma.chapterMembership.findFirst.mockResolvedValue(membership);
+    prisma.event.findUnique.mockResolvedValue({
+      id: 'e1',
+      chapterId: 'chapter-boston',
+      staff: [],
+      ...eventTimingConfig,
+    });
+    prisma.pitchSession.findFirst.mockResolvedValue({
+      id: 'ps1',
+      eventId: 'e1',
+      phase: 'PITCHING',
+      ...eventTimingConfig,
+    });
+
+    const response = await POST_TRANSITION(
+      makeRequest({ targetPhase: 'FINISHED' }) as any,
+      { params: { eventId: 'e1' } } as any
+    );
+
+    expect(response.status).toBe(200);
   });
 
   it('requires a valid target phase', async () => {
@@ -373,5 +409,43 @@ describe('/api/events/[eventId]/transition', () => {
 
     const res = await POST_TRANSITION(makeRequest({ targetPhase: 'PITCHING' }) as any, { params: { eventId: 'e1' } } as any);
     expect(res.status).toBe(200);
+  });
+
+  it('does not gate transition to pitching on project card status', async () => {
+    mockAuth.mockReturnValue({ userId: 'clerk-admin' });
+    prisma.hacker.findUnique.mockResolvedValue({
+      id: 'h-admin',
+      role: 'SITE_ADMIN',
+    });
+    prisma.event.findUnique.mockResolvedValue({
+      id: 'e1',
+      chapterId: 'chapter-boston',
+      staff: [],
+      ...eventTimingConfig,
+    });
+    prisma.pitchProject.findMany.mockResolvedValue([
+      {
+        id: 'ep-draft-card',
+        cardStatus: 'DRAFT',
+        createdAt: new Date('2026-07-10T12:00:00.000Z'),
+        pitchVotes: [],
+      },
+    ]);
+    prisma.pitchProject.update.mockResolvedValue({});
+    prisma.pitchSession.update.mockResolvedValue({});
+    prisma.$transaction.mockResolvedValue([]);
+
+    const response = await POST_TRANSITION(
+      makeRequest({ targetPhase: 'PITCHING' }) as any,
+      { params: { eventId: 'e1' } } as any
+    );
+
+    expect(response.status).toBe(200);
+    expect(prisma.pitchProject.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'ep-draft-card' },
+        data: expect.objectContaining({ status: 'CURRENT' }),
+      })
+    );
   });
 });

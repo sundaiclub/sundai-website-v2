@@ -170,6 +170,8 @@ describe('/api/events event-management foundations', () => {
     const checkInClosesAt = '2026-06-18T23:00:00.000Z';
     const approvedDetailsJson = {
       arrivalInstructions: 'Use the side entrance after 6pm.',
+      doorCode: 'retired access value',
+      toolkitUrl: 'https://example.com/retired-resource',
     };
     const applicationQuestionsJson = [
       {
@@ -237,7 +239,9 @@ describe('/api/events event-management foundations', () => {
           virtualUrl: 'https://meet.example.com/boston-ai-showcase',
           applicationMode: 'REQUIRES_APPROVAL',
           autoPromoteWaitlist: true,
-          approvedDetailsJson,
+          approvedDetailsJson: {
+            arrivalInstructions: 'Use the side entrance after 6pm.',
+          },
           applicationQuestionsJson,
           hideChapterDefaultQuestions: true,
           applicationsOpen: false,

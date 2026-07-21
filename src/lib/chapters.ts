@@ -3,11 +3,11 @@ import type {
   Chapter,
   ChapterAccessMode,
   ChapterMembership,
+  ChapterNotificationPreferenceInput,
   ChapterMembershipStatus,
   ChapterRole,
   ChapterStatus,
   EntityId,
-  JsonObject,
   Role,
 } from "@/types/event-management";
 
@@ -45,15 +45,6 @@ export type ChapterViewer = {
   id?: EntityId | null;
   role?: Role | null;
 } | null;
-
-export type ChapterNotificationPreferenceInput = {
-  notificationsAllowed?: boolean;
-  emailNotificationsEnabled?: boolean;
-  smsNotificationsEnabled?: boolean;
-  notificationPreferencesJson?: JsonObject | null;
-};
-
-export type ChapterMembershipPreferenceInput = ChapterNotificationPreferenceInput;
 
 export type ListVisibleChaptersOptions = {
   viewer?: ChapterViewer;
@@ -246,7 +237,7 @@ export async function listVisibleChapters(options: ListVisibleChaptersOptions = 
 export async function joinOrReactivatePublicMembership(
   chapterId: EntityId,
   hackerId: EntityId,
-  preferences: ChapterMembershipPreferenceInput = {},
+  preferences: ChapterNotificationPreferenceInput = {},
   prismaClient: PlannedPrismaClient = plannedPrisma
 ): Promise<ChapterMembership> {
   return prismaClient.$transaction(async (tx) => {
@@ -306,7 +297,7 @@ export async function joinOrReactivatePublicMembership(
 export async function acceptPrivateChapterInvite(
   chapterId: EntityId,
   hackerId: EntityId,
-  preferences: ChapterMembershipPreferenceInput = {},
+  preferences: ChapterNotificationPreferenceInput = {},
   prismaClient: PlannedPrismaClient = plannedPrisma
 ): Promise<ChapterMembership> {
   return prismaClient.$transaction(async (tx) => {
@@ -386,6 +377,8 @@ export async function leaveChapterWithAdminGuard(
         notificationsAllowed: false,
         emailNotificationsEnabled: false,
         smsNotificationsEnabled: false,
+        smsConsentAt: null,
+        smsConsentVersion: null,
       },
     })) as ChapterMembership;
   });
@@ -478,7 +471,7 @@ async function assertChapterKeepsActiveAdmin(
 
 function membershipActivationData(
   joinedAt: Date,
-  preferences: ChapterMembershipPreferenceInput,
+  preferences: ChapterNotificationPreferenceInput,
   extraData: LooseWhere = {}
 ): LooseWhere {
   return {
@@ -509,10 +502,6 @@ function notificationPreferenceData(preferences: ChapterNotificationPreferenceIn
     data.emailNotificationsEnabled = preferences.emailNotificationsEnabled;
   }
 
-  if (preferences.smsNotificationsEnabled !== undefined) {
-    data.smsNotificationsEnabled = preferences.smsNotificationsEnabled;
-  }
-
   if (preferences.notificationPreferencesJson !== undefined) {
     data.notificationPreferencesJson = preferences.notificationPreferencesJson;
   }
@@ -520,6 +509,25 @@ function notificationPreferenceData(preferences: ChapterNotificationPreferenceIn
   if (preferences.notificationsAllowed === false) {
     data.emailNotificationsEnabled = false;
     data.smsNotificationsEnabled = false;
+    data.smsConsentAt = null;
+    data.smsConsentVersion = null;
+    return data;
+  }
+
+  if (preferences.smsNotificationsEnabled === false) {
+    data.smsNotificationsEnabled = false;
+    data.smsConsentAt = null;
+    data.smsConsentVersion = null;
+  } else if (preferences.smsNotificationsEnabled === true) {
+    const consentVersion = process.env.SMS_CONSENT_VERSION?.trim();
+    const hasExplicitConfiguredConsent =
+      preferences.smsConsentGranted === true && Boolean(consentVersion);
+
+    data.smsNotificationsEnabled = hasExplicitConfiguredConsent;
+    data.smsConsentAt = hasExplicitConfiguredConsent ? now() : null;
+    data.smsConsentVersion = hasExplicitConfiguredConsent
+      ? consentVersion
+      : null;
   }
 
   return data;

@@ -1,8 +1,10 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { SparklesIcon } from '@heroicons/react/24/outline';
 import {
   AuthStatusAlert,
   authStatusFromResponse,
@@ -19,6 +21,8 @@ import {
   useManagementClasses,
 } from '../../components/ManagementSurface';
 import { HackerSelector } from '../../components/HackerSelector';
+import ImageGenerationModal from '../../components/ImageGenerationModal';
+import { useTheme } from '../../contexts/ThemeContext';
 import type { HackerSelectionOption } from '@/types/hacker';
 import type {
   ApplicationTemplateListItem,
@@ -28,6 +32,7 @@ import type {
   TemplateFieldDefinition,
 } from '@/types/event-management';
 import { DEFAULT_EVENT_MESSAGES } from '@/lib/eventMessageDefaults';
+import { parseTemplateFieldsJson } from '@/lib/applicationTemplates';
 
 type ChapterListPayload = ManageableChapterListItem[] | null;
 type StaffListPayload =
@@ -124,22 +129,8 @@ function nextSundayInputValue(from = new Date()) {
 function fieldsFromJson(
   value: JsonValue | null | undefined
 ): TemplateFieldDefinition[] {
-  if (!Array.isArray(value)) return [];
-
-  return value.flatMap(field => {
-    if (
-      !field ||
-      typeof field !== 'object' ||
-      Array.isArray(field) ||
-      typeof field.id !== 'string' ||
-      typeof field.label !== 'string' ||
-      typeof field.type !== 'string'
-    ) {
-      return [];
-    }
-
-    return [field as unknown as TemplateFieldDefinition];
-  });
+  if (value === null || value === undefined) return [];
+  return parseTemplateFieldsJson(value, 'applicationQuestionsJson');
 }
 
 function dateTimeParts(
@@ -178,6 +169,7 @@ function formatClosedAt(value?: string | Date | null) {
 
 export function OrganizerEventForm({ eventId }: { eventId?: string }) {
   const classes = useManagementClasses();
+  const { isDarkMode } = useTheme();
   const router = useRouter();
   const isEditing = Boolean(eventId);
   const [loadedEvent, setLoadedEvent] = useState<OrganizerEventSettings | null>(
@@ -187,6 +179,13 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
   const [slug, setSlug] = useState('');
   const [chapterId, setChapterId] = useState('');
   const [description, setDescription] = useState('');
+  const [eventImageFile, setEventImageFile] = useState<File | null>(null);
+  const [eventImagePrompt, setEventImagePrompt] = useState<string | null>(null);
+  const [eventImagePreview, setEventImagePreview] = useState<string | null>(
+    null
+  );
+  const [showImageGenerationModal, setShowImageGenerationModal] =
+    useState(false);
   const [publicLocation, setPublicLocation] = useState('');
   const [eventDate, setEventDate] = useState(() => nextSundayInputValue());
   const [startClock, setStartClock] = useState(DEFAULT_START_TIME);
@@ -198,8 +197,6 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
   const [autoPromoteWaitlist, setAutoPromoteWaitlist] = useState(false);
   const [approvedAddress, setApprovedAddress] = useState('');
   const [approvedDetails, setApprovedDetails] = useState('');
-  const [doorCode, setDoorCode] = useState('');
-  const [toolkitUrl, setToolkitUrl] = useState('');
   const [applicationsOpen, setApplicationsOpen] = useState(true);
   const [applicationsCloseReason, setApplicationsCloseReason] = useState('');
   const [selectedMcs, setSelectedMcs] = useState<HackerSelectionOption[]>([]);
@@ -244,6 +241,10 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
   const [message, setMessage] = useState('');
   const [savedEventId, setSavedEventId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [savedSettingsFingerprint, setSavedSettingsFingerprint] = useState<
+    string | null
+  >(null);
   const [authStatus, setAuthStatus] = useState<AuthStatus | null>(null);
   const [isCheckingAccess, setIsCheckingAccess] = useState(true);
 
@@ -316,6 +317,7 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
           setTitle(eventPayload.title);
           setSlug(eventPayload.slug ?? slugify(eventPayload.title));
           setDescription(eventPayload.description ?? '');
+          setEventImagePreview(eventPayload.image?.url ?? null);
           setPublicLocation(eventPayload.publicLocation ?? '');
           if (start) {
             setEventDate(start.date);
@@ -344,16 +346,6 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
           setApprovedDetails(
             typeof approvedDetails?.details === 'string'
               ? approvedDetails.details
-              : ''
-          );
-          setDoorCode(
-            typeof approvedDetails?.doorCode === 'string'
-              ? approvedDetails.doorCode
-              : ''
-          );
-          setToolkitUrl(
-            typeof approvedDetails?.toolkitUrl === 'string'
-              ? approvedDetails.toolkitUrl
               : ''
           );
           setSelectedMcs(
@@ -413,6 +405,14 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
       isCurrent = false;
     };
   }, [eventId]);
+
+  useEffect(() => {
+    return () => {
+      if (eventImagePreview?.startsWith('blob:')) {
+        URL.revokeObjectURL(eventImagePreview);
+      }
+    };
+  }, [eventImagePreview]);
 
   const selectedChapter = useMemo(
     () => chapters.find(chapter => chapter.id === chapterId) ?? null,
@@ -537,6 +537,38 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
     if (!isEditing) setSlug(slugify(value));
   }
 
+  function selectEventImage(file: File | null) {
+    setEventImageFile(file);
+    setEventImagePrompt(null);
+    if (file) setEventImagePreview(URL.createObjectURL(file));
+  }
+
+  async function selectGeneratedEventImage({
+    url,
+    prompt,
+  }: {
+    url: string;
+    prompt: string;
+  }) {
+    try {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('Unable to download generated image');
+
+      const blob = await response.blob();
+      setEventImageFile(
+        new File([blob], 'ai-generated-event-image.webp', {
+          type: 'image/webp',
+        })
+      );
+      setEventImagePrompt(prompt);
+      setEventImagePreview(url);
+      setMessage('AI-generated event image selected.');
+    } catch (error) {
+      console.error('Unable to process AI-generated event image', error);
+      setMessage('Unable to select the AI-generated event image.');
+    }
+  }
+
   function addMc(hacker: HackerSelectionOption) {
     setSelectedMcs(current =>
       current.some(staff => staff.id === hacker.id)
@@ -658,7 +690,6 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
       approvedDetailsJson: {
         address: approvedAddress,
         details: approvedDetails,
-        ...(isEditing && { doorCode, toolkitUrl }),
       },
       staff,
       applicationQuestionsJson,
@@ -674,17 +705,54 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
     };
   }
 
+  function settingsFingerprint(
+    payload = buildEventPayload(),
+    imageFile = eventImageFile
+  ) {
+    return JSON.stringify({
+      payload,
+      imageFile: imageFile
+        ? {
+            name: imageFile.name,
+            size: imageFile.size,
+            lastModified: imageFile.lastModified,
+          }
+        : null,
+    });
+  }
+
+  const currentSettingsFingerprint = settingsFingerprint();
+  const hasUnsavedChanges = Boolean(
+    isEditing &&
+      savedSettingsFingerprint &&
+      currentSettingsFingerprint !== savedSettingsFingerprint
+  );
+
+  useEffect(() => {
+    if (isEditing && loadedEvent && savedSettingsFingerprint === null) {
+      setSavedSettingsFingerprint(currentSettingsFingerprint);
+    }
+  }, [
+    currentSettingsFingerprint,
+    isEditing,
+    loadedEvent,
+    savedSettingsFingerprint,
+  ]);
+
   async function saveEvent(shouldPublish: boolean) {
     setMessage('');
     setSavedEventId(null);
+    setIsSaving(true);
+    const eventPayload = buildEventPayload();
+    const savedFingerprint = settingsFingerprint(eventPayload, null);
     const response = await fetch(
       isEditing ? `/api/events/${eventId}` : '/api/events',
       {
         method: isEditing ? 'PATCH' : 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(buildEventPayload()),
+        body: JSON.stringify(eventPayload),
       }
-    );
+    ).finally(() => setIsSaving(false));
     const nextAuthStatus = authStatusFromResponse(response);
     if (nextAuthStatus) {
       setAuthStatus(nextAuthStatus);
@@ -699,6 +767,28 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
     }
 
     const savedEvent = await response.json().catch(() => null);
+    if (eventImageFile && savedEvent?.id) {
+      const imageFormData = new FormData();
+      imageFormData.append('image', eventImageFile);
+      if (eventImagePrompt) imageFormData.append('prompt', eventImagePrompt);
+      const imageResponse = await fetch(`/api/events/${savedEvent.id}/image`, {
+        method: 'POST',
+        body: imageFormData,
+      });
+      if (!imageResponse.ok) {
+        setSavedEventId(savedEvent.id);
+        setMessage('Unable to upload the event image. The event was saved.');
+        return;
+      }
+      const image = await imageResponse.json();
+      setEventImageFile(null);
+      setEventImagePrompt(null);
+      setEventImagePreview(image.url);
+      if (isEditing) {
+        setLoadedEvent(current => (current ? { ...current, image } : current));
+      }
+    }
+    if (isEditing) setSavedSettingsFingerprint(savedFingerprint);
     if (shouldPublish && savedEvent?.id) {
       const publishResponse = await fetch(
         `/api/events/${savedEvent.id}/publish`,
@@ -766,7 +856,7 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
         return;
       }
 
-      router.push('/organizer/events');
+      router.push('/events');
       router.refresh();
     } catch {
       setMessage('Unable to delete draft.');
@@ -817,6 +907,21 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
         actions={
           isEditing ? (
             <>
+              <div className="flex items-center gap-2">
+                <button
+                  className={classes.primaryButton}
+                  disabled={!canSubmit || isSaving}
+                  form="event-settings-form"
+                  type="submit"
+                >
+                  {isSaving ? 'Saving...' : 'Save settings'}
+                </button>
+                {hasUnsavedChanges && (
+                  <span className={`text-sm ${classes.mutedText}`}>
+                    You have unsaved changes
+                  </span>
+                )}
+              </div>
               {loadedEvent?.status && (
                 <ManagementBadge>{loadedEvent.status}</ManagementBadge>
               )}
@@ -829,6 +934,7 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
       />
       <form
         className="grid gap-5"
+        id="event-settings-form"
         onSubmit={event => {
           event.preventDefault();
           void saveEvent(false);
@@ -881,6 +987,73 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
                 value={description}
               />
             </label>
+            <div className="grid gap-2 sm:col-span-2">
+              <span className="text-sm font-semibold">Event image</span>
+              <div className="grid gap-4 sm:grid-cols-[minmax(0,240px)_1fr] sm:items-center">
+                <div
+                  className={`${classes.subtlePanel} relative aspect-[16/9] overflow-hidden rounded-md`}
+                >
+                  {eventImagePreview ? (
+                    <Image
+                      alt={`${title || 'Event'} preview`}
+                      className="object-cover"
+                      fill
+                      src={eventImagePreview}
+                      sizes="240px"
+                      unoptimized
+                    />
+                  ) : (
+                    <div
+                      className={`flex h-full items-center justify-center px-4 text-center text-sm ${classes.mutedText}`}
+                    >
+                      The Sundai logo will be used when no image is uploaded.
+                    </div>
+                  )}
+                </div>
+                <div className="grid gap-3">
+                  <span className={`text-sm ${classes.mutedText}`}>
+                    JPEG, PNG, WebP, or GIF. Maximum 10 MB.
+                  </span>
+                  <label className="grid gap-2">
+                    <span className="sr-only">Upload event image</span>
+                    <input
+                      accept="image/jpeg,image/png,image/webp,image/gif"
+                      aria-label="Event image"
+                      className={classes.input}
+                      onChange={event =>
+                        selectEventImage(event.target.files?.[0] ?? null)
+                      }
+                      type="file"
+                    />
+                  </label>
+                  <button
+                    className="flex w-fit items-center gap-2 rounded-md bg-purple-600 px-4 py-2 text-sm font-semibold text-white hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    disabled={
+                      !chapterId || !title.trim() || !description.trim()
+                    }
+                    onClick={() => setShowImageGenerationModal(true)}
+                    type="button"
+                  >
+                    <SparklesIcon className="h-4 w-4" />
+                    AI Generate
+                  </button>
+                  <span className={`text-xs ${classes.mutedText}`}>
+                    Add a title and description before you generate an image.
+                  </span>
+                </div>
+              </div>
+              <ImageGenerationModal
+                generationBody={{ chapterId, title, description }}
+                generationEndpoint="/api/events/generate-images"
+                isDarkMode={isDarkMode}
+                onImageSelect={selectGeneratedEventImage}
+                setShowModal={setShowImageGenerationModal}
+                showModal={showImageGenerationModal}
+                subjectDescription={description}
+                subjectLabel="Event"
+                subjectTitle={title}
+              />
+            </div>
             <label className="grid gap-2">
               <span className="text-sm font-semibold">Public location</span>
               <input
@@ -968,28 +1141,6 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
                 value={approvedDetails}
               />
             </label>
-            {isEditing && (
-              <>
-                <label className="grid gap-2">
-                  <span className="text-sm font-semibold">Door code</span>
-                  <input
-                    aria-label="Door code"
-                    className={classes.input}
-                    onChange={event => setDoorCode(event.target.value)}
-                    value={doorCode}
-                  />
-                </label>
-                <label className="grid gap-2">
-                  <span className="text-sm font-semibold">Toolkit URL</span>
-                  <input
-                    aria-label="Toolkit"
-                    className={classes.input}
-                    onChange={event => setToolkitUrl(event.target.value)}
-                    value={toolkitUrl}
-                  />
-                </label>
-              </>
-            )}
           </div>
         </ManagementSection>
 
@@ -1366,7 +1517,7 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <button
             className={classes.primaryButton}
-            disabled={!canSubmit}
+            disabled={!canSubmit || isSaving}
             type="submit"
           >
             {isEditing ? 'Save settings' : 'Save draft'}

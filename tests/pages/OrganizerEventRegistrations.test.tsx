@@ -40,6 +40,10 @@ jest.mock('next/navigation', () => ({
 }));
 
 type PageComponent = React.ComponentType<{ params: { eventId: string } }>;
+type WorkspaceLayoutComponent = React.ComponentType<{
+  children: React.ReactNode;
+  params: { eventId: string };
+}>;
 
 const eventId = 'event-ai-build-night';
 
@@ -59,6 +63,63 @@ const eventSummary = {
     slug: 'boston',
     timezone: 'America/New_York',
   },
+};
+
+const workspaceSummary = {
+  event: {
+    id: eventId,
+    title: 'AI Build Night',
+    status: 'PUBLISHED',
+    chapter: {
+      id: 'chapter-boston',
+      name: 'Sundai Boston',
+      slug: 'boston',
+    },
+    startTime: '2026-07-18T14:00:00.000Z',
+    endTime: '2026-07-18T22:00:00.000Z',
+    capacity: 40,
+    applicationMode: 'REQUIRES_APPROVAL',
+    applicationsOpen: true,
+    autoPromoteWaitlist: true,
+    publicUrl: '/events/boston/ai-build-night',
+    hasApprovedOnlyDetails: true,
+  },
+  capabilities: {
+    administerEvent: false,
+    assignStaff: false,
+    decideApplicants: true,
+    manageOperations: true,
+    sendCommunications: true,
+    manageMaterials: true,
+    managePitch: true,
+    editNotes: true,
+    viewNoteHistory: false,
+  },
+  staff: [],
+  counts: {
+    registrations: {
+      pending: 1,
+      approved: 1,
+      waitlisted: 1,
+      declined: 1,
+      cancelled: 1,
+    },
+    projects: { total: 0, submittedCards: 0 },
+    pitch: { queued: 0, pitched: 0, highlighted: 0 },
+    materials: 0,
+    communications: 0,
+  },
+  availableSections: [
+    'overview',
+    'registrations',
+    'communications',
+    'materials',
+    'projects',
+    'pitch',
+    'notes',
+    'reporting',
+  ],
+  unavailable: ['checkIn', 'attendance', 'noShows'],
 };
 
 const decisionCapabilities: OrganizerRegistrationReviewCapabilities = {
@@ -332,6 +393,10 @@ function mockRegistrationReviewFetch({
       return jsonResponse(eventSummary);
     }
 
+    if (url.pathname === `/api/events/${eventId}/workspace`) {
+      return jsonResponse(workspaceSummary);
+    }
+
     if (
       url.pathname ===
         `/api/events/${eventId}/registrations/${pendingRow.id}/notes` &&
@@ -389,6 +454,23 @@ function renderRegistrationsPage() {
   render(<OrganizerEventRegistrationsPage params={{ eventId }} />);
 }
 
+function renderWorkspaceRegistrations() {
+  const OrganizerEventLayout = loadPage(
+    '/organizer/events/[eventId] layout',
+    '../../src/app/organizer/events/[eventId]/layout'
+  ) as WorkspaceLayoutComponent;
+  const OrganizerEventRegistrationsPage = loadPage(
+    '/organizer/events/[eventId]/registrations',
+    '../../src/app/organizer/events/[eventId]/registrations/page'
+  );
+
+  render(
+    <OrganizerEventLayout params={{ eventId }}>
+      <OrganizerEventRegistrationsPage params={{ eventId }} />
+    </OrganizerEventLayout>
+  );
+}
+
 function latestFetchBody(pathPattern: RegExp) {
   const call = (global.fetch as jest.Mock).mock.calls.find(([input]) =>
     pathPattern.test(requestUrl(input))
@@ -420,6 +502,56 @@ describe('/organizer/events/[eventId]/registrations', () => {
 
   afterEach(() => {
     cleanup();
+  });
+
+  it('opens the existing registration review inside the event workspace shell', async () => {
+    renderWorkspaceRegistrations();
+
+    expect(await screen.findByText(/signed in applicant/i)).toBeInTheDocument();
+    expect(
+      screen.getByRole('navigation', { name: /event workspace/i })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: /rsvps|registrations/i })
+    ).toHaveAttribute('aria-current', 'page');
+    expect(
+      screen.getByRole('heading', { level: 1, name: 'AI Build Night' })
+    ).toBeInTheDocument();
+    expect(screen.getByText(/sundai boston/i)).toBeInTheDocument();
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      `/api/events/${eventId}/workspace`
+    );
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringMatching(`/api/events/${eventId}/registrations\\?`)
+    );
+  });
+
+  it('keeps co-MCs note-only when registration review is opened through the workspace', async () => {
+    mockRegistrationReviewFetch({
+      viewerRole: 'CO_MC',
+      rowsByStatus: {
+        ...defaultRowsByStatus,
+        PENDING: [{ ...pendingRow, capabilities: noteOnlyCapabilities }],
+      },
+    });
+
+    renderWorkspaceRegistrations();
+
+    expect(await screen.findByText(/signed in applicant/i)).toBeInTheDocument();
+    expect(
+      screen.getByRole('navigation', { name: /event workspace/i })
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText(/internal review notes/i)).toBeEnabled();
+    expect(
+      screen.queryByRole('button', { name: /^approve$/i })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /^waitlist$/i })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /^decline$/i })
+    ).not.toBeInTheDocument();
   });
 
   it('renders registration queue tabs and applicant answers for the active status', async () => {

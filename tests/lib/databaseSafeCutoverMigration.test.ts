@@ -13,6 +13,13 @@ const migration = fs.readFileSync(
   ),
   'utf8'
 );
+const slugCleanupMigration = fs.readFileSync(
+  path.join(
+    rootDir,
+    'prisma/migrations/20260721010000_remove_event_slug_cleanup_flag/migration.sql'
+  ),
+  'utf8'
+);
 
 const normalizeSql = (sql: string) => sql.replace(/\s+/g, ' ').trim();
 
@@ -31,5 +38,16 @@ describe('database-safe legacy default cutover', () => {
     );
 
     expect(migration).not.toMatch(/\b(?:UPDATE|DELETE|DROP|TRUNCATE)\b/i);
+  });
+
+  it('removes the unused event slug cleanup marker without changing event rows', () => {
+    const eventModel = schema.match(/\bmodel\s+Event\s*{([\s\S]*?)\n}/)?.[1];
+
+    expect(eventModel).toBeDefined();
+    expect(eventModel).not.toContain('slugNeedsCleanup');
+    expect(normalizeSql(slugCleanupMigration)).toBe(
+      'ALTER TABLE "Event" DROP COLUMN "slugNeedsCleanup";'
+    );
+    expect(slugCleanupMigration).not.toMatch(/\b(?:UPDATE|DELETE|TRUNCATE)\b/i);
   });
 });

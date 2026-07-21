@@ -13,7 +13,7 @@ export function authStatusFromResponse(
   return null;
 }
 
-export function authStatusMessage(status: AuthStatus) {
+function authStatusMessage(status: AuthStatus) {
   if (status === 'unauthenticated') {
     return 'Please sign in to view this page.';
   }
