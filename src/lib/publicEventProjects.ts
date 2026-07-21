@@ -10,8 +10,52 @@ function publicEventProjectSelect(eventId: string) {
         id: true,
         title: true,
         preview: true,
-        thumbnail: { select: { url: true, alt: true } },
-        launchLead: { select: { name: true } },
+        description: true,
+        githubUrl: true,
+        demoUrl: true,
+        blogUrl: true,
+        startDate: true,
+        endDate: true,
+        status: true,
+        createdAt: true,
+        updatedAt: true,
+        is_starred: true,
+        is_broken: true,
+        thumbnail: { select: { url: true, alt: true, prompt: true } },
+        launchLead: {
+          select: {
+            id: true,
+            name: true,
+            twitterUrl: true,
+            linkedinUrl: true,
+            avatar: { select: { url: true } },
+          },
+        },
+        participants: {
+          select: {
+            role: true,
+            hacker: {
+              select: {
+                id: true,
+                name: true,
+                bio: true,
+                twitterUrl: true,
+                linkedinUrl: true,
+                avatar: { select: { url: true } },
+              },
+            },
+          },
+        },
+        techTags: {
+          select: { id: true, name: true, description: true },
+        },
+        domainTags: {
+          select: { id: true, name: true, description: true },
+        },
+        likes: {
+          where: { hacker: { userBans: { none: { revokedAt: null } } } },
+          select: { hackerId: true, createdAt: true },
+        },
         pitchEntries: {
           where: { pitchSession: { eventId } },
           select: {
@@ -39,11 +83,19 @@ export function rankPublicEventProjects(
   return rows
     .map(row => ({
       project: {
-        id: row.project.id,
-        title: row.project.title,
-        preview: row.project.preview ?? null,
-        thumbnail: row.project.thumbnail ?? null,
-        launchLeadName: row.project.launchLead.name,
+        ...row.project,
+        preview: row.project.preview ?? '',
+        description: row.project.description ?? '',
+        participants: row.project.participants.map(participant => ({
+          ...participant,
+          role: participant.role ?? '',
+        })),
+        likes: row.project.likes.map(like => ({
+          ...like,
+          createdAt: like.createdAt.toISOString(),
+        })),
+        createdAt: row.project.createdAt.toISOString(),
+        updatedAt: row.project.updatedAt.toISOString(),
         pitchVoteCount: row.project.pitchEntries.reduce(
           (total, entry) => total + entry.pitchVotes.length,
           0

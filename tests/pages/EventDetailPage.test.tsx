@@ -10,6 +10,7 @@ import { publicCalendarPayloadFixture } from '../utils/event-rsvp-fixtures';
 import { getPublicEventBySlug } from '@/lib/publicEvents';
 import { listVisibleEventMaterials } from '@/lib/eventMaterials';
 import { listPublicEventProjects } from '@/lib/publicEventProjects';
+import { mockProject } from '../utils/test-utils';
 
 const mockUseTheme = jest.fn();
 const mockUseUserContext = jest.fn();
@@ -506,19 +507,27 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
   it('shows event projects as a pitch-vote-ranked carousel above registration', async () => {
     mockListPublicEventProjects.mockResolvedValue([
       {
+        ...mockProject,
         id: 'project-high',
         title: 'Top project',
         preview: 'Won the most pitch votes.',
         thumbnail: null,
-        launchLeadName: 'Ada Builder',
+        launchLead: { ...mockProject.launchLead, name: 'Ada Builder' },
+        startDate: new Date('2026-07-01T00:00:00.000Z'),
+        createdAt: '2026-07-01T00:00:00.000Z',
+        updatedAt: '2026-07-01T00:00:00.000Z',
         pitchVoteCount: 8,
       },
       {
+        ...mockProject,
         id: 'project-low',
         title: 'Second project',
         preview: 'Another event project.',
         thumbnail: null,
-        launchLeadName: 'Grace Builder',
+        launchLead: { ...mockProject.launchLead, name: 'Grace Builder' },
+        startDate: new Date('2026-07-01T00:00:00.000Z'),
+        createdAt: '2026-07-01T00:00:00.000Z',
+        updatedAt: '2026-07-01T00:00:00.000Z',
         pitchVoteCount: 3,
       },
     ]);
@@ -535,11 +544,10 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
       name: /top project|second project/i,
     });
 
-    expect(projectLinks.map(link => link.getAttribute('href'))).toEqual([
-      '/projects/project-high',
-      '/projects/project-low',
-    ]);
-    expect(screen.getByText('8 votes')).toBeInTheDocument();
+    expect(
+      Array.from(new Set(projectLinks.map(link => link.getAttribute('href'))))
+    ).toEqual(['/projects/project-high', '/projects/project-low']);
+    expect(screen.getByText(/8 votes/)).toBeInTheDocument();
     expect(
       carouselHeading.compareDocumentPosition(registrationHeading) &
         Node.DOCUMENT_POSITION_FOLLOWING

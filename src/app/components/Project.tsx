@@ -51,7 +51,7 @@ function normalizeProjectsResponse(data: ProjectsApiResponse) {
   };
 }
 
-export function ProjectCard({ project, userInfo, handleLike, isDarkMode, show_status, show_team = true, onStatusChange, onStarredChange, isAdmin, variant = "default", showTrendingBadge = false, openInNewTab = false }: {
+export function ProjectCard({ project, userInfo, handleLike, isDarkMode, show_status, show_team = true, onStatusChange, onStarredChange, isAdmin, variant = "default", showTrendingBadge = false, imageBadge, openInNewTab = false }: {
   project: Project;
   userInfo: UserInfo | null;
   handleLike: (e: React.MouseEvent, projectId: string, isLiked: boolean) => void;
@@ -63,6 +63,7 @@ export function ProjectCard({ project, userInfo, handleLike, isDarkMode, show_st
   isAdmin?: boolean;
   variant?: "default" | "compact" | "trending";
   showTrendingBadge?: boolean;
+  imageBadge?: React.ReactNode;
   openInNewTab?: boolean;
 }) {
   const AvatarImage = ({ src, alt, size }: { src: string | null; alt: string; size: number }) => {
@@ -122,14 +123,14 @@ export function ProjectCard({ project, userInfo, handleLike, isDarkMode, show_st
       } rounded-xl shadow-lg overflow-hidden transition-shadow transition-transform duration-200 hover:-translate-y-1 relative flex flex-col h-full`}
     >
       <div className={`relative ${imageHeightClass}`}>
-        {showTrendingBadge && (
+        {(showTrendingBadge || imageBadge) && (
           <div className="absolute top-3 left-3 z-10">
             <div className={`px-2 py-1 rounded-full text-xs font-semibold ${
               isDarkMode 
                 ? "bg-gradient-to-r from-purple-600 to-indigo-600 text-white" 
                 : "bg-gradient-to-r from-purple-500 to-indigo-500 text-white"
             }`}>
-              🔥 Trending
+              {imageBadge || '🔥 Trending'}
             </div>
           </div>
         )}
