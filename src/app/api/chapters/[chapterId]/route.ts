@@ -79,6 +79,7 @@ const publicEventSummarySelect = {
   title: true,
   slug: true,
   startTime: true,
+  endTime: true,
   publicLocation: true,
   image: { select: { id: true, url: true, alt: true } },
   _count: {
@@ -141,7 +142,7 @@ export async function GET(
 
     if (!chapter) return new NextResponse('Not Found', { status: 404 });
 
-    const previousEvents = await prisma.event.findMany({
+    const startedEvents = await prisma.event.findMany({
       where: {
         chapterId: resolvedChapter.id,
         status: 'PUBLISHED',
@@ -151,6 +152,12 @@ export async function GET(
       orderBy: { startTime: 'desc' },
       select: publicEventSummarySelect,
     });
+    const happeningNowEvents = startedEvents.filter(
+      event => event.endTime !== null && event.endTime > now
+    );
+    const previousEvents = startedEvents.filter(
+      event => event.endTime === null || event.endTime <= now
+    );
 
     const viewerMembership = hacker
       ? await prisma.chapterMembership.findFirst({
@@ -185,7 +192,7 @@ export async function GET(
       string,
       (typeof events)[number]['projects'][number]['project']
     >();
-    for (const event of [...events, ...previousEvents]) {
+    for (const event of [...events, ...startedEvents]) {
       for (const participation of event.projects ?? []) {
         projectsById.set(participation.project.id, participation.project);
       }
@@ -218,6 +225,7 @@ export async function GET(
     return NextResponse.json({
       ...chapterDetails,
       upcomingEvents: events.map(publicEvent),
+      happeningNowEvents: happeningNowEvents.map(publicEvent),
       previousEvents: previousEvents.map(publicEvent),
       topProjectsThisWeek: [...rankedProjects]
         .sort(

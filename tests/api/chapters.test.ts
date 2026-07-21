@@ -324,10 +324,23 @@ describe('/api/chapters', () => {
         _count: { registrations: 24 },
       }),
     ];
+    const happeningNowEvent = buildPublishedEvent({
+      id: 'event-boston-live-build',
+      title: 'Boston Live Build',
+      slug: 'live-build',
+      chapterId: chapter.id,
+      startTime: new Date('2026-05-15T18:00:00.000Z'),
+      endTime: new Date('2099-05-16T01:00:00.000Z'),
+      publicLocation: 'Kendall Square',
+      _count: { registrations: 12 },
+    });
 
     mockSignedOutClerk();
     mockChapterDetailLookup({ chapter, upcomingEvents });
-    prisma.event.findMany.mockResolvedValue(previousEvents);
+    prisma.event.findMany.mockResolvedValue([
+      happeningNowEvent,
+      ...previousEvents,
+    ]);
 
     const response = await GET_CHAPTER(
       createJsonRequest('/api/chapters/boston') as any,
@@ -365,6 +378,17 @@ describe('/api/chapters', () => {
           startTime: upcomingEvents[1].startTime.toISOString(),
           publicLocation: 'Seaport',
           applicationCount: 1,
+        },
+      ],
+      happeningNowEvents: [
+        {
+          id: 'event-boston-live-build',
+          title: 'Boston Live Build',
+          slug: 'live-build',
+          startTime: happeningNowEvent.startTime.toISOString(),
+          endTime: happeningNowEvent.endTime?.toISOString(),
+          publicLocation: 'Kendall Square',
+          applicationCount: 12,
         },
       ],
       previousEvents: [

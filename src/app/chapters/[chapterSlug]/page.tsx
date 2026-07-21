@@ -485,6 +485,21 @@ export default function ChapterLandingPage({
           id="chapter-events-panel"
           role="tabpanel"
         >
+          {(chapter?.happeningNowEvents ?? []).length > 0 && (
+            <ManagementSection title="Happening now">
+              <div className="grid max-w-2xl gap-4 sm:grid-cols-2">
+                {(chapter?.happeningNowEvents ?? []).map(event => (
+                  <EventSummaryCard
+                    event={event}
+                    href={`/events/${eventChapterSlug}/${event.slug}`}
+                    key={event.id}
+                    showEdit={canManageChapter}
+                  />
+                ))}
+              </div>
+            </ManagementSection>
+          )}
+
           {canManageChapter && (
             <ManagementSection
               title="Pending events"
