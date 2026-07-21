@@ -104,7 +104,13 @@ describe('organizer event workspace accessibility', () => {
     expect(screen.getByRole('link', { name: /materials/i })).toHaveAttribute('aria-current', 'page');
 
     await user.tab();
-    expect(screen.getByRole('link', { name: /public event/i })).toHaveFocus();
+    expect(screen.getByRole('link', { name: /back to event/i })).toHaveFocus();
+    expect(screen.getByRole('link', { name: /back to event/i })).toHaveAttribute(
+      'href',
+      workspace.event.publicUrl
+    );
+    await user.tab();
+    expect(screen.getByRole('link', { name: /view event/i })).toHaveFocus();
     for (const link of links) {
       await user.tab();
       expect(link).toHaveFocus();

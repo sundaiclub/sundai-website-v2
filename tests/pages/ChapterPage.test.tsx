@@ -141,6 +141,47 @@ describe('/chapters/[chapterSlug] public chapter page', () => {
       expect(findMailingListAction()).toBeInTheDocument();
     });
     expect(screen.queryByText(/mailchimp-audience-42/i)).not.toBeInTheDocument();
+    expect(screen.getByAltText(/sundai boston chapter/i)).toHaveAttribute(
+      'src',
+      expect.stringContaining('sundai_logo_light_horizontal.svg')
+    );
+  });
+
+  it('shows chapter and event artwork with a Sundai fallback for missing images', async () => {
+    mockChapterFetch({
+      ...bostonChapter,
+      heroImage: {
+        id: 'chapter-image',
+        url: 'https://cdn.example.com/chapter.webp',
+        alt: 'Boston chapter mark',
+      },
+      upcomingEvents: [
+        {
+          ...bostonChapter.upcomingEvents[0],
+          image: {
+            id: 'event-image',
+            url: 'https://cdn.example.com/event.webp',
+            alt: 'Demo Night artwork',
+          },
+        },
+        bostonChapter.upcomingEvents[1],
+      ],
+    });
+
+    renderChapterPage();
+
+    expect(await screen.findByAltText('Boston chapter mark')).toHaveAttribute(
+      'src',
+      'https://cdn.example.com/chapter.webp'
+    );
+    expect(screen.getByAltText('Demo Night artwork')).toHaveAttribute(
+      'src',
+      'https://cdn.example.com/event.webp'
+    );
+    expect(screen.getByAltText('Boston Agent Jam event')).toHaveAttribute(
+      'src',
+      expect.stringContaining('sundai_logo_light_horizontal.svg')
+    );
   });
 
   it('links each upcoming event to its native public event detail page', async () => {

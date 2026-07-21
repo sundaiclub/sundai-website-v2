@@ -12,6 +12,7 @@ type EventCommunicationsModule = {
   resolveEventCommunicationAudience: (input: {
     registrations: Registration[];
     audienceType: AudienceType;
+    audienceTypes?: AudienceType[];
     selectedHackerIds?: string[];
     channel: 'EMAIL' | 'SMS';
     smsConsentVersion?: string;
@@ -148,6 +149,30 @@ describe('event communication audience resolution', () => {
     const audience = resolve(rows, { audienceType: 'ACTIVE_REGISTERED' });
     expect(audience.recipients.map(row => row.hackerId).sort()).toEqual([
       'hacker-approved',
+      'hacker-pending',
+      'hacker-waitlisted',
+    ]);
+  });
+
+  it('combines selected registration-status audiences without duplicating recipients', () => {
+    const rows = ['PENDING', 'APPROVED', 'WAITLISTED', 'DECLINED'].map(status =>
+      registration({
+        id: `registration-${status.toLowerCase()}`,
+        status,
+        hacker: {
+          ...registration().hacker,
+          id: `hacker-${status.toLowerCase()}`,
+        },
+      })
+    );
+
+    const audience = resolve(rows, {
+      audienceType: 'PENDING',
+      audienceTypes: ['PENDING', 'WAITLISTED', 'DECLINED'],
+    });
+
+    expect(audience.recipients.map(row => row.hackerId).sort()).toEqual([
+      'hacker-declined',
       'hacker-pending',
       'hacker-waitlisted',
     ]);

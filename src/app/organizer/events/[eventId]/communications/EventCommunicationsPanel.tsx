@@ -45,17 +45,25 @@ type CommunicationDetail = CommunicationSummary & {
   }>;
 };
 
+type RegistrationAudience = Exclude<
+  EventCommunicationAudience,
+  'ACTIVE_REGISTERED' | 'SELECTED'
+>;
+
 const audiences: Array<{
-  value: EventCommunicationAudience;
+  value: RegistrationAudience;
   label: string;
 }> = [
-  { value: 'ACTIVE_REGISTERED', label: 'Active registered users' },
   { value: 'PENDING', label: 'Pending' },
   { value: 'APPROVED', label: 'Approved' },
   { value: 'WAITLISTED', label: 'Waitlisted' },
   { value: 'DECLINED', label: 'Declined' },
-  { value: 'SELECTED', label: 'Selected users' },
 ];
+
+type DraftPreview = {
+  id: string;
+  preview: EventCommunicationPreview;
+};
 
 export default function EventCommunicationsPanel({
   eventId,
@@ -74,15 +82,15 @@ export default function EventCommunicationsPanel({
   const [loadState, setLoadState] = useState<'loading' | 'ready' | 'error'>(
     'loading'
   );
-  const [channel, setChannel] = useState<EventCommunicationChannel>('EMAIL');
-  const [audience, setAudience] =
-    useState<EventCommunicationAudience>('APPROVED');
+  const [channels, setChannels] = useState<EventCommunicationChannel[]>([
+    'EMAIL',
+  ]);
+  const [selectedAudiences, setSelectedAudiences] = useState<
+    RegistrationAudience[]
+  >(['APPROVED']);
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
-  const [draftId, setDraftId] = useState<string | null>(null);
-  const [preview, setPreview] = useState<EventCommunicationPreview | null>(
-    null
-  );
+  const [draftPreviews, setDraftPreviews] = useState<DraftPreview[]>([]);
   const [sending, setSending] = useState(false);
   const [notice, setNotice] = useState('');
   const [detail, setDetail] = useState<CommunicationDetail | null>(null);
@@ -105,6 +113,17 @@ export default function EventCommunicationsPanel({
         setHistory(payload.items ?? []);
         if (payload.providerAvailability) {
           setProviders(payload.providerAvailability);
+          setChannels(current => {
+            const available = current.filter(channel =>
+              channel === 'EMAIL'
+                ? payload.providerAvailability!.email.available
+                : payload.providerAvailability!.sms.available
+            );
+            if (available.length > 0) return available;
+            if (payload.providerAvailability!.email.available) return ['EMAIL'];
+            if (payload.providerAvailability!.sms.available) return ['SMS'];
+            return [];
+          });
         }
         setLoadState('ready');
       })
@@ -116,76 +135,122 @@ export default function EventCommunicationsPanel({
     };
   }, [eventId]);
 
-  function resetComposer() {
-    setChannel('EMAIL');
-    setAudience('APPROVED');
-    setSubject('');
-    setBody('');
-    setDraftId(null);
-    setPreview(null);
-    setNotice('');
+  function toggleChannel(channel: EventCommunicationChannel) {
+    setChannels(current =>
+      current.includes(channel)
+        ? current.filter(value => value !== channel)
+        : [...current, channel]
+    );
+    setDraftPreviews([]);
+  }
+
+  function toggleAudience(audience: RegistrationAudience) {
+    setSelectedAudiences(current =>
+      current.includes(audience)
+        ? current.filter(value => value !== audience)
+        : [...current, audience]
+    );
+    setDraftPreviews([]);
+  }
+
+  function toggleAllAudiences() {
+    setSelectedAudiences(current =>
+      current.length === audiences.length
+        ? []
+        : audiences.map(option => option.value)
+    );
+    setDraftPreviews([]);
   }
 
   async function saveAndPreview() {
     setNotice('');
-    const draftResponse = await fetch(`/api/events/${eventId}/blasts`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        channel,
-        subject: channel === 'EMAIL' ? subject : null,
-        body,
-        audienceType: audience,
-        audienceDefinition: {},
-      }),
-    });
-    if (!draftResponse.ok) {
-      setNotice('Unable to save the communication draft.');
-      return;
-    }
-    const draft = (await draftResponse.json()) as { id: string };
-    setDraftId(draft.id);
-    const previewResponse = await fetch(
-      `/api/events/${eventId}/blasts/${draft.id}/preview`,
-      { method: 'POST' }
-    );
-    if (!previewResponse.ok) {
-      setNotice('Unable to preview this audience.');
-      return;
-    }
-    setPreview((await previewResponse.json()) as EventCommunicationPreview);
-  }
-
-  async function confirmSend() {
-    if (!draftId || !preview) return;
-    setSending(true);
-    setNotice('');
-    try {
-      const response = await fetch(
-        `/api/events/${eventId}/blasts/${draftId}/send`,
-        {
+    const audienceType = selectedAudiences[0];
+    const previews = await Promise.all(
+      channels.map(async channel => {
+        const draftResponse = await fetch(`/api/events/${eventId}/blasts`, {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({
-            previewFingerprint: preview.previewFingerprint,
+            channel,
+            subject: channel === 'EMAIL' ? subject : null,
+            body,
+            audienceType,
+            audienceDefinition: { statuses: selectedAudiences },
           }),
+        });
+        if (!draftResponse.ok) {
+          throw new Error('Unable to save the communication draft.');
         }
+        const draft = (await draftResponse.json()) as { id: string };
+        const previewResponse = await fetch(
+          `/api/events/${eventId}/blasts/${draft.id}/preview`,
+          { method: 'POST' }
+        );
+        if (!previewResponse.ok) {
+          throw new Error('Unable to preview this audience.');
+        }
+        return {
+          id: draft.id,
+          preview: (await previewResponse.json()) as EventCommunicationPreview,
+        };
+      })
+    ).catch((error: Error) => {
+      setNotice(error.message);
+      return null;
+    });
+    if (previews) setDraftPreviews(previews);
+  }
+
+  async function confirmSend() {
+    if (draftPreviews.length === 0) return;
+    setSending(true);
+    setNotice('');
+    try {
+      const results = await Promise.all(
+        draftPreviews.map(async draft => {
+          const response = await fetch(
+            `/api/events/${eventId}/blasts/${draft.id}/send`,
+            {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                previewFingerprint: draft.preview.previewFingerprint,
+              }),
+            }
+          );
+          return { draft, response, payload: await response.json() };
+        })
       );
-      const payload = await response.json();
-      if (response.status === 409) {
-        setPreview(payload.preview as EventCommunicationPreview);
+      const changed = results.filter(result => result.response.status === 409);
+      if (changed.length > 0) {
+        setDraftPreviews(current =>
+          current.map(draft => {
+            const replacement = changed.find(
+              result => result.draft.id === draft.id
+            );
+            return replacement
+              ? {
+                  id: draft.id,
+                  preview: replacement.payload
+                    .preview as EventCommunicationPreview,
+                }
+              : draft;
+          })
+        );
         setNotice(
           'Audience changed. Review the updated audience and confirm again.'
         );
         return;
       }
-      if (!response.ok) {
+      if (results.some(result => !result.response.ok)) {
         setNotice('Message delivery failed. You can retry safely.');
         return;
       }
-      setHistory(current => [payload as CommunicationSummary, ...current]);
-      setPreview(null);
-      setDraftId(null);
+      setHistory(current => [
+        ...results.map(result => result.payload as CommunicationSummary),
+        ...current,
+      ]);
+      setDraftPreviews([]);
       setNotice('Communication sent.');
     } finally {
       setSending(false);
@@ -222,15 +287,6 @@ export default function EventCommunicationsPanel({
       <ManagementSection
         title="Communications"
         description="Draft, preview, and send messages to current registration audiences."
-        actions={
-          <button
-            className={classes.primaryButton}
-            onClick={resetComposer}
-            type="button"
-          >
-            New message
-          </button>
-        }
       >
         <div className="mb-5 grid gap-3 sm:grid-cols-2">
           <div className={`${classes.subtlePanel} p-4`}>
@@ -263,57 +319,86 @@ export default function EventCommunicationsPanel({
           </ManagementAlert>
         )}
 
-        <div className={`${classes.subtlePanel} space-y-4 p-4`}>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <label>
-              <span className="mb-1 block text-sm font-bold">Channel</span>
-              <select
-                className={classes.input}
-                onChange={event =>
-                  setChannel(event.target.value as EventCommunicationChannel)
-                }
-                value={channel}
-              >
-                <option disabled={!providers.email.available} value="EMAIL">
-                  Email
-                </option>
-                <option disabled={!providers.sms.available} value="SMS">
-                  SMS
-                </option>
-              </select>
-            </label>
-            <label>
-              <span className="mb-1 block text-sm font-bold">Audience</span>
-              <select
-                className={classes.input}
-                onChange={event =>
-                  setAudience(event.target.value as EventCommunicationAudience)
-                }
-                value={audience}
-              >
+        <div className={`${classes.subtlePanel} space-y-5 p-4 sm:p-5`}>
+          <div className="grid gap-5 lg:grid-cols-2">
+            <fieldset>
+              <legend className="mb-2 text-sm font-bold">Channels</legend>
+              <div className="flex flex-wrap gap-x-6 gap-y-3">
+                {(['EMAIL', 'SMS'] as const).map(option => {
+                  const provider =
+                    providers[option === 'EMAIL' ? 'email' : 'sms'];
+                  return (
+                    <label
+                      className={`flex items-center gap-2 text-sm ${
+                        provider.available ? '' : classes.mutedText
+                      }`}
+                      key={option}
+                    >
+                      <input
+                        checked={channels.includes(option)}
+                        className={classes.checkbox}
+                        disabled={!provider.available}
+                        onChange={() => toggleChannel(option)}
+                        type="checkbox"
+                      />
+                      {option === 'EMAIL' ? 'Email' : 'SMS'}
+                    </label>
+                  );
+                })}
+              </div>
+            </fieldset>
+            <fieldset>
+              <legend className="mb-2 text-sm font-bold">Audience</legend>
+              <div className="flex flex-wrap gap-x-6 gap-y-3">
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    checked={selectedAudiences.length === audiences.length}
+                    className={classes.checkbox}
+                    onChange={toggleAllAudiences}
+                    type="checkbox"
+                  />
+                  All
+                </label>
                 {audiences.map(option => (
-                  <option key={option.value} value={option.value}>
+                  <label
+                    className="flex items-center gap-2 text-sm"
+                    key={option.value}
+                  >
+                    <input
+                      checked={selectedAudiences.includes(option.value)}
+                      className={classes.checkbox}
+                      onChange={() => toggleAudience(option.value)}
+                      type="checkbox"
+                    />
                     {option.label}
-                  </option>
+                  </label>
                 ))}
-              </select>
-            </label>
+              </div>
+            </fieldset>
           </div>
-          {channel === 'EMAIL' && (
-            <label>
-              <span className="mb-1 block text-sm font-bold">Subject</span>
-              <input
-                className={classes.input}
-                onChange={event => setSubject(event.target.value)}
-                value={subject}
-              />
-            </label>
-          )}
-          <label>
+          <label className="block">
+            <span className="mb-1 block text-sm font-bold">Subject</span>
+            <input
+              className={`${classes.input} w-full`}
+              disabled={!channels.includes('EMAIL')}
+              onChange={event => {
+                setSubject(event.target.value);
+                setDraftPreviews([]);
+              }}
+              value={subject}
+            />
+            <span className={`mt-1 block text-xs ${classes.mutedText}`}>
+              The subject is only used for emails.
+            </span>
+          </label>
+          <label className="block">
             <span className="mb-1 block text-sm font-bold">Message body</span>
             <textarea
-              className={classes.textarea}
-              onChange={event => setBody(event.target.value)}
+              className={`${classes.textarea} w-full resize-y`}
+              onChange={event => {
+                setBody(event.target.value);
+                setDraftPreviews([]);
+              }}
               rows={5}
               value={body}
             />
@@ -322,8 +407,9 @@ export default function EventCommunicationsPanel({
             className={classes.primaryButton}
             disabled={
               !body.trim() ||
-              (channel === 'EMAIL' && !subject.trim()) ||
-              !providers[channel === 'EMAIL' ? 'email' : 'sms'].available
+              channels.length === 0 ||
+              selectedAudiences.length === 0 ||
+              (channels.includes('EMAIL') && !subject.trim())
             }
             onClick={saveAndPreview}
             type="button"
@@ -332,20 +418,28 @@ export default function EventCommunicationsPanel({
           </button>
         </div>
 
-        {preview && (
-          <div className={`${classes.subtlePanel} mt-5 p-4`}>
+        {draftPreviews.length > 0 && (
+          <div className={`${classes.subtlePanel} mt-5 p-4 sm:p-5`}>
             <h3 className="font-bold">Confirm audience</h3>
-            <p className="mt-2 text-lg font-bold">
-              {preview.eligibleCount} eligible recipients
-            </p>
-            <ul className={`mt-2 space-y-1 text-sm ${classes.mutedText}`}>
-              <li>{preview.exclusions.cancelled} cancelled</li>
-              <li>{preview.exclusions.missingContact} missing contact</li>
-              <li>
-                {preview.exclusions.preferenceDisabled} preference disabled
-              </li>
-              <li>{preview.exclusions.ineligible} ineligible</li>
-            </ul>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              {draftPreviews.map(({ id, preview }) => (
+                <div className="rounded-md border p-3" key={id}>
+                  <p className="text-sm font-bold">
+                    {preview.channel === 'EMAIL' ? 'Email' : 'SMS'} ·{' '}
+                    {preview.eligibleCount} eligible recipients
+                  </p>
+                  <ul className={`mt-2 space-y-1 text-sm ${classes.mutedText}`}>
+                    <li>{preview.exclusions.cancelled} cancelled</li>
+                    <li>{preview.exclusions.missingContact} missing contact</li>
+                    <li>
+                      {preview.exclusions.preferenceDisabled} preference
+                      disabled
+                    </li>
+                    <li>{preview.exclusions.ineligible} ineligible</li>
+                  </ul>
+                </div>
+              ))}
+            </div>
             <button
               className={`${classes.primaryButton} mt-4`}
               disabled={sending}

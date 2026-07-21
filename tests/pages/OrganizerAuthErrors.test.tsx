@@ -46,18 +46,6 @@ describe('organizer auth error handling', () => {
     })
   })
 
-  it('shows a signed-out error instead of the organizer event list shell', async () => {
-    global.fetch = jest.fn(() => jsonResponse('Unauthorized', 401)) as jest.Mock
-    const OrganizerEventsPage =
-      require('../../src/app/organizer/events/page').default
-
-    render(<OrganizerEventsPage />)
-
-    expect(await screen.findByText(/please sign in/i)).toBeInTheDocument()
-    expect(screen.queryByText(/no organizer events are available/i)).not.toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: /new event/i })).not.toBeInTheDocument()
-  })
-
   it('shows permission denied instead of event settings controls', async () => {
     global.fetch = jest.fn(() => jsonResponse('Forbidden', 403)) as jest.Mock
     const EventSettingsPage =

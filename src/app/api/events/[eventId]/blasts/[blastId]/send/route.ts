@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { requireEventCommunicationsManager } from '@/lib/eventManagementApi';
 import {
+  EVENT_COMMUNICATION_STATUS_AUDIENCES,
   finalizeEventCommunication,
   fingerprintEventCommunicationAudience,
   resolveEventCommunicationAudience,
@@ -94,10 +95,22 @@ export async function POST(
     const bannedHackerIds = new Set(activeBans.map(ban => ban.hackerId));
     const definition = communication.audienceDefinitionJson as {
       hackerIds?: unknown;
+      statuses?: unknown;
     } | null;
     const selectedHackerIds = Array.isArray(definition?.hackerIds)
       ? definition.hackerIds.filter(
           (value): value is string => typeof value === 'string'
+        )
+      : [];
+    const audienceTypes = Array.isArray(definition?.statuses)
+      ? definition.statuses.filter(
+          (
+            value
+          ): value is 'PENDING' | 'APPROVED' | 'WAITLISTED' | 'DECLINED' =>
+            typeof value === 'string' &&
+            EVENT_COMMUNICATION_STATUS_AUDIENCES.includes(
+              value as (typeof EVENT_COMMUNICATION_STATUS_AUDIENCES)[number]
+            )
         )
       : [];
     const audience = resolveEventCommunicationAudience({
@@ -110,6 +123,7 @@ export async function POST(
         membership: membershipByHacker.get(registration.hackerId) ?? null,
       })),
       audienceType: communication.audienceType,
+      audienceTypes,
       selectedHackerIds,
       channel: communication.channel,
       smsConsentVersion: process.env.SMS_CONSENT_VERSION,
@@ -117,6 +131,7 @@ export async function POST(
     const currentFingerprint = fingerprintEventCommunicationAudience({
       channel: communication.channel,
       audienceType: communication.audienceType,
+      audienceTypes,
       recipients: audience.recipients,
     });
     const preview = {

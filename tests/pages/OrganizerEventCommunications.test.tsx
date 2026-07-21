@@ -42,7 +42,10 @@ const sentCommunication = {
   sentAt: '2026-07-17T14:00:00.000Z',
 };
 
-function mockCommunicationFetch({ changedAudience = false } = {}) {
+function mockCommunicationFetch({
+  changedAudience = false,
+  smsAvailable = false,
+} = {}) {
   global.fetch = jest.fn((input: RequestInfo | URL, init?: RequestInit) => {
     const url = requestUrl(input);
     if (url === `/api/events/${eventId}/blasts` && !init?.method) {
@@ -50,27 +53,30 @@ function mockCommunicationFetch({ changedAudience = false } = {}) {
         items: [sentCommunication],
         providerAvailability: {
           email: { available: true },
-          sms: {
-            available: false,
-            reason:
-              'SMS requires provider configuration and active consent copy.',
-          },
+          sms: smsAvailable
+            ? { available: true }
+            : {
+                available: false,
+                reason:
+                  'SMS requires provider configuration and active consent copy.',
+              },
         },
       });
     }
     if (url === `/api/events/${eventId}/blasts` && init?.method === 'POST') {
+      const body = JSON.parse(String(init.body));
       return jsonResponse(
         {
-          id: 'blast-draft',
+          id: `blast-draft-${String(body.channel).toLowerCase()}`,
           status: 'DRAFT',
-          ...JSON.parse(String(init.body)),
+          ...body,
         },
         201
       );
     }
-    if (url.endsWith('/blasts/blast-draft/preview')) {
+    if (url.includes('/blasts/blast-draft-') && url.endsWith('/preview')) {
       return jsonResponse({
-        channel: 'EMAIL',
+        channel: url.includes('blast-draft-sms') ? 'SMS' : 'EMAIL',
         eligibleCount: changedAudience ? 41 : 42,
         exclusions: {
           cancelled: changedAudience ? 1 : 0,
@@ -83,13 +89,13 @@ function mockCommunicationFetch({ changedAudience = false } = {}) {
           : 'sha256:original',
       });
     }
-    if (url.endsWith('/blasts/blast-draft/send')) {
+    if (url.includes('/blasts/blast-draft-') && url.endsWith('/send')) {
       if (changedAudience) {
         return jsonResponse(
           {
             error: 'Audience changed',
             preview: {
-              channel: 'EMAIL',
+              channel: url.includes('blast-draft-sms') ? 'SMS' : 'EMAIL',
               eligibleCount: 41,
               exclusions: {
                 cancelled: 1,
@@ -103,7 +109,16 @@ function mockCommunicationFetch({ changedAudience = false } = {}) {
           409
         );
       }
-      return jsonResponse({ ...sentCommunication, id: 'blast-draft' });
+      return jsonResponse({
+        ...sentCommunication,
+        id: url.includes('blast-draft-sms')
+          ? 'blast-draft-sms'
+          : 'blast-draft-email',
+        channel: url.includes('blast-draft-sms') ? 'SMS' : 'EMAIL',
+        subject: url.includes('blast-draft-sms')
+          ? null
+          : sentCommunication.subject,
+      });
     }
     if (url === `/api/events/${eventId}/blasts/${sentCommunication.id}`) {
       return jsonResponse({
@@ -147,15 +162,7 @@ function renderPage() {
 }
 
 async function composeEmail() {
-  fireEvent.click(
-    await screen.findByRole('button', { name: /new (message|blast)/i })
-  );
-  fireEvent.change(screen.getByLabelText(/channel/i), {
-    target: { value: 'EMAIL' },
-  });
-  fireEvent.change(screen.getByLabelText(/audience/i), {
-    target: { value: 'APPROVED' },
-  });
+  await screen.findByRole('checkbox', { name: /email/i });
   fireEvent.change(screen.getByLabelText(/subject/i), {
     target: { value: 'Tomorrow’s build night' },
   });
@@ -177,7 +184,7 @@ describe('/organizer/events/[eventId]/communications', () => {
     expect(await screen.findByText(/email.*available/i)).toBeInTheDocument();
     expect(screen.getByText(/sms.*unavailable/i)).toBeInTheDocument();
     expect(screen.getByText(/active consent copy/i)).toBeInTheDocument();
-    expect(screen.getByRole('option', { name: /sms/i })).toBeDisabled();
+    expect(screen.getByRole('checkbox', { name: /^sms$/i })).toBeDisabled();
   });
 
   it('composes an email with channel, audience, subject, and body', async () => {
@@ -196,6 +203,51 @@ describe('/organizer/events/[eventId]/communications', () => {
         })
       )
     );
+  });
+
+  it('uses checkboxes for combined channels and registration-status audiences', async () => {
+    mockCommunicationFetch({ smsAvailable: true });
+    renderPage();
+
+    const email = await screen.findByRole('checkbox', { name: /^email$/i });
+    const sms = screen.getByRole('checkbox', { name: /^sms$/i });
+    expect(email).toBeChecked();
+    fireEvent.click(sms);
+    fireEvent.click(screen.getByRole('checkbox', { name: /pending/i }));
+    fireEvent.click(screen.getByRole('checkbox', { name: /waitlisted/i }));
+    fireEvent.change(screen.getByLabelText(/subject/i), {
+      target: { value: 'Build night update' },
+    });
+    fireEvent.change(screen.getByLabelText(/message body/i), {
+      target: { value: 'Doors open at 9:30.' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /save.*preview/i }));
+
+    await waitFor(() => {
+      const createCalls = (global.fetch as jest.Mock).mock.calls.filter(
+        ([url, init]) =>
+          url === `/api/events/${eventId}/blasts` && init?.method === 'POST'
+      );
+      expect(createCalls).toHaveLength(2);
+      expect(createCalls.map(([, init]) => JSON.parse(init.body))).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            channel: 'EMAIL',
+            audienceDefinition: {
+              statuses: ['APPROVED', 'PENDING', 'WAITLISTED'],
+            },
+          }),
+          expect.objectContaining({
+            channel: 'SMS',
+            subject: null,
+          }),
+        ])
+      );
+    });
+    expect(screen.getByText(/subject is only used for emails/i)).toBeVisible();
+    expect(
+      screen.queryByRole('button', { name: /new message/i })
+    ).not.toBeInTheDocument();
   });
 
   it('shows eligible and aggregate exclusion counts and requires explicit confirmation', async () => {

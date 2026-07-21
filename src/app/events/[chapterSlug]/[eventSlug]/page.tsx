@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import { auth, currentUser } from '@clerk/nextjs/server';
 import { EventDetailSections } from '@/app/components/EventDetailSections';
+import { EventHeroImage } from '@/app/components/EventHeroImage';
 import {
   ManagementHeader,
   ManagementLinkButton,
@@ -91,25 +92,20 @@ export default async function PublicEventDetailPage({
         </ManagementLinkButton>
       </div>
 
+      <EventHeroImage image={event.image} title={event.title} />
+
       <ManagementHeader
         eyebrow={event.chapterName}
         title={event.title}
         description={event.description}
         actions={
           <>
-            {event.viewerCanManageRegistrations && (
+            {event.viewerCanManageEvent && (
               <ManagementLinkButton
-                href={`/organizer/events/${event.id}/registrations`}
+                href={`/organizer/events/${event.id}`}
                 variant="primary"
               >
-                Manage attendees
-              </ManagementLinkButton>
-            )}
-            {event.viewerCanEditEvent && (
-              <ManagementLinkButton
-                href={`/organizer/events/${event.id}/settings`}
-              >
-                Edit event
+                Manage
               </ManagementLinkButton>
             )}
             <PublicEventStatusBadge status={event.publicStatus} />

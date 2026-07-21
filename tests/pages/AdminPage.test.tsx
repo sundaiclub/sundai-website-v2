@@ -45,8 +45,8 @@ describe('AdminPage', () => {
       screen.getByRole('link', { name: 'Global moderation' })
     ).toHaveAttribute('href', '/admin/bans');
     expect(
-      screen.getByRole('link', { name: 'Organizer events' })
-    ).toHaveAttribute('href', '/organizer/events');
+      screen.queryByRole('link', { name: 'Organizer events' })
+    ).not.toBeInTheDocument();
   });
 
   it('should render permission denied message when user is not admin', () => {

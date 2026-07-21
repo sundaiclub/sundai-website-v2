@@ -259,7 +259,7 @@ describe('/organizer/events/[eventId]/settings', () => {
         `/api/events/${draftEventSettings.id}`,
         { method: 'DELETE' }
       );
-      expect(mockPush).toHaveBeenCalledWith('/organizer/events');
+      expect(mockPush).toHaveBeenCalledWith('/events');
       expect(mockRefresh).toHaveBeenCalled();
     });
   });

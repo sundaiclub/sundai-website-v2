@@ -136,7 +136,9 @@ describe('/api/events/[eventId]/staff', () => {
 
     mockActor(siteAdmin, mcHacker);
     mockMembershipLookup();
-    prisma.event.findUnique.mockResolvedValue(event);
+    prisma.event.findUnique.mockImplementation(async ({ where }: any) =>
+      where?.id === event.id ? event : null
+    );
     prisma.eventStaff.upsert.mockResolvedValue(assignedStaff);
 
     const response = await POST_EVENT_STAFF(

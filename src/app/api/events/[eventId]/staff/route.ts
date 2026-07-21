@@ -49,7 +49,7 @@ export async function POST(
       select: { id: true, chapterId: true },
     });
     if (!event) return notFound();
-    if (!(await canManageEventSettings(prisma, actor.id, event.chapterId))) {
+    if (!(await canManageEventSettings(prisma, actor.id, event.id))) {
       return forbidden();
     }
 

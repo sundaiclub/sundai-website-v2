@@ -189,7 +189,13 @@ describe('public event helpers', () => {
   const now = new Date('2026-06-23T12:00:00.000Z');
 
   it('redacts approved-only details and approved calendar text from unapproved viewers', () => {
-    const event = buildPublicEvent();
+    const event = buildPublicEvent({
+      image: {
+        id: 'event-image',
+        url: 'https://cdn.example.com/demo-night.webp',
+        alt: 'Demo Night artwork',
+      },
+    });
 
     const publicDetail = redactPublicEventForViewer(event, {
       approvedCalendarDetails: true,
@@ -198,6 +204,7 @@ describe('public event helpers', () => {
 
     expect(publicDetail.approvedDetailsVisible).toBe(false);
     expect(publicDetail.approvedDetailsJson).toBeNull();
+    expect(publicDetail.image).toEqual(event.image);
     expect(publicDetail.addToCalendar).toEqual({
       title: 'Demo Night',
       description: 'Public event description.',
@@ -264,6 +271,13 @@ describe('public event helpers', () => {
         startTime: { gte: now },
       },
       include: {
+        image: {
+          select: {
+            id: true,
+            url: true,
+            alt: true,
+          },
+        },
         chapter: {
           select: {
             id: true,
@@ -523,6 +537,7 @@ describe('public event helpers', () => {
     expect(detail).toEqual(
       expect.objectContaining({
         viewerCanEditEvent: true,
+        viewerCanManageEvent: true,
         viewerCanManageRegistrations: true,
       })
     );
@@ -555,6 +570,7 @@ describe('public event helpers', () => {
       expect(detail).toEqual(
         expect.objectContaining({
           viewerCanEditEvent: false,
+          viewerCanManageEvent: true,
           viewerCanManageRegistrations: expected,
         })
       );

@@ -35,7 +35,13 @@ Returns event identity, capability flags, overview aggregates, staff, public URL
     "viewNoteHistory": false
   },
   "counts": {
-    "registrations": { "pending": 10, "approved": 42, "waitlisted": 7, "declined": 3, "cancelled": 2 },
+    "registrations": {
+      "pending": 10,
+      "approved": 42,
+      "waitlisted": 7,
+      "declined": 3,
+      "cancelled": 2
+    },
     "projects": { "total": 12, "submittedCards": 9 },
     "pitch": { "queued": 8, "pitched": 4, "highlighted": 2 },
     "materials": 6,
@@ -151,11 +157,12 @@ Creates a draft.
   "subject": "Tomorrow's build night",
   "body": "Doors open at 9:30.",
   "audienceType": "APPROVED",
-  "audienceDefinition": {}
+  "audienceDefinition": { "statuses": ["PENDING", "APPROVED"] }
 }
 ```
 
 Allowed audiences: `ACTIVE_REGISTERED`, `PENDING`, `APPROVED`, `WAITLISTED`, `DECLINED`, and `SELECTED`. Checked-in/no-show audiences are rejected.
+The optional `audienceDefinition.statuses` array combines one or more registration-status audiences into a single recipient union. Each channel remains a separate draft so its consent, preview, delivery outcome, and history are independently auditable.
 
 ### `PATCH /api/events/[eventId]/blasts/[blastId]`
 

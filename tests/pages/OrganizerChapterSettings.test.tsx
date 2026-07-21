@@ -353,6 +353,7 @@ describe('/organizer/chapters/[chapterSlug]/settings', () => {
       /what are you hoping to build/i,
       /application template/i,
     )
+    expect(screen.queryByText(/site required questions/i)).not.toBeInTheDocument()
     expect(global.fetch).toHaveBeenCalledWith(
       `/api/application-templates?chapterId=${chapter.id}`,
     )

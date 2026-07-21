@@ -16,6 +16,7 @@ import {
 import { useUserContext } from '../../contexts/UserContext';
 import type {
   ChapterLanding,
+  ChapterLandingEvent,
   ChapterMembershipSummary,
 } from '@/types/event-management';
 
@@ -269,6 +270,77 @@ export default function ChapterLandingPage({
 
   const eventChapterSlug = chapter?.slug ?? params.chapterSlug;
   const pendingEvents = chapter?.pendingEvents ?? [];
+  const placeholderLogo = classes.isDarkMode
+    ? '/images/logos/sundai_logo_dark_horizontal.svg'
+    : '/images/logos/sundai_logo_light_horizontal.svg';
+
+  function eventCard(
+    event: ChapterLandingEvent,
+    href: string,
+    options: { showState?: boolean; showEdit?: boolean } = {}
+  ) {
+    return (
+      <article
+        className={`relative overflow-hidden ${classes.panel} transition hover:-translate-y-0.5 hover:shadow-md`}
+        key={event.id}
+      >
+        <Link
+          aria-label={`View ${event.title}`}
+          className="group block rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-gray-500"
+          href={href}
+        >
+          <div
+            className={`${classes.subtlePanel} relative aspect-[16/9] w-full overflow-hidden`}
+          >
+            <Image
+              alt={event.image?.alt || `${event.title} event`}
+              className={event.image?.url ? 'object-cover' : 'object-contain p-8'}
+              fill
+              src={event.image?.url || placeholderLogo}
+              sizes="(min-width: 640px) 420px, 100vw"
+              unoptimized={Boolean(event.image?.url)}
+            />
+          </div>
+          <div className="p-4">
+            <div className="font-semibold group-hover:underline">
+              {event.title}
+            </div>
+            <div className={`mt-1 text-sm ${classes.mutedText}`}>
+              {[
+                event.publicLocation,
+                event.startTime
+                  ? new Date(event.startTime).toLocaleDateString()
+                  : null,
+              ]
+                .filter(Boolean)
+                .join(' · ')}
+            </div>
+            {options.showState && (
+              <div className="mt-4 flex flex-wrap items-center gap-2">
+                {event.status && (
+                  <ManagementBadge>{event.status}</ManagementBadge>
+                )}
+                {event.visibility && (
+                  <ManagementBadge>{event.visibility}</ManagementBadge>
+                )}
+              </div>
+            )}
+          </div>
+        </Link>
+        {options.showEdit && (
+          <div className="px-4 pb-4">
+            <Link
+              aria-label={`Edit ${event.title}`}
+              className={classes.secondaryButton}
+              href={`/organizer/events/${event.id}/settings`}
+            >
+              Edit
+            </Link>
+          </div>
+        )}
+      </article>
+    );
+  }
 
   return (
     <ManagementPage maxWidth="max-w-4xl">
@@ -277,15 +349,17 @@ export default function ChapterLandingPage({
           <ManagementAlert tone="danger">{loadError}</ManagementAlert>
         </div>
       )}
-      {chapter?.heroImage?.url && (
-        <div className="relative mb-6 aspect-[16/7] overflow-hidden rounded-lg">
+      {chapter && (
+        <div
+          className={`${classes.subtlePanel} relative mb-6 aspect-[16/7] overflow-hidden rounded-lg`}
+        >
           <Image
-            alt={chapter.heroImage.alt || `${chapter.name} chapter`}
-            className="object-cover"
+            alt={chapter.heroImage?.alt || `${chapter.name} chapter`}
+            className={chapter.heroImage?.url ? 'object-cover' : 'object-contain p-10'}
             fill
-            src={chapter.heroImage.url}
+            src={chapter.heroImage?.url || placeholderLogo}
             sizes="(min-width: 1024px) 896px, 100vw"
-            unoptimized
+            unoptimized={Boolean(chapter.heroImage?.url)}
           />
         </div>
       )}
@@ -336,131 +410,57 @@ export default function ChapterLandingPage({
             title="Pending events"
             description="Draft, paused, private, and unlisted events for this chapter."
           >
-            <div className={`divide-y ${classes.divider}`}>
-              {pendingEvents.map(event => (
-                <Link
-                  key={event.id}
-                  className="group grid gap-3 rounded-md px-3 py-3 outline-none transition hover:bg-gray-500/5 focus-visible:ring-2 focus-visible:ring-gray-500 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
-                  href={`/organizer/events/${event.id}/settings`}
-                >
-                  <div className="min-w-0">
-                    <span className="font-semibold group-hover:underline">
-                      {event.title}
-                    </span>
-                    <div className={`mt-1 text-sm ${classes.mutedText}`}>
-                      {[
-                        event.publicLocation,
-                        event.startTime
-                          ? new Date(event.startTime).toLocaleDateString()
-                          : null,
-                      ]
-                        .filter(Boolean)
-                        .join(' · ')}
-                    </div>
-                  </div>
-                  <div className="flex flex-wrap gap-2 sm:justify-end">
-                    {event.status && (
-                      <ManagementBadge>{event.status}</ManagementBadge>
-                    )}
-                    {event.visibility && (
-                      <ManagementBadge>{event.visibility}</ManagementBadge>
-                    )}
-                  </div>
-                </Link>
-              ))}
+            <div className="grid gap-4 sm:grid-cols-2">
+              {pendingEvents.map(event =>
+                eventCard(event, `/organizer/events/${event.id}/settings`, {
+                  showState: true,
+                })
+              )}
               {pendingEvents.length === 0 && (
-                <ManagementEmptyState>
-                  No pending events are listed.
-                </ManagementEmptyState>
+                <div className="sm:col-span-2">
+                  <ManagementEmptyState>
+                    No pending events are listed.
+                  </ManagementEmptyState>
+                </div>
               )}
             </div>
           </ManagementSection>
         )}
 
         <ManagementSection title="Upcoming events">
-          <div className={`divide-y ${classes.divider}`}>
-            {(chapter?.upcomingEvents ?? []).map(event => (
-              <div
-                key={event.id}
-                className="grid gap-3 rounded-md px-3 py-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
-              >
-                <Link
-                  className="group min-w-0 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-gray-500"
-                  href={`/events/${eventChapterSlug}/${event.slug}`}
-                >
-                  <span className="font-semibold group-hover:underline">
-                    {event.title}
-                  </span>
-                  <div className={`mt-1 text-sm ${classes.mutedText}`}>
-                    {[
-                      event.publicLocation,
-                      event.startTime
-                        ? new Date(event.startTime).toLocaleDateString()
-                        : null,
-                    ]
-                      .filter(Boolean)
-                      .join(' · ')}
-                  </div>
-                </Link>
-                {canManageChapter && (
-                  <Link
-                    aria-label={`Edit ${event.title}`}
-                    className={classes.secondaryButton}
-                    href={`/organizer/events/${event.id}/settings`}
-                  >
-                    Edit
-                  </Link>
-                )}
-              </div>
-            ))}
+          <div className="grid gap-4 sm:grid-cols-2">
+            {(chapter?.upcomingEvents ?? []).map(event =>
+              eventCard(
+                event,
+                `/events/${eventChapterSlug}/${event.slug}`,
+                { showEdit: canManageChapter }
+              )
+            )}
             {(chapter?.upcomingEvents ?? []).length === 0 && (
-              <ManagementEmptyState>
-                No upcoming events are listed.
-              </ManagementEmptyState>
+              <div className="sm:col-span-2">
+                <ManagementEmptyState>
+                  No upcoming events are listed.
+                </ManagementEmptyState>
+              </div>
             )}
           </div>
         </ManagementSection>
 
         <ManagementSection title="Previous events">
-          <div className={`divide-y ${classes.divider}`}>
-            {(chapter?.previousEvents ?? []).map(event => (
-              <div
-                key={event.id}
-                className="grid gap-3 rounded-md px-3 py-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
-              >
-                <Link
-                  className="group min-w-0 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-gray-500"
-                  href={`/events/${eventChapterSlug}/${event.slug}`}
-                >
-                  <span className="font-semibold group-hover:underline">
-                    {event.title}
-                  </span>
-                  <div className={`mt-1 text-sm ${classes.mutedText}`}>
-                    {[
-                      event.publicLocation,
-                      event.startTime
-                        ? new Date(event.startTime).toLocaleDateString()
-                        : null,
-                    ]
-                      .filter(Boolean)
-                      .join(' · ')}
-                  </div>
-                </Link>
-                {canManageChapter && (
-                  <Link
-                    aria-label={`Edit ${event.title}`}
-                    className={classes.secondaryButton}
-                    href={`/organizer/events/${event.id}/settings`}
-                  >
-                    Edit
-                  </Link>
-                )}
-              </div>
-            ))}
+          <div className="grid gap-4 sm:grid-cols-2">
+            {(chapter?.previousEvents ?? []).map(event =>
+              eventCard(
+                event,
+                `/events/${eventChapterSlug}/${event.slug}`,
+                { showEdit: canManageChapter }
+              )
+            )}
             {(chapter?.previousEvents ?? []).length === 0 && (
-              <ManagementEmptyState>
-                No previous events are listed.
-              </ManagementEmptyState>
+              <div className="sm:col-span-2">
+                <ManagementEmptyState>
+                  No previous events are listed.
+                </ManagementEmptyState>
+              </div>
             )}
           </div>
         </ManagementSection>
@@ -541,7 +541,9 @@ export default function ChapterLandingPage({
           <div
             aria-labelledby="notification-preferences-title"
             aria-modal="true"
-            className={`${classes.panel} w-full max-w-md p-5`}
+            className={`${classes.panel} ${
+              classes.isDarkMode ? '!bg-gray-900' : '!bg-white'
+            } w-full max-w-md p-5`}
             onClick={event => event.stopPropagation()}
             role="dialog"
           >

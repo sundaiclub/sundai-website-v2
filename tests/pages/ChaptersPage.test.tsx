@@ -685,7 +685,7 @@ describe('chapter public directory and landing pages', () => {
 
       expect(
         screen.getByRole('dialog', { name: /notification preferences/i })
-      ).toBeInTheDocument();
+      ).toHaveClass('!bg-white');
 
       const notificationsControl = await screen.findByRole('checkbox', {
         name: /notifications|allow notifications/i,

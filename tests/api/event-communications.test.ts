@@ -165,7 +165,9 @@ describe('/api/events/[eventId]/blasts', () => {
     mockOrganizer();
     mockEligibleAudience();
     prisma.$transaction.mockImplementation(async (operation: any) =>
-      typeof operation === 'function' ? operation(prisma) : Promise.all(operation)
+      typeof operation === 'function'
+        ? operation(prisma)
+        : Promise.all(operation)
     );
   });
 
@@ -189,7 +191,9 @@ describe('/api/events/[eventId]/blasts', () => {
 
     expect(response.status).toBe(409);
     expect(await response.json()).toEqual(
-      expect.objectContaining({ error: expect.stringMatching(/sent|immutable/i) })
+      expect.objectContaining({
+        error: expect.stringMatching(/sent|immutable/i),
+      })
     );
     expect(prisma.eventCommunication.update).not.toHaveBeenCalled();
   });
@@ -231,6 +235,61 @@ describe('/api/events/[eventId]/blasts', () => {
     expect(firstBody.exclusions).not.toHaveProperty('banned');
   });
 
+  it('previews the union of selected registration-status audiences', async () => {
+    const pendingRegistration = {
+      ...registrations[0],
+      id: 'registration-pending',
+      hackerId: 'hacker-pending',
+      status: 'PENDING',
+      hacker: {
+        ...registrations[0].hacker,
+        id: 'hacker-pending',
+        email: 'pending@example.com',
+      },
+    };
+    prisma.eventCommunication.findUnique.mockResolvedValue({
+      ...draft,
+      audienceDefinitionJson: { statuses: ['PENDING', 'APPROVED'] },
+    });
+    prisma.eventRegistration.findMany.mockResolvedValue([
+      ...registrations,
+      pendingRegistration,
+    ]);
+    prisma.chapterMembership.findMany.mockResolvedValue([
+      ...registrations.map(registration => ({
+        hackerId: registration.hackerId,
+        status: 'ACTIVE',
+        notificationsAllowed: true,
+        emailNotificationsEnabled: true,
+        smsNotificationsEnabled: true,
+        smsConsentAt: new Date('2026-07-01T12:00:00.000Z'),
+        smsConsentVersion: '2026-07',
+      })),
+      {
+        hackerId: pendingRegistration.hackerId,
+        status: 'ACTIVE',
+        notificationsAllowed: true,
+        emailNotificationsEnabled: true,
+        smsNotificationsEnabled: true,
+        smsConsentAt: new Date('2026-07-01T12:00:00.000Z'),
+        smsConsentVersion: '2026-07',
+      },
+    ]);
+    const { POST } = loadRoute<{ POST: Function }>(
+      '../../src/app/api/events/[eventId]/blasts/[blastId]/preview/route'
+    );
+
+    const response = await POST(
+      createJsonRequest(`/api/events/${eventId}/blasts/${blastId}/preview`, {
+        method: 'POST',
+      }),
+      createRouteContext({ eventId, blastId })
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ eligibleCount: 3 });
+  });
+
   it('returns 409 with a replacement preview and sends nothing when the audience changed', async () => {
     prisma.eventCommunication.findUnique.mockResolvedValue(draft);
     const { POST } = loadRoute<{ POST: Function }>(
@@ -254,9 +313,13 @@ describe('/api/events/[eventId]/blasts', () => {
         previewFingerprint: expect.stringMatching(/^sha256:/),
       },
     });
-    expect(prisma.eventCommunicationRecipient.createMany).not.toHaveBeenCalled();
+    expect(
+      prisma.eventCommunicationRecipient.createMany
+    ).not.toHaveBeenCalled();
     expect(prisma.eventCommunication.update).not.toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ status: 'SENDING' }) })
+      expect.objectContaining({
+        data: expect.objectContaining({ status: 'SENDING' }),
+      })
     );
   });
 
@@ -287,7 +350,9 @@ describe('/api/events/[eventId]/blasts', () => {
       recipientCount: 2,
       sentCount: 2,
     });
-    expect(prisma.eventCommunicationRecipient.createMany).not.toHaveBeenCalled();
+    expect(
+      prisma.eventCommunicationRecipient.createMany
+    ).not.toHaveBeenCalled();
   });
 
   it('returns immutable recipient snapshots rather than recalculating changed registrations', async () => {
@@ -398,6 +463,8 @@ describe('/api/events/[eventId]/blasts', () => {
     expect(serialized).not.toContain('PRIVATE COMMUNICATION NOTE SENTINEL');
     expect(serialized).not.toContain('PRIVATE COMMUNICATION REVISION SENTINEL');
     expect(serialized).not.toContain('PRIVATE COMMUNICATION REVIEW SENTINEL');
-    expect(serialized).not.toMatch(/organizerNote|noteRevisions|internalReview/i);
+    expect(serialized).not.toMatch(
+      /organizerNote|noteRevisions|internalReview/i
+    );
   });
 });

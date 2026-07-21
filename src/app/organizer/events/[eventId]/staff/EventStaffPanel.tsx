@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { HackerSelector } from '../../../../components/HackerSelector';
 import {
   ManagementAlert,
   ManagementBadge,
@@ -8,6 +9,7 @@ import {
   ManagementSection,
   useManagementClasses,
 } from '../../../../components/ManagementSurface';
+import type { HackerSelectionOption } from '@/types/hacker';
 
 type StaffRole = 'MC' | 'CO_MC';
 type StaffMember = {
@@ -26,6 +28,10 @@ type StaffAudit = {
   staffHacker?: { id: string; name: string };
   actor?: { id: string; name: string };
 };
+type PendingStaffAssignment = {
+  hacker: HackerSelectionOption;
+  role: StaffRole;
+};
 
 export default function EventStaffPanel({
   eventId,
@@ -39,9 +45,15 @@ export default function EventStaffPanel({
   const classes = useManagementClasses();
   const [staff, setStaff] = useState(initialStaff);
   const [loading, setLoading] = useState(true);
-  const [showAssignment, setShowAssignment] = useState(false);
-  const [hackerId, setHackerId] = useState('');
-  const [role, setRole] = useState<StaffRole>('MC');
+  const [showMemberSearch, setShowMemberSearch] = useState(false);
+  const [memberSearchTerm, setMemberSearchTerm] = useState('');
+  const [staffCandidates, setStaffCandidates] = useState<
+    HackerSelectionOption[] | null
+  >(null);
+  const [pendingAssignment, setPendingAssignment] =
+    useState<PendingStaffAssignment | null>(null);
+  const [loadingCandidates, setLoadingCandidates] = useState(false);
+  const [savingHackerId, setSavingHackerId] = useState<string | null>(null);
   const [audits, setAudits] = useState<StaffAudit[] | null>(null);
   const [notice, setNotice] = useState('');
   const assignStaffButtonRef = useRef<HTMLButtonElement>(null);
@@ -67,30 +79,83 @@ export default function EventStaffPanel({
     };
   }, [eventId]);
 
-  async function saveAssignment(targetHackerId: string, targetRole: StaffRole) {
-    setNotice('');
-    const response = await fetch(`/api/events/${eventId}/staff`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ hackerId: targetHackerId, role: targetRole }),
+  const filteredStaffCandidates = useMemo(() => {
+    const assignedIds = new Set(staff.map(member => member.hackerId));
+    if (pendingAssignment) assignedIds.add(pendingAssignment.hacker.id);
+    const query = memberSearchTerm.trim().toLowerCase();
+    return (staffCandidates ?? []).filter(candidate => {
+      if (assignedIds.has(candidate.id)) return false;
+      if (!query) return true;
+      return (
+        candidate.name.toLowerCase().includes(query) ||
+        (candidate.email ?? '').toLowerCase().includes(query)
+      );
     });
-    if (!response.ok) {
-      setNotice('Unable to update event staff.');
+  }, [memberSearchTerm, pendingAssignment, staff, staffCandidates]);
+
+  async function openMemberSearch() {
+    setNotice('');
+    if (staffCandidates) {
+      setShowMemberSearch(true);
       return;
     }
-    const saved = (await response.json()) as StaffMember;
-    setStaff(current => {
-      const exists = current.some(member => member.hackerId === saved.hackerId);
-      return exists
-        ? current.map(member =>
-            member.hackerId === saved.hackerId ? saved : member
-          )
-        : [...current, saved];
-    });
-    setHackerId('');
-    setRole('MC');
-    setShowAssignment(false);
-    setNotice('Event staff updated.');
+
+    setLoadingCandidates(true);
+    try {
+      const response = await fetch('/api/hackers');
+      if (!response.ok) throw new Error('Unable to load members');
+      const payload = await response.json();
+      setStaffCandidates(
+        Array.isArray(payload) ? payload : (payload?.hackers ?? payload?.items ?? [])
+      );
+      setShowMemberSearch(true);
+    } catch {
+      setNotice('Unable to load members.');
+    } finally {
+      setLoadingCandidates(false);
+    }
+  }
+
+  async function saveAssignment(targetHackerId: string, targetRole: StaffRole) {
+    setNotice('');
+    setSavingHackerId(targetHackerId);
+    try {
+      const response = await fetch(`/api/events/${eventId}/staff`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ hackerId: targetHackerId, role: targetRole }),
+      });
+      if (!response.ok) {
+        setNotice('Unable to update event staff.');
+        return false;
+      }
+      const saved = (await response.json()) as StaffMember;
+      setStaff(current => {
+        const exists = current.some(member => member.hackerId === saved.hackerId);
+        return exists
+          ? current.map(member =>
+              member.hackerId === saved.hackerId ? saved : member
+            )
+          : [...current, saved];
+      });
+      setMemberSearchTerm('');
+      setNotice('Event staff updated.');
+      return true;
+    } catch {
+      setNotice('Unable to update event staff.');
+      return false;
+    } finally {
+      setSavingHackerId(null);
+    }
+  }
+
+  async function savePendingAssignment() {
+    if (!pendingAssignment) return;
+    const saved = await saveAssignment(
+      pendingAssignment.hacker.id,
+      pendingAssignment.role
+    );
+    if (saved) setPendingAssignment(null);
   }
 
   async function removeStaff(member: StaffMember) {
@@ -128,11 +193,12 @@ export default function EventStaffPanel({
             <button
               aria-label="Add staff"
               className={classes.primaryButton}
-              onClick={() => setShowAssignment(value => !value)}
+              disabled={loadingCandidates}
+              onClick={openMemberSearch}
               ref={assignStaffButtonRef}
               type="button"
             >
-              Assign staff
+              {loadingCandidates ? 'Loading members…' : 'Assign staff'}
             </button>
             <button
               className={classes.secondaryButton}
@@ -153,44 +219,62 @@ export default function EventStaffPanel({
         </ManagementAlert>
       )}
 
-      {showAssignment && canAssignStaff && (
-        <div
-          className={`${classes.subtlePanel} mt-4 grid gap-3 p-4 sm:grid-cols-2`}
-        >
-          <label>
-            <span className="mb-1 block text-sm font-bold">
-              Hacker / organizer
-            </span>
-            <input
-              className={classes.input}
-              onChange={event => setHackerId(event.target.value)}
-              placeholder="Hacker ID"
-              value={hackerId}
-            />
-          </label>
-          <label>
-            <span className="mb-1 block text-sm font-bold">Staff role</span>
-            <select
-              className={classes.input}
-              onChange={event => setRole(event.target.value as StaffRole)}
-              value={role}
-            >
-              <option value="MC">MC role</option>
-              <option value="CO_MC">Co-MC role</option>
-            </select>
-          </label>
-          <button
-            className={classes.primaryButton}
-            disabled={!hackerId.trim()}
-            onClick={() => saveAssignment(hackerId.trim(), role)}
-            type="button"
-          >
-            Assign
-          </button>
-        </div>
-      )}
-
       <div className="mt-4 grid gap-3">
+        {pendingAssignment && (
+          <div
+            className={`${classes.subtlePanel} flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between`}
+          >
+            <div>
+              <p className="font-bold">{pendingAssignment.hacker.name}</p>
+              {pendingAssignment.hacker.email && (
+                <p className={`text-sm ${classes.mutedText}`}>
+                  {pendingAssignment.hacker.email}
+                </p>
+              )}
+              <ManagementBadge>Not saved</ManagementBadge>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <label>
+                <select
+                  aria-label={`Staff role for ${pendingAssignment.hacker.name}`}
+                  className={classes.input}
+                  onChange={event =>
+                    setPendingAssignment(current =>
+                      current
+                        ? {
+                            ...current,
+                            role: event.target.value as StaffRole,
+                          }
+                        : null
+                    )
+                  }
+                  value={pendingAssignment.role}
+                >
+                  <option value="MC">MC role</option>
+                  <option value="CO_MC">Co-MC role</option>
+                </select>
+              </label>
+              <button
+                className={classes.primaryButton}
+                disabled={savingHackerId === pendingAssignment.hacker.id}
+                onClick={savePendingAssignment}
+                type="button"
+              >
+                {savingHackerId === pendingAssignment.hacker.id
+                  ? 'Saving…'
+                  : 'Save'}
+              </button>
+              <button
+                className={classes.secondaryButton}
+                disabled={savingHackerId === pendingAssignment.hacker.id}
+                onClick={() => setPendingAssignment(null)}
+                type="button"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
         {staff.map(member => {
           const name = member.name ?? member.hacker?.name ?? member.hackerId;
           return (
@@ -280,6 +364,20 @@ export default function EventStaffPanel({
           </div>
         </div>
       )}
+
+      <HackerSelector
+        filteredHackers={filteredStaffCandidates}
+        handleAddMember={candidate => {
+          setPendingAssignment({ hacker: candidate, role: 'MC' });
+          setMemberSearchTerm('');
+        }}
+        isDarkMode={classes.isDarkMode}
+        searchTerm={memberSearchTerm}
+        setSearchTerm={setMemberSearchTerm}
+        setShowModal={setShowMemberSearch}
+        showModal={showMemberSearch}
+        title="Select event staff"
+      />
     </ManagementSection>
   );
 }

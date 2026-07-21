@@ -460,42 +460,59 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
       screen.getByRole('link', { name: /back to sundai boston/i })
     ).toHaveAttribute('href', '/chapters/boston');
     expect(
-      screen.queryByRole('link', { name: /edit event/i })
+      screen.queryByRole('link', { name: /^manage$/i })
     ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole('link', { name: /manage attendees/i })
-    ).not.toBeInTheDocument();
+    expect(screen.getByAltText(/ai build night event/i)).toHaveAttribute(
+      'src',
+      expect.stringContaining('sundai_logo_light_horizontal.svg')
+    );
   });
 
-  it('shows an event settings action to admins', async () => {
+  it('shows uploaded event artwork on the public event page', async () => {
+    await renderDetailPage(
+      buildEventDetail({
+        image: {
+          id: 'event-image',
+          url: 'https://cdn.example.com/ai-build-night.webp',
+          alt: 'AI Build Night artwork',
+        },
+      })
+    );
+
+    expect(
+      await screen.findByAltText('AI Build Night artwork')
+    ).toHaveAttribute('src', 'https://cdn.example.com/ai-build-night.webp');
+  });
+
+  it('shows one event management action to admins', async () => {
     mockSignedIn();
 
     await renderDetailPage(
       buildEventDetail({
         viewerCanEditEvent: true,
+        viewerCanManageEvent: true,
       })
     );
 
-    expect(screen.getByRole('link', { name: /edit event/i })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: /^manage$/i })).toHaveAttribute(
       'href',
-      `/organizer/events/${eventFixture.id}/settings`
+      `/organizer/events/${eventFixture.id}`
     );
+    expect(screen.getAllByRole('link', { name: /^manage$/i })).toHaveLength(1);
   });
 
-  it('links admins and event MCs to attendee management', async () => {
+  it('links MCs and co-MCs to event management', async () => {
     mockSignedIn();
 
     await renderDetailPage(
       buildEventDetail({
-        viewerCanManageRegistrations: true,
+        viewerCanManageEvent: true,
       })
     );
 
-    expect(
-      screen.getByRole('link', { name: /manage attendees/i })
-    ).toHaveAttribute(
+    expect(screen.getByRole('link', { name: /^manage$/i })).toHaveAttribute(
       'href',
-      `/organizer/events/${eventFixture.id}/registrations`
+      `/organizer/events/${eventFixture.id}`
     );
   });
 

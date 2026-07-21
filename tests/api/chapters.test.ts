@@ -391,6 +391,7 @@ describe('/api/chapters', () => {
               slug: true,
               startTime: true,
               publicLocation: true,
+              image: { select: { id: true, url: true, alt: true } },
             },
           }),
         }),
@@ -410,6 +411,7 @@ describe('/api/chapters', () => {
         slug: true,
         startTime: true,
         publicLocation: true,
+        image: { select: { id: true, url: true, alt: true } },
       },
     });
   });

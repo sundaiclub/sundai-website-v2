@@ -152,6 +152,14 @@ function mockOrganizerFetches() {
       });
     }
 
+    if (url.includes('/api/events/event-created/image')) {
+      return jsonResponse({
+        id: 'event-image',
+        url: 'https://cdn.example.com/event.webp',
+        alt: 'Boston AI Build Night event',
+      });
+    }
+
     if (url.endsWith('/api/events') && init?.method === 'POST') {
       return jsonResponse(
         {
@@ -216,6 +224,14 @@ describe('/organizer/events/new', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockUseTheme.mockReturnValue({ isDarkMode: false });
+    Object.defineProperty(URL, 'createObjectURL', {
+      configurable: true,
+      value: jest.fn(() => 'blob:event-preview'),
+    });
+    Object.defineProperty(URL, 'revokeObjectURL', {
+      configurable: true,
+      value: jest.fn(),
+    });
     window.history.replaceState({}, '', '/organizer/events/new');
     mockOrganizerFetches();
   });
@@ -232,6 +248,10 @@ describe('/organizer/events/new', () => {
     expect(screen.getByLabelText(/event day/i)).toHaveValue(
       nextSundayInputValue()
     );
+    expect(screen.getByLabelText(/event image/i)).toHaveAttribute(
+      'accept',
+      'image/jpeg,image/png,image/webp,image/gif'
+    );
     expect(screen.getByText(/10:00 AM to 10:00 PM/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/timezone/i)).toHaveValue('America/New_York');
     expect(screen.getByLabelText(/^capacity$/i)).toBeRequired();
@@ -247,6 +267,36 @@ describe('/organizer/events/new', () => {
         'America/Los_Angeles'
       );
     });
+  });
+
+  it('uploads a selected event image after creating the event', async () => {
+    await renderNewEventPage();
+    fillRequiredEventFields();
+    const image = new File(['event-image'], 'demo-night.webp', {
+      type: 'image/webp',
+    });
+
+    fireEvent.change(screen.getByLabelText(/event image/i), {
+      target: { files: [image] },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /save draft/i }));
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        '/api/events/event-created/image',
+        expect.objectContaining({
+          method: 'POST',
+          body: expect.any(FormData),
+        })
+      );
+    });
+    const imageCall = (global.fetch as jest.Mock).mock.calls.find(([url]) =>
+      requestUrl(url).includes('/api/events/event-created/image')
+    );
+    expect((imageCall?.[1].body as FormData).get('image')).toBe(image);
+    expect(
+      screen.getByText(/event draft was successfully created/i)
+    ).toBeInTheDocument();
   });
 
   it('preselects the requested chapter from the chapterId query parameter', async () => {

@@ -306,8 +306,8 @@ describe('event-management site-admin pages', () => {
         screen.getAllByRole('link', { name: /settings/i })[0]
       ).toHaveAttribute('href', '/organizer/chapters/boston/settings');
       expect(
-        screen.getAllByRole('link', { name: /^events$/i })[0]
-      ).toHaveAttribute('href', '/organizer/events');
+        screen.queryByRole('link', { name: /^events$/i })
+      ).not.toBeInTheDocument();
     });
 
     it('denies chapter management to non-site-admin users', async () => {

@@ -10,6 +10,13 @@ export const EVENT_COMMUNICATION_AUDIENCES = [
   'SELECTED',
 ] as const;
 
+export const EVENT_COMMUNICATION_STATUS_AUDIENCES = [
+  'PENDING',
+  'APPROVED',
+  'WAITLISTED',
+  'DECLINED',
+] as const;
+
 type AudienceType = (typeof EVENT_COMMUNICATION_AUDIENCES)[number];
 type Channel = 'EMAIL' | 'SMS';
 
@@ -65,9 +72,15 @@ export type CommunicationAudienceResolution = {
 function isAudienceStatus(
   status: string,
   audienceType: AudienceType,
+  audienceTypes: AudienceType[],
   selected: Set<string>,
   hackerId: string
-) {
+): boolean {
+  if (audienceTypes.length > 0) {
+    return audienceTypes.some(type =>
+      isAudienceStatus(status, type, [], selected, hackerId)
+    );
+  }
   if (audienceType === 'SELECTED') return selected.has(hackerId);
   if (audienceType === 'ACTIVE_REGISTERED') {
     return ['PENDING', 'APPROVED', 'WAITLISTED'].includes(status);
@@ -86,12 +99,14 @@ function usableE164(value: string | null | undefined) {
 export function resolveEventCommunicationAudience({
   registrations,
   audienceType,
+  audienceTypes = [],
   selectedHackerIds = [],
   channel,
   smsConsentVersion,
 }: {
   registrations: AudienceRegistration[];
   audienceType: AudienceType;
+  audienceTypes?: AudienceType[];
   selectedHackerIds?: string[];
   channel: Channel;
   smsConsentVersion?: string;
@@ -118,6 +133,7 @@ export function resolveEventCommunicationAudience({
       !isAudienceStatus(
         registration.status,
         audienceType,
+        audienceTypes,
         selected,
         registration.hacker.id
       )
@@ -185,10 +201,12 @@ export function resolveEventCommunicationAudience({
 export function fingerprintEventCommunicationAudience({
   channel,
   audienceType,
+  audienceTypes = [],
   recipients,
 }: {
   channel: Channel;
   audienceType: AudienceType;
+  audienceTypes?: AudienceType[];
   recipients: Array<
     Pick<
       ResolvedCommunicationRecipient,
@@ -208,7 +226,14 @@ export function fingerprintEventCommunicationAudience({
       recipient.contactValue,
     ]);
   const digest = createHash('sha256')
-    .update(JSON.stringify({ channel, audienceType, recipients: canonical }))
+    .update(
+      JSON.stringify({
+        channel,
+        audienceType,
+        audienceTypes: [...audienceTypes].sort(),
+        recipients: canonical,
+      })
+    )
     .digest('hex');
   return `sha256:${digest}`;
 }
@@ -229,6 +254,28 @@ export function validateEventCommunicationDraft(input: {
     !EVENT_COMMUNICATION_AUDIENCES.includes(input.audienceType as AudienceType)
   ) {
     errors.audienceType = 'Audience is not supported.';
+  }
+  if (
+    input.audienceDefinition &&
+    typeof input.audienceDefinition === 'object' &&
+    'statuses' in input.audienceDefinition
+  ) {
+    const statuses = (input.audienceDefinition as { statuses?: unknown })
+      .statuses;
+    if (
+      !Array.isArray(statuses) ||
+      statuses.length === 0 ||
+      statuses.some(
+        status =>
+          typeof status !== 'string' ||
+          !EVENT_COMMUNICATION_STATUS_AUDIENCES.includes(
+            status as (typeof EVENT_COMMUNICATION_STATUS_AUDIENCES)[number]
+          )
+      )
+    ) {
+      errors.audienceDefinition =
+        'Audience statuses must include at least one supported registration status.';
+    }
   }
   if (typeof input.body !== 'string' || !input.body.trim()) {
     errors.body = 'Message body is required.';

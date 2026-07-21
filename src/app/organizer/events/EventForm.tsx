@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
@@ -187,6 +188,10 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
   const [slug, setSlug] = useState('');
   const [chapterId, setChapterId] = useState('');
   const [description, setDescription] = useState('');
+  const [eventImageFile, setEventImageFile] = useState<File | null>(null);
+  const [eventImagePreview, setEventImagePreview] = useState<string | null>(
+    null
+  );
   const [publicLocation, setPublicLocation] = useState('');
   const [eventDate, setEventDate] = useState(() => nextSundayInputValue());
   const [startClock, setStartClock] = useState(DEFAULT_START_TIME);
@@ -316,6 +321,7 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
           setTitle(eventPayload.title);
           setSlug(eventPayload.slug ?? slugify(eventPayload.title));
           setDescription(eventPayload.description ?? '');
+          setEventImagePreview(eventPayload.image?.url ?? null);
           setPublicLocation(eventPayload.publicLocation ?? '');
           if (start) {
             setEventDate(start.date);
@@ -413,6 +419,14 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
       isCurrent = false;
     };
   }, [eventId]);
+
+  useEffect(() => {
+    return () => {
+      if (eventImagePreview?.startsWith('blob:')) {
+        URL.revokeObjectURL(eventImagePreview);
+      }
+    };
+  }, [eventImagePreview]);
 
   const selectedChapter = useMemo(
     () => chapters.find(chapter => chapter.id === chapterId) ?? null,
@@ -535,6 +549,11 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
   function updateTitle(value: string) {
     setTitle(value);
     if (!isEditing) setSlug(slugify(value));
+  }
+
+  function selectEventImage(file: File | null) {
+    setEventImageFile(file);
+    if (file) setEventImagePreview(URL.createObjectURL(file));
   }
 
   function addMc(hacker: HackerSelectionOption) {
@@ -699,6 +718,25 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
     }
 
     const savedEvent = await response.json().catch(() => null);
+    if (eventImageFile && savedEvent?.id) {
+      const imageFormData = new FormData();
+      imageFormData.append('image', eventImageFile);
+      const imageResponse = await fetch(`/api/events/${savedEvent.id}/image`, {
+        method: 'POST',
+        body: imageFormData,
+      });
+      if (!imageResponse.ok) {
+        setSavedEventId(savedEvent.id);
+        setMessage('Unable to upload the event image. The event was saved.');
+        return;
+      }
+      const image = await imageResponse.json();
+      setEventImageFile(null);
+      setEventImagePreview(image.url);
+      if (isEditing) {
+        setLoadedEvent(current => (current ? { ...current, image } : current));
+      }
+    }
     if (shouldPublish && savedEvent?.id) {
       const publishResponse = await fetch(
         `/api/events/${savedEvent.id}/publish`,
@@ -766,7 +804,7 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
         return;
       }
 
-      router.push('/organizer/events');
+      router.push('/events');
       router.refresh();
     } catch {
       setMessage('Unable to delete draft.');
@@ -881,6 +919,45 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
                 value={description}
               />
             </label>
+            <div className="grid gap-2 sm:col-span-2">
+              <span className="text-sm font-semibold">Event image</span>
+              <div className="grid gap-4 sm:grid-cols-[minmax(0,240px)_1fr] sm:items-center">
+                <div
+                  className={`${classes.subtlePanel} relative aspect-[16/9] overflow-hidden rounded-md`}
+                >
+                  {eventImagePreview ? (
+                    <Image
+                      alt={`${title || 'Event'} preview`}
+                      className="object-cover"
+                      fill
+                      src={eventImagePreview}
+                      sizes="240px"
+                      unoptimized
+                    />
+                  ) : (
+                    <div
+                      className={`flex h-full items-center justify-center px-4 text-center text-sm ${classes.mutedText}`}
+                    >
+                      The Sundai logo will be used when no image is uploaded.
+                    </div>
+                  )}
+                </div>
+                <label className="grid gap-2">
+                  <span className={`text-sm ${classes.mutedText}`}>
+                    JPEG, PNG, WebP, or GIF. Maximum 10 MB.
+                  </span>
+                  <input
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    aria-label="Event image"
+                    className={classes.input}
+                    onChange={event =>
+                      selectEventImage(event.target.files?.[0] ?? null)
+                    }
+                    type="file"
+                  />
+                </label>
+              </div>
+            </div>
             <label className="grid gap-2">
               <span className="text-sm font-semibold">Public location</span>
               <input

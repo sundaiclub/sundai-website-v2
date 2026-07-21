@@ -30,6 +30,7 @@ function chapterInclude(now: Date) {
         slug: true,
         startTime: true,
         publicLocation: true,
+        image: { select: { id: true, url: true, alt: true } },
       },
     },
   } as const;
@@ -43,6 +44,7 @@ const eventSummarySelect = {
   publicLocation: true,
   status: true,
   visibility: true,
+  image: { select: { id: true, url: true, alt: true } },
 } as const;
 
 const publicEventSummarySelect = {
@@ -51,6 +53,7 @@ const publicEventSummarySelect = {
   slug: true,
   startTime: true,
   publicLocation: true,
+  image: { select: { id: true, url: true, alt: true } },
 } as const;
 
 async function resolveChapterIdentifier(chapterIdOrSlug: string) {

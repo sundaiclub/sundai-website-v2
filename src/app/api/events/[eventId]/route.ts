@@ -41,6 +41,7 @@ export async function GET(
         where: { id: params.eventId },
         include: {
           chapter: true,
+          image: true,
           staff: { include: { hacker: { include: { avatar: true } } } },
           pitchSessions: {
             include: {
@@ -96,6 +97,7 @@ export async function GET(
         id: true,
         slug: true,
         title: true,
+        image: { select: { id: true, url: true, alt: true } },
         description: true,
         startTime: true,
         endTime: true,
@@ -492,6 +494,7 @@ export async function PATCH(
     const event = await prisma.event.findUnique({
       where: { id: params.eventId },
       include: {
+        image: true,
         staff: { include: { hacker: { include: { avatar: true } } } },
         pitchSessions: {
           include: {

@@ -133,7 +133,7 @@ export type ChapterDirectoryItem = Pick<
   memberships?: Array<Pick<ChapterMembership, 'role' | 'status'>>;
 };
 
-type ChapterLandingEvent = {
+export type ChapterLandingEvent = {
   id: EntityId;
   title: string;
   slug: string;
@@ -141,6 +141,7 @@ type ChapterLandingEvent = {
   publicLocation?: string | null;
   status?: EventStatus;
   visibility?: EventVisibility;
+  image?: Pick<EventManagementImageSummary, 'id' | 'url' | 'alt'> | null;
 };
 
 export type ChapterLanding = Pick<
@@ -402,6 +403,7 @@ export type OrganizerEventSettings = {
   waitlistMessage?: string | null;
   declineMessage?: string | null;
   canDelete?: boolean;
+  image?: Pick<EventManagementImageSummary, 'id' | 'url' | 'alt'> | null;
   chapter?: Pick<Chapter, 'id' | 'name' | 'slug' | 'timezone'>;
   staff?: Array<
     Pick<EventStaff, 'id' | 'role'> & {
@@ -435,6 +437,7 @@ export interface PublicEventCard {
   chapterName: string;
   chapter: PublicEventChapterSummary;
   title: string;
+  image?: Pick<EventManagementImageSummary, 'id' | 'url' | 'alt'> | null;
   publicLocation?: string | null;
   startTime: ISODateTimeString | Date;
   endTime?: ISODateTimeString | Date | null;
@@ -492,6 +495,7 @@ export interface PublicEventDetail extends PublicEventCard {
   viewerRegistration?: PublicViewerRegistrationState | null;
   viewerCanManageRegistrations?: boolean;
   viewerCanEditEvent?: boolean;
+  viewerCanManageEvent?: boolean;
   addToCalendar: AddToCalendarPayload;
 }
 

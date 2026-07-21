@@ -18,6 +18,10 @@ jest.mock('next/navigation', () => ({
 }));
 
 const eventId = 'event-ai-build-night';
+const staffCandidates = [
+  { id: 'hacker-mc', name: 'Morgan MC', email: 'morgan@example.com' },
+  { id: 'hacker-casey', name: 'Casey Organizer', email: 'casey@example.com' },
+];
 
 const adminWorkspace = {
   event: {
@@ -77,6 +81,7 @@ function mockAdministrationFetch(workspace = adminWorkspace) {
   global.fetch = jest.fn((input: RequestInfo | URL, init?: RequestInit) => {
     const url = new URL(requestUrl(input), 'http://localhost');
     if (url.pathname === `/api/events/${eventId}/workspace`) return jsonResponse(workspace);
+    if (url.pathname === '/api/hackers') return jsonResponse(staffCandidates);
     if (url.pathname === `/api/events/${eventId}/staff` && !init?.method) {
       return jsonResponse(workspace.staff);
     }
@@ -161,9 +166,19 @@ describe('/organizer/events/[eventId] administration', () => {
   it('assigns an MC or co-MC through the event-scoped staff endpoint', async () => {
     renderAdministration();
     fireEvent.click(await screen.findByRole('button', { name: /add|assign staff/i }));
-    fireEvent.change(screen.getByLabelText(/hacker|organizer/i), { target: { value: 'hacker-casey' } });
-    fireEvent.change(screen.getByLabelText(/staff role|role/i), { target: { value: 'CO_MC' } });
-    fireEvent.click(screen.getByRole('button', { name: /save|assign/i }));
+    fireEvent.change(await screen.findByPlaceholderText(/search members/i), {
+      target: { value: 'Casey' },
+    });
+    fireEvent.click(await screen.findByRole('button', { name: /casey organizer/i }));
+    fireEvent.change(await screen.findByLabelText(/staff role for casey organizer/i), {
+      target: { value: 'CO_MC' },
+    });
+
+    expect(global.fetch).not.toHaveBeenCalledWith(
+      `/api/events/${eventId}/staff`,
+      expect.objectContaining({ method: 'POST' })
+    );
+    fireEvent.click(screen.getByRole('button', { name: /^save$/i }));
 
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith(

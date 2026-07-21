@@ -102,7 +102,9 @@ function jsonResponse(data: unknown, status = 200) {
     json: jest.fn().mockResolvedValue(data),
     text: jest
       .fn()
-      .mockResolvedValue(typeof data === 'string' ? data : JSON.stringify(data)),
+      .mockResolvedValue(
+        typeof data === 'string' ? data : JSON.stringify(data)
+      ),
   });
 }
 
@@ -123,7 +125,9 @@ function loadOverview(): React.ComponentType<{
   return require('../../src/app/organizer/events/[eventId]/page').default;
 }
 
-function renderWorkspace(children: React.ReactNode = <div>Overview content</div>) {
+function renderWorkspace(
+  children: React.ReactNode = <div>Overview content</div>
+) {
   const Layout = loadLayout();
   return render(<Layout params={{ eventId }}>{children}</Layout>);
 }
@@ -154,9 +158,10 @@ describe('/organizer/events/[eventId] workspace', () => {
     expect(screen.getByText('Sundai Boston')).toBeInTheDocument();
     expect(screen.getByText(/published/i)).toBeInTheDocument();
     expect(screen.getByText(/MC/)).toBeInTheDocument();
-    expect(
-      screen.getByRole('link', { name: /public event/i })
-    ).toHaveAttribute('href', '/events/boston/ai-build-night');
+    expect(screen.getByRole('link', { name: /view event/i })).toHaveAttribute(
+      'href',
+      '/events/boston/ai-build-night'
+    );
   });
 
   it('provides event-scoped navigation for every completed workspace section', async () => {
@@ -177,6 +182,36 @@ describe('/organizer/events/[eventId] workspace', () => {
     for (const [name, href] of expectedLinks) {
       expect(screen.getByRole('link', { name })).toHaveAttribute('href', href);
     }
+  });
+
+  it('hides RSVP navigation from co-MCs while retaining other workspace tabs', async () => {
+    mockWorkspaceFetch({
+      ...workspace,
+      effectiveRole: 'CO_MC',
+      availableSections: workspace.availableSections.filter(
+        section => section !== 'registrations'
+      ),
+    });
+
+    renderWorkspace();
+    await screen.findByText('AI Build Night');
+
+    expect(
+      screen.queryByRole('link', { name: /rsvps/i })
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /overview/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: /communications/i })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: /materials/i })
+    ).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /projects/i })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /^pitch$/i })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /notes/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: /reporting preview/i })
+    ).toBeInTheDocument();
   });
 
   it('renders overview settings, staff, and safe operational counts', async () => {

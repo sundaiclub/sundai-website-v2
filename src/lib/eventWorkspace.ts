@@ -31,6 +31,14 @@ const AVAILABLE_SECTIONS: EventWorkspaceOverview['availableSections'] = [
   'reporting',
 ];
 
+export function getAvailableWorkspaceSections(
+  canReviewRsvps: boolean
+): EventWorkspaceOverview['availableSections'] {
+  return canReviewRsvps
+    ? [...AVAILABLE_SECTIONS]
+    : AVAILABLE_SECTIONS.filter(section => section !== 'registrations');
+}
+
 export const WORKSPACE_UNAVAILABLE_METRICS: EventWorkspaceOverview['unavailable'] =
   ['checkIn', 'attendance', 'noShows'];
 
@@ -221,7 +229,9 @@ export async function loadEventWorkspace(
       materials: materialCount,
       communications: communicationCount,
     },
-    availableSections: [...AVAILABLE_SECTIONS],
+    availableSections: getAvailableWorkspaceSections(
+      canDecideEventApplicantsWithContext(permissionContext)
+    ),
     unavailable: [...WORKSPACE_UNAVAILABLE_METRICS],
   };
 }

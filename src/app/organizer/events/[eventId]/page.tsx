@@ -177,9 +177,6 @@ export default function OrganizerEventOverviewPage({
         title="Overview"
         actions={
           <div className="flex flex-wrap gap-2">
-            <ManagementLinkButton href={event.publicUrl} variant="secondary">
-              Public event
-            </ManagementLinkButton>
             {capabilities.managePitch && (
               <ManagementLinkButton
                 href={`/pitch/${params.eventId}`}

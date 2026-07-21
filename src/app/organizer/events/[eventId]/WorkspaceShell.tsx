@@ -145,6 +145,12 @@ function WorkspaceContent({
 
   return (
     <ManagementPage maxWidth="max-w-7xl">
+      <div className="mb-4">
+        <Link className={classes.ghostButton} href={event.publicUrl}>
+          <span aria-hidden="true">&larr;</span>
+          <span>Back to event</span>
+        </Link>
+      </div>
       <header className={`${classes.panel} mb-5 p-5 sm:p-6`}>
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
@@ -169,7 +175,7 @@ function WorkspaceContent({
             href={event.publicUrl}
             target="_blank"
           >
-            Public event
+            View event
           </Link>
         </div>
 
