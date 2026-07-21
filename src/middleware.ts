@@ -25,7 +25,10 @@ export async function afterAuthHandler(auth: MiddlewareAuth, req: NextRequest) {
       const clerkId = auth.userId;
       if (!clerkId) return NextResponse.json('Unauthorized', { status: 401 });
 
-      if (req.nextUrl.pathname.includes('/submit')) {
+      if (
+        req.nextUrl.pathname.endsWith('/submit') ||
+        req.nextUrl.pathname.endsWith('/edit')
+      ) {
         return;
       }
 

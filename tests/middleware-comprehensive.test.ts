@@ -99,6 +99,24 @@ describe('middleware comprehensive', () => {
       expect(result).toBeUndefined();
     });
 
+    it('should allow multipart project edits to reach the edit endpoint', async () => {
+      const mockAuth = { userId: 'test-user-id' };
+      const mockReq = {
+        nextUrl: {
+          pathname: '/api/projects/123/edit',
+          origin: 'http://localhost:3000'
+        },
+        method: 'PATCH',
+        clone: jest.fn()
+      };
+
+      const result = await afterAuthFunction(mockAuth, mockReq as any);
+
+      expect(result).toBeUndefined();
+      expect(mockReq.clone).not.toHaveBeenCalled();
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
     it('should allow non-admin actions to pass through', async () => {
       const mockAuth = { userId: 'test-user-id' };
       const mockReq = {
