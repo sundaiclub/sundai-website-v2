@@ -35,6 +35,18 @@ const bostonChapter = {
   mailingListExternalId: 'mailchimp-audience-42',
   viewerMembership: null,
   memberships: [],
+  happeningNowEvents: [
+    {
+      id: 'event-boston-live-build',
+      title: 'Boston Live Build',
+      slug: 'live-build',
+      chapterSlug: 'boston',
+      applicationCount: 12,
+      startTime: '2026-07-10T18:00:00.000Z',
+      endTime: '2026-07-11T01:00:00.000Z',
+      publicLocation: 'Kendall Square',
+    },
+  ],
   upcomingEvents: [
     {
       id: 'event-boston-demo-night',
@@ -313,6 +325,25 @@ describe('/chapters/[chapterSlug] public chapter page', () => {
         ).toLocaleDateString()}`
       )
     ).toBeInTheDocument();
+  });
+
+  it('shows events that are happening now at the top of the public event groups', async () => {
+    renderChapterPage();
+
+    const happeningNowHeading = await screen.findByRole('heading', {
+      name: /happening now/i,
+    });
+    const upcomingHeading = screen.getByRole('heading', {
+      name: /upcoming events/i,
+    });
+    expect(
+      happeningNowHeading.compareDocumentPosition(upcomingHeading) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+
+    expect(
+      screen.getByRole('link', { name: /boston live build/i })
+    ).toHaveAttribute('href', '/events/boston/live-build');
   });
 
   it('shows manage and new event actions to chapter admins', async () => {

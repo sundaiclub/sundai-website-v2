@@ -139,6 +139,7 @@ export type ChapterLandingEvent = {
   slug: string;
   applicationCount: number;
   startTime?: Date | string;
+  endTime?: Date | string | null;
   publicLocation?: string | null;
   status?: EventStatus;
   visibility?: EventVisibility;
@@ -175,6 +176,7 @@ export type ChapterLanding = Pick<
   viewerMembership?: ChapterMembershipSummary | null;
   memberships?: ChapterMembershipSummary[];
   upcomingEvents?: ChapterLandingEvent[];
+  happeningNowEvents?: ChapterLandingEvent[];
   previousEvents?: ChapterLandingEvent[];
   pendingEvents?: ChapterLandingEvent[];
   topProjectsThisWeek?: ChapterLandingProject[];
