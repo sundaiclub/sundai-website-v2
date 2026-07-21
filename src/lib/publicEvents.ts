@@ -333,7 +333,13 @@ function publicEventListingWhere(
 ): Prisma.EventWhereInput {
   return {
     ...publicEventVisibilityWhere(chapterSlug),
-    startTime: { gte: now },
+    OR: [
+      { startTime: { gte: now } },
+      {
+        startTime: { lt: now },
+        endTime: { gt: now },
+      },
+    ],
   };
 }
 

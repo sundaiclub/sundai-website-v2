@@ -83,6 +83,12 @@ function matchesScalarFilter<T>(value: T, filter: T | { in?: T[] }) {
 
 function matchesEventWhere(event: EventRecord, where: any = {}) {
   if (!where) return true;
+  if (
+    where.OR &&
+    !where.OR.some((condition: any) => matchesEventWhere(event, condition))
+  ) {
+    return false;
+  }
   if (where.id && event.id !== where.id) return false;
   if (where.slug && event.slug !== where.slug) return false;
   if (where.status && !matchesScalarFilter(event.status, where.status)) {
@@ -101,6 +107,15 @@ function matchesEventWhere(event: EventRecord, where: any = {}) {
     return false;
   }
   if (where.startTime?.gte && event.startTime < where.startTime.gte) {
+    return false;
+  }
+  if (where.startTime?.lt && event.startTime >= where.startTime.lt) {
+    return false;
+  }
+  if (
+    where.endTime?.gt &&
+    (!event.endTime || event.endTime <= where.endTime.gt)
+  ) {
     return false;
   }
   if (where.chapter) {
@@ -303,7 +318,7 @@ describe('GET /api/events public listing', () => {
     jest.useRealTimers();
   });
 
-  it('returns only upcoming published public events in active public chapters', async () => {
+  it('returns only current and upcoming published public events in active public chapters', async () => {
     const fixture = buildNativeEventRsvpFixture();
     const otherChapter = buildChapter({
       id: 'chapter-nyc',
@@ -326,6 +341,15 @@ describe('GET /api/events public listing', () => {
       title: 'Past Build Night',
       slug: 'past-build-night',
       startTime: new Date('2026-05-10T22:00:00.000Z'),
+      endTime: new Date('2026-05-11T01:00:00.000Z'),
+    });
+    const happeningNowEvent = buildPublishedEvent({
+      id: 'event-boston-happening-now',
+      chapterId: fixture.publicChapter.id,
+      title: 'Happening Now',
+      slug: 'happening-now',
+      startTime: new Date('2026-06-23T11:00:00.000Z'),
+      endTime: new Date('2026-06-23T14:00:00.000Z'),
     });
 
     mockSignedOutClerk();
@@ -336,6 +360,7 @@ describe('GET /api/events public listing', () => {
         withChapter(fixture.privateChapterEvent, fixture.privateChapter),
         withChapter(nycEvent, otherChapter),
         withChapter(pastEvent, fixture.publicChapter),
+        withChapter(happeningNowEvent, fixture.publicChapter),
       ],
     });
 
@@ -344,6 +369,7 @@ describe('GET /api/events public listing', () => {
 
     expect(response.status).toBe(200);
     expect(body.map((event: any) => event.id)).toEqual([
+      happeningNowEvent.id,
       fixture.publishedEvent.id,
       nycEvent.id,
     ]);

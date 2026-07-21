@@ -234,7 +234,7 @@ describe('public event helpers', () => {
     );
   });
 
-  it('queries only public published upcoming events in active public chapters', async () => {
+  it('queries only public published current and upcoming events in active public chapters', async () => {
     const event = buildPublicEvent({
       id: 'event-2',
       slug: 'ai-night',
@@ -267,7 +267,13 @@ describe('public event helpers', () => {
           accessMode: 'PUBLIC',
           slug: 'nyc',
         },
-        startTime: { gte: now },
+        OR: [
+          { startTime: { gte: now } },
+          {
+            startTime: { lt: now },
+            endTime: { gt: now },
+          },
+        ],
       },
       include: {
         image: {
@@ -354,7 +360,13 @@ describe('public event helpers', () => {
             status: 'ACTIVE',
             accessMode: 'PUBLIC',
           },
-          startTime: { gte: now },
+          OR: [
+            { startTime: { gte: now } },
+            {
+              startTime: { lt: now },
+              endTime: { gt: now },
+            },
+          ],
         },
         orderBy: [{ startTime: 'asc' }, { title: 'asc' }],
       })
