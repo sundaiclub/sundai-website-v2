@@ -18,16 +18,17 @@ import type {
   TemplateFieldDefinition,
 } from '@/types/event-management';
 
+
 function templateList(payload: unknown): ApplicationTemplateListItem[] {
   const templates = Array.isArray(payload)
     ? (payload as ApplicationTemplateListItem[])
     : payload && typeof payload === 'object'
       ? ((
-          payload as {
-            templates?: ApplicationTemplateListItem[];
-            items?: ApplicationTemplateListItem[];
-          }
-        ).templates ??
+        payload as {
+          templates?: ApplicationTemplateListItem[];
+          items?: ApplicationTemplateListItem[];
+        }
+      ).templates ??
         (
           payload as {
             templates?: ApplicationTemplateListItem[];
@@ -43,7 +44,7 @@ function templateList(payload: unknown): ApplicationTemplateListItem[] {
       typeof template.isActive === 'boolean'
         ? template.isActive
         : (template as ApplicationTemplateListItem & { status?: string })
-            .status === 'ACTIVE',
+          .status === 'ACTIVE',
   }));
 }
 
@@ -54,13 +55,13 @@ function replaceTemplate(
   return templates.map(template =>
     template.id === savedTemplate.id
       ? {
-          ...template,
-          ...savedTemplate,
-        }
+        ...template,
+        ...savedTemplate,
+      }
       : savedTemplate.isActive &&
-          template.scope === savedTemplate.scope &&
-          (template.scope === 'SITE' ||
-            template.chapterId === savedTemplate.chapterId)
+        template.scope === savedTemplate.scope &&
+        (template.scope === 'SITE' ||
+          template.chapterId === savedTemplate.chapterId)
         ? { ...template, isActive: false }
         : template
   );
