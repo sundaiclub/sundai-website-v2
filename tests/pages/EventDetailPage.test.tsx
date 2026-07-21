@@ -9,6 +9,7 @@ import type {
 import { publicCalendarPayloadFixture } from '../utils/event-rsvp-fixtures';
 import { getPublicEventBySlug } from '@/lib/publicEvents';
 import { listVisibleEventMaterials } from '@/lib/eventMaterials';
+import { listPublicEventProjects } from '@/lib/publicEventProjects';
 
 const mockUseTheme = jest.fn();
 const mockUseUserContext = jest.fn();
@@ -64,12 +65,17 @@ jest.mock('@/lib/eventMaterials', () => ({
   listVisibleEventMaterials: jest.fn(),
 }));
 
+jest.mock('@/lib/publicEventProjects', () => ({
+  listPublicEventProjects: jest.fn(),
+}));
+
 type PageComponent = React.ComponentType<{
   params?: { chapterSlug: string; eventSlug: string };
 }>;
 
 const mockGetPublicEventBySlug = getPublicEventBySlug as jest.Mock;
 const mockListVisibleEventMaterials = listVisibleEventMaterials as jest.Mock;
+const mockListPublicEventProjects = listPublicEventProjects as jest.Mock;
 const routeParams = { chapterSlug: 'boston', eventSlug: 'ai-build-night' };
 const eventFixture = publicCalendarPayloadFixture.event;
 const approvedOnlyDetails = {
@@ -452,6 +458,7 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockUseTheme.mockReturnValue({ isDarkMode: false });
+    mockListPublicEventProjects.mockResolvedValue([]);
     mockSignedOut();
   });
 
@@ -494,6 +501,52 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
     expect(
       await screen.findByAltText('AI Build Night artwork')
     ).toHaveAttribute('src', 'https://cdn.example.com/ai-build-night.webp');
+  });
+
+  it('shows event projects as a pitch-vote-ranked carousel above registration', async () => {
+    mockListPublicEventProjects.mockResolvedValue([
+      {
+        id: 'project-high',
+        title: 'Top project',
+        preview: 'Won the most pitch votes.',
+        thumbnail: null,
+        launchLeadName: 'Ada Builder',
+        pitchVoteCount: 8,
+      },
+      {
+        id: 'project-low',
+        title: 'Second project',
+        preview: 'Another event project.',
+        thumbnail: null,
+        launchLeadName: 'Grace Builder',
+        pitchVoteCount: 3,
+      },
+    ]);
+
+    await renderDetailPage(buildEventDetail());
+
+    const carouselHeading = screen.getByRole('heading', {
+      name: /projects from this event/i,
+    });
+    const registrationHeading = screen.getByRole('heading', {
+      name: /^registration$/i,
+    });
+    const projectLinks = screen.getAllByRole('link', {
+      name: /top project|second project/i,
+    });
+
+    expect(projectLinks.map(link => link.getAttribute('href'))).toEqual([
+      '/projects/project-high',
+      '/projects/project-low',
+    ]);
+    expect(screen.getByText('8 votes')).toBeInTheDocument();
+    expect(
+      carouselHeading.compareDocumentPosition(registrationHeading) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+    expect(mockListPublicEventProjects).toHaveBeenCalledWith({
+      eventId: eventFixture.id,
+    });
   });
 
   it('shows one event management action to admins', async () => {
@@ -700,7 +753,7 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
     );
 
     expect(
-      screen.getByRole('heading', { name: /^pitch$/i })
+      screen.getByRole('heading', { name: /pitch session/i })
     ).toBeInTheDocument();
     expect(
       screen.getByRole('link', { name: /open pitch event/i })
@@ -861,9 +914,9 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
 
     const calendarAction = await findCalendarAction();
     expect(calendarAction).toBeInTheDocument();
-    expect(screen.getAllByRole('link', { name: /add.*calendar/i })).toHaveLength(
-      1
-    );
+    expect(
+      screen.getAllByRole('link', { name: /add.*calendar/i })
+    ).toHaveLength(1);
     expect(calendarAction.parentElement).toHaveTextContent(/open/i);
     expect(calendarAction.parentElement).toHaveTextContent(/registered/i);
 

@@ -515,6 +515,18 @@ export interface PublicEventDetail extends PublicEventCard {
   addToCalendar: AddToCalendarPayload;
 }
 
+export interface PublicEventProject {
+  id: EntityId;
+  title: string;
+  preview?: string | null;
+  thumbnail?: {
+    url: string;
+    alt?: string | null;
+  } | null;
+  launchLeadName: string;
+  pitchVoteCount: number;
+}
+
 export interface PublicEventDetailState {
   event: PublicEventDetail;
   viewerRegistration: PublicViewerRegistrationState | null;

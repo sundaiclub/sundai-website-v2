@@ -8,6 +8,9 @@
     },
     "src/app/api/projects/[projectId]/generate-images/route.ts": {
       "maxDuration": 300
+    },
+    "src/app/api/events/generate-images/route.ts": {
+      "maxDuration": 300
     }
   }
 }

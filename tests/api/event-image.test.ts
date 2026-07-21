@@ -26,9 +26,10 @@ const prisma = require('../../src/lib/prisma').default;
 const { requireEventSettingsManager } = require('../../src/lib/eventManagementApi');
 const { uploadToGCS } = require('../../src/lib/gcp-storage');
 
-function imageRequest(file: File) {
+function imageRequest(file: File, prompt?: string) {
   const formData = new FormData();
   formData.append('image', file);
+  if (prompt) formData.append('prompt', prompt);
   return { formData: jest.fn().mockResolvedValue(formData) } as any;
 }
 
@@ -62,7 +63,8 @@ describe('/api/events/[eventId]/image', () => {
 
     const response = await POST(
       imageRequest(
-        new File(['image-bytes'], 'demo.webp', { type: 'image/webp' })
+        new File(['image-bytes'], 'demo.webp', { type: 'image/webp' }),
+        'A pixel-art crowd building AI projects'
       ),
       { params: { eventId: 'event-1' } }
     );
@@ -75,6 +77,7 @@ describe('/api/events/[eventId]/image', () => {
         filename: 'demo.webp',
         mimeType: 'image/webp',
         alt: 'Demo Night event',
+        prompt: 'A pixel-art crowd building AI projects',
       }),
     });
     expect(prisma.event.update).toHaveBeenCalledWith({

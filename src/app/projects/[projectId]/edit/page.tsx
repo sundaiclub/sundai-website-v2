@@ -778,9 +778,13 @@ export default function ProjectEditPage() {
             <ImageGenerationModal
               showModal={showImageGenerationModal}
               setShowModal={setShowImageGenerationModal}
-              projectId={params?.projectId as string}
-              projectTitle={project?.title || ""}
-              projectDescription={project?.preview || ""}
+              generationEndpoint={`/api/projects/${params?.projectId as string}/generate-images`}
+              generationBody={{
+                prompt: "Generate pixel-art thumbnails based on project description",
+              }}
+              subjectLabel="Project"
+              subjectTitle={project?.title || ""}
+              subjectDescription={project?.preview || ""}
               onImageSelect={handleAIGeneratedImageSelect}
               isDarkMode={isDarkMode}
             />

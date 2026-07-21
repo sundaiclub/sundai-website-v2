@@ -75,7 +75,7 @@ describe('Navbar Component', () => {
     
     expect(screen.getAllByText('All Projects')[0]).toBeInTheDocument()
     expect(screen.getAllByText('Events')[0]).toBeInTheDocument()
-    expect(screen.getAllByText('Get Involved')[0]).toBeInTheDocument()
+    expect(screen.queryByText('Get Involved')).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Pitch' })).not.toBeInTheDocument()
   })
 

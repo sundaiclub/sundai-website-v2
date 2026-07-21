@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { SparklesIcon } from '@heroicons/react/24/outline';
 import {
   AuthStatusAlert,
   authStatusFromResponse,
@@ -20,6 +21,8 @@ import {
   useManagementClasses,
 } from '../../components/ManagementSurface';
 import { HackerSelector } from '../../components/HackerSelector';
+import ImageGenerationModal from '../../components/ImageGenerationModal';
+import { useTheme } from '../../contexts/ThemeContext';
 import type { HackerSelectionOption } from '@/types/hacker';
 import type {
   ApplicationTemplateListItem,
@@ -179,6 +182,7 @@ function formatClosedAt(value?: string | Date | null) {
 
 export function OrganizerEventForm({ eventId }: { eventId?: string }) {
   const classes = useManagementClasses();
+  const { isDarkMode } = useTheme();
   const router = useRouter();
   const isEditing = Boolean(eventId);
   const [loadedEvent, setLoadedEvent] = useState<OrganizerEventSettings | null>(
@@ -189,9 +193,12 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
   const [chapterId, setChapterId] = useState('');
   const [description, setDescription] = useState('');
   const [eventImageFile, setEventImageFile] = useState<File | null>(null);
+  const [eventImagePrompt, setEventImagePrompt] = useState<string | null>(null);
   const [eventImagePreview, setEventImagePreview] = useState<string | null>(
     null
   );
+  const [showImageGenerationModal, setShowImageGenerationModal] =
+    useState(false);
   const [publicLocation, setPublicLocation] = useState('');
   const [eventDate, setEventDate] = useState(() => nextSundayInputValue());
   const [startClock, setStartClock] = useState(DEFAULT_START_TIME);
@@ -545,7 +552,34 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
 
   function selectEventImage(file: File | null) {
     setEventImageFile(file);
+    setEventImagePrompt(null);
     if (file) setEventImagePreview(URL.createObjectURL(file));
+  }
+
+  async function selectGeneratedEventImage({
+    url,
+    prompt,
+  }: {
+    url: string;
+    prompt: string;
+  }) {
+    try {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('Unable to download generated image');
+
+      const blob = await response.blob();
+      setEventImageFile(
+        new File([blob], 'ai-generated-event-image.webp', {
+          type: 'image/webp',
+        })
+      );
+      setEventImagePrompt(prompt);
+      setEventImagePreview(url);
+      setMessage('AI-generated event image selected.');
+    } catch (error) {
+      console.error('Unable to process AI-generated event image', error);
+      setMessage('Unable to select the AI-generated event image.');
+    }
   }
 
   function addMc(hacker: HackerSelectionOption) {
@@ -749,6 +783,7 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
     if (eventImageFile && savedEvent?.id) {
       const imageFormData = new FormData();
       imageFormData.append('image', eventImageFile);
+      if (eventImagePrompt) imageFormData.append('prompt', eventImagePrompt);
       const imageResponse = await fetch(`/api/events/${savedEvent.id}/image`, {
         method: 'POST',
         body: imageFormData,
@@ -760,6 +795,7 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
       }
       const image = await imageResponse.json();
       setEventImageFile(null);
+      setEventImagePrompt(null);
       setEventImagePreview(image.url);
       if (isEditing) {
         setLoadedEvent(current => (current ? { ...current, image } : current));
@@ -987,21 +1023,47 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
                     </div>
                   )}
                 </div>
-                <label className="grid gap-2">
+                <div className="grid gap-3">
                   <span className={`text-sm ${classes.mutedText}`}>
                     JPEG, PNG, WebP, or GIF. Maximum 10 MB.
                   </span>
-                  <input
-                    accept="image/jpeg,image/png,image/webp,image/gif"
-                    aria-label="Event image"
-                    className={classes.input}
-                    onChange={event =>
-                      selectEventImage(event.target.files?.[0] ?? null)
-                    }
-                    type="file"
-                  />
-                </label>
+                  <label className="grid gap-2">
+                    <span className="sr-only">Upload event image</span>
+                    <input
+                      accept="image/jpeg,image/png,image/webp,image/gif"
+                      aria-label="Event image"
+                      className={classes.input}
+                      onChange={event =>
+                        selectEventImage(event.target.files?.[0] ?? null)
+                      }
+                      type="file"
+                    />
+                  </label>
+                  <button
+                    className="flex w-fit items-center gap-2 rounded-md bg-purple-600 px-4 py-2 text-sm font-semibold text-white hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    disabled={!chapterId || !title.trim() || !description.trim()}
+                    onClick={() => setShowImageGenerationModal(true)}
+                    type="button"
+                  >
+                    <SparklesIcon className="h-4 w-4" />
+                    AI Generate
+                  </button>
+                  <span className={`text-xs ${classes.mutedText}`}>
+                    Add a title and description before you generate an image.
+                  </span>
+                </div>
               </div>
+              <ImageGenerationModal
+                generationBody={{ chapterId, title, description }}
+                generationEndpoint="/api/events/generate-images"
+                isDarkMode={isDarkMode}
+                onImageSelect={selectGeneratedEventImage}
+                setShowModal={setShowImageGenerationModal}
+                showModal={showImageGenerationModal}
+                subjectDescription={description}
+                subjectLabel="Event"
+                subjectTitle={title}
+              />
             </div>
             <label className="grid gap-2">
               <span className="text-sm font-semibold">Public location</span>

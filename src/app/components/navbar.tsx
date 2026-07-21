@@ -89,15 +89,6 @@ const Navbar = () => {
           </button>
           <div className="hidden md:flex items-center">
             <Link
-              href="/join"
-              className={`${isPWA ? "px-4 py-3" : "px-3 py-2"
-                } mx-2 rounded-lg active:bg-indigo-100`}
-            >
-              <span className={`text-sm font-fira-code ${isDarkMode ? 'text-gray-200' : 'text-black'} hover:text-indigo-700 dark:hover:text-indigo-500 transition duration-300`}>
-                Get Involved
-              </span>
-            </Link>
-            <Link
               href="/projects"
               className={`${isPWA ? "px-4 py-3" : "px-3 py-2"
                 } mx-2 rounded-lg active:bg-indigo-100`}
@@ -178,15 +169,6 @@ const Navbar = () => {
           </div>
         </div>
         <div className={`md:hidden ${isMenuOpen ? 'block' : 'hidden'} pb-4`}>
-          <Link
-            href="/join"
-            className="block px-4 py-2 rounded-lg"
-            onClick={() => setIsMenuOpen(false)}
-          >
-            <span className={`text-sm font-fira-code ${isDarkMode ? 'text-gray-200' : 'text-black'} hover:text-indigo-700 dark:hover:text-indigo-500`}>
-              Get Involved
-            </span>
-          </Link>
           <Link
             href="/projects"
             className="block px-4 py-2 rounded-lg"

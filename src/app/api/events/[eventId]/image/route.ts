@@ -27,6 +27,11 @@ export async function POST(
 
     const formData = await request.formData();
     const file = formData.get('image');
+    const rawPrompt = formData.get('prompt');
+    const prompt =
+      typeof rawPrompt === 'string' && rawPrompt.trim()
+        ? rawPrompt.trim().slice(0, 10_000)
+        : null;
     if (!(file instanceof File) || file.size === 0) {
       return NextResponse.json(
         { message: 'An event image is required.' },
@@ -56,6 +61,7 @@ export async function POST(
         mimeType: file.type,
         size: file.size,
         alt: `${event.title} event`,
+        prompt,
       },
     });
     const updatedEvent = await prisma.event.update({

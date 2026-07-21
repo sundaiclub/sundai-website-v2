@@ -22,6 +22,14 @@ jest.mock('next/navigation', () => ({
   }),
 }));
 
+jest.mock('react-hot-toast', () => ({
+  __esModule: true,
+  default: {
+    success: jest.fn(),
+    error: jest.fn(),
+  },
+}));
+
 const chapters = [
   {
     id: 'chapter-boston',
@@ -145,6 +153,25 @@ function mockOrganizerFetches() {
       return jsonResponse(applicationTemplates);
     }
 
+    if (url.includes('/api/events/generate-images')) {
+      return jsonResponse({
+        images: Array.from({ length: 4 }, (_, index) => ({
+          url: `https://images.example.com/event-${index + 1}.webp`,
+          prompt: `Generated event image ${index + 1}`,
+        })),
+      });
+    }
+
+    if (url.startsWith('https://images.example.com/')) {
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        blob: jest
+          .fn()
+          .mockResolvedValue(new Blob(['generated-image'], { type: 'image/webp' })),
+      });
+    }
+
     if (url.includes('/api/events/event-created/publish')) {
       return jsonResponse({
         id: 'event-created',
@@ -252,6 +279,9 @@ describe('/organizer/events/new', () => {
       'accept',
       'image/jpeg,image/png,image/webp,image/gif'
     );
+    expect(
+      screen.getByRole('button', { name: /ai generate/i })
+    ).toBeDisabled();
     expect(screen.getByText(/10:00 AM to 10:00 PM/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/timezone/i)).toHaveValue('America/New_York');
     expect(screen.getByLabelText(/^capacity$/i)).toBeRequired();
@@ -297,6 +327,58 @@ describe('/organizer/events/new', () => {
     expect(
       screen.getByText(/event draft was successfully created/i)
     ).toBeInTheDocument();
+  });
+
+  it('generates, selects, and uploads an AI event image', async () => {
+    await renderNewEventPage();
+    fillRequiredEventFields();
+
+    const generateButton = screen.getByRole('button', {
+      name: /ai generate/i,
+    });
+    expect(generateButton).toBeEnabled();
+    fireEvent.click(generateButton);
+    const generateButtons = await screen.findAllByRole('button', {
+      name: /^ai generate$/i,
+    });
+    fireEvent.click(generateButtons[generateButtons.length - 1]);
+
+    fireEvent.click(
+      await screen.findByAltText(/generated image 1/i)
+    );
+    fireEvent.click(screen.getByRole('button', { name: /use this image/i }));
+
+    await screen.findByAltText(/boston ai build night preview/i);
+    fireEvent.click(screen.getByRole('button', { name: /save draft/i }));
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        '/api/events/generate-images',
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({
+            chapterId: 'chapter-boston',
+            title: 'Boston AI Build Night',
+            description: 'A public build night for AI projects.',
+          }),
+        })
+      );
+      expect(global.fetch).toHaveBeenCalledWith(
+        '/api/events/event-created/image',
+        expect.objectContaining({ method: 'POST', body: expect.any(FormData) })
+      );
+    });
+    const imageCall = (global.fetch as jest.Mock).mock.calls.find(([url]) =>
+      requestUrl(url).includes('/api/events/event-created/image')
+    );
+    const uploadedImage = (imageCall?.[1].body as FormData).get(
+      'image'
+    ) as File;
+    expect(uploadedImage.name).toBe('ai-generated-event-image.webp');
+    expect(uploadedImage.type).toBe('image/webp');
+    expect((imageCall?.[1].body as FormData).get('prompt')).toBe(
+      'Generated event image 1'
+    );
   });
 
   it('preselects the requested chapter from the chapterId query parameter', async () => {

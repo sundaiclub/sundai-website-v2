@@ -3,19 +3,23 @@ import { auth, currentUser } from '@clerk/nextjs/server';
 import {
   AddToCalendarAction,
   EventDetailSections,
+  EventMaterialsSection,
+  EventPitchSection,
+  EventProgramHighlights,
+  type PublicEventMaterialLink,
 } from '@/app/components/EventDetailSections';
-import { EventHeroImage } from '@/app/components/EventHeroImage';
+import { PublicEventHero } from '@/app/components/EventHeroImage';
+import { EventProjectCarousel } from '@/app/components/EventProjectCarousel';
 import {
-  ManagementHeader,
   ManagementLinkButton,
   ManagementPage,
-  ManagementSection,
 } from '@/app/components/ManagementSurface';
 import {
   PublicEventStatusBadge,
   ViewerRegistrationStatusBadge,
 } from '@/app/components/PublicEventCard';
 import { listVisibleEventMaterials } from '@/lib/eventMaterials';
+import { listPublicEventProjects } from '@/lib/publicEventProjects';
 import { getPublicEventBySlug } from '@/lib/publicEvents';
 
 type PublicMaterial = {
@@ -56,6 +60,22 @@ function publicMaterials(
   });
 }
 
+function approvedAddress(event: {
+  approvedDetailsVisible: boolean;
+  approvedDetailsJson?: Record<string, unknown> | null;
+}) {
+  if (!event.approvedDetailsVisible || !event.approvedDetailsJson) return null;
+
+  const address = Object.entries(event.approvedDetailsJson).find(
+    ([key, value]) =>
+      key.replace(/[^a-z0-9]/gi, '').toLowerCase() === 'address' &&
+      typeof value === 'string' &&
+      value.trim()
+  )?.[1];
+
+  return typeof address === 'string' ? address.trim() : null;
+}
+
 export default async function PublicEventDetailPage({
   params,
 }: {
@@ -79,12 +99,15 @@ export default async function PublicEventDetailPage({
         username: viewer.username,
       }
     : null;
-  const visibleMaterials = (await listVisibleEventMaterials({
-    eventId: event.id,
-    viewer: {
-      registrationStatus: event.viewerRegistrationStatus ?? null,
-    },
-  })) as PublicMaterial[];
+  const [visibleMaterials, eventProjects] = await Promise.all([
+    listVisibleEventMaterials({
+      eventId: event.id,
+      viewer: {
+        registrationStatus: event.viewerRegistrationStatus ?? null,
+      },
+    }) as Promise<PublicMaterial[]>,
+    listPublicEventProjects({ eventId: event.id }),
+  ]);
   const materials = publicMaterials(
     visibleMaterials.map(material => ({
       id: material.id,
@@ -99,9 +122,38 @@ export default async function PublicEventDetailPage({
     })),
     event.viewerRegistrationStatus === 'APPROVED'
   );
+  const materialLinks = materials.flatMap<PublicEventMaterialLink>(material => {
+    const href =
+      material.kind === 'FILE'
+        ? `/api/events/${event.id}/materials/${material.id}/content`
+        : material.externalUrl;
+    if (!href || (!href.startsWith('https://') && material.kind === 'LINK')) {
+      return [];
+    }
+    return [
+      {
+        id: material.id,
+        title: material.title,
+        description: material.description,
+        href,
+        kind: material.kind,
+      },
+    ];
+  });
+  const privateAddress = approvedAddress(event);
+  const heroEvent = privateAddress
+    ? {
+        ...event,
+        publicLocation: privateAddress,
+        addToCalendar: {
+          ...event.addToCalendar,
+          location: privateAddress,
+        },
+      }
+    : event;
 
   return (
-    <ManagementPage maxWidth="max-w-4xl">
+    <ManagementPage maxWidth="max-w-6xl">
       <div className="mb-4">
         <ManagementLinkButton
           href={`/chapters/${event.chapterSlug}`}
@@ -112,14 +164,17 @@ export default async function PublicEventDetailPage({
         </ManagementLinkButton>
       </div>
 
-      <EventHeroImage image={event.image} title={event.title} />
-
-      <ManagementHeader
-        eyebrow={event.chapterName}
-        title={event.title}
-        description={event.description}
+      <PublicEventHero
+        event={heroEvent}
         actions={
           <>
+            <PublicEventStatusBadge status={event.publicStatus} />
+            {event.viewerRegistrationStatus && (
+              <ViewerRegistrationStatusBadge
+                status={event.viewerRegistrationStatus}
+              />
+            )}
+            <AddToCalendarAction payload={heroEvent.addToCalendar} />
             {event.viewerCanManageEvent && (
               <ManagementLinkButton
                 href={`/organizer/events/${event.id}`}
@@ -128,99 +183,24 @@ export default async function PublicEventDetailPage({
                 Manage
               </ManagementLinkButton>
             )}
-            <PublicEventStatusBadge status={event.publicStatus} />
-            {event.viewerRegistrationStatus && (
-              <ViewerRegistrationStatusBadge
-                status={event.viewerRegistrationStatus}
-              />
-            )}
-            <AddToCalendarAction payload={event.addToCalendar} />
           </>
         }
       />
 
-      {(event.publicProgramLabel ||
-        event.publicSponsorText ||
-        event.publicExpertText) && (
-        <ManagementSection title="Program">
-          <div className="grid gap-4 text-sm leading-6">
-            {event.publicProgramLabel && (
-              <p>
-                <span className="font-semibold">Format: </span>
-                {event.publicProgramLabel}
-              </p>
-            )}
-            {event.publicSponsorText && <p>{event.publicSponsorText}</p>}
-            {event.publicExpertText && <p>{event.publicExpertText}</p>}
-          </div>
-        </ManagementSection>
-      )}
-
-      <div className="mt-5">
+      <div className="mt-6 grid gap-5">
+        <EventProgramHighlights
+          experts={event.publicExpertText}
+          format={event.publicProgramLabel}
+          partners={event.publicSponsorText}
+        />
+        <EventProjectCarousel projects={eventProjects} />
         <EventDetailSections event={event} viewerProfile={viewerProfile} />
+        <EventMaterialsSection materials={materialLinks} />
+        <EventPitchSection
+          eventId={event.pitchSession ? event.id : null}
+          phase={event.pitchSession?.phase}
+        />
       </div>
-
-      {event.pitchSession && (
-        <div className="mt-5">
-          <ManagementSection
-            title="Pitch"
-            actions={
-              <ManagementLinkButton
-                href={`/pitch/${event.id}`}
-                variant="primary"
-              >
-                Open pitch event
-              </ManagementLinkButton>
-            }
-          >
-            <p className="text-sm leading-6">
-              Pitching is currently {event.pitchSession.phase.toLowerCase()}.
-              Open the pitch event to add an eligible project, follow the queue,
-              and participate in voting.
-            </p>
-          </ManagementSection>
-        </div>
-      )}
-
-      {materials.length > 0 && (
-        <div className="mt-5">
-          <ManagementSection title="Event materials">
-            <ul className="grid gap-3">
-              {materials.map(material => {
-                const href =
-                  material.kind === 'FILE'
-                    ? `/api/events/${event.id}/materials/${material.id}/content`
-                    : material.externalUrl;
-                if (
-                  !href ||
-                  (!href.startsWith('https://') && material.kind === 'LINK')
-                ) {
-                  return null;
-                }
-
-                return (
-                  <li key={material.id}>
-                    <a
-                      className="font-semibold underline underline-offset-4 hover:no-underline"
-                      href={href}
-                      {...(material.kind === 'LINK'
-                        ? { rel: 'noopener noreferrer' }
-                        : {})}
-                    >
-                      {material.title}
-                    </a>
-                    {material.description && (
-                      <p className="mt-1 text-sm text-gray-600">
-                        {material.description}
-                      </p>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-          </ManagementSection>
-        </div>
-      )}
     </ManagementPage>
   );
 }
