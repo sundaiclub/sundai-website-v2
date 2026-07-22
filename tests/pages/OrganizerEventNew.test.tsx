@@ -555,6 +555,9 @@ describe('/organizer/events/new', () => {
       /decline message/i,
       'We cannot accommodate your application.'
     );
+    fireEvent.click(
+      screen.getByLabelText(/notify chapter members when published/i)
+    );
 
     fireEvent.click(screen.getByRole('button', { name: /publish/i }));
 
@@ -569,6 +572,7 @@ describe('/organizer/events/new', () => {
         '/api/events/event-created/publish',
         expect.objectContaining({
           method: 'POST',
+          body: JSON.stringify({ notifyChapterMembers: true }),
         })
       );
     });

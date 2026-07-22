@@ -253,8 +253,12 @@ describe('/organizer/events/[eventId]/settings', () => {
 
     renderSettingsPage(draftEventSettings.id);
 
+    expect(
+      await screen.findByLabelText(/notify chapter members when published/i)
+    ).toBeInTheDocument();
+
     fireEvent.click(
-      await screen.findByRole('button', { name: /delete draft/i })
+      screen.getByRole('button', { name: /delete draft/i })
     );
 
     expect(window.confirm).toHaveBeenCalledWith(
@@ -276,6 +280,9 @@ describe('/organizer/events/[eventId]/settings', () => {
     await screen.findByRole('heading', { name: /ai build night/i });
     expect(
       screen.queryByRole('button', { name: /delete draft/i })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByLabelText(/notify chapter members when published/i)
     ).not.toBeInTheDocument();
   });
 

@@ -58,7 +58,13 @@ jest.mock('../../src/lib/prisma', () => ({
   },
 }));
 
+jest.mock('../../src/lib/eventPublicationNotifications', () => ({
+  notifyChapterMembersOfPublishedEvent: jest.fn(),
+}));
+
 const prisma = require('../../src/lib/prisma').default;
+const notifyChapterMembersOfPublishedEvent = require('../../src/lib/eventPublicationNotifications')
+  .notifyChapterMembersOfPublishedEvent as jest.Mock;
 
 const createNativeEventBody = (overrides: Record<string, unknown> = {}) => ({
   title: 'Boston AI Build Night',
@@ -559,6 +565,46 @@ describe('/api/events organizer immediate publishing', () => {
         status: 'PUBLISHED',
         visibility: 'PUBLIC',
       })
+    );
+  });
+
+  it('notifies chapter members when a draft is published with notification enabled', async () => {
+    const {
+      chapter,
+      hacker: chapterAdmin,
+      membership,
+    } = buildChapterAdminFixture();
+    const draftEvent = buildUnpublishedEvent({
+      chapterId: chapter.id,
+      createdById: chapterAdmin.id,
+    });
+    const publishedEvent = buildPublishedEvent({
+      ...draftEvent,
+      status: 'PUBLISHED',
+    });
+    const notification = { sentCount: 3, failedCount: 1 };
+
+    mockActor(chapterAdmin);
+    mockMembershipLookup(membership);
+    prisma.event.findUnique.mockResolvedValue(draftEvent);
+    prisma.event.update.mockResolvedValue(publishedEvent);
+    notifyChapterMembersOfPublishedEvent.mockResolvedValue(notification);
+
+    const response = await POST_PUBLISH_EVENT(
+      createJsonRequest(`/api/events/${draftEvent.id}/publish`, {
+        method: 'POST',
+        body: { notifyChapterMembers: true },
+      }) as any,
+      createRouteContext({ eventId: draftEvent.id }) as any
+    );
+
+    expect(response.status).toBe(200);
+    expect(notifyChapterMembersOfPublishedEvent).toHaveBeenCalledWith({
+      event: publishedEvent,
+      requestedById: chapterAdmin.id,
+    });
+    await expect(response.json()).resolves.toEqual(
+      expect.objectContaining({ publicationNotification: notification })
     );
   });
 

@@ -18,7 +18,12 @@ const workspace = {
     id: eventId,
     title: 'Accessible Build Night',
     status: 'PUBLISHED',
-    chapter: { id: 'chapter-boston', name: 'Sundai Boston', slug: 'boston' },
+    chapter: {
+      id: 'chapter-boston',
+      name: 'Sundai Boston',
+      slug: 'boston',
+      timezone: 'America/New_York',
+    },
     startTime: '2026-07-18T14:00:00.000Z',
     endTime: '2026-07-18T22:00:00.000Z',
     capacity: 80,
@@ -42,13 +47,28 @@ const workspace = {
   },
   staff: [],
   counts: {
-    registrations: { pending: 0, approved: 0, waitlisted: 0, declined: 0, cancelled: 0 },
+    registrations: {
+      pending: 0,
+      approved: 0,
+      waitlisted: 0,
+      declined: 0,
+      cancelled: 0,
+    },
     projects: { total: 0, submittedCards: 0 },
     pitch: { queued: 0, pitched: 0, highlighted: 0 },
     materials: 1,
     communications: 0,
   },
-  availableSections: ['overview', 'registrations', 'communications', 'materials', 'projects', 'pitch', 'notes', 'reporting'] as const,
+  availableSections: [
+    'overview',
+    'registrations',
+    'communications',
+    'materials',
+    'projects',
+    'pitch',
+    'notes',
+    'reporting',
+  ] as const,
   unavailable: ['checkIn', 'attendance', 'noShows'] as const,
 };
 
@@ -77,7 +97,11 @@ function jsonResponse(data: unknown, status = 200) {
     ok: status >= 200 && status < 300,
     status,
     json: jest.fn().mockResolvedValue(data),
-    text: jest.fn().mockResolvedValue(typeof data === 'string' ? data : JSON.stringify(data)),
+    text: jest
+      .fn()
+      .mockResolvedValue(
+        typeof data === 'string' ? data : JSON.stringify(data)
+      ),
   });
 }
 
@@ -90,7 +114,8 @@ describe('organizer event workspace accessibility', () => {
   afterEach(cleanup);
 
   it('supports keyboard navigation and exposes the current section semantically', async () => {
-    const WorkspaceShell = require('../../src/app/organizer/events/[eventId]/WorkspaceShell').default;
+    const WorkspaceShell =
+      require('../../src/app/organizer/events/[eventId]/WorkspaceShell').default;
     const user = userEvent.setup();
     render(
       <WorkspaceShell eventId={eventId} initialWorkspace={workspace}>
@@ -98,17 +123,21 @@ describe('organizer event workspace accessibility', () => {
       </WorkspaceShell>
     );
 
-    const navigation = screen.getByRole('navigation', { name: /event workspace/i });
+    const navigation = screen.getByRole('navigation', {
+      name: /event workspace/i,
+    });
     const links = Array.from(navigation.querySelectorAll('a'));
     expect(links).toHaveLength(8);
-    expect(screen.getByRole('link', { name: /materials/i })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('link', { name: /materials/i })).toHaveAttribute(
+      'aria-current',
+      'page'
+    );
 
     await user.tab();
     expect(screen.getByRole('link', { name: /back to event/i })).toHaveFocus();
-    expect(screen.getByRole('link', { name: /back to event/i })).toHaveAttribute(
-      'href',
-      workspace.event.publicUrl
-    );
+    expect(
+      screen.getByRole('link', { name: /back to event/i })
+    ).toHaveAttribute('href', workspace.event.publicUrl);
     await user.tab();
     expect(screen.getByRole('link', { name: /view event/i })).toHaveFocus();
     for (const link of links) {
@@ -123,34 +152,50 @@ describe('organizer event workspace accessibility', () => {
       WorkspacePermissionLost,
     } = require('../../src/app/organizer/events/[eventId]/WorkspaceShell');
     const { rerender } = render(<WorkspaceLoading />);
-    expect(screen.getByRole('status')).toHaveTextContent(/loading event workspace/i);
+    expect(screen.getByRole('status')).toHaveTextContent(
+      /loading event workspace/i
+    );
 
     rerender(<WorkspacePermissionLost />);
-    expect(screen.getByRole('alert')).toHaveTextContent(/no longer have access/i);
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      /no longer have access/i
+    );
   });
 
   it('exposes material visibility and availability with readable text, not color alone', async () => {
     global.fetch = jest.fn(() => jsonResponse([material])) as jest.Mock;
-    const EventMaterialsPanel = require('../../src/app/organizer/events/[eventId]/materials/EventMaterialsPanel').default;
+    const EventMaterialsPanel =
+      require('../../src/app/organizer/events/[eventId]/materials/EventMaterialsPanel').default;
     render(<EventMaterialsPanel eventId={eventId} />);
 
-    expect(await screen.findByText('Private sponsor brief')).toBeInTheDocument();
+    expect(
+      await screen.findByText('Private sponsor brief')
+    ).toBeInTheDocument();
     expect(screen.getByText('Organizers only')).toBeInTheDocument();
     expect(screen.getByText('Unavailable')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /mark private sponsor brief available/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', {
+        name: /mark private sponsor brief available/i,
+      })
+    ).toBeInTheDocument();
   });
 
   it('requires destructive confirmation and preserves focus when deletion is cancelled', async () => {
     global.fetch = jest.fn(() => jsonResponse([material])) as jest.Mock;
     jest.spyOn(window, 'confirm').mockReturnValue(false);
-    const EventMaterialsPanel = require('../../src/app/organizer/events/[eventId]/materials/EventMaterialsPanel').default;
+    const EventMaterialsPanel =
+      require('../../src/app/organizer/events/[eventId]/materials/EventMaterialsPanel').default;
     render(<EventMaterialsPanel eventId={eventId} />);
 
-    const remove = await screen.findByRole('button', { name: /delete private sponsor brief/i });
+    const remove = await screen.findByRole('button', {
+      name: /delete private sponsor brief/i,
+    });
     remove.focus();
     fireEvent.click(remove);
 
-    expect(window.confirm).toHaveBeenCalledWith(expect.stringMatching(/cannot be undone/i));
+    expect(window.confirm).toHaveBeenCalledWith(
+      expect.stringMatching(/cannot be undone/i)
+    );
     expect(remove).toHaveFocus();
     expect(global.fetch).not.toHaveBeenCalledWith(
       expect.stringContaining(`/materials/${material.id}`),
@@ -159,24 +204,35 @@ describe('organizer event workspace accessibility', () => {
   });
 
   it('announces destructive staff removal and restores focus to a stable control', async () => {
-    const staff = [{
-      id: 'staff-mc',
-      hackerId: 'hacker-mc',
-      name: 'Morgan MC',
-      role: 'MC',
-    }];
+    const staff = [
+      {
+        id: 'staff-mc',
+        hackerId: 'hacker-mc',
+        name: 'Morgan MC',
+        role: 'MC',
+      },
+    ];
     global.fetch = jest.fn((input: RequestInfo | URL, init?: RequestInit) =>
       init?.method === 'DELETE' ? jsonResponse(null, 204) : jsonResponse(staff)
     ) as jest.Mock;
     jest.spyOn(window, 'confirm').mockReturnValue(true);
-    const EventStaffPanel = require('../../src/app/organizer/events/[eventId]/staff/EventStaffPanel').default;
-    render(<EventStaffPanel eventId={eventId} canAssignStaff initialStaff={staff} />);
+    const EventStaffPanel =
+      require('../../src/app/organizer/events/[eventId]/staff/EventStaffPanel').default;
+    render(
+      <EventStaffPanel eventId={eventId} canAssignStaff initialStaff={staff} />
+    );
 
-    const remove = await screen.findByRole('button', { name: /remove morgan mc/i });
+    const remove = await screen.findByRole('button', {
+      name: /remove morgan mc/i,
+    });
     fireEvent.click(remove);
 
-    expect(window.confirm).toHaveBeenCalledWith(expect.stringMatching(/remove morgan mc/i));
-    expect(await screen.findByRole('status')).toHaveTextContent(/access is revoked immediately/i);
+    expect(window.confirm).toHaveBeenCalledWith(
+      expect.stringMatching(/remove morgan mc/i)
+    );
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      /access is revoked immediately/i
+    );
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /add staff/i })).toHaveFocus();
     });

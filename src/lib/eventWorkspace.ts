@@ -39,8 +39,11 @@ export function getAvailableWorkspaceSections(
     : AVAILABLE_SECTIONS.filter(section => section !== 'registrations');
 }
 
-const WORKSPACE_UNAVAILABLE_METRICS: EventWorkspaceOverview['unavailable'] =
-  ['checkIn', 'attendance', 'noShows'];
+const WORKSPACE_UNAVAILABLE_METRICS: EventWorkspaceOverview['unavailable'] = [
+  'checkIn',
+  'attendance',
+  'noShows',
+];
 
 function projectCapabilities(
   actor: WorkspaceActor,
@@ -120,7 +123,18 @@ export async function loadEventWorkspace(
       approvedDetailsJson: true,
       slug: true,
       chapterId: true,
-      chapter: { select: { id: true, name: true, slug: true } },
+      chapter: { select: { id: true, name: true, slug: true, timezone: true } },
+      publicationNotification: {
+        select: {
+          status: true,
+          recipientCount: true,
+          sentCount: true,
+          failedCount: true,
+          emailRecipientCount: true,
+          smsRecipientCount: true,
+          sentAt: true,
+        },
+      },
       staff: {
         orderBy: [{ role: 'asc' }, { createdAt: 'asc' }],
         // Event staff is displayed inline; keep the relation include bounded.
@@ -245,5 +259,11 @@ export async function loadEventWorkspace(
       canDecideEventApplicantsWithContext(permissionContext)
     ),
     unavailable: [...WORKSPACE_UNAVAILABLE_METRICS],
+    publicationNotification: event.publicationNotification
+      ? {
+          ...event.publicationNotification,
+          sentAt: event.publicationNotification.sentAt?.toISOString() ?? null,
+        }
+      : null,
   };
 }

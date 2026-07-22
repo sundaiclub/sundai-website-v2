@@ -33,6 +33,7 @@ const workspace = {
       id: 'chapter-boston',
       name: 'Sundai Boston',
       slug: 'boston',
+      timezone: 'America/New_York',
     },
     startTime: '2026-07-18T14:00:00.000Z',
     endTime: '2026-07-18T22:00:00.000Z',
@@ -158,6 +159,7 @@ describe('/organizer/events/[eventId] workspace', () => {
     expect(screen.getByText('Sundai Boston')).toBeInTheDocument();
     expect(screen.getByText(/published/i)).toBeInTheDocument();
     expect(screen.getByText(/MC/)).toBeInTheDocument();
+    expect(screen.getByText(/10:00 AM.*6:00 PM/)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /view event/i })).toHaveAttribute(
       'href',
       '/events/boston/ai-build-night'
@@ -230,6 +232,33 @@ describe('/organizer/events/[eventId] workspace', () => {
     expect(screen.getByText(/8 queued/i)).toBeInTheDocument();
     expect(screen.getByText(/6 materials/i)).toBeInTheDocument();
     expect(screen.getByText(/3 communications/i)).toBeInTheDocument();
+  });
+
+  it('shows the publication notification delivery record on the overview', async () => {
+    mockWorkspaceFetch({
+      ...workspace,
+      publicationNotification: {
+        status: 'PARTIAL',
+        recipientCount: 12,
+        sentCount: 10,
+        failedCount: 2,
+        emailRecipientCount: 8,
+        smsRecipientCount: 4,
+        sentAt: '2026-07-18T13:00:00.000Z',
+      },
+    });
+    const Overview = loadOverview();
+    renderWorkspace(<Overview params={{ eventId }} />);
+
+    expect(
+      await screen.findByText(/chapter member notification/i)
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/10 of 12 messages sent; 2 failed/i)
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/8 email and 4 SMS recipients/i)
+    ).toBeInTheDocument();
   });
 
   it('shows permission lost without retaining event metadata after access is denied', async () => {

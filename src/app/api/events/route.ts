@@ -16,6 +16,11 @@ import {
 } from '@/lib/eventRequestParsing';
 import { DEFAULT_EVENT_MESSAGES } from '@/lib/eventMessageDefaults';
 import { listPublicEvents } from '@/lib/publicEvents';
+import {
+  EventDateTimeInputError,
+  parseEventDateTimeInput,
+  parseOptionalEventDateTimeInput,
+} from '@/lib/eventDateTime';
 
 export async function GET(req: Request) {
   try {
@@ -137,6 +142,7 @@ export async function POST(req: Request) {
       description,
       startTime,
       endTime,
+      timezone,
       meetingUrl,
       location,
       venueName,
@@ -237,13 +243,42 @@ export async function POST(req: Request) {
       );
     }
 
+    const parsedStartTime = parseEventDateTimeInput(
+      startTime,
+      timezone,
+      'startTime'
+    );
+    const parsedEndTime = parseOptionalEventDateTimeInput(
+      endTime,
+      timezone,
+      'endTime'
+    );
+    const parsedCheckInOpensAt = parseOptionalEventDateTimeInput(
+      checkInOpensAt,
+      timezone,
+      'checkInOpensAt'
+    );
+    const parsedCheckInClosesAt = parseOptionalEventDateTimeInput(
+      checkInClosesAt,
+      timezone,
+      'checkInClosesAt'
+    );
+    const parsedVotingEndTime = parseOptionalEventDateTimeInput(
+      votingEndTime,
+      timezone,
+      'votingEndTime'
+    );
+    if (parsedEndTime && parsedEndTime <= parsedStartTime) {
+      throw new EventDateTimeInputError('endTime must be after startTime');
+    }
+
     const event = await prisma.event.create({
       data: {
         title,
         description: description || null,
-        startTime: new Date(startTime),
+        startTime: parsedStartTime,
         ...(endTime !== undefined && {
-          endTime: endTime ? new Date(endTime) : null,
+          endTime: parsedEndTime,
         }),
         chapterId,
         slug: slugifyEventValue(slug || title),
@@ -266,8 +301,7 @@ export async function POST(req: Request) {
         applicationMode: parsedApplicationMode,
         autoPromoteWaitlist: Boolean(autoPromoteWaitlist),
         ...(approvedDetailsJson !== undefined && {
-          approvedDetailsJson:
-            sanitizeApprovedDetailsJson(approvedDetailsJson),
+          approvedDetailsJson: sanitizeApprovedDetailsJson(approvedDetailsJson),
         }),
         ...(applicationQuestionsJson !== undefined && {
           applicationQuestionsJson,
@@ -298,10 +332,10 @@ export async function POST(req: Request) {
           ? null
           : applicationsCloseReason || null,
         ...(checkInOpensAt !== undefined && {
-          checkInOpensAt: checkInOpensAt ? new Date(checkInOpensAt) : null,
+          checkInOpensAt: parsedCheckInOpensAt,
         }),
         ...(checkInClosesAt !== undefined && {
-          checkInClosesAt: checkInClosesAt ? new Date(checkInClosesAt) : null,
+          checkInClosesAt: parsedCheckInClosesAt,
         }),
         staff: {
           create:
@@ -317,14 +351,14 @@ export async function POST(req: Request) {
             chapterId,
             title,
             description: description || null,
-            startTime: new Date(startTime),
+            startTime: parsedStartTime,
             meetingUrl: meetingUrl || null,
             location: location || null,
             createdById: user.id,
             audienceCanReorder,
-            votingEndTime: votingEndTime
-              ? new Date(votingEndTime)
-              : new Date(new Date(startTime).getTime() + 15 * 60 * 1000),
+            votingEndTime:
+              parsedVotingEndTime ??
+              new Date(parsedStartTime.getTime() + 15 * 60 * 1000),
             ...(topProjectCount !== undefined && { topProjectCount }),
             ...(topPresentingSec !== undefined && { topPresentingSec }),
             ...(topQuestionsSec !== undefined && { topQuestionsSec }),
@@ -343,6 +377,9 @@ export async function POST(req: Request) {
 
     return NextResponse.json(event);
   } catch (error) {
+    if (error instanceof EventDateTimeInputError) {
+      return NextResponse.json({ message: error.message }, { status: 400 });
+    }
     if (error instanceof ApplicationTemplateValidationError) {
       return NextResponse.json(
         { message: error.message, issues: error.issues },

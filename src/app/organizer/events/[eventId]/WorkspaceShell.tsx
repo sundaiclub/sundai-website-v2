@@ -65,7 +65,7 @@ function readableStatus(status: string) {
     .join(' ');
 }
 
-function scheduleLabel(startTime: string, endTime: string) {
+function scheduleLabel(startTime: string, endTime: string, timezone: string) {
   const start = new Date(startTime);
   const end = new Date(endTime);
   if (Number.isNaN(start.valueOf()) || Number.isNaN(end.valueOf())) {
@@ -76,14 +76,17 @@ function scheduleLabel(startTime: string, endTime: string) {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
+    timeZone: timezone,
   });
   const startLabel = start.toLocaleTimeString(undefined, {
     hour: 'numeric',
     minute: '2-digit',
+    timeZone: timezone,
   });
   const endLabel = end.toLocaleTimeString(undefined, {
     hour: 'numeric',
     minute: '2-digit',
+    timeZone: timezone,
   });
   return `${date}, ${startLabel}–${endLabel}`;
 }
@@ -161,9 +164,16 @@ function WorkspaceContent({
               {event.title}
             </h1>
             <p className={`mt-2 text-sm ${classes.mutedText}`}>
-              {scheduleLabel(event.startTime, event.endTime)}
+              {scheduleLabel(
+                event.startTime,
+                event.endTime,
+                event.chapter.timezone
+              )}
             </p>
-            <div className="mt-3 flex flex-wrap gap-2" aria-label="Event status">
+            <div
+              className="mt-3 flex flex-wrap gap-2"
+              aria-label="Event status"
+            >
               <ManagementBadge>{readableStatus(event.status)}</ManagementBadge>
               <ManagementBadge>
                 Role: {readableRole(workspace.effectiveRole)}

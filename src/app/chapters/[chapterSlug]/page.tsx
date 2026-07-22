@@ -494,6 +494,7 @@ export default function ChapterLandingPage({
                     href={`/events/${eventChapterSlug}/${event.slug}`}
                     key={event.id}
                     showEdit={canManageChapter}
+                    timezone={chapter?.timezone}
                   />
                 ))}
               </div>
@@ -512,6 +513,7 @@ export default function ChapterLandingPage({
                     href={`/organizer/events/${event.id}/settings`}
                     key={event.id}
                     showState
+                    timezone={chapter?.timezone}
                   />
                 ))}
                 {pendingEvents.length === 0 && (
@@ -533,6 +535,7 @@ export default function ChapterLandingPage({
                   href={`/events/${eventChapterSlug}/${event.slug}`}
                   key={event.id}
                   showEdit={canManageChapter}
+                  timezone={chapter?.timezone}
                 />
               ))}
               {(chapter?.upcomingEvents ?? []).length === 0 && (
@@ -553,6 +556,7 @@ export default function ChapterLandingPage({
                   href={`/events/${eventChapterSlug}/${event.slug}`}
                   key={event.id}
                   showEdit={canManageChapter}
+                  timezone={chapter?.timezone}
                 />
               ))}
               {(chapter?.previousEvents ?? []).length === 0 && (

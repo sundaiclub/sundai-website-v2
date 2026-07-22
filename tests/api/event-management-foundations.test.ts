@@ -154,8 +154,8 @@ describe('/api/events event-management foundations', () => {
     prisma.chapterMembership.findFirst.mockResolvedValue(null);
     prisma.chapterMembership.findMany.mockResolvedValue([]);
     prisma.eventStaff.findFirst.mockResolvedValue(null);
-    prisma.$transaction.mockImplementation(async (ops: Array<Promise<unknown>>) =>
-      Promise.all(ops)
+    prisma.$transaction.mockImplementation(
+      async (ops: Array<Promise<unknown>>) => Promise.all(ops)
     );
   });
 
@@ -163,8 +163,8 @@ describe('/api/events event-management foundations', () => {
     const siteAdmin = buildSiteAdmin();
     const chapter = buildChapter();
     const createdEvent = buildEvent({ chapterId: chapter.id });
-    const startTime = '2026-06-18T22:00:00.000Z';
-    const endTime = '2026-06-19T00:00:00.000Z';
+    const startTime = '2026-06-18T18:00';
+    const endTime = '2026-06-18T20:00';
     const applicationsClosedAt = '2026-06-01T13:00:00.000Z';
     const checkInOpensAt = '2026-06-18T21:30:00.000Z';
     const checkInClosesAt = '2026-06-18T23:00:00.000Z';
@@ -196,6 +196,7 @@ describe('/api/events event-management foundations', () => {
           slug: createdEvent.slug,
           startTime,
           endTime,
+          timezone: 'America/New_York',
           visibility: 'UNLISTED',
           programType: 'demo-night',
           publicProgramLabel: 'Demo Night',
@@ -227,8 +228,8 @@ describe('/api/events event-management foundations', () => {
           description: createdEvent.description,
           chapterId: chapter.id,
           slug: createdEvent.slug,
-          startTime: new Date(startTime),
-          endTime: new Date(endTime),
+          startTime: new Date('2026-06-18T22:00:00.000Z'),
+          endTime: new Date('2026-06-19T00:00:00.000Z'),
           visibility: 'UNLISTED',
           programType: 'demo-night',
           publicProgramLabel: 'Demo Night',

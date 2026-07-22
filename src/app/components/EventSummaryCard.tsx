@@ -15,6 +15,7 @@ type EventSummaryCardData = {
   } | null;
   publicLocation?: string | null;
   startTime?: Date | string;
+  chapter?: { timezone?: string };
   applicationCount?: number;
   status?: EventStatus;
   visibility?: EventVisibility;
@@ -28,6 +29,7 @@ export default function EventSummaryCard({
   eyebrow,
   showState = false,
   showEdit = false,
+  timezone,
 }: {
   event: EventSummaryCardData;
   href: string;
@@ -36,6 +38,7 @@ export default function EventSummaryCard({
   eyebrow?: ReactNode;
   showState?: boolean;
   showEdit?: boolean;
+  timezone?: string;
 }) {
   const classes = useManagementClasses();
   const applicationCount = event.applicationCount ?? 0;
@@ -77,7 +80,9 @@ export default function EventSummaryCard({
             {[
               event.publicLocation,
               event.startTime
-                ? new Date(event.startTime).toLocaleDateString()
+                ? new Date(event.startTime).toLocaleDateString(undefined, {
+                    timeZone: timezone ?? event.chapter?.timezone,
+                  })
                 : null,
             ]
               .filter(Boolean)

@@ -51,6 +51,7 @@ type EventDetail = {
   description?: string | null;
   startTime: string;
   endTime?: string | null;
+  chapter: { timezone: string };
   meetingUrl?: string | null;
   audienceCanReorder: boolean;
   votingEndTime?: string | null;
@@ -505,7 +506,7 @@ function VotingPhase({
         >
           <p className="opacity-80 text-center max-w-md">
             {event.votingEndTime
-              ? `You have until ${new Date(event.votingEndTime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} to vote on projects. `
+              ? `You have until ${new Date(event.votingEndTime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', timeZone: event.chapter.timezone })} to vote on projects. `
               : 'Vote on projects to decide who presents first. '}
             Top projects get to present first and get more time per
             presentation. Make sure your card is something people will vote on!
@@ -623,6 +624,7 @@ function VotingPhase({
                       {new Date(event.votingEndTime).toLocaleTimeString([], {
                         hour: 'numeric',
                         minute: '2-digit',
+                        timeZone: event.chapter.timezone,
                       })}
                     </p>
                   )}
@@ -1804,13 +1806,16 @@ export default function PitchEventPage() {
   const openEdit = async () => {
     if (!event) return;
     setEditTitle(event.title);
-    setEditStartTime(formatDateTimeLocalValue(event.startTime));
+    setEditStartTime(
+      formatDateTimeLocalValue(event.startTime, event.chapter.timezone)
+    );
     setEditMeetingUrl(event.meetingUrl || '');
     setEditVotingEndTime(
       event.votingEndTime
-        ? formatDateTimeLocalValue(event.votingEndTime)
+        ? formatDateTimeLocalValue(event.votingEndTime, event.chapter.timezone)
         : formatDateTimeLocalValue(
-            new Date(new Date(event.startTime).getTime() + 15 * 60 * 1000)
+            new Date(new Date(event.startTime).getTime() + 15 * 60 * 1000),
+            event.chapter.timezone
           )
     );
     setEditMcIds(
@@ -1839,6 +1844,7 @@ export default function PitchEventPage() {
         body: JSON.stringify({
           title: editTitle,
           startTime: serializeDateTimeLocalValue(editStartTime),
+          timezone: event.chapter.timezone,
           meetingUrl: editMeetingUrl,
           votingEndTime: serializeDateTimeLocalValue(editVotingEndTime),
           mcIds: editMcIds,

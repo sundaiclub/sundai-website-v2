@@ -72,6 +72,8 @@ model Hacker {
   createdCommunications     EventCommunication[]          @relation("EventCommunicationCreator")
   sentCommunications        EventCommunication[]          @relation("EventCommunicationSender")
   communicationRecipients   EventCommunicationRecipient[] @relation("EventCommunicationRecipientHacker")
+  requestedPublicationNotifications EventPublicationNotification[]          @relation("EventPublicationNotificationRequester")
+  publicationNotificationRecipients EventPublicationNotificationRecipient[] @relation("EventPublicationNotificationRecipientHacker")
   staffAuditSubjects        EventStaffAudit[]             @relation("EventStaffAuditSubject")
   staffAuditActions         EventStaffAudit[]             @relation("EventStaffAuditActor")
 
@@ -438,6 +440,7 @@ model Event {
   materials                   EventMaterial[]
   materialAudits              EventMaterialAudit[]
   communications              EventCommunication[]
+  publicationNotification     EventPublicationNotification?
   staffAudits                 EventStaffAudit[]
   createdAt                   DateTime                 @default(now())
   updatedAt                   DateTime                 @updatedAt
@@ -729,6 +732,49 @@ model EventCommunicationRecipient {
   @@index([communicationId, status])
   @@index([hackerId, createdAt])
   @@index([registrationId])
+}
+
+model EventPublicationNotification {
+  id                  String                                  @id @default(uuid())
+  event               Event                                   @relation(fields: [eventId], references: [id])
+  eventId             String                                  @unique
+  requestedBy         Hacker                                  @relation("EventPublicationNotificationRequester", fields: [requestedById], references: [id])
+  requestedById       String
+  status              EventCommunicationStatus                @default(SENDING)
+  recipientCount      Int                                     @default(0)
+  sentCount           Int                                     @default(0)
+  failedCount         Int                                     @default(0)
+  emailRecipientCount Int                                     @default(0)
+  smsRecipientCount   Int                                     @default(0)
+  sentAt              DateTime?
+  createdAt           DateTime                                @default(now())
+  updatedAt           DateTime                                @updatedAt
+  recipients          EventPublicationNotificationRecipient[]
+
+  @@index([eventId, createdAt])
+  @@index([requestedById, createdAt])
+}
+
+model EventPublicationNotificationRecipient {
+  id                String                            @id @default(uuid())
+  notification      EventPublicationNotification      @relation(fields: [notificationId], references: [id])
+  notificationId    String
+  hacker            Hacker                            @relation("EventPublicationNotificationRecipientHacker", fields: [hackerId], references: [id])
+  hackerId          String
+  channel           EventCommunicationChannel
+  contactValue      String
+  status            EventCommunicationRecipientStatus @default(PENDING)
+  providerMessageId String?
+  errorCode         String?
+  errorMessage      String?
+  attemptedAt       DateTime?
+  deliveredAt       DateTime?
+  createdAt         DateTime                          @default(now())
+  updatedAt         DateTime                          @updatedAt
+
+  @@unique([notificationId, hackerId, channel])
+  @@index([notificationId, status])
+  @@index([hackerId, createdAt])
 }
 
 model EventStaffAudit {

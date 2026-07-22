@@ -199,6 +199,7 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
   const [approvedDetails, setApprovedDetails] = useState('');
   const [applicationsOpen, setApplicationsOpen] = useState(true);
   const [applicationsCloseReason, setApplicationsCloseReason] = useState('');
+  const [notifyChapterMembers, setNotifyChapterMembers] = useState(false);
   const [selectedMcs, setSelectedMcs] = useState<HackerSelectionOption[]>([]);
   const [selectedCoMcs, setSelectedCoMcs] = useState<HackerSelectionOption[]>(
     []
@@ -794,6 +795,8 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
         `/api/events/${savedEvent.id}/publish`,
         {
           method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ notifyChapterMembers }),
         }
       );
       if (!publishResponse.ok) {
@@ -801,7 +804,13 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
         return;
       }
       setSavedEventId(savedEvent.id);
-      setMessage('Event was successfully published.');
+      const publishedEvent = await publishResponse.json().catch(() => null);
+      const notification = publishedEvent?.publicationNotification;
+      setMessage(
+        notification
+          ? `Event was successfully published. ${notification.sentCount} member notification${notification.sentCount === 1 ? '' : 's'} sent${notification.failedCount ? `; ${notification.failedCount} failed` : ''}.`
+          : 'Event was successfully published.'
+      );
       if (isEditing) {
         setLoadedEvent(current =>
           current ? { ...current, status: 'PUBLISHED' } : current
@@ -1513,6 +1522,27 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
             </label>
           </div>
         </ManagementSection>
+
+        {(!isEditing || loadedEvent?.status === 'DRAFT') && (
+          <label className={`${classes.subtlePanel} mb-3 flex items-start gap-3 p-4`}>
+            <input
+              aria-label="Notify chapter members when published"
+              checked={notifyChapterMembers}
+              className={`${classes.checkbox} mt-0.5`}
+              onChange={event => setNotifyChapterMembers(event.target.checked)}
+              type="checkbox"
+            />
+            <span>
+              <span className="block text-sm font-semibold">
+                Notify chapter members
+              </span>
+              <span className={`mt-1 block text-sm ${classes.mutedText}`}>
+                When you publish, send this event to active chapter members by
+                email, SMS, or both, based on each member&apos;s preferences.
+              </span>
+            </span>
+          </label>
+        )}
 
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <button

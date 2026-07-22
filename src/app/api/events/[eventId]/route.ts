@@ -23,6 +23,11 @@ import {
   redactPublicEventForViewer,
 } from '@/lib/publicEvents';
 import { requireEventSettingsManager } from '@/lib/eventManagementApi';
+import {
+  EventDateTimeInputError,
+  parseEventDateTimeInput,
+  parseOptionalEventDateTimeInput,
+} from '@/lib/eventDateTime';
 
 export async function GET(
   req: Request,
@@ -286,6 +291,7 @@ export async function PATCH(
       description,
       startTime,
       endTime,
+      timezone,
       meetingUrl,
       location,
       venueName,
@@ -349,6 +355,34 @@ export async function PATCH(
       );
     }
 
+    const parsedStartTime =
+      startTime === undefined
+        ? undefined
+        : parseEventDateTimeInput(startTime, timezone, 'startTime');
+    const parsedEndTime = parseOptionalEventDateTimeInput(
+      endTime,
+      timezone,
+      'endTime'
+    );
+    const parsedCheckInOpensAt = parseOptionalEventDateTimeInput(
+      checkInOpensAt,
+      timezone,
+      'checkInOpensAt'
+    );
+    const parsedCheckInClosesAt = parseOptionalEventDateTimeInput(
+      checkInClosesAt,
+      timezone,
+      'checkInClosesAt'
+    );
+    const parsedVotingEndTime = parseOptionalEventDateTimeInput(
+      votingEndTime,
+      timezone,
+      'votingEndTime'
+    );
+    if (parsedStartTime && parsedEndTime && parsedEndTime <= parsedStartTime) {
+      throw new EventDateTimeInputError('endTime must be after startTime');
+    }
+
     if (applicationQuestionsJson !== undefined) {
       parseTemplateFieldsJson(
         applicationQuestionsJson,
@@ -381,9 +415,9 @@ export async function PATCH(
       data: {
         ...(title !== undefined && { title }),
         ...(description !== undefined && { description: description || null }),
-        ...(startTime !== undefined && { startTime: new Date(startTime) }),
+        ...(startTime !== undefined && { startTime: parsedStartTime }),
         ...(endTime !== undefined && {
-          endTime: endTime ? new Date(endTime) : null,
+          endTime: parsedEndTime,
         }),
         ...(meetingUrl !== undefined && { meetingUrl: meetingUrl || null }),
         ...(location !== undefined && { location: location || null }),
@@ -454,10 +488,10 @@ export async function PATCH(
             applicationsCloseReason: applicationsCloseReason || null,
           }),
         ...(checkInOpensAt !== undefined && {
-          checkInOpensAt: checkInOpensAt ? new Date(checkInOpensAt) : null,
+          checkInOpensAt: parsedCheckInOpensAt,
         }),
         ...(checkInClosesAt !== undefined && {
-          checkInClosesAt: checkInClosesAt ? new Date(checkInClosesAt) : null,
+          checkInClosesAt: parsedCheckInClosesAt,
         }),
       },
     });
@@ -482,7 +516,7 @@ export async function PATCH(
         where: { id: pitchSession.id },
         data: {
           ...(votingEndTime !== undefined && {
-            votingEndTime: votingEndTime ? new Date(votingEndTime) : null,
+            votingEndTime: parsedVotingEndTime,
           }),
           ...(topProjectCount !== undefined && { topProjectCount }),
           ...(topPresentingSec !== undefined && { topPresentingSec }),
@@ -588,6 +622,9 @@ export async function PATCH(
 
     return NextResponse.json(event);
   } catch (error) {
+    if (error instanceof EventDateTimeInputError) {
+      return NextResponse.json({ message: error.message }, { status: 400 });
+    }
     if (error instanceof ApplicationTemplateValidationError) {
       return NextResponse.json(
         { message: error.message, issues: error.issues },

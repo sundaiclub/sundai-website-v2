@@ -17,10 +17,7 @@ export type WorkspaceSection =
   | 'notes'
   | 'reporting';
 
-export type WorkspaceUnavailableMetric =
-  | 'checkIn'
-  | 'attendance'
-  | 'noShows';
+export type WorkspaceUnavailableMetric = 'checkIn' | 'attendance' | 'noShows';
 
 export interface EventWorkspaceCapabilities {
   administerEvent: boolean;
@@ -38,6 +35,7 @@ export interface EventWorkspaceChapter {
   id: EntityId;
   name: string;
   slug: string;
+  timezone: string;
 }
 
 export interface EventWorkspaceEvent {
@@ -93,6 +91,17 @@ export interface EventWorkspaceOverview {
   counts: EventWorkspaceCounts;
   availableSections: WorkspaceSection[];
   unavailable: WorkspaceUnavailableMetric[];
+  publicationNotification: EventPublicationNotificationSummary | null;
+}
+
+export interface EventPublicationNotificationSummary {
+  status: EventCommunicationStatus;
+  recipientCount: number;
+  sentCount: number;
+  failedCount: number;
+  emailRecipientCount: number;
+  smsRecipientCount: number;
+  sentAt: string | null;
 }
 
 export type EventMaterialKind = 'LINK' | 'FILE';

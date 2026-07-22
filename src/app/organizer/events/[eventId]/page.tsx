@@ -18,7 +18,7 @@ function words(value: string) {
     .join(' ');
 }
 
-function formatSchedule(startTime: string, endTime: string) {
+function formatSchedule(startTime: string, endTime: string, timezone: string) {
   const start = new Date(startTime);
   const end = new Date(endTime);
   if (Number.isNaN(start.valueOf()) || Number.isNaN(end.valueOf())) {
@@ -27,7 +27,11 @@ function formatSchedule(startTime: string, endTime: string) {
 
   return `${start.toLocaleTimeString(undefined, {
     timeStyle: 'short',
-  })} – ${end.toLocaleTimeString(undefined, { timeStyle: 'short' })}`;
+    timeZone: timezone,
+  })} – ${end.toLocaleTimeString(undefined, {
+    timeStyle: 'short',
+    timeZone: timezone,
+  })}`;
 }
 
 function Counts({ workspace }: { workspace: EventWorkspacePayload }) {
@@ -170,6 +174,7 @@ export default function OrganizerEventOverviewPage({
   }
 
   const { event, capabilities } = workspace;
+  const publicationNotification = workspace.publicationNotification;
 
   return (
     <div className="space-y-5">
@@ -200,7 +205,11 @@ export default function OrganizerEventOverviewPage({
           <div className={classes.subtlePanel + ' p-4'}>
             <dt className={`text-sm ${classes.mutedText}`}>Schedule</dt>
             <dd className="mt-1 font-semibold">
-              {formatSchedule(event.startTime, event.endTime)}
+              {formatSchedule(
+                event.startTime,
+                event.endTime,
+                event.chapter.timezone
+              )}
             </dd>
           </div>
           <div className={classes.subtlePanel + ' p-4'}>
@@ -252,6 +261,32 @@ export default function OrganizerEventOverviewPage({
           </div>
         )}
       </ManagementSection>
+
+      {publicationNotification && (
+        <ManagementSection title="Chapter member notification">
+          <div className={`${classes.subtlePanel} p-4`}>
+            <p className="font-semibold">
+              Event announcement {words(publicationNotification.status)}
+            </p>
+            <p className={`mt-2 text-sm ${classes.mutedText}`}>
+              {publicationNotification.sentCount} of{' '}
+              {publicationNotification.recipientCount} messages sent
+              {publicationNotification.failedCount > 0
+                ? `; ${publicationNotification.failedCount} failed`
+                : ''}
+              . The audience included{' '}
+              {publicationNotification.emailRecipientCount} email and{' '}
+              {publicationNotification.smsRecipientCount} SMS recipients.
+            </p>
+            {publicationNotification.sentAt && (
+              <p className={`mt-1 text-sm ${classes.mutedText}`}>
+                Completed{' '}
+                {new Date(publicationNotification.sentAt).toLocaleString()}.
+              </p>
+            )}
+          </div>
+        </ManagementSection>
+      )}
 
       <EventStaffPanel
         canAssignStaff={capabilities.assignStaff}
