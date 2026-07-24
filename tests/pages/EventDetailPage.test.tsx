@@ -174,6 +174,14 @@ const applicationQuestionSet = {
       required: true,
       siteRequired: true,
     }),
+    applicationField('phoneNumber', {
+      label: 'Phone number',
+      type: 'PHONE',
+      required: true,
+      siteRequired: true,
+      helpText:
+        'By submitting your phone number, you consent to receive recurring automated text messages from Sundai about event applications and updates. Message frequency varies. Message and data rates may apply. Reply STOP to unsubscribe or HELP for help.',
+    }),
   ],
   chapterFields: [
     applicationField('chapterGoals', {
@@ -203,6 +211,15 @@ const applicationQuestionSet = {
       required: true,
       siteRequired: true,
       order: 1,
+    }),
+    applicationField('phoneNumber', {
+      label: 'Phone number',
+      type: 'PHONE',
+      required: true,
+      siteRequired: true,
+      helpText:
+        'By submitting your phone number, you consent to receive recurring automated text messages from Sundai about event applications and updates. Message frequency varies. Message and data rates may apply. Reply STOP to unsubscribe or HELP for help.',
+      order: 2,
     }),
     applicationField('chapterGoals', {
       label: 'Chapter goals',
@@ -298,6 +315,12 @@ function buildApplicationEvent(
   overrides: Partial<PublicEventDetail> = {}
 ): PublicEventDetail {
   return buildEventDetail({
+    viewerProfile: {
+      name: null,
+      email: signedInUser.email,
+      phoneNumber: '+15551234567',
+      username: 'currenthacker',
+    },
     applicationQuestionSet,
     applicationControls: {
       ...buildEventDetail().applicationControls,
@@ -950,7 +973,7 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
       mockSignedIn();
     });
 
-    it('reveals the composed registration form from the register button with profile prefill', async () => {
+    it('reveals the composed registration form without Clerk name prefill', async () => {
       await renderDetailPage(buildApplicationEvent());
 
       expect(screen.queryByLabelText(/full name/i)).not.toBeInTheDocument();
@@ -960,11 +983,16 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
 
       const nameInput = await screen.findByLabelText(/full name/i);
       const emailInput = screen.getByLabelText(/email/i);
+      const phoneInput = screen.getByLabelText(/phone number/i);
       const chapterGoalsInput = screen.getByLabelText(/chapter goals/i);
       const projectInput = screen.getByLabelText(/project idea/i);
 
-      expect(nameInput).toHaveValue(signedInUser.name);
+      expect(nameInput).toHaveValue('');
       expect(emailInput).toHaveValue(signedInUser.email);
+      expect(phoneInput).toHaveValue('+15551234567');
+      expect(
+        screen.getByText(/message and data rates may apply/i)
+      ).toBeInTheDocument();
       expect(
         nameInput.compareDocumentPosition(emailInput) &
           Node.DOCUMENT_POSITION_FOLLOWING

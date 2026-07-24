@@ -35,6 +35,7 @@ jest.mock('../../src/lib/prisma', () => ({
   default: {
     hacker: {
       findUnique: jest.fn(),
+      update: jest.fn(),
     },
     chapterMembership: {
       findFirst: jest.fn(),
@@ -76,7 +77,7 @@ const submittedAt = new Date('2026-06-22T16:00:00.000Z');
 const templateFields = [
   {
     id: 'name',
-    label: 'Name',
+    label: 'Full legal name',
     type: 'TEXT',
     required: true,
     siteRequired: true,
@@ -89,6 +90,14 @@ const templateFields = [
     required: true,
     siteRequired: true,
     order: 2,
+  },
+  {
+    id: 'phoneNumber',
+    label: 'Phone number',
+    type: 'PHONE',
+    required: true,
+    siteRequired: true,
+    order: 3,
   },
   {
     id: 'why_this_event',
@@ -109,6 +118,7 @@ const templateFields = [
 const answersJson = {
   name: 'Signed In Applicant',
   email: 'applicant@example.com',
+  phoneNumber: '+15551234567',
   why_this_event: 'I want to build with the Boston AI community.',
   project_url: 'https://example.com/applicant-project',
 };
@@ -178,18 +188,16 @@ function mockPublicRegistrationDatabase({
     createdAt: submittedAt,
     updatedAt: submittedAt,
   }));
-  prisma.eventRegistration.update.mockImplementation(
-    async ({ data }: any) => ({
-      ...(existingRegistration ??
-        buildEventRegistration({
-          id: 'registration-public-updated',
-          eventId: event.id,
-          hackerId: hacker.id,
-        })),
-      ...data,
-      updatedAt: submittedAt,
-    })
-  );
+  prisma.eventRegistration.update.mockImplementation(async ({ data }: any) => ({
+    ...(existingRegistration ??
+      buildEventRegistration({
+        id: 'registration-public-updated',
+        eventId: event.id,
+        hackerId: hacker.id,
+      })),
+    ...data,
+    updatedAt: submittedAt,
+  }));
   prisma.eventRegistrationAudit.create.mockImplementation(
     async ({ data }: any) => ({
       id: 'registration-audit-public',
@@ -477,9 +485,9 @@ describe('PATCH /api/events/[eventId]/registrations/me', () => {
         templateSnapshotJson: templateFields,
       },
     });
-    expect(prisma.eventRegistration.update.mock.calls[0][0].data).not.toHaveProperty(
-      'submittedAt'
-    );
+    expect(
+      prisma.eventRegistration.update.mock.calls[0][0].data
+    ).not.toHaveProperty('submittedAt');
     expect(prisma.eventRegistrationAudit.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         registrationId: existingRegistration.id,
@@ -512,8 +520,7 @@ describe('PATCH /api/events/[eventId]/registrations/me', () => {
       publicSafeMessage:
         status === 'BLOCKED' ? blockedRegistrationMessage : null,
       cancelledAt: status === 'CANCELLED' ? submittedAt : null,
-      cancelledById:
-        status === 'CANCELLED' ? fixture.applicant.id : null,
+      cancelledById: status === 'CANCELLED' ? fixture.applicant.id : null,
       waitlistedAt: status === 'WAITLISTED' ? submittedAt : null,
     });
 

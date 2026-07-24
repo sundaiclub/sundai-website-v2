@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { fetchMergedApplicationTemplate } from '@/lib/applicationTemplateQueries';
 import { BLOCKED_REGISTRATION_MESSAGE } from '@/lib/moderation';
 import { notifyEventDecision } from '@/lib/eventDecisionNotifications';
+import { SITE_APPLICATION_SMS_CONSENT_VERSION } from '@/lib/smsConsent';
 import type {
   EntityId,
   EventApplicationMode,
@@ -270,12 +271,17 @@ type UserBanDelegate = {
   findMany(args: Prisma.UserBanFindManyArgs): Promise<UserBanRecord[]>;
 };
 
+type HackerDelegate = {
+  update(args: Prisma.HackerUpdateArgs): Promise<unknown>;
+};
+
 type EventManagementPrismaClient = {
   event: Pick<EventDelegate, 'findUnique' | 'findFirst'>;
   eventRegistration: EventRegistrationDelegate;
   eventRegistrationAudit: Pick<EventRegistrationAuditDelegate, 'create'>;
   applicationTemplate: Pick<ApplicationTemplateDelegate, 'findFirst'>;
   userBan: Pick<UserBanDelegate, 'findMany'>;
+  hacker: Pick<HackerDelegate, 'update'>;
   $transaction<T>(
     callback: (tx: EventManagementPrismaClient) => Promise<T>,
     options?: { isolationLevel?: 'Serializable' }
@@ -293,6 +299,7 @@ type TransactionDb = Pick<
   | 'eventRegistrationAudit'
   | 'applicationTemplate'
   | 'userBan'
+  | 'hacker'
 >;
 
 function createEventManagementClient(
@@ -318,6 +325,9 @@ function createEventManagementClient(
     },
     userBan: {
       findMany: args => db.userBan.findMany(args),
+    },
+    hacker: {
+      update: args => db.hacker.update(args),
     },
     $transaction: callback => callback(adapter),
   };
@@ -655,6 +665,7 @@ export async function submitPublicEventRegistration(
     }
 
     const answers = normalizeRegistrationAnswers(input.answersJson);
+    await updateHackerApplicationProfile(input.hackerId, answers, tx);
     const toStatus = getInitialPublicRegistrationStatus(event.applicationMode);
     const registration = await tx.eventRegistration.create({
       data: {
@@ -741,6 +752,7 @@ export async function updatePendingPublicEventRegistration(
     }
 
     const answers = normalizeRegistrationAnswers(input.answersJson);
+    await updateHackerApplicationProfile(input.hackerId, answers, tx);
     const registration = await tx.eventRegistration.update({
       where: { id: existingRegistration.id },
       data: {
@@ -1309,6 +1321,32 @@ function toTime(value: Date | string | null | undefined): number | null {
 
 function normalizeRegistrationAnswers(answersJson: unknown): JsonObject {
   return isJsonObject(answersJson) ? answersJson : {};
+}
+
+async function updateHackerApplicationProfile(
+  hackerId: EntityId,
+  answers: JsonObject,
+  db: EventManagementPrismaClient
+): Promise<void> {
+  const name = typeof answers.name === 'string' ? answers.name.trim() : '';
+  const phoneNumber =
+    typeof answers.phoneNumber === 'string' ? answers.phoneNumber.trim() : '';
+
+  if (!name && !phoneNumber) return;
+
+  await db.hacker.update({
+    where: { id: hackerId },
+    data: {
+      ...(name ? { name } : {}),
+      ...(phoneNumber ? { phoneNumber } : {}),
+      ...(phoneNumber
+        ? {
+            smsConsentAt: new Date(),
+            smsConsentVersion: SITE_APPLICATION_SMS_CONSENT_VERSION,
+          }
+        : {}),
+    },
+  });
 }
 
 function validateRegistrationAnswerForField(

@@ -14,6 +14,8 @@ describe('event publication notifications', () => {
           hacker: {
             email: 'both@example.com',
             phoneNumber: '+16175550101',
+            smsConsentAt: new Date('2026-07-01T00:00:00.000Z'),
+            smsConsentVersion: 'site-application-2026-07-22',
           },
         },
         {
@@ -26,6 +28,8 @@ describe('event publication notifications', () => {
           hacker: {
             email: 'disabled@example.com',
             phoneNumber: '+16175550102',
+            smsConsentAt: new Date('2026-07-01T00:00:00.000Z'),
+            smsConsentVersion: 'site-application-2026-07-22',
           },
         },
         {
@@ -38,6 +42,8 @@ describe('event publication notifications', () => {
           hacker: {
             email: 'email@example.com',
             phoneNumber: '+16175550103',
+            smsConsentAt: null,
+            smsConsentVersion: null,
           },
         },
         {
@@ -47,10 +53,14 @@ describe('event publication notifications', () => {
           smsNotificationsEnabled: true,
           smsConsentAt: new Date('2026-07-01T00:00:00.000Z'),
           smsConsentVersion: 'v1',
-          hacker: { email: null, phoneNumber: '+16175550104' },
+          hacker: {
+            email: null,
+            phoneNumber: '+16175550104',
+            smsConsentAt: new Date('2026-07-01T00:00:00.000Z'),
+            smsConsentVersion: 'v1',
+          },
         },
-      ],
-      'v2'
+      ]
     );
 
     expect(recipients).toEqual([

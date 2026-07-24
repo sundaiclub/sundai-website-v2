@@ -1,7 +1,7 @@
-import { Webhook } from "svix";
-import { headers } from "next/headers";
-import { WebhookEvent } from "@clerk/nextjs/server";
-import prisma from "@/lib/prisma";
+import { Webhook } from 'svix';
+import { headers } from 'next/headers';
+import { WebhookEvent } from '@clerk/nextjs/server';
+import prisma from '@/lib/prisma';
 
 function serializeError(error: unknown) {
   if (error instanceof Error) {
@@ -13,7 +13,7 @@ function serializeError(error: unknown) {
   }
 
   return {
-    message: typeof error === "string" ? error : JSON.stringify(error),
+    message: typeof error === 'string' ? error : JSON.stringify(error),
   };
 }
 
@@ -23,7 +23,8 @@ function createDebugErrorResponse(
   error: unknown,
   context: Record<string, unknown>
 ) {
-  const isDebugEnv = process.env.NODE_ENV === "test" || process.env.CI === "true";
+  const isDebugEnv =
+    process.env.NODE_ENV === 'test' || process.env.CI === 'true';
 
   if (!isDebugEnv) {
     return new Response(message, { status });
@@ -38,7 +39,7 @@ function createDebugErrorResponse(
     {
       status,
       headers: {
-        "Content-Type": "application/json",
+        'Content-Type': 'application/json',
       },
     }
   );
@@ -46,12 +47,12 @@ function createDebugErrorResponse(
 
 async function handler(request: Request) {
   const headerPayload = headers();
-  const svix_id = headerPayload.get("svix-id");
-  const svix_timestamp = headerPayload.get("svix-timestamp");
-  const svix_signature = headerPayload.get("svix-signature");
+  const svix_id = headerPayload.get('svix-id');
+  const svix_timestamp = headerPayload.get('svix-timestamp');
+  const svix_signature = headerPayload.get('svix-signature');
 
   if (!svix_id || !svix_timestamp || !svix_signature) {
-    return new Response("Error occured -- no svix headers", {
+    return new Response('Error occured -- no svix headers', {
       status: 400,
     });
   }
@@ -59,29 +60,96 @@ async function handler(request: Request) {
   const payload = await request.json();
   const body = JSON.stringify(payload);
 
-  const wh = new Webhook(process.env.WEBHOOK_SECRET || "");
+  const wh = new Webhook(process.env.WEBHOOK_SECRET || '');
 
   let evt: WebhookEvent;
 
   try {
     evt = wh.verify(body, {
-      "svix-id": svix_id,
-      "svix-timestamp": svix_timestamp,
-      "svix-signature": svix_signature,
+      'svix-id': svix_id,
+      'svix-timestamp': svix_timestamp,
+      'svix-signature': svix_signature,
     }) as WebhookEvent;
   } catch (err) {
-    console.error("Error verifying webhook:", err);
-    return new Response("Error occured", {
+    console.error('Error verifying webhook:', err);
+    return new Response('Error occured', {
       status: 400,
     });
   }
 
   const eventType = evt.type;
 
-  if (eventType === "user.created") {
-    const { id, email_addresses, first_name, last_name, image_url, username } = evt.data;
+  if (eventType === 'user.created') {
+    const {
+      id,
+      email_addresses,
+      primary_email_address_id,
+      first_name,
+      last_name,
+      image_url,
+      username,
+    } = evt.data;
     try {
-      const emailUsername = email_addresses[0].email_address.split("@")[0];
+      const primaryEmail = email_addresses.find(
+        email => email.id === primary_email_address_id
+      );
+
+      if (
+        !primaryEmail ||
+        primaryEmail.verification?.status !== 'verified' ||
+        !primaryEmail.email_address.trim()
+      ) {
+        console.error(
+          'Cannot create or link Hacker without a verified primary email',
+          {
+            eventType,
+            clerkId: id,
+            primaryEmailAddressId: primary_email_address_id,
+          }
+        );
+        return new Response('Verified primary email required', { status: 422 });
+      }
+
+      const normalizedEmail = primaryEmail.email_address.trim().toLowerCase();
+      const existingClerkHacker = await prisma.hacker.findUnique({
+        where: { clerkId: id },
+      });
+
+      if (existingClerkHacker) {
+        return new Response(JSON.stringify(existingClerkHacker), {
+          status: 200,
+        });
+      }
+
+      const emailMatches = await prisma.$queryRaw<Array<{ id: string }>>`
+        SELECT id
+        FROM "Hacker"
+        WHERE LOWER(BTRIM(email)) = ${normalizedEmail}
+        ORDER BY "createdAt" ASC
+        LIMIT 2
+      `;
+
+      if (emailMatches.length > 1) {
+        console.warn(
+          'Creating a new Hacker because the email matches multiple Hackers',
+          {
+            eventType,
+            clerkId: id,
+            hackerIds: emailMatches.map(hacker => hacker.id),
+          }
+        );
+      }
+
+      if (emailMatches.length === 1) {
+        const linkedHacker = await prisma.hacker.update({
+          where: { id: emailMatches[0].id },
+          data: { clerkId: id },
+        });
+
+        return new Response(JSON.stringify(linkedHacker), { status: 200 });
+      }
+
+      const emailUsername = normalizedEmail.split('@')[0];
       const name =
         first_name && last_name
           ? `${first_name} ${last_name}`
@@ -93,17 +161,17 @@ async function handler(request: Request) {
         where: { clerkId: id },
         update: {
           name: name,
-          email: email_addresses[0].email_address,
+          email: normalizedEmail,
           username: username || emailUsername,
           ...(image_url && {
             avatar: {
               upsert: {
                 create: {
                   key: `avatars/${id}`,
-                  bucket: "sundai-avatars",
+                  bucket: 'sundai-avatars',
                   url: image_url,
                   filename: `${id}-avatar`,
-                  mimeType: "image/jpeg",
+                  mimeType: 'image/jpeg',
                   size: 0,
                 },
                 update: {
@@ -116,17 +184,17 @@ async function handler(request: Request) {
         create: {
           name: name,
           clerkId: id,
-          email: email_addresses[0].email_address,
+          email: normalizedEmail,
           username: username || emailUsername,
-          role: "HACKER",
+          role: 'HACKER',
           ...(image_url && {
             avatar: {
               create: {
                 key: `avatars/${id}`,
-                bucket: "sundai-avatars",
+                bucket: 'sundai-avatars',
                 url: image_url,
                 filename: `${id}-avatar`,
-                mimeType: "image/jpeg",
+                mimeType: 'image/jpeg',
                 size: 0,
               },
             },
@@ -136,7 +204,7 @@ async function handler(request: Request) {
 
       return new Response(JSON.stringify(hacker), { status: 201 });
     } catch (error) {
-      console.error("Error creating hacker:", {
+      console.error('Error creating hacker:', {
         eventType,
         clerkId: id,
         emailCount: email_addresses?.length ?? 0,
@@ -144,7 +212,7 @@ async function handler(request: Request) {
         username,
         error: serializeError(error),
       });
-      return createDebugErrorResponse(500, "Error creating hacker", error, {
+      return createDebugErrorResponse(500, 'Error creating hacker', error, {
         eventType,
         clerkId: id,
         emailCount: email_addresses?.length ?? 0,
@@ -154,7 +222,7 @@ async function handler(request: Request) {
     }
   }
 
-  return new Response("", { status: 200 });
+  return new Response('', { status: 200 });
 }
 export const GET = handler;
 export const POST = handler;

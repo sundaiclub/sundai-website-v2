@@ -1,4 +1,5 @@
 import prisma from '@/lib/prisma';
+import { SITE_APPLICATION_SMS_CONSENT_VERSION } from '@/lib/smsConsent';
 import {
   deliverEventRecipients,
   type EventDeliveryResult,
@@ -33,12 +34,13 @@ export function resolvePublicationNotificationRecipients(
     hackerId: string;
     notificationsAllowed: boolean;
     emailNotificationsEnabled: boolean;
-    smsNotificationsEnabled: boolean;
-    smsConsentAt: Date | null;
-    smsConsentVersion: string | null;
-    hacker: { email: string | null; phoneNumber: string | null };
-  }>,
-  smsConsentVersion: string | undefined
+    hacker: {
+      email: string | null;
+      phoneNumber: string | null;
+      smsConsentAt: Date | null;
+      smsConsentVersion: string | null;
+    };
+  }>
 ): PublicationRecipient[] {
   const recipients: PublicationRecipient[] = [];
 
@@ -55,11 +57,10 @@ export function resolvePublicationNotificationRecipients(
       });
     }
     if (
-      membership.smsNotificationsEnabled &&
       usableE164(membership.hacker.phoneNumber) &&
-      smsConsentVersion &&
-      membership.smsConsentAt &&
-      membership.smsConsentVersion === smsConsentVersion
+      membership.hacker.smsConsentAt &&
+      membership.hacker.smsConsentVersion ===
+        SITE_APPLICATION_SMS_CONSENT_VERSION
     ) {
       recipients.push({
         hackerId: membership.hackerId,
@@ -119,16 +120,17 @@ export async function notifyChapterMembersOfPublishedEvent({
       hackerId: true,
       notificationsAllowed: true,
       emailNotificationsEnabled: true,
-      smsNotificationsEnabled: true,
-      smsConsentAt: true,
-      smsConsentVersion: true,
-      hacker: { select: { email: true, phoneNumber: true } },
+      hacker: {
+        select: {
+          email: true,
+          phoneNumber: true,
+          smsConsentAt: true,
+          smsConsentVersion: true,
+        },
+      },
     },
   });
-  const recipients = resolvePublicationNotificationRecipients(
-    memberships,
-    process.env.SMS_CONSENT_VERSION
-  );
+  const recipients = resolvePublicationNotificationRecipients(memberships);
 
   let notification;
   try {

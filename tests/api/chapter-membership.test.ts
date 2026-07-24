@@ -475,7 +475,7 @@ describe('chapter membership API', () => {
     );
   });
 
-  it('records configured versioned SMS consent only after explicit opt-in', async () => {
+  it('does not manage SMS consent through chapter preferences', async () => {
     const previousVersion = process.env.SMS_CONSENT_VERSION;
     process.env.SMS_CONSENT_VERSION = '2026-07-10';
     const { PATCH } = loadChapterNotificationsRoute();
@@ -515,22 +515,20 @@ describe('chapter membership API', () => {
     );
 
     expect(response.status).toBe(200);
-    expect(prisma.chapterMembership.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { id: activeMembership.id },
-        data: expect.objectContaining({
-          smsNotificationsEnabled: true,
-          smsConsentAt: expect.any(Date),
-          smsConsentVersion: '2026-07-10',
-        }),
-      })
-    );
+    expect(prisma.chapterMembership.update).toHaveBeenCalledWith({
+      where: { id: activeMembership.id },
+      data: {
+        notificationsAllowed: true,
+        emailNotificationsEnabled: true,
+        notificationPreferencesJson: null,
+      },
+    });
 
     if (previousVersion === undefined) delete process.env.SMS_CONSENT_VERSION;
     else process.env.SMS_CONSENT_VERSION = previousVersion;
   });
 
-  it('clears SMS consent evidence when the member opts out', async () => {
+  it('ignores obsolete SMS preference fields', async () => {
     const { PATCH } = loadChapterNotificationsRoute();
     const hacker = buildHacker();
     const activeMembership = buildChapterMembership({
@@ -566,15 +564,13 @@ describe('chapter membership API', () => {
     );
 
     expect(response.status).toBe(200);
-    expect(prisma.chapterMembership.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { id: activeMembership.id },
-        data: expect.objectContaining({
-          smsNotificationsEnabled: false,
-          smsConsentAt: null,
-          smsConsentVersion: null,
-        }),
-      })
-    );
+    expect(prisma.chapterMembership.update).toHaveBeenCalledWith({
+      where: { id: activeMembership.id },
+      data: {
+        notificationsAllowed: true,
+        emailNotificationsEnabled: true,
+        notificationPreferencesJson: null,
+      },
+    });
   });
 });

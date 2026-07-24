@@ -27,6 +27,8 @@ model Hacker {
   websiteUrl           String?
   email                String?
   phoneNumber          String?
+  smsConsentAt         DateTime?
+  smsConsentVersion    String?
   attended             Int                    @default(0)
   avatar               Image?                 @relation("HackerAvatar", fields: [avatarId], references: [id])
   avatarId             String?                @unique

@@ -1,6 +1,7 @@
 import { createHash } from 'crypto';
 import type { PrismaClient } from '@prisma/client';
 import prisma from '@/lib/prisma';
+import { SITE_APPLICATION_SMS_CONSENT_VERSION } from '@/lib/smsConsent';
 import type {
   EventCommunicationAudience,
   EventCommunicationChannel,
@@ -42,6 +43,8 @@ type AudienceRegistration = {
     name: string;
     email?: string | null;
     phoneNumber?: string | null;
+    smsConsentAt?: Date | string | null;
+    smsConsentVersion?: string | null;
     isGloballyBanned?: boolean;
   };
   membership?: {
@@ -104,14 +107,12 @@ export function resolveEventCommunicationAudience({
   audienceTypes = [],
   selectedHackerIds = [],
   channel,
-  smsConsentVersion,
 }: {
   registrations: AudienceRegistration[];
   audienceType: EventCommunicationAudience;
   audienceTypes?: EventCommunicationAudience[];
   selectedHackerIds?: string[];
   channel: EventCommunicationChannel;
-  smsConsentVersion?: string;
 }): CommunicationAudienceResolution {
   if (!EVENT_COMMUNICATION_AUDIENCES.includes(audienceType)) {
     throw new Error('Unsupported communication audience.');
@@ -147,18 +148,17 @@ export function resolveEventCommunicationAudience({
       continue;
     }
 
-    const membership = registration.membership;
-    if (!membership || membership.status !== 'ACTIVE') {
-      exclusions.ineligible += 1;
-      continue;
-    }
-    if (!membership.notificationsAllowed) {
-      exclusions.preferenceDisabled += 1;
-      continue;
-    }
-
     let contactValue: string | null | undefined;
     if (channel === 'EMAIL') {
+      const membership = registration.membership;
+      if (!membership || membership.status !== 'ACTIVE') {
+        exclusions.ineligible += 1;
+        continue;
+      }
+      if (!membership.notificationsAllowed) {
+        exclusions.preferenceDisabled += 1;
+        continue;
+      }
       contactValue = registration.hacker.email;
       if (!usableEmail(contactValue)) {
         exclusions.missingContact += 1;
@@ -169,19 +169,19 @@ export function resolveEventCommunicationAudience({
         continue;
       }
     } else {
+      if (registration.membership?.notificationsAllowed === false) {
+        exclusions.preferenceDisabled += 1;
+        continue;
+      }
       contactValue = registration.hacker.phoneNumber;
       if (!usableE164(contactValue)) {
         exclusions.missingContact += 1;
         continue;
       }
-      if (!membership.smsNotificationsEnabled) {
-        exclusions.preferenceDisabled += 1;
-        continue;
-      }
       if (
-        !smsConsentVersion ||
-        !membership.smsConsentAt ||
-        membership.smsConsentVersion !== smsConsentVersion
+        !registration.hacker.smsConsentAt ||
+        registration.hacker.smsConsentVersion !==
+          SITE_APPLICATION_SMS_CONSENT_VERSION
       ) {
         exclusions.ineligible += 1;
         continue;
@@ -391,19 +391,14 @@ export function getEventCommunicationProviderAvailability(
     !!env.TWILIO_ACCOUNT_SID &&
     !!env.TWILIO_AUTH_TOKEN &&
     !!env.TWILIO_MESSAGING_SERVICE_SID;
-  const smsConsent = !!env.SMS_CONSENT_VERSION && !!env.SMS_CONSENT_COPY;
   return {
     email: {
       available: email,
       reason: email ? null : 'AWS SES is not configured.',
     },
     sms: {
-      available: smsProvider && smsConsent,
-      reason: !smsProvider
-        ? 'Twilio is not configured.'
-        : !smsConsent
-          ? 'SMS consent copy and version are not configured.'
-          : null,
+      available: smsProvider,
+      reason: smsProvider ? null : 'Twilio is not configured.',
     },
   };
 }

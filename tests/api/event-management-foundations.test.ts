@@ -481,7 +481,13 @@ describe('/api/events event-management foundations', () => {
         where: expect.objectContaining({
           status: 'PUBLISHED',
           visibility: 'PUBLIC',
-          startTime: expect.objectContaining({ gte: expect.any(Date) }),
+          OR: [
+            { startTime: { gte: expect.any(Date) } },
+            {
+              startTime: { lt: expect.any(Date) },
+              endTime: { gt: expect.any(Date) },
+            },
+          ],
           chapter: expect.objectContaining({
             status: 'ACTIVE',
             accessMode: 'PUBLIC',

@@ -164,7 +164,7 @@ async function main() {
       fieldsJson: [
         {
           id: "name",
-          label: "Name",
+          label: "Full legal name",
           type: "TEXT",
           required: true,
           siteRequired: true,
@@ -177,6 +177,17 @@ async function main() {
           required: true,
           siteRequired: true,
           order: 2,
+        },
+        {
+          id: "phoneNumber",
+          label: "Phone number",
+          type: "PHONE",
+          required: true,
+          siteRequired: true,
+          helpText:
+            "By submitting your phone number, you consent to receive recurring automated text messages from Sundai about event applications and updates. Message frequency varies. Message and data rates may apply. Reply STOP to unsubscribe or HELP for help.",
+          placeholder: "+1 555 123 4567",
+          order: 3,
         },
       ],
       isActive: true,

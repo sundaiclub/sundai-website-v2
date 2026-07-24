@@ -100,7 +100,7 @@ function buildPrismaMock(): MockPublicEventsPrisma {
   const siteFields = [
     {
       id: 'name',
-      label: 'Name',
+      label: 'Full legal name',
       type: 'TEXT',
       required: true,
       siteRequired: true,
@@ -113,6 +113,14 @@ function buildPrismaMock(): MockPublicEventsPrisma {
       required: true,
       siteRequired: true,
       order: 1,
+    },
+    {
+      id: 'phoneNumber',
+      label: 'Phone number',
+      type: 'PHONE',
+      required: true,
+      siteRequired: true,
+      order: 2,
     },
   ];
 
@@ -385,6 +393,10 @@ describe('public event helpers', () => {
     prisma.hacker.findUnique.mockResolvedValue({
       id: 'hacker-1',
       role: 'HACKER',
+      name: 'Database Legal Name',
+      email: 'database@example.com',
+      phoneNumber: '+15551234567',
+      username: 'database-user',
     });
     prisma.chapterMembership.findFirst.mockResolvedValue(null);
     prisma.eventStaff.findFirst.mockResolvedValue(null);
@@ -459,7 +471,7 @@ describe('public event helpers', () => {
 
     expect(
       detail?.applicationQuestionSet.composedFields.map(field => field.id)
-    ).toEqual(['name', 'email']);
+    ).toEqual(['name', 'email', 'phoneNumber']);
   });
 
   it('returns the latest prior answer only for questions configured for reuse', async () => {
@@ -602,6 +614,10 @@ describe('public event helpers', () => {
     prisma.hacker.findUnique.mockResolvedValue({
       id: 'hacker-1',
       role: 'HACKER',
+      name: 'Database Legal Name',
+      email: 'database@example.com',
+      phoneNumber: '+15551234567',
+      username: 'database-user',
     });
     prisma.eventRegistration.findFirst.mockResolvedValue(null);
     prisma.chapterMembership.findFirst.mockResolvedValue(null);
@@ -617,7 +633,12 @@ describe('public event helpers', () => {
 
     expect(prisma.hacker.findUnique).toHaveBeenCalledWith({
       where: { clerkId: 'clerk-1' },
-      select: { id: true },
+      select: {
+        id: true,
+        email: true,
+        phoneNumber: true,
+        username: true,
+      },
     });
     expect(prisma.eventRegistration.findFirst).toHaveBeenCalledWith({
       where: {
@@ -634,6 +655,12 @@ describe('public event helpers', () => {
         publicMessage: null,
       })
     );
+    expect(detail?.viewerProfile).toEqual({
+      name: null,
+      email: 'database@example.com',
+      phoneNumber: '+15551234567',
+      username: 'database-user',
+    });
   });
 
   it('normalizes viewer registration state and redacts blocked messages', async () => {

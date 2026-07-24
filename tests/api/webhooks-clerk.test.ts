@@ -6,8 +6,11 @@ import prisma from '../../src/lib/prisma';
 jest.mock('../../src/lib/prisma', () => ({
   hacker: {
     create: jest.fn(),
+    findUnique: jest.fn(),
+    update: jest.fn(),
     upsert: jest.fn(),
   },
+  $queryRaw: jest.fn(),
 }));
 
 jest.mock('svix', () => ({
@@ -65,7 +68,9 @@ describe('/api/webhooks/clerk', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     process.env = { ...originalEnv, WEBHOOK_SECRET: mockWebhookSecret };
-    
+    mockPrisma.hacker.findUnique.mockResolvedValue(null);
+    (mockPrisma.$queryRaw as jest.Mock).mockResolvedValue([]);
+
     // Mock headers function to return a mock Headers object
     headers.mockReturnValue({
       get: jest.fn((key: string) => {
@@ -81,19 +86,22 @@ describe('/api/webhooks/clerk', () => {
 
   // Helper function to create a mock request with json method
   const createMockRequest = (body: any) => {
-    const request = new NextRequest('http://localhost:3000/api/webhooks/clerk', {
-      method: 'POST',
-      body: JSON.stringify(body),
-      headers: {
-        'svix-id': 'test-id',
-        'svix-timestamp': 'test-timestamp',
-        'svix-signature': 'test-signature',
-      },
-    });
-    
+    const request = new NextRequest(
+      'http://localhost:3000/api/webhooks/clerk',
+      {
+        method: 'POST',
+        body: JSON.stringify(body),
+        headers: {
+          'svix-id': 'test-id',
+          'svix-timestamp': 'test-timestamp',
+          'svix-signature': 'test-signature',
+        },
+      }
+    );
+
     // Add json method to the request
     (request as any).json = jest.fn().mockResolvedValue(body);
-    
+
     return request;
   };
 
@@ -108,11 +116,14 @@ describe('/api/webhooks/clerk', () => {
         get: jest.fn(() => null),
       });
 
-      const request = new NextRequest('http://localhost:3000/api/webhooks/clerk', {
-        method: 'POST',
-        body: JSON.stringify({}),
-        headers: {},
-      });
+      const request = new NextRequest(
+        'http://localhost:3000/api/webhooks/clerk',
+        {
+          method: 'POST',
+          body: JSON.stringify({}),
+          headers: {},
+        }
+      );
 
       const response = await POST(request);
       const data = await expectTextResponse(response, 400);
@@ -142,7 +153,14 @@ describe('/api/webhooks/clerk', () => {
           type: 'user.created',
           data: {
             id: 'user_123',
-            email_addresses: [{ email_address: 'test@example.com' }],
+            primary_email_address_id: 'email_123',
+            email_addresses: [
+              {
+                id: 'email_123',
+                email_address: 'test@example.com',
+                verification: { status: 'verified' },
+              },
+            ],
             first_name: 'John',
             last_name: 'Doe',
             image_url: 'https://example.com/avatar.jpg',
@@ -177,7 +195,14 @@ describe('/api/webhooks/clerk', () => {
           type: 'user.created',
           data: {
             id: 'user_123',
-            email_addresses: [{ email_address: 'test@example.com' }],
+            primary_email_address_id: 'email_123',
+            email_addresses: [
+              {
+                id: 'email_123',
+                email_address: 'test@example.com',
+                verification: { status: 'verified' },
+              },
+            ],
             first_name: 'John',
             last_name: null,
             image_url: null,
@@ -212,7 +237,14 @@ describe('/api/webhooks/clerk', () => {
           type: 'user.created',
           data: {
             id: 'user_123',
-            email_addresses: [{ email_address: 'johndoe@example.com' }],
+            primary_email_address_id: 'email_123',
+            email_addresses: [
+              {
+                id: 'email_123',
+                email_address: 'johndoe@example.com',
+                verification: { status: 'verified' },
+              },
+            ],
             first_name: null,
             last_name: null,
             image_url: null,
@@ -240,6 +272,187 @@ describe('/api/webhooks/clerk', () => {
       expect(data).toEqual(mockCreatedHacker);
     });
 
+    it('should link a verified primary email to one existing Hacker', async () => {
+      const { Webhook } = require('svix');
+      Webhook.mockImplementation(() => ({
+        verify: jest.fn().mockReturnValue({
+          type: 'user.created',
+          data: {
+            id: 'user_new_clerk_id',
+            primary_email_address_id: 'email_primary',
+            email_addresses: [
+              {
+                id: 'email_secondary',
+                email_address: 'other@example.com',
+                verification: { status: 'verified' },
+              },
+              {
+                id: 'email_primary',
+                email_address: ' Existing@Example.com ',
+                verification: { status: 'verified' },
+              },
+            ],
+            first_name: 'New',
+            last_name: 'Clerk Name',
+            image_url: 'https://example.com/new-avatar.jpg',
+            username: 'new-clerk-username',
+          },
+        }),
+      }));
+
+      (mockPrisma.$queryRaw as jest.Mock).mockResolvedValue([
+        { id: 'hacker_existing' },
+      ]);
+      const existingHacker = {
+        id: 'hacker_existing',
+        clerkId: 'user_new_clerk_id',
+        name: 'Preserved Name',
+        email: 'existing@example.com',
+        username: 'preserved-username',
+        role: 'ADMIN',
+      };
+      mockPrisma.hacker.update.mockResolvedValue(existingHacker as any);
+
+      const response = await POST(createMockRequest({}));
+      const data = await expectJsonResponse(response, 200);
+
+      expect(data).toEqual(existingHacker);
+      expect(mockPrisma.$queryRaw).toHaveBeenCalledWith(
+        expect.anything(),
+        'existing@example.com'
+      );
+      expect(mockPrisma.hacker.update).toHaveBeenCalledWith({
+        where: { id: 'hacker_existing' },
+        data: { clerkId: 'user_new_clerk_id' },
+      });
+      expect(mockPrisma.hacker.upsert).not.toHaveBeenCalled();
+    });
+
+    it('should create a new Hacker when an email matches multiple Hackers', async () => {
+      const { Webhook } = require('svix');
+      Webhook.mockImplementation(() => ({
+        verify: jest.fn().mockReturnValue({
+          type: 'user.created',
+          data: {
+            id: 'user_new_clerk_id',
+            primary_email_address_id: 'email_primary',
+            email_addresses: [
+              {
+                id: 'email_primary',
+                email_address: 'duplicate@example.com',
+                verification: { status: 'verified' },
+              },
+            ],
+            first_name: 'Duplicate',
+            last_name: 'User',
+            image_url: null,
+            username: null,
+          },
+        }),
+      }));
+
+      (mockPrisma.$queryRaw as jest.Mock).mockResolvedValue([
+        { id: 'hacker_one' },
+        { id: 'hacker_two' },
+      ]);
+      const newHacker = {
+        id: 'hacker_new',
+        clerkId: 'user_new_clerk_id',
+        name: 'Duplicate User',
+        email: 'duplicate@example.com',
+        username: 'duplicate',
+        role: 'HACKER',
+      };
+      mockPrisma.hacker.upsert.mockResolvedValue(newHacker as any);
+
+      const response = await POST(createMockRequest({}));
+      const data = await expectJsonResponse(response, 201);
+
+      expect(data).toEqual(newHacker);
+      expect(mockPrisma.hacker.update).not.toHaveBeenCalled();
+      expect(mockPrisma.hacker.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { clerkId: 'user_new_clerk_id' },
+          create: expect.objectContaining({
+            clerkId: 'user_new_clerk_id',
+            email: 'duplicate@example.com',
+          }),
+        })
+      );
+    });
+
+    it('should reject an unverified primary email', async () => {
+      const { Webhook } = require('svix');
+      Webhook.mockImplementation(() => ({
+        verify: jest.fn().mockReturnValue({
+          type: 'user.created',
+          data: {
+            id: 'user_123',
+            primary_email_address_id: 'email_primary',
+            email_addresses: [
+              {
+                id: 'email_primary',
+                email_address: 'test@example.com',
+                verification: { status: 'unverified' },
+              },
+            ],
+            first_name: 'John',
+            last_name: 'Doe',
+            image_url: null,
+            username: null,
+          },
+        }),
+      }));
+
+      const response = await POST(createMockRequest({}));
+      const data = await expectTextResponse(response, 422);
+
+      expect(data).toBe('Verified primary email required');
+      expect(mockPrisma.hacker.findUnique).not.toHaveBeenCalled();
+      expect(mockPrisma.hacker.update).not.toHaveBeenCalled();
+      expect(mockPrisma.hacker.upsert).not.toHaveBeenCalled();
+    });
+
+    it('should return the existing Hacker when Clerk retries the event', async () => {
+      const { Webhook } = require('svix');
+      Webhook.mockImplementation(() => ({
+        verify: jest.fn().mockReturnValue({
+          type: 'user.created',
+          data: {
+            id: 'user_123',
+            primary_email_address_id: 'email_primary',
+            email_addresses: [
+              {
+                id: 'email_primary',
+                email_address: 'test@example.com',
+                verification: { status: 'verified' },
+              },
+            ],
+            first_name: 'John',
+            last_name: 'Doe',
+            image_url: null,
+            username: null,
+          },
+        }),
+      }));
+
+      const existingHacker = {
+        id: 'hacker_123',
+        clerkId: 'user_123',
+        name: 'Existing User',
+        email: 'test@example.com',
+      };
+      mockPrisma.hacker.findUnique.mockResolvedValue(existingHacker as any);
+
+      const response = await POST(createMockRequest({}));
+      const data = await expectJsonResponse(response, 200);
+
+      expect(data).toEqual(existingHacker);
+      expect(mockPrisma.$queryRaw).not.toHaveBeenCalled();
+      expect(mockPrisma.hacker.update).not.toHaveBeenCalled();
+      expect(mockPrisma.hacker.upsert).not.toHaveBeenCalled();
+    });
+
     it('should return 500 if hacker creation fails', async () => {
       const { Webhook } = require('svix');
       const mockWebhook = {
@@ -247,7 +460,14 @@ describe('/api/webhooks/clerk', () => {
           type: 'user.created',
           data: {
             id: 'user_123',
-            email_addresses: [{ email_address: 'test@example.com' }],
+            primary_email_address_id: 'email_123',
+            email_addresses: [
+              {
+                id: 'email_123',
+                email_address: 'test@example.com',
+                verification: { status: 'verified' },
+              },
+            ],
             first_name: 'John',
             last_name: 'Doe',
             image_url: null,
@@ -304,7 +524,14 @@ describe('/api/webhooks/clerk', () => {
           type: 'user.created',
           data: {
             id: 'user_123',
-            email_addresses: [{ email_address: 'test@example.com' }],
+            primary_email_address_id: 'email_123',
+            email_addresses: [
+              {
+                id: 'email_123',
+                email_address: 'test@example.com',
+                verification: { status: 'verified' },
+              },
+            ],
             first_name: 'John',
             last_name: 'Doe',
             image_url: null,
@@ -341,7 +568,14 @@ describe('/api/webhooks/clerk', () => {
           type: 'user.created',
           data: {
             id: 'user_123',
-            email_addresses: [{ email_address: 'test@example.com' }],
+            primary_email_address_id: 'email_123',
+            email_addresses: [
+              {
+                id: 'email_123',
+                email_address: 'test@example.com',
+                verification: { status: 'verified' },
+              },
+            ],
             first_name: 'John',
             last_name: 'Doe',
             image_url: null,

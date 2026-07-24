@@ -64,7 +64,7 @@ const {
 const siteRequiredFields: TemplateFieldDefinition[] = [
   {
     id: 'name',
-    label: 'Name',
+    label: 'Full legal name',
     type: 'TEXT',
     required: true,
     siteRequired: true,
@@ -77,6 +77,14 @@ const siteRequiredFields: TemplateFieldDefinition[] = [
     required: true,
     siteRequired: true,
     order: 1,
+  },
+  {
+    id: 'phoneNumber',
+    label: 'Phone number',
+    type: 'PHONE',
+    required: true,
+    siteRequired: true,
+    order: 2,
   },
 ];
 
@@ -401,6 +409,7 @@ describe('/api/application-templates/[templateId]', () => {
     const weakenedFields = [
       { ...siteRequiredFields[0], required: false },
       siteRequiredFields[1],
+      siteRequiredFields[2],
     ];
 
     signInAs(siteAdmin);
@@ -591,6 +600,7 @@ describe('/api/application-templates/merged', () => {
         fields: [
           expect.objectContaining({ id: 'name', siteRequired: true }),
           expect.objectContaining({ id: 'email', siteRequired: true }),
+          expect.objectContaining({ id: 'phoneNumber', siteRequired: true }),
           expect.objectContaining({ id: 'dietaryNeeds' }),
         ],
       })

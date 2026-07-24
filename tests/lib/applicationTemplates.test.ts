@@ -18,7 +18,7 @@ import type { TemplateFieldDefinition } from '../../src/types/event-management';
 const siteRequiredFields: TemplateFieldDefinition[] = [
   {
     id: 'name',
-    label: 'Name',
+    label: 'Full legal name',
     type: 'TEXT',
     required: true,
     siteRequired: true,
@@ -31,6 +31,14 @@ const siteRequiredFields: TemplateFieldDefinition[] = [
     required: true,
     siteRequired: true,
     order: 1,
+  },
+  {
+    id: 'phoneNumber',
+    label: 'Phone number',
+    type: 'PHONE',
+    required: true,
+    siteRequired: true,
+    order: 2,
   },
 ];
 
@@ -86,6 +94,7 @@ describe('application template composition', () => {
     ).toEqual([
       { id: 'name', required: true, siteRequired: true },
       { id: 'email', required: true, siteRequired: true },
+      { id: 'phoneNumber', required: true, siteRequired: true },
     ]);
   });
 
@@ -197,6 +206,7 @@ describe('application template composition', () => {
     expect(fields.map(item => item.id)).toEqual([
       'name',
       'email',
+      'phoneNumber',
       'chapterReferral',
       'dietaryNeeds',
       'shirtSize',
@@ -206,7 +216,7 @@ describe('application template composition', () => {
         label: 'Dinner restrictions',
         type: 'TEXTAREA',
         required: false,
-        order: 3,
+        order: 4,
       })
     );
   });
@@ -232,6 +242,7 @@ describe('application template composition', () => {
     expect(fields.map(item => item.id)).toEqual([
       'name',
       'email',
+      'phoneNumber',
       'eventSpecific',
     ]);
   });
@@ -297,6 +308,7 @@ describe('application template composition', () => {
       siteFields: [
         siteRequiredFields[1],
         siteRequiredFields[0],
+        siteRequiredFields[2],
         field('siteOptIn', {
           label: 'Site opt-in',
           type: 'CHECKBOX',
@@ -330,18 +342,19 @@ describe('application template composition', () => {
     expect(fields.map(item => item.id)).toEqual([
       'name',
       'email',
+      'phoneNumber',
       'siteOptIn',
       'chapterQuestion',
       'eventQuestion',
       'sharedNonSiteQuestion',
     ]);
-    expect(fields.map(item => item.order)).toEqual([0, 1, 2, 3, 4, 5]);
+    expect(fields.map(item => item.order)).toEqual([0, 1, 2, 3, 4, 5, 6]);
     expect(fields.find(item => item.id === 'sharedNonSiteQuestion')).toEqual(
       expect.objectContaining({
         label: 'Event shared question',
         type: 'TEXTAREA',
         required: true,
-        order: 5,
+        order: 6,
       })
     );
   });
@@ -488,6 +501,7 @@ describe('application template composition', () => {
     expect(updatedCurrentFields.map(item => item.id)).toEqual([
       'name',
       'email',
+      'phoneNumber',
       'chapterNeed',
       'newQuestion',
     ]);
@@ -495,6 +509,7 @@ describe('application template composition', () => {
       validateApplicationAnswersAgainstSnapshot(originalSnapshot, {
         name: 'Grace Hopper',
         email: 'grace@example.com',
+        phoneNumber: '+15551234567',
         chapterNeed: '',
         newQuestion: '',
       })

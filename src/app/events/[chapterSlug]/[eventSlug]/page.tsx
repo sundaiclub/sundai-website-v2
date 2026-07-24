@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation';
-import { auth, currentUser } from '@clerk/nextjs/server';
+import { auth } from '@clerk/nextjs/server';
 import {
   AddToCalendarAction,
   EventDetailSections,
@@ -91,14 +91,6 @@ export default async function PublicEventDetailPage({
 
   if (!event) notFound();
 
-  const viewer = await currentUser();
-  const viewerProfile = viewer
-    ? {
-        name: viewer.fullName,
-        email: viewer.primaryEmailAddress?.emailAddress ?? null,
-        username: viewer.username,
-      }
-    : null;
   const [visibleMaterials, eventProjects] = await Promise.all([
     listVisibleEventMaterials({
       eventId: event.id,
@@ -194,7 +186,10 @@ export default async function PublicEventDetailPage({
           partners={event.publicSponsorText}
         />
         <EventProjectCarousel projects={eventProjects} />
-        <EventDetailSections event={event} viewerProfile={viewerProfile} />
+        <EventDetailSections
+          event={event}
+          viewerProfile={event.viewerProfile}
+        />
         <EventMaterialsSection materials={materialLinks} />
         <EventPitchSection
           eventId={event.pitchSession ? event.id : null}

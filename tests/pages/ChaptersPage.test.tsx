@@ -700,19 +700,13 @@ describe('chapter public directory and landing pages', () => {
       const emailControl = screen.getByRole('checkbox', {
         name: /email/i,
       });
-      const smsControl = screen.getByRole('checkbox', {
-        name: /sms|text/i,
-      });
-
       expect(notificationsControl).not.toBeChecked();
       expect(emailControl).not.toBeChecked();
-      expect(smsControl).not.toBeChecked();
 
       fireEvent.click(notificationsControl);
 
       expect(notificationsControl).toBeChecked();
       expect(emailControl).toBeChecked();
-      expect(smsControl).not.toBeChecked();
 
       const saveButton = screen.getByRole('button', {
         name: /save.*notification|update.*notification|save preferences/i,
@@ -739,62 +733,18 @@ describe('chapter public directory and landing pages', () => {
       expect(JSON.parse(notificationRequest[1].body)).toEqual({
         notificationsAllowed: expect.any(Boolean),
         emailNotificationsEnabled: true,
-        smsNotificationsEnabled: false,
-        smsConsentGranted: false,
-        smsConsentVersion: '',
       });
     });
 
-    it('requires explicit versioned SMS consent and sends consent evidence with preferences', async () => {
-      process.env.NEXT_PUBLIC_SMS_CONSENT_COPY =
-        'I consent to receive event text messages from Sundai. Message and data rates may apply.';
-      process.env.NEXT_PUBLIC_SMS_CONSENT_VERSION = '2026-07-10';
+    it('does not show a separate SMS consent control', async () => {
       mockSignedIn(activeMemberUser);
-
       renderLandingPage('boston');
-
       fireEvent.click(
         await screen.findByRole('tab', { name: /^preferences$/i })
       );
-
-      const smsControl = await screen.findByRole('checkbox', {
-        name: /^sms|text notifications$/i,
-      });
-      fireEvent.click(smsControl);
-
       expect(
-        screen.getByText(/message and data rates may apply/i)
-      ).toBeInTheDocument();
-      expect(
-        screen.getByText(/consent version 2026-07-10/i)
-      ).toBeInTheDocument();
-
-      const explicitConsent = screen.getByRole('checkbox', {
-        name: /i consent to receive event text messages/i,
-      });
-      expect(explicitConsent).not.toBeChecked();
-      fireEvent.click(explicitConsent);
-
-      fireEvent.click(
-        screen.getByRole('button', {
-          name: /save.*notification|update.*notification|save preferences/i,
-        })
-      );
-
-      await waitFor(() => {
-        const notificationRequest = (global.fetch as jest.Mock).mock.calls.find(
-          ([url, init]) =>
-            requestUrl(url).includes('/notifications') &&
-            init?.method?.toUpperCase() === 'PATCH'
-        );
-        expect(requestBody(notificationRequest?.[1])).toEqual(
-          expect.objectContaining({
-            smsNotificationsEnabled: true,
-            smsConsentGranted: true,
-            smsConsentVersion: '2026-07-10',
-          })
-        );
-      });
+        screen.queryByRole('checkbox', { name: /sms|text/i })
+      ).not.toBeInTheDocument();
     });
 
     it('shows a manage link to chapter admins', async () => {

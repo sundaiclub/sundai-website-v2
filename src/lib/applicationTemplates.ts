@@ -13,6 +13,7 @@ import type {
   TemplateFieldType,
   TemplateFieldValidation,
 } from '@/types/event-management';
+import { SITE_APPLICATION_SMS_CONSENT_COPY } from '@/lib/smsConsent';
 
 const TEMPLATE_FIELD_TYPES: readonly TemplateFieldType[] = [
   'TEXT',
@@ -31,7 +32,7 @@ const TEMPLATE_FIELD_TYPES: readonly TemplateFieldType[] = [
 const SITE_REQUIRED_FIELD_CONSTRAINTS: readonly TemplateFieldDefinition[] = [
   {
     id: 'name',
-    label: 'Name',
+    label: 'Full legal name',
     type: 'TEXT',
     required: true,
     siteRequired: true,
@@ -44,6 +45,16 @@ const SITE_REQUIRED_FIELD_CONSTRAINTS: readonly TemplateFieldDefinition[] = [
     required: true,
     siteRequired: true,
     order: 1,
+  },
+  {
+    id: 'phoneNumber',
+    label: 'Phone number',
+    type: 'PHONE',
+    required: true,
+    siteRequired: true,
+    helpText: SITE_APPLICATION_SMS_CONSENT_COPY,
+    placeholder: '+1 555 123 4567',
+    order: 2,
   },
 ];
 

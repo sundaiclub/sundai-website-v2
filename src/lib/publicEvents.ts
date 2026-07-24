@@ -23,6 +23,7 @@ import type {
   JsonObject,
   JsonValue,
   MergedApplicationTemplate,
+  ProfilePrefillSource,
   PublicEventCard,
   PublicEventDetail,
   PublicEventStatus,
@@ -40,6 +41,10 @@ type PublicEventsDelegate<TRecord, TFindManyArgs, TFindFirstArgs> = {
 type PublicEventsHackerRecord = {
   id: EntityId;
   role?: Role | null;
+  name?: string | null;
+  email?: string | null;
+  phoneNumber?: string | null;
+  username?: string | null;
 };
 
 type PublicEventsChapterMembershipRecord = {
@@ -230,6 +235,7 @@ export type GetPublicEventBySlugInput = {
 export type RedactPublicEventOptions = {
   applicationQuestionSet?: ApplicationQuestionSet;
   reusableAnswersJson?: JsonObject | null;
+  viewerProfile?: ProfilePrefillSource | null;
   viewerRegistration?: PublicViewerRegistrationState | null;
   viewerCanManageRegistrations?: boolean;
   viewerCanViewApprovedDetails?: boolean;
@@ -386,7 +392,12 @@ export async function getPublicEventBySlug(
     !input.viewer?.hackerId && input.viewer?.clerkId
       ? client.hacker.findUnique({
           where: { clerkId: input.viewer.clerkId },
-          select: { id: true },
+          select: {
+            id: true,
+            email: true,
+            phoneNumber: true,
+            username: true,
+          },
         })
       : Promise.resolve(null),
   ]);
@@ -427,6 +438,14 @@ export async function getPublicEventBySlug(
   return redactPublicEventForViewer(event, {
     applicationQuestionSet,
     reusableAnswersJson,
+    viewerProfile: viewerHacker
+      ? {
+          name: null,
+          email: viewerHacker.email ?? null,
+          phoneNumber: viewerHacker.phoneNumber ?? null,
+          username: viewerHacker.username ?? null,
+        }
+      : null,
     viewerRegistration,
     viewerCanManageRegistrations,
     viewerCanViewApprovedDetails,
@@ -496,6 +515,7 @@ export function redactPublicEventForViewer(
     applicationQuestionSet:
       options.applicationQuestionSet ?? buildApplicationQuestionSet(event),
     reusableAnswersJson: options.reusableAnswersJson ?? null,
+    viewerProfile: options.viewerProfile ?? null,
     viewerRegistration: options.viewerRegistration ?? null,
     viewerCanManageRegistrations: options.viewerCanManageRegistrations === true,
     viewerCanEditEvent: options.viewerCanEditEvent === true,

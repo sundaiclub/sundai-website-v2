@@ -93,6 +93,9 @@ const createRegistrationDb = () => {
     userBan: {
       findMany: jest.fn(),
     },
+    hacker: {
+      update: jest.fn(),
+    },
     $transaction: jest.fn(),
   };
 
@@ -564,7 +567,10 @@ describe('public registration edit helpers', () => {
         {
           eventId,
           hackerId: 'hacker-editor',
-          answersJson: { name: 'Updated Name' },
+          answersJson: {
+            name: 'Updated Name',
+            phoneNumber: '+15551234567',
+          },
         },
         db
       )
@@ -581,8 +587,20 @@ describe('public registration edit helpers', () => {
     expect(db.eventRegistration.update).toHaveBeenCalledWith({
       where: { id: existingRegistration.id },
       data: {
-        answersJson: { name: 'Updated Name' },
+        answersJson: {
+          name: 'Updated Name',
+          phoneNumber: '+15551234567',
+        },
         templateSnapshotJson: siteFields,
+      },
+    });
+    expect(db.hacker.update).toHaveBeenCalledWith({
+      where: { id: 'hacker-editor' },
+      data: {
+        name: 'Updated Name',
+        phoneNumber: '+15551234567',
+        smsConsentAt: expect.any(Date),
+        smsConsentVersion: 'site-application-2026-07-22',
       },
     });
     expect(db.eventRegistrationAudit.create).toHaveBeenCalledWith({

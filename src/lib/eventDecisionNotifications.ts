@@ -1,5 +1,6 @@
 import prisma from '@/lib/prisma';
 import { DEFAULT_EVENT_MESSAGES } from '@/lib/eventMessageDefaults';
+import { SITE_APPLICATION_SMS_CONSENT_VERSION } from '@/lib/smsConsent';
 
 export type EventDecisionNotificationStatus = 'APPROVED' | 'DECLINED';
 export type EventDecisionNotificationChannelResult =
@@ -18,6 +19,8 @@ type EventDecisionNotificationContext = {
     name: string;
     email: string | null;
     phoneNumber: string | null;
+    smsConsentAt: Date | null;
+    smsConsentVersion: string | null;
   };
   event: {
     title: string;
@@ -32,7 +35,6 @@ type EventDecisionNotificationContext = {
   preferences: {
     notificationsAllowed: boolean;
     emailNotificationsEnabled: boolean;
-    smsNotificationsEnabled: boolean;
   } | null;
 };
 
@@ -173,6 +175,8 @@ async function loadContext(
           name: true,
           email: true,
           phoneNumber: true,
+          smsConsentAt: true,
+          smsConsentVersion: true,
         },
       },
       event: {
@@ -200,7 +204,6 @@ async function loadContext(
     select: {
       notificationsAllowed: true,
       emailNotificationsEnabled: true,
-      smsNotificationsEnabled: true,
     },
   });
 
@@ -270,7 +273,7 @@ export async function notifyEventDecision(
       input.registrationId
     );
 
-    if (!context?.preferences?.notificationsAllowed) return skippedResult();
+    if (!context) return skippedResult();
 
     const content = buildDecisionContent(context, input.status, config.appUrl);
     const result = skippedResult();
@@ -279,6 +282,7 @@ export async function notifyEventDecision(
 
     if (
       emailConfigured &&
+      context.preferences?.notificationsAllowed &&
       context.preferences.emailNotificationsEnabled &&
       isSendableEmail(context.applicant.email)
     ) {
@@ -295,7 +299,10 @@ export async function notifyEventDecision(
 
     if (
       smsConfigured &&
-      context.preferences.smsNotificationsEnabled &&
+      context.preferences?.notificationsAllowed !== false &&
+      context.applicant.smsConsentAt &&
+      context.applicant.smsConsentVersion ===
+        SITE_APPLICATION_SMS_CONSENT_VERSION &&
       isE164PhoneNumber(context.applicant.phoneNumber)
     ) {
       channels.push('sms');

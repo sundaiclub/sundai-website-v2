@@ -63,6 +63,8 @@ export async function POST(
             name: true,
             email: true,
             phoneNumber: true,
+            smsConsentAt: true,
+            smsConsentVersion: true,
           },
         },
       },
@@ -126,7 +128,6 @@ export async function POST(
       audienceTypes,
       selectedHackerIds,
       channel: communication.channel,
-      smsConsentVersion: process.env.SMS_CONSENT_VERSION,
     });
     const currentFingerprint = fingerprintEventCommunicationAudience({
       channel: communication.channel,

@@ -510,6 +510,7 @@ export interface PublicEventDetail extends PublicEventCard {
   applicationControls: ApplicationControlsState;
   applicationQuestionSet: ApplicationQuestionSet;
   reusableAnswersJson?: JsonObject | null;
+  viewerProfile?: ProfilePrefillSource | null;
   viewerRegistration?: PublicViewerRegistrationState | null;
   viewerCanManageRegistrations?: boolean;
   viewerCanEditEvent?: boolean;

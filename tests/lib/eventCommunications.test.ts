@@ -76,6 +76,8 @@ function registration(overrides: Record<string, unknown> = {}) {
       name: 'Approved Hacker',
       email: 'approved@example.com',
       phoneNumber: '+16175550100',
+      smsConsentAt: new Date('2026-07-01T12:00:00.000Z'),
+      smsConsentVersion: 'site-application-2026-07-22',
       isGloballyBanned: false,
     },
     membership: {
@@ -266,14 +268,17 @@ describe('event communication audience resolution', () => {
       }),
       registration({
         id: 'registration-no-consent',
-        hacker: { ...registration().hacker, id: 'hacker-no-consent' },
-        membership: { ...registration().membership, smsConsentAt: null },
+        hacker: {
+          ...registration().hacker,
+          id: 'hacker-no-consent',
+          smsConsentAt: null,
+        },
       }),
       registration({
         id: 'registration-old-consent',
-        hacker: { ...registration().hacker, id: 'hacker-old-consent' },
-        membership: {
-          ...registration().membership,
+        hacker: {
+          ...registration().hacker,
+          id: 'hacker-old-consent',
           smsConsentVersion: 'sms-consent-v0',
         },
       }),
