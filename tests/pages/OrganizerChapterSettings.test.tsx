@@ -427,6 +427,71 @@ describe('/organizer/chapters/[chapterSlug]/settings', () => {
     })
   })
 
+  it('opens the admin picker and adds the selected hacker as an admin', async () => {
+    mockChapterAdmin()
+    const adminCandidate = {
+      id: 'hacker-new-admin',
+      name: 'New Admin',
+      email: 'new-admin@example.com',
+    }
+    const createdAdmin = {
+      id: 'membership-new-admin',
+      chapterId: chapter.id,
+      hackerId: adminCandidate.id,
+      role: 'ADMIN',
+      status: 'ACTIVE',
+      notificationsAllowed: true,
+      emailNotificationsEnabled: true,
+      smsNotificationsEnabled: false,
+      hacker: adminCandidate,
+    }
+
+    global.fetch = jest.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = requestUrl(input)
+
+      if (url === '/api/hackers') return jsonResponse([adminCandidate])
+      if (
+        url === `/api/chapters/${chapter.id}/admins` &&
+        init?.method === 'POST'
+      ) {
+        return jsonResponse(createdAdmin, 201)
+      }
+      if (url.includes('/members')) return jsonResponse(members)
+      if (url.includes('/ban-flags')) return jsonResponse(banFlags)
+      if (isApplicationTemplateListRequest(url)) return jsonResponse(templates)
+      if (/\/api\/chapters\/[^/?]+/.test(url)) return jsonResponse(chapter)
+      return jsonResponse({})
+    }) as jest.Mock
+
+    renderSettingsPage()
+
+    await screen.findByText('Sundai Boston')
+    fireEvent.click(screen.getByRole('button', { name: /invite admin/i }))
+
+    expect(
+      await screen.findByRole('heading', { name: /invite chapter admin/i }),
+    ).toBeInTheDocument()
+    const searchInput = screen.getByPlaceholderText(/search members/i)
+    expect(global.fetch).toHaveBeenCalledWith('/api/hackers')
+
+    fireEvent.change(searchInput, { target: { value: 'New Admin' } })
+    fireEvent.click(screen.getByRole('button', { name: /new admin/i }))
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        `/api/chapters/${chapter.id}/admins`,
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({ hackerId: adminCandidate.id }),
+        }),
+      )
+    })
+    expect(
+      await screen.findByText('New Admin is now a chapter admin.'),
+    ).toBeInTheDocument()
+    expect(screen.getAllByText('new-admin@example.com').length).toBeGreaterThan(0)
+  })
+
   it('denies the organizer settings surface to users who do not manage the chapter', async () => {
     mockUnauthorizedUser()
     mockForbiddenFetches()

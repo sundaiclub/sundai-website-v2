@@ -18,6 +18,7 @@ import {
   useManagementClasses,
 } from '../../../../components/ManagementSurface';
 import { ApplicationTemplateEditor } from '../../../../components/ApplicationTemplateEditor';
+import { HackerSelector } from '../../../../components/HackerSelector';
 import { HackerSearchSelect } from '../../../../components/HackerSearchSelect';
 import type { HackerSelectionOption } from '@/types/hacker';
 import { useUserContext } from '../../../../contexts/UserContext';
@@ -33,6 +34,29 @@ function firstChapter(payload: unknown): OrganizerChapterSettings | null {
     return payload as OrganizerChapterSettings;
   }
   return null;
+}
+
+function hackerList(payload: unknown): HackerSelectionOption[] {
+  const hackers = Array.isArray(payload)
+    ? payload
+    : payload &&
+        typeof payload === 'object' &&
+        'hackers' in payload &&
+        Array.isArray(payload.hackers)
+      ? payload.hackers
+      : [];
+
+  return hackers.filter(
+    (hacker): hacker is HackerSelectionOption =>
+      Boolean(
+        hacker &&
+          typeof hacker === 'object' &&
+          'id' in hacker &&
+          typeof hacker.id === 'string' &&
+          'name' in hacker &&
+          typeof hacker.name === 'string'
+      )
+  );
 }
 
 function templateList(payload: unknown): ApplicationTemplateListItem[] {
@@ -89,6 +113,16 @@ export default function OrganizerChapterSettingsPage({
   const [settingsError, setSettingsError] = useState('');
   const [isSavingDescription, setIsSavingDescription] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [showAdminInvite, setShowAdminInvite] = useState(false);
+  const [adminCandidates, setAdminCandidates] = useState<
+    HackerSelectionOption[] | null
+  >(null);
+  const [adminHackerQuery, setAdminHackerQuery] = useState('');
+  const [adminMessage, setAdminMessage] = useState('');
+  const [adminError, setAdminError] = useState('');
+  const [isLoadingAdminCandidates, setIsLoadingAdminCandidates] =
+    useState(false);
+  const [isInvitingAdmin, setIsInvitingAdmin] = useState(false);
   const [flagHackerQuery, setFlagHackerQuery] = useState('');
   const [selectedFlagHacker, setSelectedFlagHacker] =
     useState<HackerSelectionOption | null>(null);
@@ -350,6 +384,76 @@ export default function OrganizerChapterSettingsPage({
     setFlagError('');
   }
 
+  async function openAdminInvite() {
+    setAdminMessage('');
+    setAdminError('');
+
+    if (adminCandidates) {
+      setShowAdminInvite(true);
+      return;
+    }
+
+    setIsLoadingAdminCandidates(true);
+    try {
+      const response = await fetch('/api/hackers');
+      if (!response.ok) throw new Error('Unable to load hackers.');
+
+      setAdminCandidates(hackerList(await response.json()));
+      setShowAdminInvite(true);
+    } catch (error) {
+      setAdminError(
+        error instanceof Error ? error.message : 'Unable to load hackers.'
+      );
+    } finally {
+      setIsLoadingAdminCandidates(false);
+    }
+  }
+
+  async function inviteAdmin(hacker: HackerSelectionOption) {
+    if (!chapter || isInvitingAdmin) return;
+
+    setIsInvitingAdmin(true);
+    setShowAdminInvite(false);
+    setAdminMessage('');
+    setAdminError('');
+
+    try {
+      const response = await fetch(`/api/chapters/${chapter.id}/admins`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ hackerId: hacker.id }),
+      });
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        throw new Error(
+          payload?.message || payload?.error || 'Unable to add chapter admin.'
+        );
+      }
+
+      const savedAdmin = (await response.json()) as ChapterMembershipSummary;
+      setMembers(current => {
+        const existingIndex = current.findIndex(
+          member => member.hacker?.id === savedAdmin.hacker?.id
+        );
+        if (existingIndex === -1) return [...current, savedAdmin];
+        return current.map((member, index) =>
+          index === existingIndex ? savedAdmin : member
+        );
+      });
+      setAdminMessage(`${hacker.name} is now a chapter admin.`);
+      setAdminHackerQuery('');
+    } catch (error) {
+      setAdminError(
+        error instanceof Error
+          ? error.message
+          : 'Unable to add chapter admin.'
+      );
+    } finally {
+      setIsInvitingAdmin(false);
+    }
+  }
+
   if (isLoading || (authStatus && loading)) {
     return (
       <ManagementPage maxWidth="max-w-5xl">
@@ -519,11 +623,54 @@ export default function OrganizerChapterSettingsPage({
           title="Admins"
           description="People who can manage this chapter."
           actions={
-            <button className={classes.primaryButton} type="button">
-              Invite admin
+            <button
+              className={classes.primaryButton}
+              disabled={isLoadingAdminCandidates || isInvitingAdmin}
+              onClick={openAdminInvite}
+              type="button"
+            >
+              {isLoadingAdminCandidates ? 'Loading hackers...' : 'Invite admin'}
             </button>
           }
         >
+          <HackerSelector
+            showModal={showAdminInvite}
+            setShowModal={setShowAdminInvite}
+            isDarkMode={classes.isDarkMode}
+            searchTerm={adminHackerQuery}
+            setSearchTerm={setAdminHackerQuery}
+            filteredHackers={(adminCandidates ?? []).filter(candidate => {
+              const isAdmin = members.some(
+                member =>
+                  member.role === 'ADMIN' &&
+                  member.hacker?.id === candidate.id
+              );
+              const query = adminHackerQuery.trim().toLowerCase();
+              return (
+                !isAdmin &&
+                (!query ||
+                  candidate.name.toLowerCase().includes(query) ||
+                  (candidate.email ?? '').toLowerCase().includes(query))
+              );
+            })}
+            handleAddMember={inviteAdmin}
+            title="Invite Chapter Admin"
+            singleSelect
+            selectedIds={members
+              .filter(member => member.role === 'ADMIN')
+              .flatMap(member => (member.hacker?.id ? [member.hacker.id] : []))}
+            showRoleSelector={false}
+          />
+          {adminError && (
+            <div className="mb-4">
+              <ManagementAlert tone="danger">{adminError}</ManagementAlert>
+            </div>
+          )}
+          {adminMessage && (
+            <div className="mb-4">
+              <ManagementAlert tone="success">{adminMessage}</ManagementAlert>
+            </div>
+          )}
           <div id="admins" className={`divide-y ${classes.divider}`}>
             {members
               .filter(member => member.role === 'ADMIN')
