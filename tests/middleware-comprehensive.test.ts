@@ -27,6 +27,15 @@ describe('middleware', () => {
     );
   });
 
+  it('keeps the legal pages public', () => {
+    require('../src/middleware');
+    const { createRouteMatcher } = require('@clerk/nextjs/server');
+
+    expect(createRouteMatcher).toHaveBeenCalledWith(
+      expect.arrayContaining(['/privacy', '/terms'])
+    );
+  });
+
   it('protects routes that are not public', async () => {
     const middleware = require('../src/middleware').default;
     const protect = jest.fn();
