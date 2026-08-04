@@ -16,7 +16,7 @@ const buildContext = (overrides: Record<string, unknown> = {}) => ({
     email: 'ada@example.com',
     phoneNumber: '+16175550123',
     smsConsentAt: new Date('2026-07-01T12:00:00.000Z'),
-    smsConsentVersion: 'site-application-2026-07-22',
+    smsConsentVersion: 'site-application-checkbox-2026-08-04',
   },
   event: {
     title: 'Boston AI Build Night',

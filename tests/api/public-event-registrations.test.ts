@@ -271,6 +271,7 @@ describe('POST /api/events/[eventId]/registrations public submissions', () => {
     const response = await POST_REGISTRATION(
       createCurrentUserRegistrationRequest(fixture.publishedEvent.id, {
         answersJson,
+        smsConsentGranted: true,
       }) as any,
       createRouteContext({ eventId: fixture.publishedEvent.id })
     );
@@ -313,6 +314,15 @@ describe('POST /api/events/[eventId]/registrations public submissions', () => {
           applicationMode: 'REQUIRES_APPROVAL',
         }),
       }),
+    });
+    expect(prisma.hacker.update).toHaveBeenCalledWith({
+      where: { id: fixture.applicant.id },
+      data: {
+        name: answersJson.name,
+        phoneNumber: answersJson.phoneNumber,
+        smsConsentAt: submittedAt,
+        smsConsentVersion: 'site-application-checkbox-2026-08-04',
+      },
     });
   });
 

@@ -142,8 +142,7 @@ export async function GET(
     }
 
     const canDecide = canDecideRegistrationsWithContext(permissionContext);
-    const canEditNotes =
-      canEditRegistrationNotesWithContext(permissionContext);
+    const canEditNotes = canEditRegistrationNotesWithContext(permissionContext);
 
     const siteAdmin = isSiteAdmin(hacker);
     const capabilities: OrganizerRegistrationReviewCapabilities = {
@@ -204,6 +203,7 @@ export async function POST(
         eventId: params.eventId,
         hackerId: hacker.id,
         answersJson: body?.answersJson,
+        smsConsentGranted: body?.smsConsentGranted === true,
       });
 
       return publicRegistrationActionResponse(result, { successStatus: 201 });

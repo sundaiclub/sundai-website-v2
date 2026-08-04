@@ -48,6 +48,7 @@ export type CurrentUserRegistrationAnswers = Record<string, unknown>;
 
 export type CurrentUserRegistrationRequestBody = {
   answersJson: CurrentUserRegistrationAnswers;
+  smsConsentGranted?: boolean;
 };
 
 export type CurrentUserRegistrationRequestOptions = Omit<
@@ -55,6 +56,7 @@ export type CurrentUserRegistrationRequestOptions = Omit<
   'body' | 'method'
 > & {
   answersJson?: CurrentUserRegistrationAnswers;
+  smsConsentGranted?: boolean;
   body?: CurrentUserRegistrationRequestBody;
 };
 
@@ -260,13 +262,14 @@ export function createCurrentUserRegistrationRequest(
   eventId: string,
   options: CurrentUserRegistrationRequestOptions = {}
 ) {
-  const { answersJson, body, ...requestOptions } = options;
+  const { answersJson, smsConsentGranted, body, ...requestOptions } = options;
 
   return createJsonRequest(`/api/events/${eventId}/registrations`, {
     ...requestOptions,
     method: 'POST',
     body: body ?? {
       answersJson: answersJson ?? createDefaultCurrentUserRegistrationAnswers(),
+      ...(smsConsentGranted !== undefined ? { smsConsentGranted } : {}),
     },
   });
 }
@@ -275,13 +278,14 @@ export function createCurrentUserRegistrationEditRequest(
   eventId: string,
   options: CurrentUserRegistrationRequestOptions = {}
 ) {
-  const { answersJson, body, ...requestOptions } = options;
+  const { answersJson, smsConsentGranted, body, ...requestOptions } = options;
 
   return createJsonRequest(`/api/events/${eventId}/registrations/me`, {
     ...requestOptions,
     method: 'PATCH',
     body: body ?? {
       answersJson: answersJson ?? createDefaultCurrentUserRegistrationAnswers(),
+      ...(smsConsentGranted !== undefined ? { smsConsentGranted } : {}),
     },
   });
 }

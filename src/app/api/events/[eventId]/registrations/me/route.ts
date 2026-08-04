@@ -16,6 +16,7 @@ export async function PATCH(
       eventId: params.eventId,
       hackerId: hacker.id,
       answersJson: body?.answersJson,
+      smsConsentGranted: body?.smsConsentGranted === true,
     });
 
     return publicRegistrationActionResponse(result);

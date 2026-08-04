@@ -349,6 +349,32 @@ export default function Home() {
               >
                 More about Sundai
               </a>
+              <span aria-hidden="true" className="mx-2">
+                ·
+              </span>
+              <Link
+                href="/privacy"
+                className={`${
+                  isDarkMode
+                    ? 'text-gray-200 hover:text-indigo-400'
+                    : 'text-gray-700 hover:text-indigo-600'
+                } transition duration-300`}
+              >
+                Privacy
+              </Link>
+              <span aria-hidden="true" className="mx-2">
+                ·
+              </span>
+              <Link
+                href="/terms"
+                className={`${
+                  isDarkMode
+                    ? 'text-gray-200 hover:text-indigo-400'
+                    : 'text-gray-700 hover:text-indigo-600'
+                } transition duration-300`}
+              >
+                Terms
+              </Link>
             </p>
 
             {/* Social links - Right aligned */}

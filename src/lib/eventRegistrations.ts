@@ -136,12 +136,14 @@ export type SubmitPublicEventRegistrationInput = {
   eventId: EntityId;
   hackerId: EntityId;
   answersJson: unknown;
+  smsConsentGranted?: boolean;
 };
 
 export type UpdatePendingPublicEventRegistrationInput = {
   eventId: EntityId;
   hackerId: EntityId;
   answersJson: unknown;
+  smsConsentGranted?: boolean;
 };
 
 export type CancelPublicEventRegistrationInput = {
@@ -665,7 +667,12 @@ export async function submitPublicEventRegistration(
     }
 
     const answers = normalizeRegistrationAnswers(input.answersJson);
-    await updateHackerApplicationProfile(input.hackerId, answers, tx);
+    await updateHackerApplicationProfile(
+      input.hackerId,
+      answers,
+      input.smsConsentGranted === true,
+      tx
+    );
     const toStatus = getInitialPublicRegistrationStatus(event.applicationMode);
     const registration = await tx.eventRegistration.create({
       data: {
@@ -752,7 +759,12 @@ export async function updatePendingPublicEventRegistration(
     }
 
     const answers = normalizeRegistrationAnswers(input.answersJson);
-    await updateHackerApplicationProfile(input.hackerId, answers, tx);
+    await updateHackerApplicationProfile(
+      input.hackerId,
+      answers,
+      input.smsConsentGranted === true,
+      tx
+    );
     const registration = await tx.eventRegistration.update({
       where: { id: existingRegistration.id },
       data: {
@@ -1326,6 +1338,7 @@ function normalizeRegistrationAnswers(answersJson: unknown): JsonObject {
 async function updateHackerApplicationProfile(
   hackerId: EntityId,
   answers: JsonObject,
+  smsConsentGranted: boolean,
   db: EventManagementPrismaClient
 ): Promise<void> {
   const name = typeof answers.name === 'string' ? answers.name.trim() : '';
@@ -1338,11 +1351,13 @@ async function updateHackerApplicationProfile(
     where: { id: hackerId },
     data: {
       ...(name ? { name } : {}),
-      ...(phoneNumber ? { phoneNumber } : {}),
       ...(phoneNumber
         ? {
-            smsConsentAt: new Date(),
-            smsConsentVersion: SITE_APPLICATION_SMS_CONSENT_VERSION,
+            phoneNumber,
+            smsConsentAt: smsConsentGranted ? new Date() : null,
+            smsConsentVersion: smsConsentGranted
+              ? SITE_APPLICATION_SMS_CONSENT_VERSION
+              : null,
           }
         : {}),
     },

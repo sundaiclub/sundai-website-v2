@@ -77,7 +77,7 @@ function registration(overrides: Record<string, unknown> = {}) {
       email: 'approved@example.com',
       phoneNumber: '+16175550100',
       smsConsentAt: new Date('2026-07-01T12:00:00.000Z'),
-      smsConsentVersion: 'site-application-2026-07-22',
+      smsConsentVersion: 'site-application-checkbox-2026-08-04',
       isGloballyBanned: false,
     },
     membership: {

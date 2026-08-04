@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import {
   applyProfilePrefillToAnswers,
@@ -15,6 +16,7 @@ import type {
   PublicViewerRegistrationState,
   TemplateFieldDefinition,
 } from '@/types/event-management';
+import { SITE_APPLICATION_SMS_CONSENT_COPY } from '@/lib/smsConsent';
 import {
   ManagementAlert,
   ManagementSection,
@@ -210,6 +212,7 @@ export function EventApplicationForm({
   const [actionError, setActionError] = useState('');
   const [actionMessage, setActionMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [smsConsentGranted, setSmsConsentGranted] = useState(false);
   const submittedAt = formatSubmittedAt(registration?.submittedAt);
 
   useEffect(() => {
@@ -221,6 +224,7 @@ export function EventApplicationForm({
         reusableAnswers: event.reusableAnswersJson,
       })
     );
+    setSmsConsentGranted(false);
     setIsEditing(false);
   }, [
     controls.canSubmit,
@@ -275,7 +279,7 @@ export function EventApplicationForm({
         {
           method: registration ? 'PATCH' : 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ answersJson: answers }),
+          body: JSON.stringify({ answersJson: answers, smsConsentGranted }),
         }
       );
       const payload = await response.json().catch(() => null);
@@ -346,13 +350,52 @@ export function EventApplicationForm({
           }}
         >
           {fields.map(field => (
-            <FieldInput
-              error={fieldErrors[field.id]}
-              field={field}
-              key={field.id}
-              onChange={value => updateAnswer(field, value)}
-              value={answers[field.id]}
-            />
+            <div className="grid gap-3" key={field.id}>
+              <FieldInput
+                error={fieldErrors[field.id]}
+                field={field}
+                onChange={value => updateAnswer(field, value)}
+                value={answers[field.id]}
+              />
+              {field.id === 'phoneNumber' && field.type === 'PHONE' && (
+                <div className={`${classes.subtlePanel} grid gap-2 p-3`}>
+                  <label
+                    className="flex items-start gap-3"
+                    htmlFor="application-sms-consent"
+                  >
+                    <input
+                      checked={smsConsentGranted}
+                      className={`${classes.checkbox} mt-1`}
+                      id="application-sms-consent"
+                      onChange={event =>
+                        setSmsConsentGranted(event.target.checked)
+                      }
+                      type="checkbox"
+                    />
+                    <span className="text-xs leading-5">
+                      {SITE_APPLICATION_SMS_CONSENT_COPY}
+                    </span>
+                  </label>
+                  <p className={`pl-7 text-xs ${classes.mutedText}`}>
+                    Read the{' '}
+                    <Link
+                      className="font-semibold underline underline-offset-2"
+                      href="/terms"
+                    >
+                      Terms of Service
+                    </Link>{' '}
+                    and{' '}
+                    <Link
+                      className="font-semibold underline underline-offset-2"
+                      href="/privacy"
+                    >
+                      Privacy Policy
+                    </Link>
+                    .
+                  </p>
+                </div>
+              )}
+            </div>
           ))}
           <div>
             <button

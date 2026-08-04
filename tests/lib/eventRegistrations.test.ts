@@ -571,6 +571,7 @@ describe('public registration edit helpers', () => {
             name: 'Updated Name',
             phoneNumber: '+15551234567',
           },
+          smsConsentGranted: true,
         },
         db
       )
@@ -600,7 +601,7 @@ describe('public registration edit helpers', () => {
         name: 'Updated Name',
         phoneNumber: '+15551234567',
         smsConsentAt: expect.any(Date),
-        smsConsentVersion: 'site-application-2026-07-22',
+        smsConsentVersion: 'site-application-checkbox-2026-08-04',
       },
     });
     expect(db.eventRegistrationAudit.create).toHaveBeenCalledWith({

@@ -13,8 +13,6 @@ import type {
   TemplateFieldType,
   TemplateFieldValidation,
 } from '@/types/event-management';
-import { SITE_APPLICATION_SMS_CONSENT_COPY } from '@/lib/smsConsent';
-
 const TEMPLATE_FIELD_TYPES: readonly TemplateFieldType[] = [
   'TEXT',
   'TEXTAREA',
@@ -52,7 +50,8 @@ const SITE_REQUIRED_FIELD_CONSTRAINTS: readonly TemplateFieldDefinition[] = [
     type: 'PHONE',
     required: true,
     siteRequired: true,
-    helpText: SITE_APPLICATION_SMS_CONSENT_COPY,
+    helpText:
+      'Enter a mobile number in international format, including country code.',
     placeholder: '+1 555 123 4567',
     order: 2,
   },

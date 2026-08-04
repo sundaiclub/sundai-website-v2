@@ -180,7 +180,7 @@ const applicationQuestionSet = {
       required: true,
       siteRequired: true,
       helpText:
-        'By submitting your phone number, you consent to receive recurring automated text messages from Sundai about event applications and updates. Message frequency varies. Message and data rates may apply. Reply STOP to unsubscribe or HELP for help.',
+        'Enter a mobile number in international format, including country code.',
     }),
   ],
   chapterFields: [
@@ -218,7 +218,7 @@ const applicationQuestionSet = {
       required: true,
       siteRequired: true,
       helpText:
-        'By submitting your phone number, you consent to receive recurring automated text messages from Sundai about event applications and updates. Message frequency varies. Message and data rates may apply. Reply STOP to unsubscribe or HELP for help.',
+        'Enter a mobile number in international format, including country code.',
       order: 2,
     }),
     applicationField('chapterGoals', {
@@ -994,6 +994,17 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
         screen.getByText(/message and data rates may apply/i)
       ).toBeInTheDocument();
       expect(
+        screen.getByRole('checkbox', {
+          name: /receive recurring automated text messages/i,
+        })
+      ).not.toBeChecked();
+      expect(
+        screen.getByRole('link', { name: 'Terms of Service' })
+      ).toHaveAttribute('href', '/terms');
+      expect(
+        screen.getByRole('link', { name: 'Privacy Policy' })
+      ).toHaveAttribute('href', '/privacy');
+      expect(
         nameInput.compareDocumentPosition(emailInput) &
           Node.DOCUMENT_POSITION_FOLLOWING
       ).toBeTruthy();
@@ -1010,6 +1021,48 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
           name: /submit application|apply/i,
         })
       ).toBeEnabled();
+    });
+
+    it('submits SMS consent only after the applicant checks the consent box', async () => {
+      await renderDetailPage(buildApplicationEvent());
+
+      await openRegistrationForm();
+      fireEvent.change(await screen.findByLabelText(/full name/i), {
+        target: { value: 'Signed In Applicant' },
+      });
+      fireEvent.change(screen.getByLabelText(/project idea/i), {
+        target: { value: 'Build an event scheduler' },
+      });
+      fireEvent.click(
+        screen.getByRole('checkbox', {
+          name: /receive recurring automated text messages/i,
+        })
+      );
+      fireEvent.click(
+        screen.getByRole('button', { name: /submit application/i })
+      );
+
+      await waitFor(() => {
+        expect(global.fetch).toHaveBeenCalledWith(
+          `/api/events/${eventFixture.id}/registrations`,
+          expect.objectContaining({
+            method: 'POST',
+            body: expect.any(String),
+          })
+        );
+      });
+
+      const registrationCall = (global.fetch as jest.Mock).mock.calls.find(
+        ([url]) =>
+          requestUrl(url).endsWith(
+            `/api/events/${eventFixture.id}/registrations`
+          )
+      );
+      expect(registrationCall).toBeDefined();
+      const requestInit = registrationCall?.[1] as RequestInit;
+      expect(JSON.parse(requestInit.body as string)).toEqual(
+        expect.objectContaining({ smsConsentGranted: true })
+      );
     });
 
     it('prefills only prior answers enabled for reuse', async () => {
