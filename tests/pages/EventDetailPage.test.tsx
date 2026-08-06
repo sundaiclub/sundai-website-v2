@@ -274,6 +274,7 @@ function buildEventDetail(
     chapter: eventFixture.chapter,
     title: eventFixture.title,
     publicLocation: eventFixture.publicLocation,
+    timezone: eventFixture.chapter.timezone,
     startTime: eventFixture.startTime,
     endTime: eventFixture.endTime,
     publicStatus: 'OPEN',

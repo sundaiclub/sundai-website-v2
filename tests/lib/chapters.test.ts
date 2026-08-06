@@ -135,6 +135,7 @@ describe('chapter helper indexed query shapes', () => {
             title: true,
             slug: true,
             startTime: true,
+            timezone: true,
             publicLocation: true,
           },
         },

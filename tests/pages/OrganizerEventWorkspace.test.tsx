@@ -29,6 +29,7 @@ const workspace = {
     id: eventId,
     title: 'AI Build Night',
     status: 'PUBLISHED',
+    timezone: 'America/New_York',
     chapter: {
       id: 'chapter-boston',
       name: 'Sundai Boston',
