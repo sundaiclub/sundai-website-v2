@@ -1,6 +1,7 @@
 import { createHash } from 'crypto';
 import type { PrismaClient } from '@prisma/client';
 import prisma from '@/lib/prisma';
+import { normalizeSmsPhoneNumber } from '@/lib/phoneNumbers';
 import {
   SMS_CONSENT_CONFIGURED,
   SMS_CONSENT_VERSION,
@@ -100,10 +101,6 @@ function usableEmail(value: string | null | undefined) {
   return !!value && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
-function usableE164(value: string | null | undefined) {
-  return !!value && /^\+[1-9]\d{7,14}$/.test(value);
-}
-
 export function resolveEventCommunicationAudience({
   registrations,
   audienceType,
@@ -176,8 +173,10 @@ export function resolveEventCommunicationAudience({
         exclusions.preferenceDisabled += 1;
         continue;
       }
-      contactValue = registration.hacker.phoneNumber;
-      if (!usableE164(contactValue)) {
+      contactValue = normalizeSmsPhoneNumber(
+        registration.hacker.phoneNumber
+      );
+      if (!contactValue) {
         exclusions.missingContact += 1;
         continue;
       }

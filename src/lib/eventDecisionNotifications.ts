@@ -1,5 +1,6 @@
 import prisma from '@/lib/prisma';
 import { DEFAULT_EVENT_MESSAGES } from '@/lib/eventMessageDefaults';
+import { normalizeSmsPhoneNumber } from '@/lib/phoneNumbers';
 import {
   SMS_CONSENT_CONFIGURED,
   SMS_CONSENT_VERSION,
@@ -103,10 +104,6 @@ function isSmsConfigured(config: EventDecisionNotificationConfig): boolean {
 
 function isSendableEmail(value: string | null): value is string {
   return Boolean(value && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value));
-}
-
-function isE164PhoneNumber(value: string | null): value is string {
-  return Boolean(value && /^\+[1-9]\d{7,14}$/.test(value));
 }
 
 function escapeHtml(value: string): string {
@@ -287,6 +284,9 @@ export async function notifyEventDecision(
     if (!context) return skippedResult();
 
     const content = buildDecisionContent(context, input.status, config.appUrl);
+    const smsPhoneNumber = normalizeSmsPhoneNumber(
+      context.applicant.phoneNumber
+    );
     const result = skippedResult();
     const deliveries: Promise<void>[] = [];
     const channels: Array<'email' | 'sms'> = [];
@@ -315,12 +315,12 @@ export async function notifyEventDecision(
       context.applicant.smsConsentAt &&
       context.applicant.smsConsentVersion ===
         SMS_CONSENT_VERSION &&
-      isE164PhoneNumber(context.applicant.phoneNumber)
+      smsPhoneNumber
     ) {
       channels.push('sms');
       deliveries.push(
         (dependencies.sendSms ?? (sms => sendSmsWithTwilio(sms, config)))({
-          to: context.applicant.phoneNumber,
+          to: smsPhoneNumber,
           body: content.sms,
         })
       );

@@ -1,4 +1,5 @@
 import prisma from '@/lib/prisma';
+import { normalizeSmsPhoneNumber } from '@/lib/phoneNumbers';
 import {
   SMS_CONSENT_CONFIGURED,
   SMS_CONSENT_VERSION,
@@ -28,10 +29,6 @@ function usableEmail(value: string | null) {
   return !!value && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
-function usableE164(value: string | null) {
-  return !!value && /^\+[1-9]\d{7,14}$/.test(value);
-}
-
 export function resolvePublicationNotificationRecipients(
   memberships: Array<{
     hackerId: string;
@@ -59,9 +56,12 @@ export function resolvePublicationNotificationRecipients(
         contactValue: membership.hacker.email!,
       });
     }
+    const smsPhoneNumber = normalizeSmsPhoneNumber(
+      membership.hacker.phoneNumber
+    );
     if (
       SMS_CONSENT_CONFIGURED &&
-      usableE164(membership.hacker.phoneNumber) &&
+      smsPhoneNumber &&
       membership.hacker.smsConsentAt &&
       membership.hacker.smsConsentVersion ===
         SMS_CONSENT_VERSION
@@ -69,7 +69,7 @@ export function resolvePublicationNotificationRecipients(
       recipients.push({
         hackerId: membership.hackerId,
         channel: 'SMS',
-        contactValue: membership.hacker.phoneNumber!,
+        contactValue: smsPhoneNumber,
       });
     }
   }

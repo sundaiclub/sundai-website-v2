@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { fetchMergedApplicationTemplate } from '@/lib/applicationTemplateQueries';
 import { BLOCKED_REGISTRATION_MESSAGE } from '@/lib/moderation';
 import { notifyEventDecision } from '@/lib/eventDecisionNotifications';
+import { phoneNumberForStorage } from '@/lib/phoneNumbers';
 import {
   SMS_CONSENT_CONFIGURED,
   SMS_CONSENT_VERSION,
@@ -1346,7 +1347,9 @@ async function updateHackerApplicationProfile(
 ): Promise<void> {
   const name = typeof answers.name === 'string' ? answers.name.trim() : '';
   const phoneNumber =
-    typeof answers.phoneNumber === 'string' ? answers.phoneNumber.trim() : '';
+    typeof answers.phoneNumber === 'string'
+      ? phoneNumberForStorage(answers.phoneNumber)
+      : '';
 
   if (!name && !phoneNumber) return;
   const hasSmsConsent = smsConsentGranted && SMS_CONSENT_CONFIGURED;

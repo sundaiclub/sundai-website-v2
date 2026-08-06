@@ -458,6 +458,10 @@ version change until the member explicitly opts in to the new version. If either
 value is missing, SMS consent capture and recipient eligibility are disabled.
 Clearing SMS preferences also clears the stored consent evidence.
 
+Phone numbers are stored and sent in E.164 format. A 10-digit US number without
+a country prefix defaults to `+1`; for example, `5086485700` becomes
+`+15086485700`. Other international numbers must include their `+` country code.
+
 ### Operational validation
 
 After changing workspace infrastructure or provider configuration:

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import type { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
+import { phoneNumberForStorage } from "@/lib/phoneNumbers";
 
 const REQUIRED_HACKER_UPDATE_FIELDS = ["name"] as const;
 
@@ -134,7 +135,10 @@ export async function PATCH(
       for (const key of NULLABLE_HACKER_UPDATE_FIELDS) {
         const value = data[key];
         if (typeof value === "string" || value === null) {
-          sanitizedData[key] = value;
+          sanitizedData[key] =
+            key === "phoneNumber" && typeof value === "string"
+              ? phoneNumberForStorage(value)
+              : value;
         }
       }
     }

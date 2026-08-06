@@ -140,6 +140,7 @@ describe('/api/hackers/[hackerId]', () => {
           name: 'Updated Name',
           bio: 'Updated bio',
           githubUrl: 'https://github.com/updated',
+          phoneNumber: '5086485700',
         }),
       });
 
@@ -148,6 +149,12 @@ describe('/api/hackers/[hackerId]', () => {
 
       expect(response.status).toBe(200);
       expect(data).toEqual(mockUpdatedHacker);
+      expect(mockPrisma.hacker.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'hacker-1' },
+          data: expect.objectContaining({ phoneNumber: '+15086485700' }),
+        })
+      );
     });
 
     it('should return 401 when not authenticated', async () => {

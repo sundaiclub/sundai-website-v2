@@ -255,15 +255,23 @@ describe('event communication audience resolution', () => {
     });
   });
 
-  it('requires E.164 contact and consent timestamp matching the configured SMS version', () => {
+  it('normalizes US contacts and requires consent matching the configured SMS version', () => {
     const rows = [
       registration(),
+      registration({
+        id: 'registration-us-phone',
+        hacker: {
+          ...registration().hacker,
+          id: 'hacker-us-phone',
+          phoneNumber: '5086485700',
+        },
+      }),
       registration({
         id: 'registration-bad-phone',
         hacker: {
           ...registration().hacker,
           id: 'hacker-bad-phone',
-          phoneNumber: '617-555-0101',
+          phoneNumber: '555-0101',
         },
       }),
       registration({
@@ -287,7 +295,9 @@ describe('event communication audience resolution', () => {
     const audience = resolve(rows, { channel: 'SMS' });
     expect(audience.recipients.map(row => row.hackerId)).toEqual([
       'hacker-approved',
+      'hacker-us-phone',
     ]);
+    expect(audience.recipients[1].contactValue).toBe('+15086485700');
     expect(audience.exclusions).toMatchObject({
       missingContact: 1,
       ineligible: 2,

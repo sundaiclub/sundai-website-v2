@@ -1,4 +1,5 @@
 import prisma from '@/lib/prisma';
+import { phoneNumberLookupCandidates } from '@/lib/phoneNumbers';
 import {
   emptyTwimlResponse,
   verifyTwilioWebhook,
@@ -26,7 +27,7 @@ export async function POST(request: Request) {
   if (!type || !providerSid || !fromNumber) return emptyTwimlResponse();
 
   const hackers = await prisma.hacker.findMany({
-    where: { phoneNumber: fromNumber },
+    where: { phoneNumber: { in: phoneNumberLookupCandidates(fromNumber) } },
     select: { id: true },
   });
   const hackerIds = hackers.map(hacker => hacker.id);

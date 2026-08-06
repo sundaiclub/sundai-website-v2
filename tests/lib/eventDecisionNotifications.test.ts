@@ -161,7 +161,7 @@ describe('event decision notifications', () => {
             applicant: {
               name: 'Ada Lovelace',
               email: 'ada@example.com',
-              phoneNumber: '617-555-0123',
+              phoneNumber: '555-0123',
             },
             preferences: {
               notificationsAllowed: true,

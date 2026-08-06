@@ -569,7 +569,7 @@ describe('public registration edit helpers', () => {
           hackerId: 'hacker-editor',
           answersJson: {
             name: 'Updated Name',
-            phoneNumber: '+15551234567',
+            phoneNumber: '5086485700',
           },
           smsConsentGranted: true,
         },
@@ -590,7 +590,7 @@ describe('public registration edit helpers', () => {
       data: {
         answersJson: {
           name: 'Updated Name',
-          phoneNumber: '+15551234567',
+          phoneNumber: '5086485700',
         },
         templateSnapshotJson: siteFields,
       },
@@ -599,7 +599,7 @@ describe('public registration edit helpers', () => {
       where: { id: 'hacker-editor' },
       data: {
         name: 'Updated Name',
-        phoneNumber: '+15551234567',
+        phoneNumber: '+15086485700',
         smsConsentAt: expect.any(Date),
         smsConsentVersion: 'site-application-checkbox-2026-08-04',
       },

@@ -101,6 +101,14 @@ describe('Twilio messaging webhooks', () => {
         hackerId: 'hacker-1',
       }),
     });
+    expect(mockPrisma.hacker.findMany).toHaveBeenCalledWith({
+      where: {
+        phoneNumber: {
+          in: ['+16175550123', '16175550123', '6175550123'],
+        },
+      },
+      select: { id: true },
+    });
     expect(mockPrisma.hacker.updateMany).toHaveBeenCalledWith({
       where: { id: { in: ['hacker-1'] } },
       data: { smsConsentAt: null, smsConsentVersion: null },
