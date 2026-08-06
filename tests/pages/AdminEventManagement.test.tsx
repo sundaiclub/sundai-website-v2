@@ -293,6 +293,15 @@ describe('event-management site-admin pages', () => {
         screen.getAllByRole('button', { name: /create chapter|new chapter/i })
           .length
       ).toBeGreaterThan(0);
+      const timezone = screen.getByLabelText(/timezone/i);
+      expect(timezone.tagName).toBe('SELECT');
+      expect(timezone).toHaveValue('America/New_York');
+      expect(
+        screen.getByRole('option', { name: /central.*america\/chicago/i })
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole('option', { name: /london.*europe\/london/i })
+      ).toBeInTheDocument();
       await expectSomeText(/public/i);
       await expectSomeText(/private/i);
       await expectSomeText(/settings/i);

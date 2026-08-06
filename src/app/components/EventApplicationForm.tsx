@@ -19,6 +19,7 @@ import type {
 import {
   SMS_CONSENT_COPY,
   SMS_CONSENT_CONFIGURED,
+  SMS_CONSENT_VERSION,
 } from '@/lib/smsConsent';
 import {
   ManagementAlert,
@@ -215,7 +216,19 @@ export function EventApplicationForm({
   const [actionError, setActionError] = useState('');
   const [actionMessage, setActionMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [smsConsentGranted, setSmsConsentGranted] = useState(false);
+  const savedPreferences = event.viewerNotificationPreferences;
+  const savedEmailPreference =
+    savedPreferences?.notificationsAllowed === true &&
+    savedPreferences.emailNotificationsEnabled === true;
+  const savedSmsPreference =
+    savedPreferences?.notificationsAllowed === true &&
+    savedPreferences.smsNotificationsEnabled === true &&
+    Boolean(savedPreferences.smsConsentAt) &&
+    savedPreferences.smsConsentVersion === SMS_CONSENT_VERSION;
+  const [emailNotificationsEnabled, setEmailNotificationsEnabled] =
+    useState(savedEmailPreference);
+  const [smsConsentGranted, setSmsConsentGranted] =
+    useState(savedSmsPreference);
   const submittedAt = formatSubmittedAt(registration?.submittedAt);
 
   useEffect(() => {
@@ -227,13 +240,16 @@ export function EventApplicationForm({
         reusableAnswers: event.reusableAnswersJson,
       })
     );
-    setSmsConsentGranted(false);
+    setEmailNotificationsEnabled(savedEmailPreference);
+    setSmsConsentGranted(savedSmsPreference);
     setIsEditing(false);
   }, [
     controls.canSubmit,
     event.reusableAnswersJson,
     fields,
     registration,
+    savedEmailPreference,
+    savedSmsPreference,
     viewerProfile,
   ]);
 
@@ -282,7 +298,12 @@ export function EventApplicationForm({
         {
           method: registration ? 'PATCH' : 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ answersJson: answers, smsConsentGranted }),
+          body: JSON.stringify({
+            answersJson: answers,
+            emailNotificationsEnabled,
+            smsNotificationsEnabled: smsConsentGranted,
+            smsConsentGranted,
+          }),
         }
       );
       const payload = await response.json().catch(() => null);
@@ -360,9 +381,32 @@ export function EventApplicationForm({
                 onChange={value => updateAnswer(field, value)}
                 value={answers[field.id]}
               />
-              {field.id === 'phoneNumber' &&
-                field.type === 'PHONE' &&
-                SMS_CONSENT_CONFIGURED && (
+              {field.id === 'email' && field.type === 'EMAIL' && (
+                <div className={`${classes.subtlePanel} grid gap-2 p-3`}>
+                  <label
+                    className="flex items-start gap-3"
+                    htmlFor="application-email-notifications"
+                  >
+                    <input
+                      checked={emailNotificationsEnabled}
+                      className={`${classes.checkbox} mt-1`}
+                      id="application-email-notifications"
+                      onChange={event =>
+                        setEmailNotificationsEnabled(event.target.checked)
+                      }
+                      type="checkbox"
+                    />
+                    <span className="text-sm font-semibold">
+                      Email me about this event and other {event.chapterName}{' '}
+                      events.
+                    </span>
+                  </label>
+                  <p className={`pl-7 text-xs ${classes.mutedText}`}>
+                    You can change this setting on the chapter preferences page.
+                  </p>
+                </div>
+              )}
+              {field.id === 'phoneNumber' && field.type === 'PHONE' && (
                 <div className={`${classes.subtlePanel} grid gap-2 p-3`}>
                   <label
                     className="flex items-start gap-3"
@@ -371,6 +415,7 @@ export function EventApplicationForm({
                     <input
                       checked={smsConsentGranted}
                       className={`${classes.checkbox} mt-1`}
+                      disabled={!SMS_CONSENT_CONFIGURED}
                       id="application-sms-consent"
                       onChange={event =>
                         setSmsConsentGranted(event.target.checked)
@@ -378,26 +423,30 @@ export function EventApplicationForm({
                       type="checkbox"
                     />
                     <span className="text-xs leading-5">
-                      {SMS_CONSENT_COPY}
+                      {SMS_CONSENT_CONFIGURED
+                        ? SMS_CONSENT_COPY
+                        : 'Text message updates are not currently available.'}
                     </span>
                   </label>
-                  <p className={`pl-7 text-xs ${classes.mutedText}`}>
-                    Read the{' '}
-                    <Link
-                      className="font-semibold underline underline-offset-2"
-                      href="/terms"
-                    >
-                      Terms of Service
-                    </Link>{' '}
-                    and{' '}
-                    <Link
-                      className="font-semibold underline underline-offset-2"
-                      href="/privacy"
-                    >
-                      Privacy Policy
-                    </Link>
-                    .
-                  </p>
+                  {SMS_CONSENT_CONFIGURED && (
+                    <p className={`pl-7 text-xs ${classes.mutedText}`}>
+                      Read the{' '}
+                      <Link
+                        className="font-semibold underline underline-offset-2"
+                        href="/terms"
+                      >
+                        Terms of Service
+                      </Link>{' '}
+                      and{' '}
+                      <Link
+                        className="font-semibold underline underline-offset-2"
+                        href="/privacy"
+                      >
+                        Privacy Policy
+                      </Link>
+                      .
+                    </p>
+                  )}
                 </div>
               )}
             </div>

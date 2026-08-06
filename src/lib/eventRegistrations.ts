@@ -4,10 +4,7 @@ import { fetchMergedApplicationTemplate } from '@/lib/applicationTemplateQueries
 import { BLOCKED_REGISTRATION_MESSAGE } from '@/lib/moderation';
 import { notifyEventDecision } from '@/lib/eventDecisionNotifications';
 import { phoneNumberForStorage } from '@/lib/phoneNumbers';
-import {
-  SMS_CONSENT_CONFIGURED,
-  SMS_CONSENT_VERSION,
-} from '@/lib/smsConsent';
+import { SMS_CONSENT_CONFIGURED, SMS_CONSENT_VERSION } from '@/lib/smsConsent';
 import type {
   EntityId,
   EventApplicationMode,
@@ -140,6 +137,8 @@ export type SubmitPublicEventRegistrationInput = {
   eventId: EntityId;
   hackerId: EntityId;
   answersJson: unknown;
+  emailNotificationsEnabled: boolean;
+  smsNotificationsEnabled: boolean;
   smsConsentGranted?: boolean;
 };
 
@@ -147,6 +146,8 @@ export type UpdatePendingPublicEventRegistrationInput = {
   eventId: EntityId;
   hackerId: EntityId;
   answersJson: unknown;
+  emailNotificationsEnabled: boolean;
+  smsNotificationsEnabled: boolean;
   smsConsentGranted?: boolean;
 };
 
@@ -281,6 +282,10 @@ type HackerDelegate = {
   update(args: Prisma.HackerUpdateArgs): Promise<unknown>;
 };
 
+type ChapterMembershipDelegate = {
+  upsert(args: Prisma.ChapterMembershipUpsertArgs): Promise<unknown>;
+};
+
 type EventManagementPrismaClient = {
   event: Pick<EventDelegate, 'findUnique' | 'findFirst'>;
   eventRegistration: EventRegistrationDelegate;
@@ -288,6 +293,7 @@ type EventManagementPrismaClient = {
   applicationTemplate: Pick<ApplicationTemplateDelegate, 'findFirst'>;
   userBan: Pick<UserBanDelegate, 'findMany'>;
   hacker: Pick<HackerDelegate, 'update'>;
+  chapterMembership: Pick<ChapterMembershipDelegate, 'upsert'>;
   $transaction<T>(
     callback: (tx: EventManagementPrismaClient) => Promise<T>,
     options?: { isolationLevel?: 'Serializable' }
@@ -306,6 +312,7 @@ type TransactionDb = Pick<
   | 'applicationTemplate'
   | 'userBan'
   | 'hacker'
+  | 'chapterMembership'
 >;
 
 function createEventManagementClient(
@@ -334,6 +341,9 @@ function createEventManagementClient(
     },
     hacker: {
       update: args => db.hacker.update(args),
+    },
+    chapterMembership: {
+      upsert: args => db.chapterMembership.upsert(args),
     },
     $transaction: callback => callback(adapter),
   };
@@ -677,6 +687,16 @@ export async function submitPublicEventRegistration(
       input.smsConsentGranted === true,
       tx
     );
+    await saveApplicationNotificationPreferences(
+      {
+        chapterId: event.chapterId,
+        hackerId: input.hackerId,
+        emailNotificationsEnabled: input.emailNotificationsEnabled,
+        smsNotificationsEnabled: input.smsNotificationsEnabled,
+        smsConsentGranted: input.smsConsentGranted === true,
+      },
+      tx
+    );
     const toStatus = getInitialPublicRegistrationStatus(event.applicationMode);
     const registration = await tx.eventRegistration.create({
       data: {
@@ -769,6 +789,19 @@ export async function updatePendingPublicEventRegistration(
       input.smsConsentGranted === true,
       tx
     );
+    const event = await dbEventChapter(input.eventId, tx);
+    if (event) {
+      await saveApplicationNotificationPreferences(
+        {
+          chapterId: event.chapterId,
+          hackerId: input.hackerId,
+          emailNotificationsEnabled: input.emailNotificationsEnabled,
+          smsNotificationsEnabled: input.smsNotificationsEnabled,
+          smsConsentGranted: input.smsConsentGranted === true,
+        },
+        tx
+      );
+    }
     const registration = await tx.eventRegistration.update({
       where: { id: existingRegistration.id },
       data: {
@@ -1074,6 +1107,7 @@ async function findPublicRegistrableEvent(
       id: eventId,
       status: 'PUBLISHED',
       visibility: 'PUBLIC',
+      chapter: { status: 'ACTIVE', accessMode: 'PUBLIC' },
     },
     select: {
       id: true,
@@ -1082,6 +1116,16 @@ async function findPublicRegistrableEvent(
       applicationsOpen: true,
     },
   }) as Promise<PublicRegistrableEventRecord | null>;
+}
+
+async function dbEventChapter(
+  eventId: EntityId,
+  db: EventManagementPrismaClient
+): Promise<{ chapterId: EntityId } | null> {
+  return db.event.findUnique({
+    where: { id: eventId },
+    select: { chapterId: true },
+  }) as Promise<{ chapterId: EntityId } | null>;
 }
 
 async function findWaitlistCapacityEvent(
@@ -1362,11 +1406,58 @@ async function updateHackerApplicationProfile(
         ? {
             phoneNumber,
             smsConsentAt: hasSmsConsent ? new Date() : null,
-            smsConsentVersion: hasSmsConsent
-              ? SMS_CONSENT_VERSION
-              : null,
+            smsConsentVersion: hasSmsConsent ? SMS_CONSENT_VERSION : null,
           }
         : {}),
+    },
+  });
+}
+
+async function saveApplicationNotificationPreferences(
+  input: {
+    chapterId: EntityId;
+    hackerId: EntityId;
+    emailNotificationsEnabled: boolean;
+    smsNotificationsEnabled: boolean;
+    smsConsentGranted: boolean;
+  },
+  db: EventManagementPrismaClient
+): Promise<void> {
+  const smsEnabled =
+    input.smsNotificationsEnabled &&
+    input.smsConsentGranted &&
+    SMS_CONSENT_CONFIGURED;
+  const notificationsAllowed = input.emailNotificationsEnabled || smsEnabled;
+  const preferenceData = {
+    notificationsAllowed,
+    emailNotificationsEnabled: input.emailNotificationsEnabled,
+    smsNotificationsEnabled: smsEnabled,
+    smsConsentAt: smsEnabled ? new Date() : null,
+    smsConsentVersion: smsEnabled ? SMS_CONSENT_VERSION : null,
+  };
+
+  await db.chapterMembership.upsert({
+    where: {
+      chapterId_hackerId: {
+        chapterId: input.chapterId,
+        hackerId: input.hackerId,
+      },
+    },
+    create: {
+      chapterId: input.chapterId,
+      hackerId: input.hackerId,
+      role: 'MEMBER',
+      status: 'ACTIVE',
+      joinedAt: new Date(),
+      notificationPreferencesJson: {},
+      ...preferenceData,
+    },
+    update: {
+      status: 'ACTIVE',
+      joinedAt: new Date(),
+      leftAt: null,
+      revokedAt: null,
+      ...preferenceData,
     },
   });
 }

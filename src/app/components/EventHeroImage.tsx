@@ -111,7 +111,7 @@ export function PublicEventHero({
                 {formatEventDate(
                   event.startTime,
                   event.endTime,
-                  event.chapter.timezone
+                  event.timezone
                 )}
               </dd>
             </div>

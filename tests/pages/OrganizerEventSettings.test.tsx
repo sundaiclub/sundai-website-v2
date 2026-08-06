@@ -30,6 +30,7 @@ const eventSettings = {
   slug: 'ai-build-night',
   visibility: 'PUBLIC',
   status: 'PUBLISHED',
+  timezone: 'America/New_York',
   publicStatus: 'OPEN',
   chapter: {
     id: 'chapter-boston',
@@ -253,13 +254,9 @@ describe('/organizer/events/[eventId]/settings', () => {
 
     renderSettingsPage(draftEventSettings.id);
 
-    expect(
-      await screen.findByLabelText(/notify chapter members when published/i)
-    ).toBeInTheDocument();
+    await screen.findByRole('heading', { name: /ai build night/i });
 
-    fireEvent.click(
-      screen.getByRole('button', { name: /delete draft/i })
-    );
+    fireEvent.click(screen.getByRole('button', { name: /delete draft/i }));
 
     expect(window.confirm).toHaveBeenCalledWith(
       'Delete this draft event? This cannot be undone.'
@@ -281,15 +278,13 @@ describe('/organizer/events/[eventId]/settings', () => {
     expect(
       screen.queryByRole('button', { name: /delete draft/i })
     ).not.toBeInTheDocument();
-    expect(
-      screen.queryByLabelText(/notify chapter members when published/i)
-    ).not.toBeInTheDocument();
   });
 
   it('shows a header save action and only flags settings after they change', async () => {
     renderSettingsPage();
 
     const titleInput = await screen.findByLabelText(/title/i);
+    expect(screen.getByLabelText(/timezone/i)).toHaveValue('America/New_York');
     expect(topSaveSettingsButton()).toBeInTheDocument();
     expect(
       screen.queryByText(/you have unsaved changes/i)
@@ -538,6 +533,9 @@ describe('/organizer/events/[eventId]/settings', () => {
     fireEvent.change(screen.getByLabelText(/public location/i), {
       target: { value: 'Cambridge, MA' },
     });
+    fireEvent.change(screen.getByLabelText(/timezone/i), {
+      target: { value: 'Europe/Berlin' },
+    });
     fireEvent.change(
       screen.getByLabelText(/approved-only address|private address/i),
       {
@@ -567,6 +565,9 @@ describe('/organizer/events/[eventId]/settings', () => {
       expect.objectContaining({
         body: expect.stringContaining('"publicLocation":"Cambridge, MA"'),
       })
+    );
+    expect(patchBodyForEvent()).toEqual(
+      expect.objectContaining({ timezone: 'Europe/Berlin' })
     );
     expect(global.fetch).toHaveBeenCalledWith(
       `/api/events/${eventSettings.id}`,

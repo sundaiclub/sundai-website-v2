@@ -51,6 +51,11 @@ type PublicEventsChapterMembershipRecord = {
   id?: EntityId;
   role: 'MEMBER' | 'ADMIN';
   status: 'INVITED' | 'ACTIVE' | 'REVOKED' | 'LEFT';
+  notificationsAllowed?: boolean;
+  emailNotificationsEnabled?: boolean;
+  smsNotificationsEnabled?: boolean;
+  smsConsentAt?: Date | string | null;
+  smsConsentVersion?: string | null;
 };
 
 type PublicEventsStaffRecord = {
@@ -121,6 +126,7 @@ type PublicEventsEventRecord = {
   id: EntityId;
   slug: string;
   title: string;
+  timezone: string;
   image?: {
     id: EntityId;
     url: string;
@@ -236,6 +242,7 @@ export type RedactPublicEventOptions = {
   applicationQuestionSet?: ApplicationQuestionSet;
   reusableAnswersJson?: JsonObject | null;
   viewerProfile?: ProfilePrefillSource | null;
+  viewerNotificationPreferences?: PublicEventDetail['viewerNotificationPreferences'];
   viewerRegistration?: PublicViewerRegistrationState | null;
   viewerCanManageRegistrations?: boolean;
   viewerCanViewApprovedDetails?: boolean;
@@ -446,6 +453,24 @@ export async function getPublicEventBySlug(
           username: viewerHacker.username ?? null,
         }
       : null,
+    viewerNotificationPreferences:
+      readPermissionContext.chapterMembership?.status === 'ACTIVE'
+        ? {
+            notificationsAllowed:
+              readPermissionContext.chapterMembership.notificationsAllowed ===
+              true,
+            emailNotificationsEnabled:
+              readPermissionContext.chapterMembership
+                .emailNotificationsEnabled === true,
+            smsNotificationsEnabled:
+              readPermissionContext.chapterMembership
+                .smsNotificationsEnabled === true,
+            smsConsentAt:
+              readPermissionContext.chapterMembership.smsConsentAt ?? null,
+            smsConsentVersion:
+              readPermissionContext.chapterMembership.smsConsentVersion ?? null,
+          }
+        : null,
     viewerRegistration,
     viewerCanManageRegistrations,
     viewerCanViewApprovedDetails,
@@ -516,6 +541,8 @@ export function redactPublicEventForViewer(
       options.applicationQuestionSet ?? buildApplicationQuestionSet(event),
     reusableAnswersJson: options.reusableAnswersJson ?? null,
     viewerProfile: options.viewerProfile ?? null,
+    viewerNotificationPreferences:
+      options.viewerNotificationPreferences ?? null,
     viewerRegistration: options.viewerRegistration ?? null,
     viewerCanManageRegistrations: options.viewerCanManageRegistrations === true,
     viewerCanEditEvent: options.viewerCanEditEvent === true,
@@ -595,6 +622,7 @@ export function buildAddToCalendarPayload(
     | 'publicLocation'
     | 'startTime'
     | 'endTime'
+    | 'timezone'
     | 'chapter'
     | 'approvedDetailsJson'
   >,
@@ -611,7 +639,7 @@ export function buildAddToCalendarPayload(
     location: event.publicLocation ?? null,
     startTime: event.startTime,
     endTime: event.endTime ?? null,
-    timezone: event.chapter.timezone,
+    timezone: event.timezone,
   };
 }
 
@@ -679,6 +707,7 @@ function buildPublicEventCard(
     chapterName: event.chapter.name,
     chapter,
     title: event.title,
+    timezone: event.timezone,
     image: event.image ?? null,
     publicLocation: event.publicLocation ?? null,
     startTime: event.startTime,
@@ -792,6 +821,11 @@ async function getPublicEventReadPermissionContext(
       select: {
         role: true,
         status: true,
+        notificationsAllowed: true,
+        emailNotificationsEnabled: true,
+        smsNotificationsEnabled: true,
+        smsConsentAt: true,
+        smsConsentVersion: true,
       },
     }),
     client.eventStaff.findFirst({

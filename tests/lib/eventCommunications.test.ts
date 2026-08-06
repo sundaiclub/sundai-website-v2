@@ -86,7 +86,7 @@ function registration(overrides: Record<string, unknown> = {}) {
       emailNotificationsEnabled: true,
       smsNotificationsEnabled: true,
       smsConsentAt: new Date('2026-07-01T12:00:00.000Z'),
-      smsConsentVersion: 'sms-consent-v1',
+      smsConsentVersion: 'site-application-checkbox-2026-08-04',
     },
     ...overrides,
   } as any;
@@ -279,6 +279,9 @@ describe('event communication audience resolution', () => {
         hacker: {
           ...registration().hacker,
           id: 'hacker-no-consent',
+        },
+        membership: {
+          ...registration().membership,
           smsConsentAt: null,
         },
       }),
@@ -287,6 +290,9 @@ describe('event communication audience resolution', () => {
         hacker: {
           ...registration().hacker,
           id: 'hacker-old-consent',
+        },
+        membership: {
+          ...registration().membership,
           smsConsentVersion: 'sms-consent-v0',
         },
       }),
@@ -302,6 +308,23 @@ describe('event communication audience resolution', () => {
       missingContact: 1,
       ineligible: 2,
     });
+  });
+
+  it('excludes SMS recipients who disabled SMS in chapter preferences', () => {
+    const audience = resolve(
+      [
+        registration({
+          membership: {
+            ...registration().membership,
+            smsNotificationsEnabled: false,
+          },
+        }),
+      ],
+      { channel: 'SMS' }
+    );
+
+    expect(audience.recipients).toHaveLength(0);
+    expect(audience.exclusions.preferenceDisabled).toBe(1);
   });
 
   it('folds globally banned recipients into neutral ineligible results without ban metadata', () => {

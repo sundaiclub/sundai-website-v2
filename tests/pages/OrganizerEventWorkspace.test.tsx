@@ -234,33 +234,6 @@ describe('/organizer/events/[eventId] workspace', () => {
     expect(screen.getByText(/3 communications/i)).toBeInTheDocument();
   });
 
-  it('shows the publication notification delivery record on the overview', async () => {
-    mockWorkspaceFetch({
-      ...workspace,
-      publicationNotification: {
-        status: 'PARTIAL',
-        recipientCount: 12,
-        sentCount: 10,
-        failedCount: 2,
-        emailRecipientCount: 8,
-        smsRecipientCount: 4,
-        sentAt: '2026-07-18T13:00:00.000Z',
-      },
-    });
-    const Overview = loadOverview();
-    renderWorkspace(<Overview params={{ eventId }} />);
-
-    expect(
-      await screen.findByText(/chapter member notification/i)
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(/10 of 12 messages sent; 2 failed/i)
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(/8 email and 4 SMS recipients/i)
-    ).toBeInTheDocument();
-  });
-
   it('shows permission lost without retaining event metadata after access is denied', async () => {
     mockWorkspaceFetch('Forbidden', 403);
     renderWorkspace();

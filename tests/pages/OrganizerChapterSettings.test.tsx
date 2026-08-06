@@ -1,17 +1,17 @@
-import React from 'react'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import React from 'react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
-const mockUseTheme = jest.fn()
-const mockUseUserContext = jest.fn()
-const mockUseParams = jest.fn()
+const mockUseTheme = jest.fn();
+const mockUseUserContext = jest.fn();
+const mockUseParams = jest.fn();
 
 jest.mock('../../src/app/contexts/ThemeContext', () => ({
   useTheme: () => mockUseTheme(),
-}))
+}));
 
 jest.mock('../../src/app/contexts/UserContext', () => ({
   useUserContext: () => mockUseUserContext(),
-}))
+}));
 
 jest.mock('next/navigation', () => ({
   useParams: () => mockUseParams(),
@@ -25,9 +25,9 @@ jest.mock('next/navigation', () => ({
     forward: jest.fn(),
     refresh: jest.fn(),
   }),
-}))
+}));
 
-type PageComponent = React.ComponentType<{ params?: { chapterSlug: string } }>
+type PageComponent = React.ComponentType<{ params?: { chapterSlug: string } }>;
 
 const chapterAdminUser = {
   id: 'hacker-chapter-admin',
@@ -44,7 +44,7 @@ const chapterAdminUser = {
       status: 'ACTIVE',
     },
   ],
-}
+};
 
 const regularUser = {
   id: 'hacker-regular',
@@ -54,7 +54,7 @@ const regularUser = {
   role: 'HACKER',
   roles: ['HACKER'],
   chapterMemberships: [],
-}
+};
 
 const chapter = {
   id: 'chapter-boston',
@@ -99,7 +99,7 @@ const chapter = {
       },
     },
   ],
-}
+};
 
 const members = [
   {
@@ -152,7 +152,7 @@ const members = [
       email: 'invited@example.com',
     },
   },
-]
+];
 
 const templates = [
   {
@@ -162,7 +162,13 @@ const templates = [
     isActive: true,
     fieldsJson: [
       { id: 'name', key: 'name', label: 'Name', type: 'TEXT', required: true },
-      { id: 'email', key: 'email', label: 'Email', type: 'EMAIL', required: true },
+      {
+        id: 'email',
+        key: 'email',
+        label: 'Email',
+        type: 'EMAIL',
+        required: true,
+      },
     ],
   },
   {
@@ -181,7 +187,7 @@ const templates = [
       },
     ],
   },
-]
+];
 
 const banFlags = [
   {
@@ -201,19 +207,21 @@ const banFlags = [
       email: 'chapter-admin@example.com',
     },
   },
-]
+];
 
 function loadPage(route: string, modulePath: string): PageComponent {
   try {
-    const mod = require(modulePath)
+    const mod = require(modulePath);
     if (!mod.default) {
-      throw new Error('module did not export a default React component')
+      throw new Error('module did not export a default React component');
     }
 
-    return mod.default
+    return mod.default;
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error)
-    throw new Error(`Expected ${route} page module at ${modulePath}: ${message}`)
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(
+      `Expected ${route} page module at ${modulePath}: ${message}`
+    );
   }
 }
 
@@ -222,7 +230,7 @@ function mockChapterAdmin() {
     isAdmin: false,
     loading: false,
     userInfo: chapterAdminUser,
-  })
+  });
 }
 
 function mockUnauthorizedUser() {
@@ -230,7 +238,7 @@ function mockUnauthorizedUser() {
     isAdmin: false,
     loading: false,
     userInfo: regularUser,
-  })
+  });
 }
 
 function mockLoadingUser() {
@@ -238,7 +246,7 @@ function mockLoadingUser() {
     isAdmin: false,
     loading: true,
     userInfo: null,
-  })
+  });
 }
 
 function jsonResponse(data: unknown, status = 200) {
@@ -246,66 +254,73 @@ function jsonResponse(data: unknown, status = 200) {
     ok: status >= 200 && status < 300,
     status,
     json: jest.fn().mockResolvedValue(data),
-    text: jest.fn().mockResolvedValue(
-      typeof data === 'string' ? data : JSON.stringify(data),
-    ),
-  })
+    text: jest
+      .fn()
+      .mockResolvedValue(
+        typeof data === 'string' ? data : JSON.stringify(data)
+      ),
+  });
 }
 
 function requestUrl(input: RequestInfo | URL) {
-  if (typeof input === 'string') return input
-  if ('url' in input) return input.url
-  return input.toString()
+  if (typeof input === 'string') return input;
+  if ('url' in input) return input.url;
+  return input.toString();
 }
 
 function isApplicationTemplateListRequest(url: string) {
-  return url === `/api/application-templates?chapterId=${chapter.id}`
+  return url === `/api/application-templates?chapterId=${chapter.id}`;
 }
 
 function mockOrganizerFetches() {
   global.fetch = jest.fn((input: RequestInfo | URL) => {
-    const url = requestUrl(input)
+    const url = requestUrl(input);
 
     if (url.includes('/members')) {
-      return jsonResponse(members)
+      return jsonResponse(members);
     }
 
     if (url.includes('/invites')) {
-      return jsonResponse(members.filter((member) => member.status === 'INVITED'))
+      return jsonResponse(
+        members.filter(member => member.status === 'INVITED')
+      );
     }
 
     if (url.includes('/ban-flags')) {
-      return jsonResponse(banFlags)
+      return jsonResponse(banFlags);
     }
 
     if (isApplicationTemplateListRequest(url)) {
-      return jsonResponse(templates)
+      return jsonResponse(templates);
     }
 
     if (/\/api\/chapters\/[^/?]+/.test(url)) {
-      return jsonResponse(chapter)
+      return jsonResponse(chapter);
     }
 
     if (url.includes('/api/chapters')) {
-      return jsonResponse([chapter])
+      return jsonResponse([chapter]);
     }
 
-    return jsonResponse({})
-  }) as jest.Mock
+    return jsonResponse({});
+  }) as jest.Mock;
 }
 
 function mockForbiddenFetches() {
   global.fetch = jest.fn(() =>
-    jsonResponse({ error: 'You do not have permission to view this page.' }, 403),
-  ) as jest.Mock
+    jsonResponse(
+      { error: 'You do not have permission to view this page.' },
+      403
+    )
+  ) as jest.Mock;
 }
 
 async function expectSomeText(...patterns: RegExp[]) {
   await waitFor(() => {
     expect(
-      patterns.some((pattern) => screen.queryAllByText(pattern).length > 0),
-    ).toBe(true)
-  })
+      patterns.some(pattern => screen.queryAllByText(pattern).length > 0)
+    ).toBe(true);
+  });
 }
 
 async function expectAccessDenied() {
@@ -313,64 +328,94 @@ async function expectAccessDenied() {
     /you do not have permission/i,
     /access denied/i,
     /not authorized/i,
-    /forbidden/i,
-  )
+    /forbidden/i
+  );
 }
 
 function renderSettingsPage() {
   const OrganizerChapterSettingsPage = loadPage(
     '/organizer/chapters/[chapterSlug]/settings',
-    '../../src/app/organizer/chapters/[chapterSlug]/settings/page',
-  )
+    '../../src/app/organizer/chapters/[chapterSlug]/settings/page'
+  );
 
-  render(<OrganizerChapterSettingsPage params={{ chapterSlug: 'boston' }} />)
+  render(<OrganizerChapterSettingsPage params={{ chapterSlug: 'boston' }} />);
 }
 
 describe('/organizer/chapters/[chapterSlug]/settings', () => {
   beforeEach(() => {
-    jest.clearAllMocks()
-    mockUseTheme.mockReturnValue({ isDarkMode: false })
-    mockUseParams.mockReturnValue({ chapterSlug: 'boston' })
-    mockOrganizerFetches()
-  })
+    jest.clearAllMocks();
+    mockUseTheme.mockReturnValue({ isDarkMode: false });
+    mockUseParams.mockReturnValue({ chapterSlug: 'boston' });
+    mockOrganizerFetches();
+  });
 
   it('renders the chapter settings organizer surface for chapter admins', async () => {
-    mockChapterAdmin()
+    mockChapterAdmin();
 
-    renderSettingsPage()
+    renderSettingsPage();
 
-    await expectSomeText(/sundai boston/i, /chapter settings/i)
-    await expectSomeText(/private/i, /active/i)
-    await expectSomeText(/chapter admin/i)
-    await expectSomeText(/active member/i)
-    await expectSomeText(/invited hacker/i, /invitations?/i)
-    await expectSomeText(/admins?/i)
-    await expectSomeText(/members?/i)
-    await expectSomeText(/notification/i)
-    await expectSomeText(/ban flags?/i, /flagged hacker/i, /repeated no-show pattern/i)
+    await expectSomeText(/sundai boston/i, /chapter settings/i);
+    await expectSomeText(/private/i, /active/i);
+    await expectSomeText(/chapter admin/i);
+    await expectSomeText(/active member/i);
+    await expectSomeText(/invited hacker/i, /invitations?/i);
+    await expectSomeText(/admins?/i);
+    await expectSomeText(/members?/i);
+    await expectSomeText(/notification/i);
+    await expectSomeText(
+      /ban flags?/i,
+      /flagged hacker/i,
+      /repeated no-show pattern/i
+    );
     await expectSomeText(
       /boston chapter application/i,
       /what are you hoping to build/i,
-      /application template/i,
-    )
-    expect(screen.queryByText(/site required questions/i)).not.toBeInTheDocument()
+      /application template/i
+    );
+    expect(
+      screen.queryByText(/site required questions/i)
+    ).not.toBeInTheDocument();
     expect(global.fetch).toHaveBeenCalledWith(
-      `/api/application-templates?chapterId=${chapter.id}`,
-    )
-    await expectSomeText(/chapter profile/i, /chapter description/i)
-    expect(screen.getByLabelText(/chapter image/i)).toBeInTheDocument()
+      `/api/application-templates?chapterId=${chapter.id}`
+    );
+    await expectSomeText(/chapter profile/i, /chapter description/i);
+    expect(screen.getByLabelText(/chapter image/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/chapter description/i)).toHaveValue(
-      'Boston chapter operations',
-    )
+      'Boston chapter operations'
+    );
+    expect(screen.getByLabelText(/timezone/i)).toHaveValue('America/New_York');
 
     expect(
-      screen.getAllByRole('button', { name: /save|update|invite|remove|revoke|add/i })
-        .length,
-    ).toBeGreaterThan(0)
-  })
+      screen.getAllByRole('button', {
+        name: /save|update|invite|remove|revoke|add/i,
+      }).length
+    ).toBeGreaterThan(0);
+  });
+
+  it('updates the chapter timezone from the profile form', async () => {
+    mockChapterAdmin();
+    renderSettingsPage();
+
+    const timezone = await screen.findByLabelText(/timezone/i);
+    fireEvent.change(timezone, { target: { value: 'Europe/Berlin' } });
+    fireEvent.click(screen.getByRole('button', { name: /save profile/i }));
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        `/api/chapters/${chapter.id}`,
+        expect.objectContaining({
+          method: 'PATCH',
+          body: JSON.stringify({
+            description: chapter.description,
+            timezone: 'Europe/Berlin',
+          }),
+        })
+      );
+    });
+  });
 
   it('creates a ban flag from the selected hacker search result', async () => {
-    mockChapterAdmin()
+    mockChapterAdmin();
     const createdFlag = {
       id: 'flag-active-member',
       chapterId: chapter.id,
@@ -382,36 +427,41 @@ describe('/organizer/chapters/[chapterSlug]/settings', () => {
         name: 'Active Member',
         email: 'member@example.com',
       },
-    }
+    };
 
     global.fetch = jest.fn((input: RequestInfo | URL, init?: RequestInit) => {
-      const url = requestUrl(input)
+      const url = requestUrl(input);
 
-      if (url.includes('/members')) return jsonResponse(members)
+      if (url.includes('/members')) return jsonResponse(members);
       if (url.includes('/invites')) {
-        return jsonResponse(members.filter((member) => member.status === 'INVITED'))
+        return jsonResponse(
+          members.filter(member => member.status === 'INVITED')
+        );
       }
       if (url.includes('/ban-flags') && init?.method === 'POST') {
-        return jsonResponse(createdFlag, 201)
+        return jsonResponse(createdFlag, 201);
       }
-      if (url.includes('/ban-flags')) return jsonResponse([])
-      if (isApplicationTemplateListRequest(url)) return jsonResponse(templates)
-      if (/\/api\/chapters\/[^/?]+/.test(url)) return jsonResponse(chapter)
-      return jsonResponse({})
-    }) as jest.Mock
+      if (url.includes('/ban-flags')) return jsonResponse([]);
+      if (isApplicationTemplateListRequest(url)) return jsonResponse(templates);
+      if (/\/api\/chapters\/[^/?]+/.test(url)) return jsonResponse(chapter);
+      return jsonResponse({});
+    }) as jest.Mock;
 
-    renderSettingsPage()
+    renderSettingsPage();
 
-    await expectSomeText(/no ban flags are open/i)
-    fireEvent.change(screen.getByRole('textbox', { name: /search hacker to flag/i }), {
-      target: { value: 'Active' },
-    })
-    await expectSomeText(/member@example.com/i)
-    fireEvent.click(screen.getByRole('option', { name: /active member/i }))
+    await expectSomeText(/no ban flags are open/i);
+    fireEvent.change(
+      screen.getByRole('textbox', { name: /search hacker to flag/i }),
+      {
+        target: { value: 'Active' },
+      }
+    );
+    await expectSomeText(/member@example.com/i);
+    fireEvent.click(screen.getByRole('option', { name: /active member/i }));
     fireEvent.change(screen.getByRole('textbox', { name: /flag reason/i }), {
       target: { value: 'Repeated no-show pattern' },
-    })
-    fireEvent.click(screen.getByRole('button', { name: /create flag/i }))
+    });
+    fireEvent.click(screen.getByRole('button', { name: /create flag/i }));
 
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith(
@@ -422,18 +472,18 @@ describe('/organizer/chapters/[chapterSlug]/settings', () => {
             hackerId: 'hacker-active-member',
             reason: 'Repeated no-show pattern',
           }),
-        }),
-      )
-    })
-  })
+        })
+      );
+    });
+  });
 
   it('opens the admin picker and adds the selected hacker as an admin', async () => {
-    mockChapterAdmin()
+    mockChapterAdmin();
     const adminCandidate = {
       id: 'hacker-new-admin',
       name: 'New Admin',
       email: 'new-admin@example.com',
-    }
+    };
     const createdAdmin = {
       id: 'membership-new-admin',
       chapterId: chapter.id,
@@ -444,38 +494,38 @@ describe('/organizer/chapters/[chapterSlug]/settings', () => {
       emailNotificationsEnabled: true,
       smsNotificationsEnabled: false,
       hacker: adminCandidate,
-    }
+    };
 
     global.fetch = jest.fn((input: RequestInfo | URL, init?: RequestInit) => {
-      const url = requestUrl(input)
+      const url = requestUrl(input);
 
-      if (url === '/api/hackers') return jsonResponse([adminCandidate])
+      if (url === '/api/hackers') return jsonResponse([adminCandidate]);
       if (
         url === `/api/chapters/${chapter.id}/admins` &&
         init?.method === 'POST'
       ) {
-        return jsonResponse(createdAdmin, 201)
+        return jsonResponse(createdAdmin, 201);
       }
-      if (url.includes('/members')) return jsonResponse(members)
-      if (url.includes('/ban-flags')) return jsonResponse(banFlags)
-      if (isApplicationTemplateListRequest(url)) return jsonResponse(templates)
-      if (/\/api\/chapters\/[^/?]+/.test(url)) return jsonResponse(chapter)
-      return jsonResponse({})
-    }) as jest.Mock
+      if (url.includes('/members')) return jsonResponse(members);
+      if (url.includes('/ban-flags')) return jsonResponse(banFlags);
+      if (isApplicationTemplateListRequest(url)) return jsonResponse(templates);
+      if (/\/api\/chapters\/[^/?]+/.test(url)) return jsonResponse(chapter);
+      return jsonResponse({});
+    }) as jest.Mock;
 
-    renderSettingsPage()
+    renderSettingsPage();
 
-    await screen.findByText('Sundai Boston')
-    fireEvent.click(screen.getByRole('button', { name: /invite admin/i }))
+    await screen.findByText('Sundai Boston');
+    fireEvent.click(screen.getByRole('button', { name: /invite admin/i }));
 
     expect(
-      await screen.findByRole('heading', { name: /invite chapter admin/i }),
-    ).toBeInTheDocument()
-    const searchInput = screen.getByPlaceholderText(/search members/i)
-    expect(global.fetch).toHaveBeenCalledWith('/api/hackers')
+      await screen.findByRole('heading', { name: /invite chapter admin/i })
+    ).toBeInTheDocument();
+    const searchInput = screen.getByPlaceholderText(/search members/i);
+    expect(global.fetch).toHaveBeenCalledWith('/api/hackers');
 
-    fireEvent.change(searchInput, { target: { value: 'New Admin' } })
-    fireEvent.click(screen.getByRole('button', { name: /new admin/i }))
+    fireEvent.change(searchInput, { target: { value: 'New Admin' } });
+    fireEvent.click(screen.getByRole('button', { name: /new admin/i }));
 
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith(
@@ -483,42 +533,50 @@ describe('/organizer/chapters/[chapterSlug]/settings', () => {
         expect.objectContaining({
           method: 'POST',
           body: JSON.stringify({ hackerId: adminCandidate.id }),
-        }),
-      )
-    })
+        })
+      );
+    });
     expect(
-      await screen.findByText('New Admin is now a chapter admin.'),
-    ).toBeInTheDocument()
-    expect(screen.getAllByText('new-admin@example.com').length).toBeGreaterThan(0)
-  })
+      await screen.findByText('New Admin is now a chapter admin.')
+    ).toBeInTheDocument();
+    expect(screen.getAllByText('new-admin@example.com').length).toBeGreaterThan(
+      0
+    );
+  });
 
   it('denies the organizer settings surface to users who do not manage the chapter', async () => {
-    mockUnauthorizedUser()
-    mockForbiddenFetches()
+    mockUnauthorizedUser();
+    mockForbiddenFetches();
 
-    renderSettingsPage()
+    renderSettingsPage();
 
-    await expectAccessDenied()
-    expect(screen.queryByText(/active member/i)).not.toBeInTheDocument()
-    expect(screen.queryByText(/invited hacker/i)).not.toBeInTheDocument()
-    expect(screen.queryByText(/repeated no-show pattern/i)).not.toBeInTheDocument()
-    expect(screen.queryByLabelText(/chapter description/i)).not.toBeInTheDocument()
+    await expectAccessDenied();
+    expect(screen.queryByText(/active member/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/invited hacker/i)).not.toBeInTheDocument();
     expect(
-      screen.queryByRole('button', { name: /save|update|invite|remove|revoke|add/i }),
-    ).not.toBeInTheDocument()
-  })
+      screen.queryByText(/repeated no-show pattern/i)
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByLabelText(/chapter description/i)
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', {
+        name: /save|update|invite|remove|revoke|add/i,
+      })
+    ).not.toBeInTheDocument();
+  });
 
   it('shows loading instead of access denied while auth is still resolving', async () => {
-    mockLoadingUser()
-    mockForbiddenFetches()
+    mockLoadingUser();
+    mockForbiddenFetches();
 
-    renderSettingsPage()
+    renderSettingsPage();
 
     await waitFor(() => {
-      expect(screen.getByText('Loading...')).toBeInTheDocument()
-    })
+      expect(screen.getByText('Loading...')).toBeInTheDocument();
+    });
     expect(
-      screen.queryByText('You do not have permission to view this page.'),
-    ).not.toBeInTheDocument()
-  })
-})
+      screen.queryByText('You do not have permission to view this page.')
+    ).not.toBeInTheDocument();
+  });
+});

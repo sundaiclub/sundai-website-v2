@@ -55,17 +55,25 @@ export async function PATCH(
 
     let publicSafeMessage = body.publicSafeMessage;
     if (
-      (toStatus === 'APPROVED' || toStatus === 'DECLINED') &&
+      (toStatus === 'APPROVED' ||
+        toStatus === 'WAITLISTED' ||
+        toStatus === 'DECLINED') &&
       publicSafeMessage === undefined
     ) {
       const event = await prisma.event.findUnique({
         where: { id: params.eventId },
-        select: { confirmationMessage: true, declineMessage: true },
+        select: {
+          confirmationMessage: true,
+          waitlistMessage: true,
+          declineMessage: true,
+        },
       });
       publicSafeMessage =
-        (toStatus === 'APPROVED'
-          ? event?.confirmationMessage
-          : event?.declineMessage) ?? undefined;
+        ({
+          APPROVED: event?.confirmationMessage,
+          WAITLISTED: event?.waitlistMessage,
+          DECLINED: event?.declineMessage,
+        }[toStatus] as string | null | undefined) ?? undefined;
     }
 
     const registration = await updateEventRegistrationStatus({
@@ -82,7 +90,9 @@ export async function PATCH(
 
     if (
       previousRegistration?.status !== toStatus &&
-      (toStatus === 'APPROVED' || toStatus === 'DECLINED')
+      (toStatus === 'APPROVED' ||
+        toStatus === 'WAITLISTED' ||
+        toStatus === 'DECLINED')
     ) {
       await notifyEventDecision({
         eventId: params.eventId,

@@ -46,39 +46,37 @@ model Hacker {
   lastAttendance       DateTime?
 
   // Event relations
-  createdEvents                     Event[]
-  createdPitchSessions              PitchSession[]
-  chapterMemberships                ChapterMembership[]                     @relation("ChapterMembershipHacker")
-  invitedChapterMemberships         ChapterMembership[]                     @relation("ChapterMembershipInviter")
-  eventStaffAssignments             EventStaff[]
-  addedPitchProjects                PitchProject[]
-  addedEventProjects                EventProject[]                          @relation("EventProjectAdder")
-  applicationTemplates              ApplicationTemplate[]                   @relation("ApplicationTemplateCreator")
-  eventRegistrations                EventRegistration[]                     @relation("EventRegistrationHacker")
-  decidedRegistrations              EventRegistration[]                     @relation("EventRegistrationDecider")
-  cancelledRegistrations            EventRegistration[]                     @relation("EventRegistrationCanceller")
-  applicationsClosedEvents          Event[]                                 @relation("EventApplicationsClosedBy")
-  registrationAudits                EventRegistrationAudit[]                @relation("RegistrationAuditActor")
-  createdUserBans                   UserBan[]                               @relation("UserBanCreator")
-  revokedUserBans                   UserBan[]                               @relation("UserBanRevoker")
-  userBans                          UserBan[]                               @relation("UserBanHacker")
-  createdBanFlags                   UserBanFlag[]                           @relation("UserBanFlagCreator")
-  resolvedBanFlags                  UserBanFlag[]                           @relation("UserBanFlagResolver")
-  banFlags                          UserBanFlag[]                           @relation("UserBanFlagHacker")
-  organizerNote                     HackerOrganizerNote?                    @relation("OrganizerNoteHacker")
-  updatedOrganizerNotes             HackerOrganizerNote[]                   @relation("OrganizerNoteUpdater")
-  organizerNoteRevisions            HackerOrganizerNoteRevision[]           @relation("OrganizerNoteRevisionHacker")
-  editedOrganizerRevisions          HackerOrganizerNoteRevision[]           @relation("OrganizerNoteRevisionEditor")
-  createdEventMaterials             EventMaterial[]                         @relation("EventMaterialCreator")
-  eventMaterialAudits               EventMaterialAudit[]                    @relation("EventMaterialAuditActor")
-  createdCommunications             EventCommunication[]                    @relation("EventCommunicationCreator")
-  sentCommunications                EventCommunication[]                    @relation("EventCommunicationSender")
-  communicationRecipients           EventCommunicationRecipient[]           @relation("EventCommunicationRecipientHacker")
-  requestedPublicationNotifications EventPublicationNotification[]          @relation("EventPublicationNotificationRequester")
-  publicationNotificationRecipients EventPublicationNotificationRecipient[] @relation("EventPublicationNotificationRecipientHacker")
-  smsPreferenceEvents               SmsPreferenceEvent[]                    @relation("SmsPreferenceEventHacker")
-  staffAuditSubjects                EventStaffAudit[]                       @relation("EventStaffAuditSubject")
-  staffAuditActions                 EventStaffAudit[]                       @relation("EventStaffAuditActor")
+  createdEvents             Event[]
+  createdPitchSessions      PitchSession[]
+  chapterMemberships        ChapterMembership[]           @relation("ChapterMembershipHacker")
+  invitedChapterMemberships ChapterMembership[]           @relation("ChapterMembershipInviter")
+  eventStaffAssignments     EventStaff[]
+  addedPitchProjects        PitchProject[]
+  addedEventProjects        EventProject[]                @relation("EventProjectAdder")
+  applicationTemplates      ApplicationTemplate[]         @relation("ApplicationTemplateCreator")
+  eventRegistrations        EventRegistration[]           @relation("EventRegistrationHacker")
+  decidedRegistrations      EventRegistration[]           @relation("EventRegistrationDecider")
+  cancelledRegistrations    EventRegistration[]           @relation("EventRegistrationCanceller")
+  applicationsClosedEvents  Event[]                       @relation("EventApplicationsClosedBy")
+  registrationAudits        EventRegistrationAudit[]      @relation("RegistrationAuditActor")
+  createdUserBans           UserBan[]                     @relation("UserBanCreator")
+  revokedUserBans           UserBan[]                     @relation("UserBanRevoker")
+  userBans                  UserBan[]                     @relation("UserBanHacker")
+  createdBanFlags           UserBanFlag[]                 @relation("UserBanFlagCreator")
+  resolvedBanFlags          UserBanFlag[]                 @relation("UserBanFlagResolver")
+  banFlags                  UserBanFlag[]                 @relation("UserBanFlagHacker")
+  organizerNote             HackerOrganizerNote?          @relation("OrganizerNoteHacker")
+  updatedOrganizerNotes     HackerOrganizerNote[]         @relation("OrganizerNoteUpdater")
+  organizerNoteRevisions    HackerOrganizerNoteRevision[] @relation("OrganizerNoteRevisionHacker")
+  editedOrganizerRevisions  HackerOrganizerNoteRevision[] @relation("OrganizerNoteRevisionEditor")
+  createdEventMaterials     EventMaterial[]               @relation("EventMaterialCreator")
+  eventMaterialAudits       EventMaterialAudit[]          @relation("EventMaterialAuditActor")
+  createdCommunications     EventCommunication[]          @relation("EventCommunicationCreator")
+  sentCommunications        EventCommunication[]          @relation("EventCommunicationSender")
+  communicationRecipients   EventCommunicationRecipient[] @relation("EventCommunicationRecipientHacker")
+  smsPreferenceEvents       SmsPreferenceEvent[]          @relation("SmsPreferenceEventHacker")
+  staffAuditSubjects        EventStaffAudit[]             @relation("EventStaffAuditSubject")
+  staffAuditActions         EventStaffAudit[]             @relation("EventStaffAuditActor")
 
   @@index([clerkId])
 }
@@ -405,44 +403,45 @@ enum PitchSessionPhase {
 
 // Events and Pitch Queue
 model Event {
-  id                          String                        @id @default(uuid())
+  id                          String                   @id @default(uuid())
   title                       String
   description                 String?
   startTime                   DateTime
   endTime                     DateTime?
+  timezone                    String
   meetingUrl                  String?
   location                    String?
   venueName                   String?
   publicLocation              String?
   address                     String?
   virtualUrl                  String?
-  createdBy                   Hacker                        @relation(fields: [createdById], references: [id])
+  createdBy                   Hacker                   @relation(fields: [createdById], references: [id])
   createdById                 String
-  chapter                     Chapter                       @relation(fields: [chapterId], references: [id])
+  chapter                     Chapter                  @relation(fields: [chapterId], references: [id])
   chapterId                   String
   slug                        String
-  status                      EventStatus                   @default(DRAFT)
-  visibility                  EventVisibility               @default(PUBLIC)
+  status                      EventStatus              @default(DRAFT)
+  visibility                  EventVisibility          @default(PUBLIC)
   programType                 String?
   publicProgramLabel          String?
   capacity                    Int?
-  applicationMode             EventApplicationMode          @default(REQUIRES_APPROVAL)
-  autoPromoteWaitlist         Boolean                       @default(false)
+  applicationMode             EventApplicationMode     @default(REQUIRES_APPROVAL)
+  autoPromoteWaitlist         Boolean                  @default(false)
   approvedDetailsJson         Json?
   applicationQuestionsJson    Json?
-  hideChapterDefaultQuestions Boolean                       @default(false)
+  hideChapterDefaultQuestions Boolean                  @default(false)
   confirmationMessage         String?
   waitlistMessage             String?
   declineMessage              String?
-  applicationsOpen            Boolean                       @default(true)
+  applicationsOpen            Boolean                  @default(true)
   applicationsClosedAt        DateTime?
-  applicationsClosedBy        Hacker?                       @relation("EventApplicationsClosedBy", fields: [applicationsClosedById], references: [id])
+  applicationsClosedBy        Hacker?                  @relation("EventApplicationsClosedBy", fields: [applicationsClosedById], references: [id])
   applicationsClosedById      String?
   applicationsCloseReason     String?
   checkInOpensAt              DateTime?
   checkInClosesAt             DateTime?
-  image                       Image?                        @relation("EventImage", fields: [imageId], references: [id])
-  imageId                     String?                       @unique
+  image                       Image?                   @relation("EventImage", fields: [imageId], references: [id])
+  imageId                     String?                  @unique
   staff                       EventStaff[]
   pitchSessions               PitchSession[]
   projects                    EventProject[]
@@ -451,10 +450,9 @@ model Event {
   materials                   EventMaterial[]
   materialAudits              EventMaterialAudit[]
   communications              EventCommunication[]
-  publicationNotification     EventPublicationNotification?
   staffAudits                 EventStaffAudit[]
-  createdAt                   DateTime                      @default(now())
-  updatedAt                   DateTime                      @updatedAt
+  createdAt                   DateTime                 @default(now())
+  updatedAt                   DateTime                 @updatedAt
 
   @@unique([chapterId, slug])
   @@index([startTime])
@@ -744,50 +742,6 @@ model EventCommunicationRecipient {
   @@index([providerMessageId])
   @@index([hackerId, createdAt])
   @@index([registrationId])
-}
-
-model EventPublicationNotification {
-  id                  String                                  @id @default(uuid())
-  event               Event                                   @relation(fields: [eventId], references: [id])
-  eventId             String                                  @unique
-  requestedBy         Hacker                                  @relation("EventPublicationNotificationRequester", fields: [requestedById], references: [id])
-  requestedById       String
-  status              EventCommunicationStatus                @default(SENDING)
-  recipientCount      Int                                     @default(0)
-  sentCount           Int                                     @default(0)
-  failedCount         Int                                     @default(0)
-  emailRecipientCount Int                                     @default(0)
-  smsRecipientCount   Int                                     @default(0)
-  sentAt              DateTime?
-  createdAt           DateTime                                @default(now())
-  updatedAt           DateTime                                @updatedAt
-  recipients          EventPublicationNotificationRecipient[]
-
-  @@index([eventId, createdAt])
-  @@index([requestedById, createdAt])
-}
-
-model EventPublicationNotificationRecipient {
-  id                String                            @id @default(uuid())
-  notification      EventPublicationNotification      @relation(fields: [notificationId], references: [id])
-  notificationId    String
-  hacker            Hacker                            @relation("EventPublicationNotificationRecipientHacker", fields: [hackerId], references: [id])
-  hackerId          String
-  channel           EventCommunicationChannel
-  contactValue      String
-  status            EventCommunicationRecipientStatus @default(PENDING)
-  providerMessageId String?
-  errorCode         String?
-  errorMessage      String?
-  attemptedAt       DateTime?
-  deliveredAt       DateTime?
-  createdAt         DateTime                          @default(now())
-  updatedAt         DateTime                          @updatedAt
-
-  @@unique([notificationId, hackerId, channel])
-  @@index([notificationId, status])
-  @@index([providerMessageId])
-  @@index([hackerId, createdAt])
 }
 
 model SmsPreferenceEvent {

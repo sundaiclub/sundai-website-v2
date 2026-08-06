@@ -16,6 +16,7 @@ import {
 } from '../../components/ManagementSurface';
 import { useUserContext } from '../../contexts/UserContext';
 import type { SiteAdminChapterListItem } from '@/types/event-management';
+import { CHAPTER_TIMEZONE_GROUPS } from '@/lib/chapterTimezones';
 
 function chapterList(payload: unknown): SiteAdminChapterListItem[] {
   if (Array.isArray(payload)) return payload as SiteAdminChapterListItem[];
@@ -112,10 +113,7 @@ export default function AdminChaptersPage() {
             </div>
           )}
           <ManagementSection title="Create chapter">
-            <form
-              onSubmit={createChapter}
-              className="grid gap-3"
-            >
+            <form onSubmit={createChapter} className="grid gap-3">
               <div className="grid gap-3 md:grid-cols-2">
                 <input
                   aria-label="Chapter name"
@@ -152,13 +150,22 @@ export default function AdminChaptersPage() {
                   onChange={event => setCountry(event.target.value)}
                   placeholder="Country"
                 />
-                <input
+                <select
                   aria-label="Timezone"
                   className={classes.input}
                   value={timezone}
                   onChange={event => setTimezone(event.target.value)}
-                  placeholder="Timezone"
-                />
+                >
+                  {CHAPTER_TIMEZONE_GROUPS.map(group => (
+                    <optgroup key={group.label} label={group.label}>
+                      {group.options.map(option => (
+                        <option key={option.value} value={option.value}>
+                          {option.label} ({option.value})
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
                 <select
                   aria-label="Access mode"
                   className={classes.input}

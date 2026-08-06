@@ -21,6 +21,7 @@ const buildContext = (overrides: Record<string, unknown> = {}) => ({
   event: {
     title: 'Boston AI Build Night',
     confirmationMessage: 'Bring your laptop and photo ID.',
+    waitlistMessage: 'We will contact you if a spot opens.',
     declineMessage: 'We cannot accommodate this application.',
     slug: 'ai-build-night',
     chapter: {
@@ -32,6 +33,8 @@ const buildContext = (overrides: Record<string, unknown> = {}) => ({
     notificationsAllowed: true,
     emailNotificationsEnabled: true,
     smsNotificationsEnabled: true,
+    smsConsentAt: new Date('2026-07-01T12:00:00.000Z'),
+    smsConsentVersion: 'site-application-checkbox-2026-08-04',
   },
   ...overrides,
 });
@@ -95,6 +98,8 @@ describe('event decision notifications', () => {
               notificationsAllowed: true,
               emailNotificationsEnabled: true,
               smsNotificationsEnabled: false,
+              smsConsentAt: null,
+              smsConsentVersion: null,
             },
           })
         ),
@@ -111,6 +116,44 @@ describe('event decision notifications', () => {
         ),
       })
     );
+  });
+
+  it('sends the configured waitlist message through enabled channels', async () => {
+    const sendEmail = jest.fn().mockResolvedValue(undefined);
+    const sendSms = jest.fn().mockResolvedValue(undefined);
+
+    const result = await notifyEventDecision(
+      {
+        eventId: 'event-1',
+        registrationId: 'registration-1',
+        status: 'WAITLISTED',
+      },
+      {
+        config,
+        loadContext: jest.fn().mockResolvedValue(buildContext()),
+        sendEmail,
+        sendSms,
+      }
+    );
+
+    expect(result).toEqual({ email: 'sent', sms: 'sent' });
+    expect(sendEmail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        subject: "You're waitlisted for Boston AI Build Night",
+        text: expect.stringContaining(
+          'Your application for “Boston AI Build Night” has been waitlisted.'
+        ),
+        html: expect.stringContaining(
+          'We will contact you if a spot opens.'
+        ),
+      })
+    );
+    expect(sendSms).toHaveBeenCalledWith({
+      to: '+16175550123',
+      body: expect.stringContaining(
+        'Your application for “Boston AI Build Night” has been waitlisted.'
+      ),
+    });
   });
 
   it('honors the master notification preference', async () => {

@@ -113,6 +113,7 @@ export async function loadEventWorkspace(
     select: {
       id: true,
       title: true,
+      timezone: true,
       status: true,
       startTime: true,
       endTime: true,
@@ -124,17 +125,6 @@ export async function loadEventWorkspace(
       slug: true,
       chapterId: true,
       chapter: { select: { id: true, name: true, slug: true, timezone: true } },
-      publicationNotification: {
-        select: {
-          status: true,
-          recipientCount: true,
-          sentCount: true,
-          failedCount: true,
-          emailRecipientCount: true,
-          smsRecipientCount: true,
-          sentAt: true,
-        },
-      },
       staff: {
         orderBy: [{ role: 'asc' }, { createdAt: 'asc' }],
         // Event staff is displayed inline; keep the relation include bounded.
@@ -226,6 +216,7 @@ export async function loadEventWorkspace(
     event: {
       id: event.id,
       title: event.title,
+      timezone: event.timezone,
       status: event.status,
       chapter: event.chapter,
       startTime: event.startTime.toISOString(),
@@ -259,11 +250,5 @@ export async function loadEventWorkspace(
       canDecideEventApplicantsWithContext(permissionContext)
     ),
     unavailable: [...WORKSPACE_UNAVAILABLE_METRICS],
-    publicationNotification: event.publicationNotification
-      ? {
-          ...event.publicationNotification,
-          sentAt: event.publicationNotification.sentAt?.toISOString() ?? null,
-        }
-      : null,
   };
 }

@@ -687,6 +687,7 @@ describe('/api/chapters', () => {
       name: 'Sundai Greater Boston',
       accessMode: 'PRIVATE',
       description: 'Greater Boston builders and demos.',
+      timezone: 'Europe/Berlin',
     };
     const updatedChapter = buildChapter({
       ...chapter,
@@ -719,6 +720,25 @@ describe('/api/chapters', () => {
         data: expect.objectContaining(updateBody),
       })
     );
+  });
+
+  it('rejects an unsupported chapter timezone', async () => {
+    const siteAdmin = buildSiteAdmin();
+    const chapter = buildChapter({ id: 'chapter-boston' });
+
+    mockActor(siteAdmin);
+    prisma.chapter.findUnique.mockResolvedValue(chapter);
+
+    const response = await PATCH_CHAPTER(
+      createJsonRequest('/api/chapters/chapter-boston', {
+        method: 'PATCH',
+        body: { timezone: 'EST' },
+      }) as any,
+      createRouteContext({ chapterId: chapter.id }) as any
+    );
+
+    expect(response.status).toBe(400);
+    expect(prisma.chapter.update).not.toHaveBeenCalled();
   });
 
   it('requires authentication to create chapters', async () => {

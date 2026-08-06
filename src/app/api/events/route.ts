@@ -277,6 +277,7 @@ export async function POST(req: Request) {
         title,
         description: description || null,
         startTime: parsedStartTime,
+        timezone,
         ...(endTime !== undefined && {
           endTime: parsedEndTime,
         }),

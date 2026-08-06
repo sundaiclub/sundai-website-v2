@@ -212,6 +212,7 @@ export async function listVisibleChapters(options: ListVisibleChaptersOptions = 
           title: true,
           slug: true,
           startTime: true,
+          timezone: true,
           publicLocation: true,
         },
       },

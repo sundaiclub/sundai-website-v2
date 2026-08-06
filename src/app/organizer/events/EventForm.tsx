@@ -33,6 +33,7 @@ import type {
 } from '@/types/event-management';
 import { DEFAULT_EVENT_MESSAGES } from '@/lib/eventMessageDefaults';
 import { parseTemplateFieldsJson } from '@/lib/applicationTemplates';
+import { CHAPTER_TIMEZONE_GROUPS } from '@/lib/chapterTimezones';
 
 type ChapterListPayload = ManageableChapterListItem[] | null;
 type StaffListPayload =
@@ -178,6 +179,7 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
   const [title, setTitle] = useState('');
   const [slug, setSlug] = useState('');
   const [chapterId, setChapterId] = useState('');
+  const [timezone, setTimezone] = useState('');
   const [description, setDescription] = useState('');
   const [eventImageFile, setEventImageFile] = useState<File | null>(null);
   const [eventImagePrompt, setEventImagePrompt] = useState<string | null>(null);
@@ -199,7 +201,6 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
   const [approvedDetails, setApprovedDetails] = useState('');
   const [applicationsOpen, setApplicationsOpen] = useState(true);
   const [applicationsCloseReason, setApplicationsCloseReason] = useState('');
-  const [notifyChapterMembers, setNotifyChapterMembers] = useState(false);
   const [selectedMcs, setSelectedMcs] = useState<HackerSelectionOption[]>([]);
   const [selectedCoMcs, setSelectedCoMcs] = useState<HackerSelectionOption[]>(
     []
@@ -305,7 +306,7 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
         setStaffCandidates(nextStaff);
 
         if (eventPayload) {
-          const eventTimezone = eventPayload.chapter?.timezone ?? 'UTC';
+          const eventTimezone = eventPayload.timezone;
           const start = dateTimeParts(eventPayload.startTime, eventTimezone);
           const end = dateTimeParts(eventPayload.endTime, eventTimezone);
           const questions = fieldsFromJson(
@@ -315,6 +316,7 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
 
           setLoadedEvent(eventPayload);
           setChapterId(eventPayload.chapter?.id ?? '');
+          setTimezone(eventTimezone);
           setTitle(eventPayload.title);
           setSlug(eventPayload.slug ?? slugify(eventPayload.title));
           setDescription(eventPayload.description ?? '');
@@ -419,7 +421,6 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
     () => chapters.find(chapter => chapter.id === chapterId) ?? null,
     [chapterId, chapters]
   );
-  const timezone = selectedChapter?.timezone ?? '';
   const startTime = eventDate ? `${eventDate}T${startClock}` : '';
   const endTime = eventDate ? `${eventDate}T${endClock}` : '';
   const filteredMcCandidates = useMemo(
@@ -496,8 +497,15 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
       eventDate &&
       startClock &&
       endClock &&
+      timezone &&
       (hasNoCapacityLimit || capacity.trim())
   );
+
+  useEffect(() => {
+    if (!isEditing && selectedChapter) {
+      setTimezone(selectedChapter.timezone);
+    }
+  }, [isEditing, selectedChapter]);
 
   useEffect(() => {
     if (!chapterId) {
@@ -795,8 +803,6 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
         `/api/events/${savedEvent.id}/publish`,
         {
           method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ notifyChapterMembers }),
         }
       );
       if (!publishResponse.ok) {
@@ -804,13 +810,7 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
         return;
       }
       setSavedEventId(savedEvent.id);
-      const publishedEvent = await publishResponse.json().catch(() => null);
-      const notification = publishedEvent?.publicationNotification;
-      setMessage(
-        notification
-          ? `Event was successfully published. ${notification.sentCount} member notification${notification.sentCount === 1 ? '' : 's'} sent${notification.failedCount ? `; ${notification.failedCount} failed` : ''}.`
-          : 'Event was successfully published.'
-      );
+      setMessage('Event was successfully published.');
       if (isEditing) {
         setLoadedEvent(current =>
           current ? { ...current, status: 'PUBLISHED' } : current
@@ -969,12 +969,22 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
             </label>
             <label className="grid gap-2">
               <span className="text-sm font-semibold">Timezone</span>
-              <input
+              <select
                 aria-label="Timezone"
                 className={classes.input}
-                readOnly
+                onChange={event => setTimezone(event.target.value)}
                 value={timezone}
-              />
+              >
+                {CHAPTER_TIMEZONE_GROUPS.map(group => (
+                  <optgroup key={group.label} label={group.label}>
+                    {group.options.map(option => (
+                      <option key={option.value} value={option.value}>
+                        {option.label} ({option.value})
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
             </label>
             <label className="grid gap-2 sm:col-span-2">
               <span className="text-sm font-semibold">Title</span>
@@ -1522,27 +1532,6 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
             </label>
           </div>
         </ManagementSection>
-
-        {(!isEditing || loadedEvent?.status === 'DRAFT') && (
-          <label className={`${classes.subtlePanel} mb-3 flex items-start gap-3 p-4`}>
-            <input
-              aria-label="Notify chapter members when published"
-              checked={notifyChapterMembers}
-              className={`${classes.checkbox} mt-0.5`}
-              onChange={event => setNotifyChapterMembers(event.target.checked)}
-              type="checkbox"
-            />
-            <span>
-              <span className="block text-sm font-semibold">
-                Notify chapter members
-              </span>
-              <span className={`mt-1 block text-sm ${classes.mutedText}`}>
-                When you publish, send this event to active chapter members by
-                email, SMS, or both, based on each member&apos;s preferences.
-              </span>
-            </span>
-          </label>
-        )}
 
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <button

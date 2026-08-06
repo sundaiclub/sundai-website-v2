@@ -207,6 +207,7 @@ export type EventFixture = {
   description: string | null;
   startTime: Date;
   endTime: Date | null;
+  timezone: string;
   meetingUrl: string | null;
   location: string | null;
   venueName: string | null;
@@ -528,6 +529,7 @@ export const buildEvent = (
   description: 'Public event description for Boston builders.',
   startTime: new Date('2026-07-10T22:00:00.000Z'),
   endTime: new Date('2026-07-11T01:00:00.000Z'),
+  timezone: 'America/New_York',
   meetingUrl: null,
   location: null,
   venueName: 'Sundai Boston HQ',
@@ -806,7 +808,8 @@ export const buildBlockedRegistration = (
     id: 'registration-banned-applicant-blocked',
     hackerId: 'hacker-banned-applicant',
     status: 'BLOCKED',
-    publicSafeMessage: 'You are unable to register for this event at this time.',
+    publicSafeMessage:
+      'You are unable to register for this event at this time.',
     answersJson: null,
     templateSnapshotJson: null,
     internalReviewNotes: 'Active global ban; visible to site admins only.',

@@ -56,6 +56,7 @@ function buildPublicEvent(
     description: 'Public event description.',
     startTime: new Date('2026-07-10T22:00:00.000Z'),
     endTime: new Date('2026-07-11T01:00:00.000Z'),
+    timezone: 'America/New_York',
     publicLocation: 'Sundai HQ',
     status: 'PUBLISHED',
     visibility: 'PUBLIC',

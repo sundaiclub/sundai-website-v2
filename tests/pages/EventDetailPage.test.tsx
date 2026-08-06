@@ -982,8 +982,14 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
       await openRegistrationForm();
 
       const nameInput = await screen.findByLabelText(/full name/i);
-      const emailInput = screen.getByLabelText(/email/i);
+      const emailInput = screen.getByRole('textbox', { name: /email/i });
       const phoneInput = screen.getByLabelText(/phone number/i);
+      const emailPreference = screen.getByRole('checkbox', {
+        name: /email me about this event/i,
+      });
+      const smsPreference = screen.getByRole('checkbox', {
+        name: /receive recurring automated text messages/i,
+      });
       const chapterGoalsInput = screen.getByLabelText(/chapter goals/i);
       const projectInput = screen.getByLabelText(/project idea/i);
 
@@ -993,11 +999,7 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
       expect(
         screen.getByText(/message and data rates may apply/i)
       ).toBeInTheDocument();
-      expect(
-        screen.getByRole('checkbox', {
-          name: /receive recurring automated text messages/i,
-        })
-      ).not.toBeChecked();
+      expect(smsPreference).not.toBeChecked();
       expect(
         screen.getByRole('link', { name: 'Terms of Service' })
       ).toHaveAttribute('href', '/terms');
@@ -1009,7 +1011,19 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
           Node.DOCUMENT_POSITION_FOLLOWING
       ).toBeTruthy();
       expect(
-        emailInput.compareDocumentPosition(chapterGoalsInput) &
+        emailInput.compareDocumentPosition(emailPreference) &
+          Node.DOCUMENT_POSITION_FOLLOWING
+      ).toBeTruthy();
+      expect(
+        emailPreference.compareDocumentPosition(phoneInput) &
+          Node.DOCUMENT_POSITION_FOLLOWING
+      ).toBeTruthy();
+      expect(
+        phoneInput.compareDocumentPosition(smsPreference) &
+          Node.DOCUMENT_POSITION_FOLLOWING
+      ).toBeTruthy();
+      expect(
+        smsPreference.compareDocumentPosition(chapterGoalsInput) &
           Node.DOCUMENT_POSITION_FOLLOWING
       ).toBeTruthy();
       expect(
@@ -1061,8 +1075,38 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
       expect(registrationCall).toBeDefined();
       const requestInit = registrationCall?.[1] as RequestInit;
       expect(JSON.parse(requestInit.body as string)).toEqual(
-        expect.objectContaining({ smsConsentGranted: true })
+        expect.objectContaining({
+          smsNotificationsEnabled: true,
+          smsConsentGranted: true,
+        })
       );
+    });
+
+    it('uses saved chapter preferences as the application defaults', async () => {
+      await renderDetailPage(
+        buildApplicationEvent({
+          viewerNotificationPreferences: {
+            notificationsAllowed: true,
+            emailNotificationsEnabled: true,
+            smsNotificationsEnabled: true,
+            smsConsentAt: '2026-08-05T12:00:00.000Z',
+            smsConsentVersion: 'site-application-checkbox-2026-08-04',
+          },
+        })
+      );
+
+      await openRegistrationForm();
+
+      expect(
+        screen.getByRole('checkbox', {
+          name: /email me about this event/i,
+        })
+      ).toBeChecked();
+      expect(
+        screen.getByRole('checkbox', {
+          name: /receive recurring automated text messages/i,
+        })
+      ).toBeChecked();
     });
 
     it('prefills only prior answers enabled for reuse', async () => {

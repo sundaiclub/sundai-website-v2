@@ -39,6 +39,7 @@ jest.mock('../../src/lib/prisma', () => ({
     },
     chapterMembership: {
       findFirst: jest.fn(),
+      upsert: jest.fn(),
     },
     event: {
       findUnique: jest.fn(),
@@ -271,6 +272,8 @@ describe('POST /api/events/[eventId]/registrations public submissions', () => {
     const response = await POST_REGISTRATION(
       createCurrentUserRegistrationRequest(fixture.publishedEvent.id, {
         answersJson,
+        emailNotificationsEnabled: true,
+        smsNotificationsEnabled: true,
         smsConsentGranted: true,
       }) as any,
       createRouteContext({ eventId: fixture.publishedEvent.id })
@@ -299,6 +302,24 @@ describe('POST /api/events/[eventId]/registrations public submissions', () => {
         internalReviewNotes: null,
         decidedById: null,
         decidedAt: null,
+      }),
+    });
+    expect(prisma.chapterMembership.upsert).toHaveBeenCalledWith({
+      where: {
+        chapterId_hackerId: {
+          chapterId: fixture.publishedEvent.chapterId,
+          hackerId: fixture.applicant.id,
+        },
+      },
+      create: expect.objectContaining({
+        notificationsAllowed: true,
+        emailNotificationsEnabled: true,
+        smsNotificationsEnabled: true,
+      }),
+      update: expect.objectContaining({
+        notificationsAllowed: true,
+        emailNotificationsEnabled: true,
+        smsNotificationsEnabled: true,
       }),
     });
     expect(prisma.eventRegistrationAudit.create).toHaveBeenCalledWith({

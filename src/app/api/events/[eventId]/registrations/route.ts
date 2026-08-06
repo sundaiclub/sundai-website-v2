@@ -203,6 +203,8 @@ export async function POST(
         eventId: params.eventId,
         hackerId: hacker.id,
         answersJson: body?.answersJson,
+        emailNotificationsEnabled: body?.emailNotificationsEnabled === true,
+        smsNotificationsEnabled: body?.smsNotificationsEnabled === true,
         smsConsentGranted: body?.smsConsentGranted === true,
       });
 

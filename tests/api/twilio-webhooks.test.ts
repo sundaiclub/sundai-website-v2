@@ -11,12 +11,6 @@ const mockPrisma = {
     update: jest.fn(),
   },
   eventCommunication: { update: jest.fn() },
-  eventPublicationNotificationRecipient: {
-    findFirst: jest.fn(),
-    findMany: jest.fn(),
-    update: jest.fn(),
-  },
-  eventPublicationNotification: { update: jest.fn() },
   $transaction: jest.fn(),
 };
 
@@ -56,9 +50,6 @@ describe('Twilio messaging webhooks', () => {
     mockValidateRequest.mockReturnValue(true);
     mockPrisma.$transaction.mockImplementation(async (callback: Function) =>
       callback(mockPrisma)
-    );
-    mockPrisma.eventPublicationNotificationRecipient.findFirst.mockResolvedValue(
-      null
     );
   });
 

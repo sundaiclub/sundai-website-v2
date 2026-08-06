@@ -255,9 +255,15 @@ const mockChapterDirectoryDatabase = ({
 
 describe('chapter visibility API', () => {
   beforeEach(() => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date('2026-06-01T12:00:00.000Z'));
     jest.clearAllMocks();
     resetClerkMocks();
     prisma.event.findMany.mockResolvedValue([]);
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
   });
 
   it('lists active public chapters for signed-out users', async () => {
@@ -668,6 +674,7 @@ describe('chapter visibility API', () => {
       title: 'Past Build Night',
       slug: 'past-build-night',
       startTime: new Date('2026-05-01T22:00:00.000Z'),
+      endTime: new Date('2026-05-02T01:00:00.000Z'),
       publicLocation: 'Boston, MA',
     });
     const events = [

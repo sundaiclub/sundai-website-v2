@@ -467,15 +467,11 @@ describe('T052 organizer registration review decisions API', () => {
           }),
         })
       );
-      if (status === 'APPROVED' || status === 'DECLINED') {
-        expect(notifyEventDecision).toHaveBeenCalledWith({
-          eventId: fixture.publishedEvent.id,
-          registrationId: fixture.pendingRegistration.id,
-          status,
-        });
-      } else {
-        expect(notifyEventDecision).not.toHaveBeenCalled();
-      }
+      expect(notifyEventDecision).toHaveBeenCalledWith({
+        eventId: fixture.publishedEvent.id,
+        registrationId: fixture.pendingRegistration.id,
+        status,
+      });
     }
   );
 

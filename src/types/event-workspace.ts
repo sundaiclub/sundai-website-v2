@@ -41,6 +41,7 @@ export interface EventWorkspaceChapter {
 export interface EventWorkspaceEvent {
   id: EntityId;
   title: string;
+  timezone: string;
   status: EventStatus;
   chapter: EventWorkspaceChapter;
   startTime: string;
@@ -91,17 +92,6 @@ export interface EventWorkspaceOverview {
   counts: EventWorkspaceCounts;
   availableSections: WorkspaceSection[];
   unavailable: WorkspaceUnavailableMetric[];
-  publicationNotification: EventPublicationNotificationSummary | null;
-}
-
-export interface EventPublicationNotificationSummary {
-  status: EventCommunicationStatus;
-  recipientCount: number;
-  sentCount: number;
-  failedCount: number;
-  emailRecipientCount: number;
-  smsRecipientCount: number;
-  sentAt: string | null;
 }
 
 export type EventMaterialKind = 'LINK' | 'FILE';

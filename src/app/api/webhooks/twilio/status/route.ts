@@ -85,35 +85,7 @@ export async function POST(request: Request) {
         where: { id: recipient.communicationId },
         data: communicationAggregate(rows.map(row => row.status)),
       });
-      return;
     }
-
-    const publicationRecipient =
-      await tx.eventPublicationNotificationRecipient.findFirst({
-        where: { providerMessageId },
-        select: { id: true, notificationId: true, status: true },
-      });
-    if (!publicationRecipient) return;
-    if (
-      STATUS_RANK[nextStatus] >= STATUS_RANK[publicationRecipient.status]
-    ) {
-      await tx.eventPublicationNotificationRecipient.update({
-        where: { id: publicationRecipient.id },
-        data: {
-          status: nextStatus,
-          errorCode: verified.params.get('ErrorCode'),
-          deliveredAt: nextStatus === 'DELIVERED' ? new Date() : undefined,
-        },
-      });
-    }
-    const rows = await tx.eventPublicationNotificationRecipient.findMany({
-      where: { notificationId: publicationRecipient.notificationId },
-      select: { status: true },
-    });
-    await tx.eventPublicationNotification.update({
-      where: { id: publicationRecipient.notificationId },
-      data: communicationAggregate(rows.map(row => row.status)),
-    });
   });
 
   return new Response(null, { status: 204 });

@@ -139,6 +139,7 @@ export type ChapterLandingEvent = {
   title: string;
   slug: string;
   applicationCount: number;
+  timezone: string;
   startTime?: Date | string;
   endTime?: Date | string | null;
   publicLocation?: string | null;
@@ -397,6 +398,7 @@ export type OrganizerEventListItem = {
 export type OrganizerEventSettings = {
   id: EntityId;
   title: string;
+  timezone: string;
   slug?: string;
   startTime?: ISODateTimeString | Date;
   endTime?: ISODateTimeString | Date | null;
@@ -454,6 +456,7 @@ export interface PublicEventCard {
   chapterName: string;
   chapter: PublicEventChapterSummary;
   title: string;
+  timezone: string;
   image?: Pick<EventManagementImageSummary, 'id' | 'url' | 'alt'> | null;
   publicLocation?: string | null;
   startTime: ISODateTimeString | Date;
@@ -511,6 +514,14 @@ export interface PublicEventDetail extends PublicEventCard {
   applicationQuestionSet: ApplicationQuestionSet;
   reusableAnswersJson?: JsonObject | null;
   viewerProfile?: ProfilePrefillSource | null;
+  viewerNotificationPreferences?: Pick<
+    ChapterMembership,
+    | 'notificationsAllowed'
+    | 'emailNotificationsEnabled'
+    | 'smsNotificationsEnabled'
+    | 'smsConsentAt'
+    | 'smsConsentVersion'
+  > | null;
   viewerRegistration?: PublicViewerRegistrationState | null;
   viewerCanManageRegistrations?: boolean;
   viewerCanEditEvent?: boolean;
@@ -677,7 +688,14 @@ export type AdminBanFlagListItem = UserBanFlag & {
 
 export type OrganizerChapterSettings = Pick<
   Chapter,
-  'id' | 'name' | 'slug' | 'description' | 'status' | 'accessMode' | 'heroImage'
+  | 'id'
+  | 'name'
+  | 'slug'
+  | 'timezone'
+  | 'description'
+  | 'status'
+  | 'accessMode'
+  | 'heroImage'
 >;
 
 export interface HackerOrganizerNote {

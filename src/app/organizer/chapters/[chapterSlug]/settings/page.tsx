@@ -28,6 +28,7 @@ import type {
   ChapterMembershipSummary,
   OrganizerChapterSettings,
 } from '@/types/event-management';
+import { CHAPTER_TIMEZONE_GROUPS } from '@/lib/chapterTimezones';
 
 function firstChapter(payload: unknown): OrganizerChapterSettings | null {
   if (payload && typeof payload === 'object' && 'id' in payload) {
@@ -46,16 +47,15 @@ function hackerList(payload: unknown): HackerSelectionOption[] {
       ? payload.hackers
       : [];
 
-  return hackers.filter(
-    (hacker): hacker is HackerSelectionOption =>
-      Boolean(
-        hacker &&
-          typeof hacker === 'object' &&
-          'id' in hacker &&
-          typeof hacker.id === 'string' &&
-          'name' in hacker &&
-          typeof hacker.name === 'string'
-      )
+  return hackers.filter((hacker): hacker is HackerSelectionOption =>
+    Boolean(
+      hacker &&
+        typeof hacker === 'object' &&
+        'id' in hacker &&
+        typeof hacker.id === 'string' &&
+        'name' in hacker &&
+        typeof hacker.name === 'string'
+    )
   );
 }
 
@@ -109,9 +109,10 @@ export default function OrganizerChapterSettingsPage({
   const [templateError, setTemplateError] = useState('');
   const [isCreatingTemplate, setIsCreatingTemplate] = useState(false);
   const [descriptionDraft, setDescriptionDraft] = useState('');
+  const [timezoneDraft, setTimezoneDraft] = useState('America/New_York');
   const [settingsMessage, setSettingsMessage] = useState('');
   const [settingsError, setSettingsError] = useState('');
-  const [isSavingDescription, setIsSavingDescription] = useState(false);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [showAdminInvite, setShowAdminInvite] = useState(false);
   const [adminCandidates, setAdminCandidates] = useState<
@@ -208,6 +209,7 @@ export default function OrganizerChapterSettingsPage({
 
         setChapter(nextChapter);
         setDescriptionDraft(nextChapter.description ?? '');
+        setTimezoneDraft(nextChapter.timezone);
         setMembers(Array.isArray(membersPayload) ? membersPayload : []);
         setTemplates(templateList(templatesPayload));
         setBanFlags(Array.isArray(banFlagsPayload) ? banFlagsPayload : []);
@@ -225,11 +227,11 @@ export default function OrganizerChapterSettingsPage({
     };
   }, [params.chapterSlug]);
 
-  async function saveChapterDescription(event: React.FormEvent) {
+  async function saveChapterProfile(event: React.FormEvent) {
     event.preventDefault();
     if (!chapter) return;
 
-    setIsSavingDescription(true);
+    setIsSavingProfile(true);
     setSettingsMessage('');
     setSettingsError('');
 
@@ -239,6 +241,7 @@ export default function OrganizerChapterSettingsPage({
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           description: descriptionDraft.trim(),
+          timezone: timezoneDraft,
         }),
       });
 
@@ -251,18 +254,23 @@ export default function OrganizerChapterSettingsPage({
       if (updatedChapter) {
         setChapter(updatedChapter);
         setDescriptionDraft(updatedChapter.description ?? '');
+        setTimezoneDraft(updatedChapter.timezone);
       }
-      setSettingsMessage('Chapter description saved.');
+      setSettingsMessage('Chapter profile saved.');
     } catch (error) {
       setSettingsError(
-        error instanceof Error ? error.message : 'Unable to save description.'
+        error instanceof Error
+          ? error.message
+          : 'Unable to save chapter profile.'
       );
     } finally {
-      setIsSavingDescription(false);
+      setIsSavingProfile(false);
     }
   }
 
-  async function uploadChapterImage(event: React.ChangeEvent<HTMLInputElement>) {
+  async function uploadChapterImage(
+    event: React.ChangeEvent<HTMLInputElement>
+  ) {
     if (!chapter) return;
     const file = event.currentTarget.files?.[0];
     if (!file) return;
@@ -379,7 +387,9 @@ export default function OrganizerChapterSettingsPage({
     }
   }
 
-  function handleSelectedFlagHackerChange(hacker: HackerSelectionOption | null) {
+  function handleSelectedFlagHackerChange(
+    hacker: HackerSelectionOption | null
+  ) {
     setSelectedFlagHacker(hacker);
     setFlagError('');
   }
@@ -445,9 +455,7 @@ export default function OrganizerChapterSettingsPage({
       setAdminHackerQuery('');
     } catch (error) {
       setAdminError(
-        error instanceof Error
-          ? error.message
-          : 'Unable to add chapter admin.'
+        error instanceof Error ? error.message : 'Unable to add chapter admin.'
       );
     } finally {
       setIsInvitingAdmin(false);
@@ -505,12 +513,14 @@ export default function OrganizerChapterSettingsPage({
           title="Chapter profile"
           description="Public chapter details shown on chapter pages."
         >
-          <form className="grid gap-4" onSubmit={saveChapterDescription}>
+          <form className="grid gap-4" onSubmit={saveChapterProfile}>
             {settingsError && (
               <ManagementAlert tone="danger">{settingsError}</ManagementAlert>
             )}
             {settingsMessage && (
-              <ManagementAlert tone="success">{settingsMessage}</ManagementAlert>
+              <ManagementAlert tone="success">
+                {settingsMessage}
+              </ManagementAlert>
             )}
             <div className="grid gap-4 md:grid-cols-[180px_minmax(0,1fr)]">
               <div className="min-w-0">
@@ -534,6 +544,25 @@ export default function OrganizerChapterSettingsPage({
                 )}
               </div>
               <div className="grid gap-3">
+                <label className="grid gap-2">
+                  <span className="text-sm font-semibold">Timezone</span>
+                  <select
+                    aria-label="Timezone"
+                    className={classes.input}
+                    value={timezoneDraft}
+                    onChange={event => setTimezoneDraft(event.target.value)}
+                  >
+                    {CHAPTER_TIMEZONE_GROUPS.map(group => (
+                      <optgroup key={group.label} label={group.label}>
+                        {group.options.map(option => (
+                          <option key={option.value} value={option.value}>
+                            {option.label} ({option.value})
+                          </option>
+                        ))}
+                      </optgroup>
+                    ))}
+                  </select>
+                </label>
                 <label className="grid gap-2">
                   <span className="text-sm font-semibold">Chapter image</span>
                   <input
@@ -560,10 +589,10 @@ export default function OrganizerChapterSettingsPage({
                 <div>
                   <button
                     className={classes.primaryButton}
-                    disabled={isSavingDescription || isUploadingImage}
+                    disabled={isSavingProfile || isUploadingImage}
                     type="submit"
                   >
-                    {isSavingDescription ? 'Saving...' : 'Save description'}
+                    {isSavingProfile ? 'Saving...' : 'Save profile'}
                   </button>
                 </div>
               </div>
@@ -592,7 +621,9 @@ export default function OrganizerChapterSettingsPage({
               <ManagementAlert tone="danger">{templateError}</ManagementAlert>
             )}
             {templateMessage && (
-              <ManagementAlert tone="success">{templateMessage}</ManagementAlert>
+              <ManagementAlert tone="success">
+                {templateMessage}
+              </ManagementAlert>
             )}
             {templates.map(template => (
               <ApplicationTemplateEditor
@@ -642,8 +673,7 @@ export default function OrganizerChapterSettingsPage({
             filteredHackers={(adminCandidates ?? []).filter(candidate => {
               const isAdmin = members.some(
                 member =>
-                  member.role === 'ADMIN' &&
-                  member.hacker?.id === candidate.id
+                  member.role === 'ADMIN' && member.hacker?.id === candidate.id
               );
               const query = adminHackerQuery.trim().toLowerCase();
               return (

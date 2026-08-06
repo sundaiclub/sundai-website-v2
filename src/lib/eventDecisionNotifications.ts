@@ -1,12 +1,12 @@
 import prisma from '@/lib/prisma';
 import { DEFAULT_EVENT_MESSAGES } from '@/lib/eventMessageDefaults';
 import { normalizeSmsPhoneNumber } from '@/lib/phoneNumbers';
-import {
-  SMS_CONSENT_CONFIGURED,
-  SMS_CONSENT_VERSION,
-} from '@/lib/smsConsent';
+import { SMS_CONSENT_CONFIGURED, SMS_CONSENT_VERSION } from '@/lib/smsConsent';
 
-export type EventDecisionNotificationStatus = 'APPROVED' | 'DECLINED';
+export type EventDecisionNotificationStatus =
+  | 'APPROVED'
+  | 'WAITLISTED'
+  | 'DECLINED';
 export type EventDecisionNotificationChannelResult =
   | 'sent'
   | 'skipped'
@@ -29,6 +29,7 @@ type EventDecisionNotificationContext = {
   event: {
     title: string;
     confirmationMessage: string | null;
+    waitlistMessage: string | null;
     declineMessage: string | null;
     slug: string;
     chapter: {
@@ -39,6 +40,9 @@ type EventDecisionNotificationContext = {
   preferences: {
     notificationsAllowed: boolean;
     emailNotificationsEnabled: boolean;
+    smsNotificationsEnabled: boolean;
+    smsConsentAt: Date | null;
+    smsConsentVersion: string | null;
   } | null;
 };
 
@@ -129,25 +133,34 @@ function buildDecisionContent(
   html: string;
   sms: string;
 } {
-  const approved = status === 'APPROVED';
-  const statusLabel = approved ? 'approved' : 'declined';
+  const statusLabel = {
+    APPROVED: 'approved',
+    WAITLISTED: 'waitlisted',
+    DECLINED: 'declined',
+  }[status];
+  const eventMessage = {
+    APPROVED: context.event.confirmationMessage,
+    WAITLISTED: context.event.waitlistMessage,
+    DECLINED: context.event.declineMessage,
+  }[status];
+  const defaultMessage = {
+    APPROVED: DEFAULT_EVENT_MESSAGES.confirmation,
+    WAITLISTED: DEFAULT_EVENT_MESSAGES.waitlist,
+    DECLINED: DEFAULT_EVENT_MESSAGES.decline,
+  }[status];
   const configuredMessage =
-    context.publicSafeMessage ??
-    (approved
-      ? context.event.confirmationMessage
-      : context.event.declineMessage);
-  const publicMessage =
-    configuredMessage?.trim() ||
-    (approved
-      ? DEFAULT_EVENT_MESSAGES.confirmation
-      : DEFAULT_EVENT_MESSAGES.decline);
+    context.publicSafeMessage ?? eventMessage;
+  const publicMessage = configuredMessage?.trim() || defaultMessage;
   const eventUrl = `${normalizeAppUrl(appUrl)}/events/${encodeURIComponent(
     context.event.chapter.slug
   )}/${encodeURIComponent(context.event.slug)}`;
   const statusSentence = `Your application for “${context.event.title}” has been ${statusLabel}.`;
-  const subject = approved
-    ? `You're approved for ${context.event.title}`
-    : `Update on your application for ${context.event.title}`;
+  const subject =
+    status === 'APPROVED'
+      ? `You're approved for ${context.event.title}`
+      : status === 'WAITLISTED'
+        ? `You're waitlisted for ${context.event.title}`
+        : `Update on your application for ${context.event.title}`;
   const text = `Hi ${context.applicant.name},\n\n${statusSentence}\n\n${publicMessage}\n\nView event: ${eventUrl}\n\nSundai`;
   const html = [
     `<p>Hi ${escapeHtml(context.applicant.name)},</p>`,
@@ -183,6 +196,7 @@ async function loadContext(
         select: {
           title: true,
           confirmationMessage: true,
+          waitlistMessage: true,
           declineMessage: true,
           slug: true,
           chapter: {
@@ -204,6 +218,9 @@ async function loadContext(
     select: {
       notificationsAllowed: true,
       emailNotificationsEnabled: true,
+      smsNotificationsEnabled: true,
+      smsConsentAt: true,
+      smsConsentVersion: true,
     },
   });
 
@@ -311,10 +328,10 @@ export async function notifyEventDecision(
     if (
       smsConfigured &&
       SMS_CONSENT_CONFIGURED &&
-      context.preferences?.notificationsAllowed !== false &&
-      context.applicant.smsConsentAt &&
-      context.applicant.smsConsentVersion ===
-        SMS_CONSENT_VERSION &&
+      context.preferences?.notificationsAllowed === true &&
+      context.preferences.smsNotificationsEnabled === true &&
+      context.preferences.smsConsentAt &&
+      context.preferences.smsConsentVersion === SMS_CONSENT_VERSION &&
       smsPhoneNumber
     ) {
       channels.push('sms');

@@ -2,10 +2,7 @@ import { createHash } from 'crypto';
 import type { PrismaClient } from '@prisma/client';
 import prisma from '@/lib/prisma';
 import { normalizeSmsPhoneNumber } from '@/lib/phoneNumbers';
-import {
-  SMS_CONSENT_CONFIGURED,
-  SMS_CONSENT_VERSION,
-} from '@/lib/smsConsent';
+import { SMS_CONSENT_CONFIGURED, SMS_CONSENT_VERSION } from '@/lib/smsConsent';
 import type {
   EventCommunicationAudience,
   EventCommunicationChannel,
@@ -169,22 +166,27 @@ export function resolveEventCommunicationAudience({
         continue;
       }
     } else {
-      if (registration.membership?.notificationsAllowed === false) {
+      const membership = registration.membership;
+      if (!membership || membership.status !== 'ACTIVE') {
+        exclusions.ineligible += 1;
+        continue;
+      }
+      if (
+        !membership.notificationsAllowed ||
+        !membership.smsNotificationsEnabled
+      ) {
         exclusions.preferenceDisabled += 1;
         continue;
       }
-      contactValue = normalizeSmsPhoneNumber(
-        registration.hacker.phoneNumber
-      );
+      contactValue = normalizeSmsPhoneNumber(registration.hacker.phoneNumber);
       if (!contactValue) {
         exclusions.missingContact += 1;
         continue;
       }
       if (
         !SMS_CONSENT_CONFIGURED ||
-        !registration.hacker.smsConsentAt ||
-        registration.hacker.smsConsentVersion !==
-          SMS_CONSENT_VERSION
+        !membership.smsConsentAt ||
+        membership.smsConsentVersion !== SMS_CONSENT_VERSION
       ) {
         exclusions.ineligible += 1;
         continue;

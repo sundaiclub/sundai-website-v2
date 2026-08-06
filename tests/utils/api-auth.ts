@@ -48,6 +48,8 @@ export type CurrentUserRegistrationAnswers = Record<string, unknown>;
 
 export type CurrentUserRegistrationRequestBody = {
   answersJson: CurrentUserRegistrationAnswers;
+  emailNotificationsEnabled?: boolean;
+  smsNotificationsEnabled?: boolean;
   smsConsentGranted?: boolean;
 };
 
@@ -56,6 +58,8 @@ export type CurrentUserRegistrationRequestOptions = Omit<
   'body' | 'method'
 > & {
   answersJson?: CurrentUserRegistrationAnswers;
+  emailNotificationsEnabled?: boolean;
+  smsNotificationsEnabled?: boolean;
   smsConsentGranted?: boolean;
   body?: CurrentUserRegistrationRequestBody;
 };
@@ -262,13 +266,26 @@ export function createCurrentUserRegistrationRequest(
   eventId: string,
   options: CurrentUserRegistrationRequestOptions = {}
 ) {
-  const { answersJson, smsConsentGranted, body, ...requestOptions } = options;
+  const {
+    answersJson,
+    emailNotificationsEnabled,
+    smsNotificationsEnabled,
+    smsConsentGranted,
+    body,
+    ...requestOptions
+  } = options;
 
   return createJsonRequest(`/api/events/${eventId}/registrations`, {
     ...requestOptions,
     method: 'POST',
     body: body ?? {
       answersJson: answersJson ?? createDefaultCurrentUserRegistrationAnswers(),
+      ...(emailNotificationsEnabled !== undefined
+        ? { emailNotificationsEnabled }
+        : {}),
+      ...(smsNotificationsEnabled !== undefined
+        ? { smsNotificationsEnabled }
+        : {}),
       ...(smsConsentGranted !== undefined ? { smsConsentGranted } : {}),
     },
   });
@@ -278,13 +295,26 @@ export function createCurrentUserRegistrationEditRequest(
   eventId: string,
   options: CurrentUserRegistrationRequestOptions = {}
 ) {
-  const { answersJson, smsConsentGranted, body, ...requestOptions } = options;
+  const {
+    answersJson,
+    emailNotificationsEnabled,
+    smsNotificationsEnabled,
+    smsConsentGranted,
+    body,
+    ...requestOptions
+  } = options;
 
   return createJsonRequest(`/api/events/${eventId}/registrations/me`, {
     ...requestOptions,
     method: 'PATCH',
     body: body ?? {
       answersJson: answersJson ?? createDefaultCurrentUserRegistrationAnswers(),
+      ...(emailNotificationsEnabled !== undefined
+        ? { emailNotificationsEnabled }
+        : {}),
+      ...(smsNotificationsEnabled !== undefined
+        ? { smsNotificationsEnabled }
+        : {}),
       ...(smsConsentGranted !== undefined ? { smsConsentGranted } : {}),
     },
   });

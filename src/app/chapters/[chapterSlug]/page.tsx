@@ -211,8 +211,7 @@ export default function ChapterLandingPage({
               emailNotificationsEnabled || smsNotificationsEnabled,
             emailNotificationsEnabled,
             smsNotificationsEnabled,
-            smsConsentGranted:
-              smsNotificationsEnabled && smsConsentGranted,
+            smsConsentGranted: smsNotificationsEnabled && smsConsentGranted,
           }),
         }
       );
@@ -493,7 +492,7 @@ export default function ChapterLandingPage({
                     href={`/events/${eventChapterSlug}/${event.slug}`}
                     key={event.id}
                     showEdit={canManageChapter}
-                    timezone={chapter?.timezone}
+                    timezone={event.timezone}
                   />
                 ))}
               </div>
@@ -512,7 +511,7 @@ export default function ChapterLandingPage({
                     href={`/organizer/events/${event.id}/settings`}
                     key={event.id}
                     showState
-                    timezone={chapter?.timezone}
+                    timezone={event.timezone}
                   />
                 ))}
                 {pendingEvents.length === 0 && (
@@ -534,7 +533,7 @@ export default function ChapterLandingPage({
                   href={`/events/${eventChapterSlug}/${event.slug}`}
                   key={event.id}
                   showEdit={canManageChapter}
-                  timezone={chapter?.timezone}
+                  timezone={event.timezone}
                 />
               ))}
               {(chapter?.upcomingEvents ?? []).length === 0 && (
@@ -555,7 +554,7 @@ export default function ChapterLandingPage({
                   href={`/events/${eventChapterSlug}/${event.slug}`}
                   key={event.id}
                   showEdit={canManageChapter}
-                  timezone={chapter?.timezone}
+                  timezone={event.timezone}
                 />
               ))}
               {(chapter?.previousEvents ?? []).length === 0 && (

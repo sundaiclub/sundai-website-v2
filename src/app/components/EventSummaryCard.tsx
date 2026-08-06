@@ -15,6 +15,7 @@ type EventSummaryCardData = {
   } | null;
   publicLocation?: string | null;
   startTime?: Date | string;
+  timezone?: string;
   chapter?: { timezone?: string };
   applicationCount?: number;
   status?: EventStatus;
@@ -81,7 +82,8 @@ export default function EventSummaryCard({
               event.publicLocation,
               event.startTime
                 ? new Date(event.startTime).toLocaleDateString(undefined, {
-                    timeZone: timezone ?? event.chapter?.timezone,
+                    timeZone:
+                      timezone ?? event.timezone ?? event.chapter?.timezone,
                   })
                 : null,
             ]

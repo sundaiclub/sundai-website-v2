@@ -9,6 +9,7 @@ import {
   canManageChapterSettingsWithContext,
   canViewChapter as canViewChapterWithAuth,
 } from '@/lib/eventManagementAuth';
+import { isChapterTimezone } from '@/lib/chapterTimezones';
 
 const chapterProjectSelect = {
   id: true,
@@ -40,6 +41,7 @@ function chapterInclude(now: Date) {
         title: true,
         slug: true,
         startTime: true,
+        timezone: true,
         publicLocation: true,
         image: { select: { id: true, url: true, alt: true } },
         _count: {
@@ -63,6 +65,7 @@ const eventSummarySelect = {
   title: true,
   slug: true,
   startTime: true,
+  timezone: true,
   publicLocation: true,
   status: true,
   visibility: true,
@@ -80,6 +83,7 @@ const publicEventSummarySelect = {
   slug: true,
   startTime: true,
   endTime: true,
+  timezone: true,
   publicLocation: true,
   image: { select: { id: true, url: true, alt: true } },
   _count: {
@@ -276,6 +280,10 @@ export async function PATCH(
       'mailingListExternalId',
     ] as const;
     const data: Record<string, unknown> = {};
+
+    if (body?.timezone !== undefined && !isChapterTimezone(body.timezone)) {
+      return badRequest('timezone must be a supported IANA timezone');
+    }
 
     for (const key of allowedKeys) {
       if (body?.[key] !== undefined) data[key] = body[key] || null;

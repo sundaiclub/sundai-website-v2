@@ -10,6 +10,13 @@ const migrationPath = path.join(
 
 const schema = fs.readFileSync(schemaPath, 'utf8');
 const migration = fs.readFileSync(migrationPath, 'utf8');
+const eventTimezoneMigration = fs.readFileSync(
+  path.join(
+    rootDir,
+    'prisma/migrations/20260806020000_add_event_timezone/migration.sql'
+  ),
+  'utf8'
+);
 
 const readBlock = (source: string, kind: 'enum' | 'model', name: string) => {
   const match = source.match(
@@ -32,6 +39,27 @@ const expectSchemaLine = (block: string, fields: string[]) => {
 };
 
 describe('event management foundation migration', () => {
+  it('stores an event timezone and backfills existing events from their chapters', () => {
+    const eventModel = readBlock(schema, 'model', 'Event');
+    const normalizedMigration = normalizeSql(eventTimezoneMigration);
+
+    expectSchemaLine(eventModel, ['timezone', 'String']);
+    expect(normalizedMigration).toContain(
+      normalizeSql('ALTER TABLE "Event" ADD COLUMN "timezone" TEXT;')
+    );
+    expect(normalizedMigration).toContain(
+      normalizeSql(`
+        UPDATE "Event"
+        SET "timezone" = "Chapter"."timezone"
+        FROM "Chapter"
+        WHERE "Event"."chapterId" = "Chapter"."id";
+      `)
+    );
+    expect(normalizedMigration).toContain(
+      normalizeSql('ALTER TABLE "Event" ALTER COLUMN "timezone" SET NOT NULL;')
+    );
+  });
+
   it('cuts Role.ADMIN over to Role.SITE_ADMIN without keeping ADMIN in the Role schema enum', () => {
     const roleEnum = readBlock(schema, 'enum', 'Role');
 

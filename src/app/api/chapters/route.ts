@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { isChapterTimezone } from '@/lib/chapterTimezones';
 import {
   badRequest,
   getCurrentHacker,
@@ -94,6 +95,10 @@ export async function POST(req: Request) {
 
     if (!name || !city || !country || !timezone) {
       return badRequest('name, city, country, and timezone are required');
+    }
+
+    if (!isChapterTimezone(timezone)) {
+      return badRequest('timezone must be a supported IANA timezone');
     }
 
     const chapter = await prisma.chapter.create({

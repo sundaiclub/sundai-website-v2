@@ -168,7 +168,9 @@ function mockOrganizerFetches() {
         status: 200,
         blob: jest
           .fn()
-          .mockResolvedValue(new Blob(['generated-image'], { type: 'image/webp' })),
+          .mockResolvedValue(
+            new Blob(['generated-image'], { type: 'image/webp' })
+          ),
       });
     }
 
@@ -279,11 +281,10 @@ describe('/organizer/events/new', () => {
       'accept',
       'image/jpeg,image/png,image/webp,image/gif'
     );
-    expect(
-      screen.getByRole('button', { name: /ai generate/i })
-    ).toBeDisabled();
+    expect(screen.getByRole('button', { name: /ai generate/i })).toBeDisabled();
     expect(screen.getByText(/10:00 AM to 10:00 PM/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/timezone/i)).toHaveValue('America/New_York');
+    expect(screen.getByLabelText(/timezone/i).tagName).toBe('SELECT');
     expect(screen.getByLabelText(/^capacity$/i)).toBeRequired();
     expect(screen.getByLabelText(/^capacity$/i)).toHaveValue(100);
     expect(screen.getByLabelText(/no capacity limit/i)).not.toBeChecked();
@@ -297,6 +298,11 @@ describe('/organizer/events/new', () => {
         'America/Los_Angeles'
       );
     });
+
+    fireEvent.change(screen.getByLabelText(/timezone/i), {
+      target: { value: 'Europe/Berlin' },
+    });
+    expect(screen.getByLabelText(/timezone/i)).toHaveValue('Europe/Berlin');
   });
 
   it('uploads a selected event image after creating the event', async () => {
@@ -343,9 +349,7 @@ describe('/organizer/events/new', () => {
     });
     fireEvent.click(generateButtons[generateButtons.length - 1]);
 
-    fireEvent.click(
-      await screen.findByAltText(/generated image 1/i)
-    );
+    fireEvent.click(await screen.findByAltText(/generated image 1/i));
     fireEvent.click(screen.getByRole('button', { name: /use this image/i }));
 
     await screen.findByAltText(/boston ai build night preview/i);
@@ -555,10 +559,6 @@ describe('/organizer/events/new', () => {
       /decline message/i,
       'We cannot accommodate your application.'
     );
-    fireEvent.click(
-      screen.getByLabelText(/notify chapter members when published/i)
-    );
-
     fireEvent.click(screen.getByRole('button', { name: /publish/i }));
 
     await waitFor(() => {
@@ -572,7 +572,6 @@ describe('/organizer/events/new', () => {
         '/api/events/event-created/publish',
         expect.objectContaining({
           method: 'POST',
-          body: JSON.stringify({ notifyChapterMembers: true }),
         })
       );
     });

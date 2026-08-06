@@ -14,11 +14,7 @@ import type {
   WorkspaceSection,
 } from '@/types/event-workspace';
 
-type EffectiveWorkspaceRole =
-  | 'SITE_ADMIN'
-  | 'CHAPTER_ADMIN'
-  | 'MC'
-  | 'CO_MC';
+type EffectiveWorkspaceRole = 'SITE_ADMIN' | 'CHAPTER_ADMIN' | 'MC' | 'CO_MC';
 
 export type EventWorkspacePayload = EventWorkspaceOverview & {
   effectiveRole?: EffectiveWorkspaceRole;
@@ -164,11 +160,7 @@ function WorkspaceContent({
               {event.title}
             </h1>
             <p className={`mt-2 text-sm ${classes.mutedText}`}>
-              {scheduleLabel(
-                event.startTime,
-                event.endTime,
-                event.chapter.timezone
-              )}
+              {scheduleLabel(event.startTime, event.endTime, event.timezone)}
             </p>
             <div
               className="mt-3 flex flex-wrap gap-2"

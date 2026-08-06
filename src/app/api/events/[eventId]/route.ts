@@ -109,6 +109,7 @@ export async function GET(
         id: true,
         slug: true,
         title: true,
+        timezone: true,
         image: { select: { id: true, url: true, alt: true } },
         description: true,
         startTime: true,
@@ -416,6 +417,7 @@ export async function PATCH(
         ...(title !== undefined && { title }),
         ...(description !== undefined && { description: description || null }),
         ...(startTime !== undefined && { startTime: parsedStartTime }),
+        ...(timezone !== undefined && { timezone }),
         ...(endTime !== undefined && {
           endTime: parsedEndTime,
         }),

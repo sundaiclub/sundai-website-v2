@@ -51,6 +51,7 @@ type EventDetail = {
   description?: string | null;
   startTime: string;
   endTime?: string | null;
+  timezone: string;
   chapter: { timezone: string };
   meetingUrl?: string | null;
   audienceCanReorder: boolean;
@@ -69,18 +70,32 @@ type EventDetail = {
   projects: PitchProjectEntry[];
 };
 
-type EventPitchResponse = Omit<EventDetail, 'audienceCanReorder' | 'votingEndTime' | 'phase' | 'topProjectCount' | 'topPresentingSec' | 'topQuestionsSec' | 'defaultPresentingSec' | 'defaultQuestionsSec' | 'projects'> & {
-  pitchSessions?: Array<Pick<EventDetail,
-    | 'audienceCanReorder'
-    | 'votingEndTime'
-    | 'phase'
-    | 'topProjectCount'
-    | 'topPresentingSec'
-    | 'topQuestionsSec'
-    | 'defaultPresentingSec'
-    | 'defaultQuestionsSec'
-    | 'projects'
-  >>;
+type EventPitchResponse = Omit<
+  EventDetail,
+  | 'audienceCanReorder'
+  | 'votingEndTime'
+  | 'phase'
+  | 'topProjectCount'
+  | 'topPresentingSec'
+  | 'topQuestionsSec'
+  | 'defaultPresentingSec'
+  | 'defaultQuestionsSec'
+  | 'projects'
+> & {
+  pitchSessions?: Array<
+    Pick<
+      EventDetail,
+      | 'audienceCanReorder'
+      | 'votingEndTime'
+      | 'phase'
+      | 'topProjectCount'
+      | 'topPresentingSec'
+      | 'topQuestionsSec'
+      | 'defaultPresentingSec'
+      | 'defaultQuestionsSec'
+      | 'projects'
+    >
+  >;
 };
 
 function toEventDetail(data: EventPitchResponse): EventDetail {
@@ -226,7 +241,10 @@ function SwipeCard({
   const [dragX, setDragX] = useState(0);
   const SWIPE_THRESHOLD = 100;
 
-  const handleDragEnd = (_: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
+  const handleDragEnd = (
+    _: MouseEvent | TouchEvent | PointerEvent,
+    info: PanInfo
+  ) => {
     if (info.offset.x > SWIPE_THRESHOLD) {
       onSwipeRight();
     } else if (info.offset.x < -SWIPE_THRESHOLD) {
@@ -506,7 +524,7 @@ function VotingPhase({
         >
           <p className="opacity-80 text-center max-w-md">
             {event.votingEndTime
-              ? `You have until ${new Date(event.votingEndTime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', timeZone: event.chapter.timezone })} to vote on projects. `
+              ? `You have until ${new Date(event.votingEndTime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', timeZone: event.timezone })} to vote on projects. `
               : 'Vote on projects to decide who presents first. '}
             Top projects get to present first and get more time per
             presentation. Make sure your card is something people will vote on!
@@ -624,7 +642,7 @@ function VotingPhase({
                       {new Date(event.votingEndTime).toLocaleTimeString([], {
                         hour: 'numeric',
                         minute: '2-digit',
-                        timeZone: event.chapter.timezone,
+                        timeZone: event.timezone,
                       })}
                     </p>
                   )}
@@ -696,9 +714,12 @@ function VotingQueuePanel({
   const hasTopGroup = topGroupIds.size > 0;
 
   const delistItem = async (pitchProjectId: string) => {
-    const res = await fetch(`/api/events/${event.id}/pitch/queue/${pitchProjectId}`, {
-      method: 'DELETE',
-    });
+    const res = await fetch(
+      `/api/events/${event.id}/pitch/queue/${pitchProjectId}`,
+      {
+        method: 'DELETE',
+      }
+    );
     if (res.status === 204) {
       setEvent(await fetchEventDetail(event.id));
     }
@@ -1008,7 +1029,9 @@ function PitchTimer({
       });
       if (res.ok) {
         if (action === 'finish') {
-          await fetch(`/api/events/${eventId}/pitch/advance`, { method: 'POST' });
+          await fetch(`/api/events/${eventId}/pitch/advance`, {
+            method: 'POST',
+          });
         }
         onUpdate();
       }
@@ -1347,9 +1370,12 @@ function PitchingPhase({
   };
 
   const delistItem = async (pitchProjectId: string) => {
-    const res = await fetch(`/api/events/${event.id}/pitch/queue/${pitchProjectId}`, {
-      method: 'DELETE',
-    });
+    const res = await fetch(
+      `/api/events/${event.id}/pitch/queue/${pitchProjectId}`,
+      {
+        method: 'DELETE',
+      }
+    );
     if (res.status === 204) {
       setEvent(await fetchEventDetail(event.id));
     }
@@ -1373,7 +1399,10 @@ function PitchingPhase({
               isDarkMode={isDarkMode}
               onUpdate={async () => {
                 const res = await fetch(`/api/events/${event.id}`);
-                if (res.ok) setEvent(toEventDetail((await res.json()) as EventPitchResponse));
+                if (res.ok)
+                  setEvent(
+                    toEventDetail((await res.json()) as EventPitchResponse)
+                  );
               }}
             />
             <ProjectCard
@@ -1806,16 +1835,14 @@ export default function PitchEventPage() {
   const openEdit = async () => {
     if (!event) return;
     setEditTitle(event.title);
-    setEditStartTime(
-      formatDateTimeLocalValue(event.startTime, event.chapter.timezone)
-    );
+    setEditStartTime(formatDateTimeLocalValue(event.startTime, event.timezone));
     setEditMeetingUrl(event.meetingUrl || '');
     setEditVotingEndTime(
       event.votingEndTime
-        ? formatDateTimeLocalValue(event.votingEndTime, event.chapter.timezone)
+        ? formatDateTimeLocalValue(event.votingEndTime, event.timezone)
         : formatDateTimeLocalValue(
             new Date(new Date(event.startTime).getTime() + 15 * 60 * 1000),
-            event.chapter.timezone
+            event.timezone
           )
     );
     setEditMcIds(
@@ -1844,7 +1871,7 @@ export default function PitchEventPage() {
         body: JSON.stringify({
           title: editTitle,
           startTime: serializeDateTimeLocalValue(editStartTime),
-          timezone: event.chapter.timezone,
+          timezone: event.timezone,
           meetingUrl: editMeetingUrl,
           votingEndTime: serializeDateTimeLocalValue(editVotingEndTime),
           mcIds: editMcIds,
@@ -2304,8 +2331,7 @@ export default function PitchEventPage() {
                           {p.preview}
                         </div>
                         <div className="text-[10px] opacity-60 mt-1">
-                          Launched{' '}
-                          {new Date(p.startDate).toLocaleDateString()}
+                          Launched {new Date(p.startDate).toLocaleDateString()}
                         </div>
                       </div>
                     </label>
