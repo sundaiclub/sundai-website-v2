@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getCurrentHacker } from '@/lib/eventManagementApi';
 import { updateChapterNotificationPreferences } from '@/lib/chapters';
+import { SMS_CONSENT_CONFIGURED } from '@/lib/smsConsent';
 import type { JsonObject } from '@/types/event-management';
 
 export async function PATCH(
@@ -31,6 +32,8 @@ export async function PATCH(
     for (const field of [
       'notificationsAllowed',
       'emailNotificationsEnabled',
+      'smsNotificationsEnabled',
+      'smsConsentGranted',
     ]) {
       if (
         preferences[field] !== undefined &&
@@ -43,6 +46,22 @@ export async function PATCH(
       }
     }
 
+    const activeSmsOptIn =
+      preferences.notificationsAllowed !== false &&
+      preferences.smsNotificationsEnabled === true;
+    if (activeSmsOptIn && preferences.smsConsentGranted !== true) {
+      return NextResponse.json(
+        { message: 'Explicit SMS consent is required to enable SMS.' },
+        { status: 400 }
+      );
+    }
+    if (activeSmsOptIn && !SMS_CONSENT_CONFIGURED) {
+      return NextResponse.json(
+        { message: 'SMS consent is not currently available.' },
+        { status: 503 }
+      );
+    }
+
     const membership = await updateChapterNotificationPreferences(
       params.chapterId,
       hacker.id,
@@ -51,6 +70,12 @@ export async function PATCH(
           | boolean
           | undefined,
         emailNotificationsEnabled: preferences.emailNotificationsEnabled as
+          | boolean
+          | undefined,
+        smsNotificationsEnabled: preferences.smsNotificationsEnabled as
+          | boolean
+          | undefined,
+        smsConsentGranted: preferences.smsConsentGranted as
           | boolean
           | undefined,
         notificationPreferencesJson:

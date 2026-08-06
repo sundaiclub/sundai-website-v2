@@ -475,7 +475,7 @@ describe('chapter membership API', () => {
     );
   });
 
-  it('does not manage SMS consent through chapter preferences', async () => {
+  it('records versioned SMS consent after explicit opt-in', async () => {
     const { PATCH } = loadChapterNotificationsRoute();
     const hacker = buildHacker();
     const activeMembership = buildChapterMembership({
@@ -513,17 +513,21 @@ describe('chapter membership API', () => {
     );
 
     expect(response.status).toBe(200);
-    expect(prisma.chapterMembership.update).toHaveBeenCalledWith({
-      where: { id: activeMembership.id },
-      data: {
-        notificationsAllowed: true,
-        emailNotificationsEnabled: true,
-        notificationPreferencesJson: null,
-      },
-    });
+    expect(prisma.chapterMembership.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: activeMembership.id },
+        data: expect.objectContaining({
+          notificationsAllowed: true,
+          emailNotificationsEnabled: true,
+          smsNotificationsEnabled: true,
+          smsConsentAt: expect.any(Date),
+          smsConsentVersion: 'site-application-checkbox-2026-08-04',
+        }),
+      })
+    );
   });
 
-  it('ignores obsolete SMS preference fields', async () => {
+  it('clears SMS consent evidence when the member opts out', async () => {
     const { PATCH } = loadChapterNotificationsRoute();
     const hacker = buildHacker();
     const activeMembership = buildChapterMembership({
@@ -559,13 +563,17 @@ describe('chapter membership API', () => {
     );
 
     expect(response.status).toBe(200);
-    expect(prisma.chapterMembership.update).toHaveBeenCalledWith({
-      where: { id: activeMembership.id },
-      data: {
-        notificationsAllowed: true,
-        emailNotificationsEnabled: true,
-        notificationPreferencesJson: null,
-      },
-    });
+    expect(prisma.chapterMembership.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: activeMembership.id },
+        data: expect.objectContaining({
+          notificationsAllowed: true,
+          emailNotificationsEnabled: true,
+          smsNotificationsEnabled: false,
+          smsConsentAt: null,
+          smsConsentVersion: null,
+        }),
+      })
+    );
   });
 });

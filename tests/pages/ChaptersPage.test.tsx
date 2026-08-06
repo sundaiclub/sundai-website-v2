@@ -692,21 +692,16 @@ describe('chapter public directory and landing pages', () => {
         screen.getByRole('button', { name: /leave chapter/i })
       ).toBeInTheDocument();
 
-      const notificationsControl = await screen.findByRole('checkbox', {
-        name: /notifications|allow notifications/i,
-      });
-      fireEvent.click(notificationsControl);
-
-      const emailControl = screen.getByRole('checkbox', {
+      const emailControl = await screen.findByRole('checkbox', {
         name: /email/i,
       });
-      expect(notificationsControl).not.toBeChecked();
-      expect(emailControl).not.toBeChecked();
+      const smsControl = screen.getByRole('checkbox', { name: /^sms$/i });
 
-      fireEvent.click(notificationsControl);
-
-      expect(notificationsControl).toBeChecked();
       expect(emailControl).toBeChecked();
+      expect(smsControl).not.toBeChecked();
+      expect(
+        screen.queryByRole('checkbox', { name: /allow notifications/i })
+      ).not.toBeInTheDocument();
 
       const saveButton = screen.getByRole('button', {
         name: /save.*notification|update.*notification|save preferences/i,
@@ -731,20 +726,46 @@ describe('chapter public directory and landing pages', () => {
           init?.method?.toUpperCase() === 'PATCH'
       );
       expect(JSON.parse(notificationRequest[1].body)).toEqual({
-        notificationsAllowed: expect.any(Boolean),
+        notificationsAllowed: true,
         emailNotificationsEnabled: true,
+        smsNotificationsEnabled: false,
+        smsConsentGranted: false,
       });
     });
 
-    it('does not show a separate SMS consent control', async () => {
+    it('requires explicit versioned consent when SMS is enabled', async () => {
       mockSignedIn(activeMemberUser);
       renderLandingPage('boston');
       fireEvent.click(
         await screen.findByRole('tab', { name: /^preferences$/i })
       );
+
+      fireEvent.click(screen.getByRole('checkbox', { name: /^sms$/i }));
       expect(
-        screen.queryByRole('checkbox', { name: /sms|text/i })
-      ).not.toBeInTheDocument();
+        screen.getByText(/message and data rates may apply/i)
+      ).toBeInTheDocument();
+      fireEvent.click(
+        screen.getByRole('checkbox', {
+          name: /i agree to receive recurring automated text messages/i,
+        })
+      );
+      fireEvent.click(
+        screen.getByRole('button', { name: /save preferences/i })
+      );
+
+      await waitFor(() => {
+        const notificationRequest = (global.fetch as jest.Mock).mock.calls.find(
+          ([url, init]) =>
+            requestUrl(url).includes('/notifications') &&
+            init?.method?.toUpperCase() === 'PATCH'
+        );
+        expect(requestBody(notificationRequest?.[1])).toEqual({
+          notificationsAllowed: true,
+          emailNotificationsEnabled: true,
+          smsNotificationsEnabled: true,
+          smsConsentGranted: true,
+        });
+      });
     });
 
     it('shows a manage link to chapter admins', async () => {

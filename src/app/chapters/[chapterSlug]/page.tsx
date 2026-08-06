@@ -5,6 +5,11 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import EventSummaryCard from '../../components/EventSummaryCard';
 import {
+  SMS_CONSENT_CONFIGURED,
+  SMS_CONSENT_COPY,
+  SMS_CONSENT_VERSION,
+} from '@/lib/smsConsent';
+import {
   ManagementAlert,
   ManagementBadge,
   ManagementEmptyState,
@@ -50,9 +55,10 @@ export default function ChapterLandingPage({
       (Boolean(userInfo) &&
         membership?.role === 'ADMIN' &&
         membership.status === 'ACTIVE'));
-  const [notificationsAllowed, setNotificationsAllowed] = useState(false);
   const [emailNotificationsEnabled, setEmailNotificationsEnabled] =
     useState(false);
+  const [smsNotificationsEnabled, setSmsNotificationsEnabled] = useState(false);
+  const [smsConsentGranted, setSmsConsentGranted] = useState(false);
 
   useEffect(() => {
     setDenied(false);
@@ -72,9 +78,18 @@ export default function ChapterLandingPage({
         if (!payload) return;
         setChapter(payload);
         const nextMembership = firstMembership(payload);
-        setNotificationsAllowed(Boolean(nextMembership?.notificationsAllowed));
         setEmailNotificationsEnabled(
           Boolean(nextMembership?.emailNotificationsEnabled)
+        );
+        setSmsNotificationsEnabled(
+          Boolean(nextMembership?.smsNotificationsEnabled)
+        );
+        setSmsConsentGranted(
+          Boolean(
+            nextMembership?.smsNotificationsEnabled &&
+              nextMembership.smsConsentAt &&
+              nextMembership.smsConsentVersion === SMS_CONSENT_VERSION
+          )
         );
       })
       .catch(() => setLoadError('Unable to load chapter.'));
@@ -192,8 +207,12 @@ export default function ChapterLandingPage({
           method: 'PATCH',
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({
-            notificationsAllowed,
+            notificationsAllowed:
+              emailNotificationsEnabled || smsNotificationsEnabled,
             emailNotificationsEnabled,
+            smsNotificationsEnabled,
+            smsConsentGranted:
+              smsNotificationsEnabled && smsConsentGranted,
           }),
         }
       );
@@ -218,15 +237,17 @@ export default function ChapterLandingPage({
     }
   }
 
-  function setAllNotifications(enabled: boolean) {
-    setNotificationsAllowed(enabled);
-    setEmailNotificationsEnabled(enabled);
-  }
-
   function openPreferences() {
-    setNotificationsAllowed(Boolean(membership?.notificationsAllowed));
     setEmailNotificationsEnabled(
       Boolean(membership?.emailNotificationsEnabled)
+    );
+    setSmsNotificationsEnabled(Boolean(membership?.smsNotificationsEnabled));
+    setSmsConsentGranted(
+      Boolean(
+        membership?.smsNotificationsEnabled &&
+          membership.smsConsentAt &&
+          membership.smsConsentVersion === SMS_CONSENT_VERSION
+      )
     );
     setActionMessage('');
     setActionError('');
@@ -607,22 +628,9 @@ export default function ChapterLandingPage({
                 )}
                 <label className="flex items-center gap-3 text-sm font-semibold">
                   <input
-                    aria-label="Allow notifications"
-                    className={classes.checkbox}
-                    checked={notificationsAllowed}
-                    onChange={event =>
-                      setAllNotifications(event.target.checked)
-                    }
-                    type="checkbox"
-                  />
-                  Allow notifications
-                </label>
-                <label className="flex items-center gap-3 text-sm font-semibold">
-                  <input
                     aria-label="Email"
                     className={classes.checkbox}
                     checked={emailNotificationsEnabled}
-                    disabled={!notificationsAllowed}
                     onChange={event =>
                       setEmailNotificationsEnabled(event.target.checked)
                     }
@@ -630,6 +638,45 @@ export default function ChapterLandingPage({
                   />
                   Email
                 </label>
+                <label className="flex items-center gap-3 text-sm font-semibold">
+                  <input
+                    aria-label="SMS"
+                    className={classes.checkbox}
+                    checked={smsNotificationsEnabled}
+                    disabled={!SMS_CONSENT_CONFIGURED}
+                    onChange={event => {
+                      setSmsNotificationsEnabled(event.target.checked);
+                      if (!event.target.checked) setSmsConsentGranted(false);
+                    }}
+                    type="checkbox"
+                  />
+                  SMS
+                </label>
+                {!SMS_CONSENT_CONFIGURED && (
+                  <p className={`text-sm ${classes.mutedText}`} role="status">
+                    SMS notifications are unavailable until consent information
+                    is configured.
+                  </p>
+                )}
+                {smsNotificationsEnabled && SMS_CONSENT_CONFIGURED && (
+                  <div className={`${classes.subtlePanel} grid gap-2 p-3`}>
+                    <label className="flex items-start gap-3 text-sm">
+                      <input
+                        aria-label={SMS_CONSENT_COPY}
+                        checked={smsConsentGranted}
+                        className={`${classes.checkbox} mt-0.5`}
+                        onChange={event =>
+                          setSmsConsentGranted(event.target.checked)
+                        }
+                        type="checkbox"
+                      />
+                      <span>{SMS_CONSENT_COPY}</span>
+                    </label>
+                    <p className={`text-xs ${classes.mutedText}`}>
+                      Consent version {SMS_CONSENT_VERSION}
+                    </p>
+                  </div>
+                )}
                 <div className="mt-2 flex justify-end gap-3">
                   <button
                     className={classes.primaryButton}
