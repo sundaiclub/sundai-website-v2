@@ -105,6 +105,19 @@ describe('Home Page', () => {
     })
   })
 
+  it('renders sponsor links', async () => {
+    await act(async () => {
+      render(<Home />)
+    })
+
+    await waitFor(() => {
+      expect(screen.getByRole('link', { name: 'Red Hat' })).toHaveAttribute('href', 'https://www.redhat.com/en')
+      expect(screen.getByRole('link', { name: 'GAI Insights' })).toHaveAttribute('href', 'https://gaiinsights.com/')
+      expect(screen.getByRole('link', { name: 'Hyperskill' })).toHaveAttribute('href', 'https://hyperskill.org/')
+      expect(screen.getByRole('link', { name: 'E14 Fund' })).toHaveAttribute('href', 'https://www.e14.vc/')
+    })
+  })
+
   it('renders the foundation link', async () => {
     await act(async () => {
       render(<Home />)
