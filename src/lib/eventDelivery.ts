@@ -45,6 +45,35 @@ const failedResult = (
   errorMessage,
 });
 
+function sesFailedResult(error: unknown): EventDeliveryResult {
+  if (!error || typeof error !== 'object') {
+    return failedResult('SES_PROVIDER_ERROR', 'SES delivery failed.');
+  }
+
+  const providerError = error as {
+    Code?: unknown;
+    code?: unknown;
+    name?: unknown;
+    message?: unknown;
+  };
+  const rawCode = [
+    providerError.Code,
+    providerError.code,
+    providerError.name,
+  ].find(value => typeof value === 'string' && value.trim());
+  const errorCode =
+    typeof rawCode === 'string'
+      ? rawCode.replace(/[^A-Za-z0-9_.-]/g, '_').slice(0, 100)
+      : 'SES_PROVIDER_ERROR';
+  const errorMessage =
+    typeof providerError.message === 'string' && providerError.message.trim()
+      ? providerError.message.trim().slice(0, 1000)
+      : 'SES delivery failed.';
+
+  console.error('[EVENT_EMAIL_DELIVERY]', { errorCode, errorMessage });
+  return failedResult(errorCode, errorMessage);
+}
+
 function environmentConfig(): EventDeliveryConfig {
   return {
     awsRegion: process.env.AWS_REGION ?? null,
@@ -119,8 +148,8 @@ export async function sendEventEmail(
       errorCode: null,
       errorMessage: null,
     };
-  } catch {
-    return failedResult();
+  } catch (error) {
+    return sesFailedResult(error);
   }
 }
 

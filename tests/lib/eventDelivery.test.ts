@@ -61,6 +61,36 @@ describe('event delivery provider adapters', () => {
     );
   });
 
+  it('saves the SES error code and message when SES rejects a message', async () => {
+    const { sendEventEmail } = loadDelivery();
+    const providerError = Object.assign(
+      new Error(
+        'Email address is not verified in region US-EAST-2: ada@example.com'
+      ),
+      { name: 'MessageRejected', Code: 'MessageRejected' }
+    );
+
+    const result = await sendEventEmail(
+      {
+        to: 'ada@example.com',
+        subject: 'Event update',
+        body: 'Doors open at 9:30.',
+      },
+      {
+        config: configuredProviders,
+        send: jest.fn().mockRejectedValue(providerError),
+      }
+    );
+
+    expect(result).toEqual({
+      status: 'FAILED',
+      providerMessageId: null,
+      errorCode: 'MessageRejected',
+      errorMessage:
+        'Email address is not verified in region US-EAST-2: ada@example.com',
+    });
+  });
+
   it('normalizes a successful Twilio send through the configured messaging service', async () => {
     const { sendEventSms } = loadDelivery();
     const create = jest.fn().mockResolvedValue({ sid: 'SM-message-123' });
