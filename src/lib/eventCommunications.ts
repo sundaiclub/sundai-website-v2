@@ -1,7 +1,10 @@
 import { createHash } from 'crypto';
 import type { PrismaClient } from '@prisma/client';
 import prisma from '@/lib/prisma';
-import { SITE_APPLICATION_SMS_CONSENT_VERSION } from '@/lib/smsConsent';
+import {
+  SMS_CONSENT_CONFIGURED,
+  SMS_CONSENT_VERSION,
+} from '@/lib/smsConsent';
 import type {
   EventCommunicationAudience,
   EventCommunicationChannel,
@@ -179,9 +182,10 @@ export function resolveEventCommunicationAudience({
         continue;
       }
       if (
+        !SMS_CONSENT_CONFIGURED ||
         !registration.hacker.smsConsentAt ||
         registration.hacker.smsConsentVersion !==
-          SITE_APPLICATION_SMS_CONSENT_VERSION
+          SMS_CONSENT_VERSION
       ) {
         exclusions.ineligible += 1;
         continue;
@@ -500,10 +504,7 @@ export async function finalizeEventCommunication({
           errorCode: outcome.errorCode ?? null,
           errorMessage: outcome.errorMessage ?? null,
           attemptedAt: outcome.attemptedAt ?? new Date(),
-          deliveredAt:
-            outcome.status === 'SENT'
-              ? (outcome.deliveredAt ?? new Date())
-              : null,
+          deliveredAt: outcome.deliveredAt ?? null,
         },
       });
     }

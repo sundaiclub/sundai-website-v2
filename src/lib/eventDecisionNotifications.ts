@@ -1,6 +1,9 @@
 import prisma from '@/lib/prisma';
 import { DEFAULT_EVENT_MESSAGES } from '@/lib/eventMessageDefaults';
-import { SITE_APPLICATION_SMS_CONSENT_VERSION } from '@/lib/smsConsent';
+import {
+  SMS_CONSENT_CONFIGURED,
+  SMS_CONSENT_VERSION,
+} from '@/lib/smsConsent';
 
 export type EventDecisionNotificationStatus = 'APPROVED' | 'DECLINED';
 export type EventDecisionNotificationChannelResult =
@@ -246,6 +249,14 @@ async function sendSmsWithTwilio(
     to: notification.to,
     messagingServiceSid: config.twilioMessagingServiceSid!,
     body: notification.body,
+    ...((process.env.TWILIO_WEBHOOK_BASE_URL ?? process.env.NEXT_PUBLIC_APP_URL)
+      ? {
+          statusCallback: `${(
+            process.env.TWILIO_WEBHOOK_BASE_URL ??
+            process.env.NEXT_PUBLIC_APP_URL!
+          ).replace(/\/$/, '')}/api/webhooks/twilio/status`,
+        }
+      : {}),
   });
 }
 
@@ -299,10 +310,11 @@ export async function notifyEventDecision(
 
     if (
       smsConfigured &&
+      SMS_CONSENT_CONFIGURED &&
       context.preferences?.notificationsAllowed !== false &&
       context.applicant.smsConsentAt &&
       context.applicant.smsConsentVersion ===
-        SITE_APPLICATION_SMS_CONSENT_VERSION &&
+        SMS_CONSENT_VERSION &&
       isE164PhoneNumber(context.applicant.phoneNumber)
     ) {
       channels.push('sms');

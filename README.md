@@ -406,6 +406,7 @@ Event SMS requires the complete Twilio configuration:
 TWILIO_ACCOUNT_SID="AC..."
 TWILIO_AUTH_TOKEN="..."
 TWILIO_MESSAGING_SERVICE_SID="MG..."
+TWILIO_WEBHOOK_BASE_URL="https://www.sundai.club"
 ```
 
 The Messaging Service must have an SMS-capable sender. Missing any SES setting
@@ -414,6 +415,27 @@ recipient, so a partial provider failure remains visible without rewriting
 successful outcomes or registration status. Provider errors returned to the UI
 are sanitized; use provider dashboards and server logs for operational diagnosis.
 
+Configure the Twilio Messaging Service to use these HTTPS endpoints with `POST`:
+
+```text
+Incoming messages: https://www.sundai.club/api/webhooks/twilio/incoming
+Delivery status:   https://www.sundai.club/api/webhooks/twilio/status
+```
+
+Enable Advanced Opt-Out on the Messaging Service and keep incoming keyword
+messages enabled. Twilio sends `OptOutType` for STOP, HELP, and START. Twilio
+already sends the configured keyword reply, so the application records the event
+and returns empty TwiML. STOP clears the matching user's site and chapter SMS
+consent. START does not restore consent; the user must use the approved site
+consent flow again. `TWILIO_WEBHOOK_BASE_URL` must exactly match the public origin
+that is configured in Twilio because the application validates every Twilio
+request signature.
+
+The application also adds the delivery status URL to each new outbound SMS API
+request. Delivery callbacks update recipient states and the site-admin
+communications report at `/admin/communications`. Existing messages that were
+sent before this setup do not receive historical delivery callbacks.
+
 ### Versioned SMS consent
 
 Twilio configuration alone does not enable an SMS recipient. SMS also requires
@@ -421,21 +443,20 @@ approved consent copy/version configuration and an active chapter membership wit
 SMS enabled, a usable E.164 phone number, and consent captured for the current
 version.
 
-Configure matching server and public values:
+Configure one public version and copy. The browser displays these values, and
+the server uses the same values to record and validate consent:
 
 ```bash
-SMS_CONSENT_VERSION="2026-07-10"
-SMS_CONSENT_COPY="Approved consent language shown before opt-in"
 NEXT_PUBLIC_SMS_CONSENT_VERSION="2026-07-10"
 NEXT_PUBLIC_SMS_CONSENT_COPY="Approved consent language shown before opt-in"
 ```
 
-The `NEXT_PUBLIC_*` values display the consent language in the browser; the
-server-side values control capture and recipient eligibility. Keep each pair
-identical for a deployment. Change the version whenever the approved copy changes.
-Existing consent is deliberately ineligible after a version change until the
-member explicitly opts in to the new version. Clearing SMS preferences also
-clears the stored consent evidence.
+These values are not secrets. Next.js includes them in the browser build, so a
+change requires a new build and deployment. Change the version whenever the
+approved copy changes. Existing consent is deliberately ineligible after a
+version change until the member explicitly opts in to the new version. If either
+value is missing, SMS consent capture and recipient eligibility are disabled.
+Clearing SMS preferences also clears the stored consent evidence.
 
 ### Operational validation
 

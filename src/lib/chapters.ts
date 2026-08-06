@@ -1,4 +1,8 @@
 import prisma from "@/lib/prisma";
+import {
+  SMS_CONSENT_CONFIGURED,
+  SMS_CONSENT_VERSION,
+} from "@/lib/smsConsent";
 import type {
   Chapter,
   ChapterAccessMode,
@@ -519,14 +523,13 @@ function notificationPreferenceData(preferences: ChapterNotificationPreferenceIn
     data.smsConsentAt = null;
     data.smsConsentVersion = null;
   } else if (preferences.smsNotificationsEnabled === true) {
-    const consentVersion = process.env.SMS_CONSENT_VERSION?.trim();
     const hasExplicitConfiguredConsent =
-      preferences.smsConsentGranted === true && Boolean(consentVersion);
+      preferences.smsConsentGranted === true && SMS_CONSENT_CONFIGURED;
 
     data.smsNotificationsEnabled = hasExplicitConfiguredConsent;
     data.smsConsentAt = hasExplicitConfiguredConsent ? now() : null;
     data.smsConsentVersion = hasExplicitConfiguredConsent
-      ? consentVersion
+      ? SMS_CONSENT_VERSION
       : null;
   }
 

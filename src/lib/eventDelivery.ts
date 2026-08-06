@@ -125,7 +125,12 @@ export async function sendEventEmail(
 }
 
 async function sendWithTwilio(
-  payload: { to: string; messagingServiceSid: string; body: string },
+  payload: {
+    to: string;
+    messagingServiceSid: string;
+    body: string;
+    statusCallback?: string;
+  },
   config: EventDeliveryConfig
 ) {
   const { default: twilio } = await import('twilio');
@@ -141,6 +146,7 @@ export async function sendEventSms(
       to: string;
       messagingServiceSid: string;
       body: string;
+      statusCallback?: string;
     }) => Promise<{ sid?: string }>;
   } = {}
 ): Promise<EventDeliveryResult> {
@@ -149,10 +155,12 @@ export async function sendEventSms(
     return failedResult('PROVIDER_UNAVAILABLE', 'SMS delivery is unavailable.');
   }
 
+  const statusCallback = twilioStatusCallbackUrl();
   const payload = {
     to: input.to,
     messagingServiceSid: config.twilioMessagingServiceSid!,
     body: input.body,
+    ...(statusCallback ? { statusCallback } : {}),
   };
 
   try {
@@ -167,6 +175,13 @@ export async function sendEventSms(
   } catch {
     return failedResult();
   }
+}
+
+function twilioStatusCallbackUrl() {
+  const base =
+    process.env.TWILIO_WEBHOOK_BASE_URL ?? process.env.NEXT_PUBLIC_APP_URL;
+  if (!base) return null;
+  return `${base.replace(/\/$/, '')}/api/webhooks/twilio/status`;
 }
 
 export async function deliverEventRecipients(

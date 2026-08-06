@@ -476,8 +476,6 @@ describe('chapter membership API', () => {
   });
 
   it('does not manage SMS consent through chapter preferences', async () => {
-    const previousVersion = process.env.SMS_CONSENT_VERSION;
-    process.env.SMS_CONSENT_VERSION = '2026-07-10';
     const { PATCH } = loadChapterNotificationsRoute();
     const hacker = buildHacker();
     const activeMembership = buildChapterMembership({
@@ -523,9 +521,6 @@ describe('chapter membership API', () => {
         notificationPreferencesJson: null,
       },
     });
-
-    if (previousVersion === undefined) delete process.env.SMS_CONSENT_VERSION;
-    else process.env.SMS_CONSENT_VERSION = previousVersion;
   });
 
   it('ignores obsolete SMS preference fields', async () => {

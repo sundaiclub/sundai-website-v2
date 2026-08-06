@@ -15,6 +15,7 @@ const adminSections = [
   { href: '/admin/chapters', label: 'Chapters' },
   { href: '/admin/application-templates', label: 'Application templates' },
   { href: '/admin/bans', label: 'Global moderation' },
+  { href: '/admin/communications', label: 'Communications' },
 ];
 
 export default function AdminConsolePage() {
@@ -35,7 +36,7 @@ export default function AdminConsolePage() {
           <ManagementHeader
             eyebrow="Site admin"
             title="Site admin console"
-            description="Moderate projects, chapters, application templates, and global safety controls."
+            description="Moderate projects, chapters, communications, application templates, and global safety controls."
           />
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {adminSections.map(section => (

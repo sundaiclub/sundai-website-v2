@@ -3,7 +3,10 @@ import { Prisma } from '@prisma/client';
 import { fetchMergedApplicationTemplate } from '@/lib/applicationTemplateQueries';
 import { BLOCKED_REGISTRATION_MESSAGE } from '@/lib/moderation';
 import { notifyEventDecision } from '@/lib/eventDecisionNotifications';
-import { SITE_APPLICATION_SMS_CONSENT_VERSION } from '@/lib/smsConsent';
+import {
+  SMS_CONSENT_CONFIGURED,
+  SMS_CONSENT_VERSION,
+} from '@/lib/smsConsent';
 import type {
   EntityId,
   EventApplicationMode,
@@ -1346,6 +1349,7 @@ async function updateHackerApplicationProfile(
     typeof answers.phoneNumber === 'string' ? answers.phoneNumber.trim() : '';
 
   if (!name && !phoneNumber) return;
+  const hasSmsConsent = smsConsentGranted && SMS_CONSENT_CONFIGURED;
 
   await db.hacker.update({
     where: { id: hackerId },
@@ -1354,9 +1358,9 @@ async function updateHackerApplicationProfile(
       ...(phoneNumber
         ? {
             phoneNumber,
-            smsConsentAt: smsConsentGranted ? new Date() : null,
-            smsConsentVersion: smsConsentGranted
-              ? SITE_APPLICATION_SMS_CONSENT_VERSION
+            smsConsentAt: hasSmsConsent ? new Date() : null,
+            smsConsentVersion: hasSmsConsent
+              ? SMS_CONSENT_VERSION
               : null,
           }
         : {}),

@@ -16,7 +16,10 @@ import type {
   PublicViewerRegistrationState,
   TemplateFieldDefinition,
 } from '@/types/event-management';
-import { SITE_APPLICATION_SMS_CONSENT_COPY } from '@/lib/smsConsent';
+import {
+  SMS_CONSENT_COPY,
+  SMS_CONSENT_CONFIGURED,
+} from '@/lib/smsConsent';
 import {
   ManagementAlert,
   ManagementSection,
@@ -357,7 +360,9 @@ export function EventApplicationForm({
                 onChange={value => updateAnswer(field, value)}
                 value={answers[field.id]}
               />
-              {field.id === 'phoneNumber' && field.type === 'PHONE' && (
+              {field.id === 'phoneNumber' &&
+                field.type === 'PHONE' &&
+                SMS_CONSENT_CONFIGURED && (
                 <div className={`${classes.subtlePanel} grid gap-2 p-3`}>
                   <label
                     className="flex items-start gap-3"
@@ -373,7 +378,7 @@ export function EventApplicationForm({
                       type="checkbox"
                     />
                     <span className="text-xs leading-5">
-                      {SITE_APPLICATION_SMS_CONSENT_COPY}
+                      {SMS_CONSENT_COPY}
                     </span>
                   </label>
                   <p className={`pl-7 text-xs ${classes.mutedText}`}>

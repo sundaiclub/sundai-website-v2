@@ -27,6 +27,15 @@ describe('middleware', () => {
     );
   });
 
+  it('keeps verified Twilio webhooks public', () => {
+    require('../src/middleware');
+    const { createRouteMatcher } = require('@clerk/nextjs/server');
+
+    expect(createRouteMatcher).toHaveBeenCalledWith(
+      expect.arrayContaining(['/api/webhooks/twilio(.*)'])
+    );
+  });
+
   it('keeps the legal pages public', () => {
     require('../src/middleware');
     const { createRouteMatcher } = require('@clerk/nextjs/server');

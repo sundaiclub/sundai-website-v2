@@ -196,6 +196,8 @@ export type EventCommunicationRecipientStatus =
   | 'PENDING'
   | 'SENDING'
   | 'SENT'
+  | 'DELIVERED'
+  | 'UNDELIVERED'
   | 'FAILED';
 
 export interface EventCommunication {

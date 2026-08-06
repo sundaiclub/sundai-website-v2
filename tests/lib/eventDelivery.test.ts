@@ -83,6 +83,34 @@ describe('event delivery provider adapters', () => {
     });
   });
 
+  it('adds the public delivery status callback to an SMS send', async () => {
+    const previousBaseUrl = process.env.TWILIO_WEBHOOK_BASE_URL;
+    process.env.TWILIO_WEBHOOK_BASE_URL = 'https://www.sundai.club/';
+    const { sendEventSms } = loadDelivery();
+    const create = jest.fn().mockResolvedValue({ sid: 'SM-message-456' });
+
+    try {
+      await sendEventSms(
+        { to: '+16175550123', body: 'Doors open at 9:30.' },
+        { config: configuredProviders, create }
+      );
+
+      expect(create).toHaveBeenCalledWith({
+        to: '+16175550123',
+        messagingServiceSid: configuredProviders.twilioMessagingServiceSid,
+        body: 'Doors open at 9:30.',
+        statusCallback:
+          'https://www.sundai.club/api/webhooks/twilio/status',
+      });
+    } finally {
+      if (previousBaseUrl === undefined) {
+        delete process.env.TWILIO_WEBHOOK_BASE_URL;
+      } else {
+        process.env.TWILIO_WEBHOOK_BASE_URL = previousBaseUrl;
+      }
+    }
+  });
+
   it('returns a sanitized failure without persisting credentials or raw provider errors', async () => {
     const { sendEventSms } = loadDelivery();
     const rawError = new Error(

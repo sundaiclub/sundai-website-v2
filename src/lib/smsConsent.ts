@@ -1,5 +1,9 @@
-export const SITE_APPLICATION_SMS_CONSENT_VERSION =
-  'site-application-checkbox-2026-08-04';
+export const SMS_CONSENT_VERSION =
+  process.env.NEXT_PUBLIC_SMS_CONSENT_VERSION?.trim() ?? '';
 
-export const SITE_APPLICATION_SMS_CONSENT_COPY =
-  'I agree to receive recurring automated text messages from Sundai about event applications and updates. Message frequency varies. Message and data rates may apply. Reply STOP to unsubscribe or HELP for help. Consent is optional and is not a condition of registration.';
+export const SMS_CONSENT_COPY =
+  process.env.NEXT_PUBLIC_SMS_CONSENT_COPY?.trim() ?? '';
+
+export const SMS_CONSENT_CONFIGURED = Boolean(
+  SMS_CONSENT_VERSION && SMS_CONSENT_COPY
+);

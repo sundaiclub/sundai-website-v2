@@ -1,5 +1,8 @@
 import prisma from '@/lib/prisma';
-import { SITE_APPLICATION_SMS_CONSENT_VERSION } from '@/lib/smsConsent';
+import {
+  SMS_CONSENT_CONFIGURED,
+  SMS_CONSENT_VERSION,
+} from '@/lib/smsConsent';
 import {
   deliverEventRecipients,
   type EventDeliveryResult,
@@ -57,10 +60,11 @@ export function resolvePublicationNotificationRecipients(
       });
     }
     if (
+      SMS_CONSENT_CONFIGURED &&
       usableE164(membership.hacker.phoneNumber) &&
       membership.hacker.smsConsentAt &&
       membership.hacker.smsConsentVersion ===
-        SITE_APPLICATION_SMS_CONSENT_VERSION
+        SMS_CONSENT_VERSION
     ) {
       recipients.push({
         hackerId: membership.hackerId,
@@ -191,7 +195,7 @@ export async function notifyChapterMembersOfPublishedEvent({
           errorCode: outcome.errorCode,
           errorMessage: outcome.errorMessage,
           attemptedAt: now,
-          deliveredAt: outcome.status === 'SENT' ? now : null,
+          deliveredAt: null,
         },
       });
     }
