@@ -20,8 +20,36 @@ BEGIN
   LIMIT 1;
 
   IF template_creator_id IS NULL THEN
-    RAISE EXCEPTION
-      'Cannot create the default site application template: hacker mandrew0987@gmail.com was not found';
+    SELECT "id"
+    INTO template_creator_id
+    FROM "Hacker"
+    WHERE "role" = 'SITE_ADMIN'
+    ORDER BY "createdAt" ASC, "id" ASC
+    LIMIT 1;
+  END IF;
+
+  IF template_creator_id IS NULL THEN
+    INSERT INTO "Hacker" (
+      "id",
+      "clerkId",
+      "name",
+      "role",
+      "createdAt",
+      "updatedAt"
+    ) VALUES (
+      gen_random_uuid()::text,
+      'system_default_site_application_template_creator',
+      'System application template creator',
+      'NOT_SET',
+      CURRENT_TIMESTAMP,
+      CURRENT_TIMESTAMP
+    )
+    ON CONFLICT ("clerkId") DO NOTHING;
+
+    SELECT "id"
+    INTO template_creator_id
+    FROM "Hacker"
+    WHERE "clerkId" = 'system_default_site_application_template_creator';
   END IF;
 
   INSERT INTO "ApplicationTemplate" (

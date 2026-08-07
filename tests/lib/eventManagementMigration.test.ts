@@ -17,6 +17,13 @@ const eventTimezoneMigration = fs.readFileSync(
   ),
   'utf8'
 );
+const siteApplicationTemplateMigration = fs.readFileSync(
+  path.join(
+    rootDir,
+    'prisma/migrations/20260721020000_ensure_active_site_application_template/migration.sql'
+  ),
+  'utf8'
+);
 
 const readBlock = (source: string, kind: 'enum' | 'model', name: string) => {
   const match = source.match(
@@ -39,6 +46,43 @@ const expectSchemaLine = (block: string, fields: string[]) => {
 };
 
 describe('event management foundation migration', () => {
+  it('creates a system template creator on a clean database without users', () => {
+    const normalizedMigration = normalizeSql(siteApplicationTemplateMigration);
+
+    expect(normalizedMigration).toContain(
+      normalizeSql(`
+        WHERE "role" = 'SITE_ADMIN'
+        ORDER BY "createdAt" ASC, "id" ASC
+        LIMIT 1;
+      `)
+    );
+    expect(normalizedMigration).toContain(
+      normalizeSql(`
+        INSERT INTO "Hacker" (
+          "id",
+          "clerkId",
+          "name",
+          "role",
+          "createdAt",
+          "updatedAt"
+        ) VALUES (
+          gen_random_uuid()::text,
+          'system_default_site_application_template_creator',
+          'System application template creator',
+          'NOT_SET',
+          CURRENT_TIMESTAMP,
+          CURRENT_TIMESTAMP
+        )
+        ON CONFLICT ("clerkId") DO NOTHING;
+      `)
+    );
+    expect(normalizedMigration).toContain(
+      normalizeSql(`
+        WHERE "clerkId" = 'system_default_site_application_template_creator';
+      `)
+    );
+  });
+
   it('stores an event timezone and backfills existing events from their chapters', () => {
     const eventModel = readBlock(schema, 'model', 'Event');
     const normalizedMigration = normalizeSql(eventTimezoneMigration);
