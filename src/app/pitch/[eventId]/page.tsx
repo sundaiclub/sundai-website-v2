@@ -10,6 +10,7 @@ import { ProjectCard } from '../../components/Project';
 import type { Project } from '@/types/project';
 import { motion, AnimatePresence, PanInfo } from 'framer-motion';
 import ProjectMarkdown from '../../components/ProjectMarkdown';
+import EventMarkdown from '../../components/EventMarkdown';
 import {
   formatDateTimeLocalValue,
   serializeDateTimeLocalValue,
@@ -2007,7 +2008,14 @@ export default function PitchEventPage() {
             </div>
           </div>
 
-          <p className="opacity-80 mb-4">{event.description}</p>
+          {event.description && (
+            <EventMarkdown
+              markdown={event.description}
+              className={`prose prose-sm mb-4 max-w-none opacity-80 prose-a:text-current ${
+                isDarkMode ? 'prose-invert' : 'prose-gray'
+              }`}
+            />
+          )}
 
           {event.phase === 'VOTING' ? (
             <VotingPhase

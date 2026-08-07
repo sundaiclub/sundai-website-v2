@@ -997,7 +997,17 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
               />
             </label>
             <label className="grid gap-2 sm:col-span-2">
-              <span className="text-sm font-semibold">Public description</span>
+              <span className="flex flex-wrap items-baseline justify-between gap-2 text-sm font-semibold">
+                <span>Public description</span>
+                <a
+                  className={`font-normal underline ${classes.mutedText}`}
+                  href="https://www.markdownguide.org/basic-syntax/"
+                  rel="noopener noreferrer"
+                  target="_blank"
+                >
+                  Markdown supported
+                </a>
+              </span>
               <textarea
                 aria-label="Public description"
                 className={classes.textarea}
