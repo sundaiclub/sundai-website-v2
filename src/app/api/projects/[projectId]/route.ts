@@ -63,7 +63,6 @@ export async function DELETE(
       return new NextResponse("Unauthorized", { status: 401 });
     }
 
-    // Get the hacker making the request
     const hacker = await prisma.hacker.findUnique({
       where: { clerkId: userId },
     });
@@ -72,7 +71,6 @@ export async function DELETE(
       return new NextResponse("Builder not found", { status: 404 });
     }
 
-    // Get the project to check ownership
     const project = await prisma.project.findUnique({
       where: { id: params.projectId },
       include: {
@@ -85,25 +83,35 @@ export async function DELETE(
       return new NextResponse("Project not found", { status: 404 });
     }
 
-    // Check if user is admin or launch lead
-    const isAdmin = hacker.role === "ADMIN";
+    const isAdmin = hacker.role === "SITE_ADMIN";
     const isLaunchLead = project.launchLeadId === hacker.id;
 
     if (!isAdmin && !isLaunchLead) {
       return new NextResponse("Unauthorized", { status: 401 });
     }
 
-    // Delete related records first
+    const pitchEntries = await prisma.pitchProject.findMany({
+      where: { projectId: params.projectId },
+      select: { id: true },
+    });
+    const pitchProjectIds = pitchEntries.map(entry => entry.id);
+
     await prisma.$transaction([
-      // Delete likes
+      prisma.pitchProjectVote.deleteMany({
+        where: { pitchProjectId: { in: pitchProjectIds } },
+      }),
+      prisma.pitchProject.deleteMany({
+        where: { projectId: params.projectId },
+      }),
+      prisma.eventProject.deleteMany({
+        where: { projectId: params.projectId },
+      }),
       prisma.projectLike.deleteMany({
         where: { projectId: params.projectId },
       }),
-      // Delete participants
       prisma.projectToParticipant.deleteMany({
         where: { projectId: params.projectId },
       }),
-      // Finally delete the project
       prisma.project.delete({
         where: { id: params.projectId },
       }),

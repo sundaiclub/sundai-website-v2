@@ -21,6 +21,7 @@ Reach out to @godeva or @arteml0178 on discord with any quesions.
 - [🏗️ Architecture Overview](#️-architecture-overview)
 - [🔧 Troubleshooting](#-troubleshooting)
 - [📖 Feature Documentation](#-feature-documentation)
+- [🛠️ Organizer Event Workspace Operations](#️-organizer-event-workspace-operations)
 - [🔑 Required External Services Setup](#-required-external-services-setup)
 - [🚀 Learn More](#-learn-more)
 
@@ -345,6 +346,141 @@ npm run test:coverage # Run tests with coverage
 npm run test:ci      # Run tests for CI
 npm run setup-husky  # Setup pre-commit hooks
 ```
+
+## 🛠️ Organizer Event Workspace Operations
+
+The organizer workspace supports private event materials and consent-aware event
+email/SMS. These integrations are optional for local development: unavailable
+providers are shown as unavailable in the workspace instead of making unrelated
+event operations fail.
+
+### Private event material storage
+
+Event material files use a dedicated private Google Cloud Storage bucket. They
+must not be stored in the public image bucket or made publicly readable. Browsers
+upload through a short-lived signed PUT URL, and downloads always pass through an
+authorization endpoint before receiving a short-lived signed GET URL.
+
+Configure:
+
+```bash
+# Base64-encoded Google service-account JSON used by the existing GCS adapter
+GOOGLE_PRIVATE_KEY="base64-encoded-service-account-json"
+
+# Existing public/image storage, when those features are used
+GOOGLE_CLOUD_BUCKET="public-image-bucket"
+
+# Dedicated private bucket for organizer event materials
+GOOGLE_CLOUD_MATERIALS_BUCKET="private-event-materials"
+```
+
+The service account needs permission to create, inspect, read, and delete objects
+and to sign URLs in `GOOGLE_CLOUD_MATERIALS_BUCKET`. Keep public access prevention
+enabled on that bucket. If browser uploads originate from a different domain,
+configure bucket CORS for the application origins and the signed `PUT` method.
+Do not persist signed URLs: upload intents expire after 15 minutes and authorized
+download URLs expire after 5 minutes.
+
+Material uploads are limited to 25 MiB and the passive-file allowlist displayed
+in the organizer UI. A finalized upload is metadata-checked before its database
+record is created. Storage/provider errors should therefore be investigated in
+application logs and bucket IAM/CORS configuration; making the bucket public is
+not a valid workaround.
+
+### Email and SMS provider availability
+
+Event email is available only when both variables are present:
+
+```bash
+AWS_REGION="us-east-1"
+AWS_SES_FROM_EMAIL="Sundai Events <events@sundai.club>"
+```
+
+AWS credentials are loaded through the standard AWS SDK credential provider
+chain. The configured identity/domain must be verified in SES and permitted to
+send in the selected region.
+
+Event SMS requires the complete Twilio configuration:
+
+```bash
+TWILIO_ACCOUNT_SID="AC..."
+TWILIO_AUTH_TOKEN="..."
+TWILIO_MESSAGING_SERVICE_SID="MG..."
+TWILIO_WEBHOOK_BASE_URL="https://www.sundai.club"
+```
+
+The Messaging Service must have an SMS-capable sender. Missing any SES setting
+disables email; missing any Twilio setting disables SMS. Delivery is recorded per
+recipient, so a partial provider failure remains visible without rewriting
+successful outcomes or registration status. Provider errors returned to the UI
+are sanitized; use provider dashboards and server logs for operational diagnosis.
+
+Configure the Twilio Messaging Service to use these HTTPS endpoints with `POST`:
+
+```text
+Incoming messages: https://www.sundai.club/api/webhooks/twilio/incoming
+Delivery status:   https://www.sundai.club/api/webhooks/twilio/status
+```
+
+Enable Advanced Opt-Out on the Messaging Service and keep incoming keyword
+messages enabled. Twilio sends `OptOutType` for STOP, HELP, and START. Twilio
+already sends the configured keyword reply, so the application records the event
+and returns empty TwiML. STOP clears the matching user's site and chapter SMS
+consent. START does not restore consent; the user must use the approved site
+consent flow again. `TWILIO_WEBHOOK_BASE_URL` must exactly match the public origin
+that is configured in Twilio because the application validates every Twilio
+request signature.
+
+The application also adds the delivery status URL to each new outbound SMS API
+request. Delivery callbacks update recipient states and the site-admin
+communications report at `/admin/communications`. Existing messages that were
+sent before this setup do not receive historical delivery callbacks.
+
+### Versioned SMS consent
+
+Twilio configuration alone does not enable an SMS recipient. SMS also requires
+approved consent copy/version configuration and an active chapter membership with
+SMS enabled, a usable E.164 phone number, and consent captured for the current
+version.
+
+Configure one public version and copy. The browser displays these values, and
+the server uses the same values to record and validate consent:
+
+```bash
+NEXT_PUBLIC_SMS_CONSENT_VERSION="2026-07-10"
+NEXT_PUBLIC_SMS_CONSENT_COPY="Approved consent language shown before opt-in"
+```
+
+These values are not secrets. Next.js includes them in the browser build, so a
+change requires a new build and deployment. Change the version whenever the
+approved copy changes. Existing consent is deliberately ineligible after a
+version change until the member explicitly opts in to the new version. If either
+value is missing, SMS consent capture and recipient eligibility are disabled.
+Clearing SMS preferences also clears the stored consent evidence.
+
+Phone numbers are stored and sent in E.164 format. A 10-digit US number without
+a country prefix defaults to `+1`; for example, `5086485700` becomes
+`+15086485700`. Other international numbers must include their `+` country code.
+
+### Operational validation
+
+After changing workspace infrastructure or provider configuration:
+
+```bash
+npx prisma validate
+npx prisma generate
+npm run test -- --runInBand tests/lib/eventMaterials.test.ts
+npm run test -- --runInBand tests/lib/eventCommunications.test.ts
+npm run test -- --runInBand tests/lib/eventDelivery.test.ts
+npm run build
+```
+
+For a deployment smoke test, verify that an organizer can create and download a
+private test material, that unavailable channels are correctly labeled, and that
+an eligible test recipient can be previewed before sending. Never use production
+audiences for provider smoke tests. Audience changes between preview and send
+must return a reconfirmation step, and restricted material URLs must fail after
+their short expiry or when current access is removed.
 
 ## 🔑 Required External Services Setup
 

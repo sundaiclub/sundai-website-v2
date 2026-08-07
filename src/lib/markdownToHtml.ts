@@ -1,7 +1,6 @@
 export function markdownToHtml(markdown: string): string {
   if (!markdown || typeof markdown !== 'string') return '';
 
-  // Normalize newlines
   const lines = markdown.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
 
   const htmlParts: string[] = [];
@@ -15,7 +14,6 @@ export function markdownToHtml(markdown: string): string {
   };
 
   const renderInline = (text: string): string => {
-    // Basic link: [label](url)
     return text.replace(/\[([^\]]+)\]\(([^\)]+)\)/g, (_m, label, url) => {
       const safeLabel = String(label);
       const safeUrl = String(url);
@@ -30,7 +28,6 @@ export function markdownToHtml(markdown: string): string {
       continue;
     }
 
-    // Bullet list item: - text OR * text
     const listMatch = line.match(/^[-*]\s+(.*)$/);
     if (listMatch) {
       if (!inList) {
@@ -41,7 +38,6 @@ export function markdownToHtml(markdown: string): string {
       continue;
     }
 
-    // Heading (very simple): treat as strong paragraph
     const headingMatch = line.match(/^#{1,6}\s+(.*)$/);
     if (headingMatch) {
       flushList();
@@ -49,7 +45,6 @@ export function markdownToHtml(markdown: string): string {
       continue;
     }
 
-    // Paragraph
     flushList();
     htmlParts.push(`<p style="margin:0 0 8px;color:#374151">${renderInline(line)}</p>`);
   }
@@ -57,7 +52,3 @@ export function markdownToHtml(markdown: string): string {
   flushList();
   return htmlParts.join('');
 }
-
-export default markdownToHtml;
-
-

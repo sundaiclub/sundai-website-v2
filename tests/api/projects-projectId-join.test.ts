@@ -60,10 +60,6 @@ describe('/api/projects/[projectId]/join', () => {
       const response = await POST(request, { params: { projectId: 'project-1' } });
       const data = await response.json();
 
-      if (response.status !== 200) {
-        console.log('POST test error:', data);
-      }
-
       expect(response.status).toBe(200);
       expect(data).toEqual(mockParticipant);
     });

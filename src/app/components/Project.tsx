@@ -6,70 +6,15 @@ import { useUser } from "@clerk/nextjs";
 import { HeartIcon } from "@heroicons/react/24/outline";
 import { HeartIcon as HeartIconSolid } from "@heroicons/react/24/solid";
 import { useUserContext } from "../contexts/UserContext";
+import type { UserInfo } from "../contexts/UserContext";
 import { useTheme } from "../contexts/ThemeContext";
 import { Listbox, Transition } from '@headlessui/react';
 import { ChevronUpDownIcon } from '@heroicons/react/24/solid';
 import { toast } from 'react-hot-toast';
 import ProjectSearch from "./ProjectSearch";
+import type { Project } from "@/types/project";
 import { swapFirstLetters } from "../utils/nameUtils";
 import ProjectMarkdown from "./ProjectMarkdown";
-
-export type Project = {
-  id: string;
-  title: string;
-  status: 'DRAFT' | 'PENDING' | 'APPROVED';
-  preview: string;
-  description: string;
-  githubUrl?: string | null;
-  demoUrl?: string | null;
-  blogUrl?: string | null;
-  techTags: Array<{
-    id: string;
-    name: string;
-    description? : string | null;
-  }>;
-  domainTags: Array<{
-    id: string;
-    name: string;
-    description? : string | null;
-  }>;
-  is_starred: boolean;
-  is_broken: boolean;
-  thumbnail?: {
-    url: string;
-    prompt?: string | null;
-  } | null;
-  launchLead: {
-    id: string;
-    name: string;
-    twitterUrl?: string | null;
-    linkedinUrl?: string | null;
-    avatar?: {
-      url: string;
-    } | null;
-  };
-  participants: Array<{
-    role: string;
-    hacker: {
-      id: string;
-      name: string;
-      bio?: string | null;
-      twitterUrl?: string | null;
-      linkedinUrl?: string | null;
-      avatar?: {
-        url: string;
-      } | null;
-    };
-  }>;
-  startDate: Date;
-  endDate?: Date | null;
-  likes: Array<{
-    hackerId: string;
-    createdAt: string;
-  }>;
-  createdAt: string;
-  updatedAt: string;
-};
 
 const STATUS_OPTIONS = ['DRAFT', 'PENDING', 'APPROVED'] as const;
 const PROJECTS_PAGE_SIZE = 18;
@@ -106,9 +51,9 @@ function normalizeProjectsResponse(data: ProjectsApiResponse) {
   };
 }
 
-export function ProjectCard({ project, userInfo, handleLike, isDarkMode, show_status, show_team = true, onStatusChange, onStarredChange, isAdmin, variant = "default", showTrendingBadge = false, openInNewTab = false }: {
+export function ProjectCard({ project, userInfo, handleLike, isDarkMode, show_status, show_team = true, onStatusChange, onStarredChange, isAdmin, variant = "default", showTrendingBadge = false, imageBadge, openInNewTab = false }: {
   project: Project;
-  userInfo: any;
+  userInfo: UserInfo | null;
   handleLike: (e: React.MouseEvent, projectId: string, isLiked: boolean) => void;
   isDarkMode: boolean;
   show_status: boolean;
@@ -118,6 +63,7 @@ export function ProjectCard({ project, userInfo, handleLike, isDarkMode, show_st
   isAdmin?: boolean;
   variant?: "default" | "compact" | "trending";
   showTrendingBadge?: boolean;
+  imageBadge?: React.ReactNode;
   openInNewTab?: boolean;
 }) {
   const AvatarImage = ({ src, alt, size }: { src: string | null; alt: string; size: number }) => {
@@ -177,14 +123,14 @@ export function ProjectCard({ project, userInfo, handleLike, isDarkMode, show_st
       } rounded-xl shadow-lg overflow-hidden transition-shadow transition-transform duration-200 hover:-translate-y-1 relative flex flex-col h-full`}
     >
       <div className={`relative ${imageHeightClass}`}>
-        {showTrendingBadge && (
+        {(showTrendingBadge || imageBadge) && (
           <div className="absolute top-3 left-3 z-10">
             <div className={`px-2 py-1 rounded-full text-xs font-semibold ${
               isDarkMode 
                 ? "bg-gradient-to-r from-purple-600 to-indigo-600 text-white" 
                 : "bg-gradient-to-r from-purple-500 to-indigo-500 text-white"
             }`}>
-              🔥 Trending
+              {imageBadge || '🔥 Trending'}
             </div>
           </div>
         )}
@@ -217,7 +163,12 @@ export function ProjectCard({ project, userInfo, handleLike, isDarkMode, show_st
             </div>
           </button>
         </div>
-        <Link href={`/projects/${project.id}`} target={openInNewTab ? "_blank" : undefined} rel={openInNewTab ? "noopener noreferrer" : undefined}>
+        <Link
+          href={`/projects/${project.id}`}
+          target={openInNewTab ? "_blank" : undefined}
+          rel={openInNewTab ? "noopener noreferrer" : undefined}
+          aria-label={`View project ${project.title}`}
+        >
           <Image
             src={
               project.thumbnail?.url ||
@@ -326,7 +277,12 @@ export function ProjectCard({ project, userInfo, handleLike, isDarkMode, show_st
       <div className={`${cardPaddingClass} flex-1 flex flex-col`}>
         <div className="flex justify-between items-start mb-4">
           <div>
-            <Link href={`/projects/${project.id}`} target={openInNewTab ? "_blank" : undefined} rel={openInNewTab ? "noopener noreferrer" : undefined}>
+            <Link
+              href={`/projects/${project.id}`}
+              target={openInNewTab ? "_blank" : undefined}
+              rel={openInNewTab ? "noopener noreferrer" : undefined}
+              aria-label={`View project ${project.title}`}
+            >
               <h3
                 className={`${titleClass} line-clamp-1 ${
                   isDarkMode

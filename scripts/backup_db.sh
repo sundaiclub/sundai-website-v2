@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 
 # Load environment variables
 source .env
@@ -10,11 +10,25 @@ mkdir -p "$BACKUP_DIR"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 BACKUP_FILE="${BACKUP_DIR}/backup_${TIMESTAMP}.sql"
 
-# Use PostgreSQL 16 binaries
-PG_DUMP="/opt/homebrew/opt/postgresql@16/bin/pg_dump"
+PG_DUMP="${PG_DUMP:-pg_dump}"
+if ! command -v "$PG_DUMP" >/dev/null 2>&1; then
+  echo "pg_dump is required but was not found in PATH."
+  exit 1
+fi
 
 # Prefer a direct database connection for backup operations.
 DB_BACKUP_URL="${DIRECT_URL:-$DATABASE_URL}"
+if [[ "$DB_BACKUP_URL" == *"?"* ]]; then
+  DB_URL_BASE="${DB_BACKUP_URL%%\?*}"
+  DB_URL_QUERY="${DB_BACKUP_URL#*\?}"
+  FILTERED_QUERY="$(printf '%s' "$DB_URL_QUERY" | tr '&' '\n' | awk '$0 !~ /^schema=/' | paste -sd '&' -)"
+
+  if [ -n "$FILTERED_QUERY" ]; then
+    DB_BACKUP_URL="${DB_URL_BASE}?${FILTERED_QUERY}"
+  else
+    DB_BACKUP_URL="${DB_URL_BASE}"
+  fi
+fi
 
 # Backup
 echo "Creating backup: ${BACKUP_FILE}"

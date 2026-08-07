@@ -12,9 +12,11 @@ type GeneratedImage = {
 interface ImageGenerationModalProps {
   showModal: boolean;
   setShowModal: (show: boolean) => void;
-  projectId: string;
-  projectTitle: string;
-  projectDescription: string;
+  generationEndpoint: string;
+  generationBody: Record<string, string>;
+  subjectLabel: string;
+  subjectTitle: string;
+  subjectDescription: string;
   onImageSelect: (image: GeneratedImage) => void;
   isDarkMode: boolean;
 }
@@ -22,9 +24,11 @@ interface ImageGenerationModalProps {
 export default function ImageGenerationModal({
   showModal,
   setShowModal,
-  projectId,
-  projectTitle,
-  projectDescription,
+  generationEndpoint,
+  generationBody,
+  subjectLabel,
+  subjectTitle,
+  subjectDescription,
   onImageSelect,
   isDarkMode,
 }: ImageGenerationModalProps) {
@@ -38,12 +42,12 @@ export default function ImageGenerationModal({
     setSelectedImageIndex(null);
     
     try {
-      const response = await fetch(`/api/projects/${projectId}/generate-images`, {
+      const response = await fetch(generationEndpoint, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ prompt: "Generate pixel-art thumbnails based on project description" }),
+        body: JSON.stringify(generationBody),
       });
 
       if (!response.ok) {
@@ -98,6 +102,7 @@ export default function ImageGenerationModal({
               AI Image Generator
             </h2>
             <button
+              aria-label="Close AI image generator"
               onClick={handleClose}
               className={`p-2 rounded-lg hover:bg-gray-100 ${
                 isDarkMode ? "hover:bg-gray-700" : "hover:bg-gray-100"
@@ -108,14 +113,14 @@ export default function ImageGenerationModal({
           </div>
 
           <div className="space-y-6">
-            {/* Project Info */}
+            {/* Subject information */}
             <div className={`p-4 rounded-lg ${
               isDarkMode ? "bg-gray-700" : "bg-gray-50"
             }`}>
-              <h3 className="font-semibold mb-2">Project: {projectTitle}</h3>
-              <p className="text-sm opacity-80">{projectDescription}</p>
+              <h3 className="font-semibold mb-2">{subjectLabel}: {subjectTitle}</h3>
+              <p className="text-sm opacity-80">{subjectDescription}</p>
               <p className={`text-xs mt-2 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
-                💡 Tip: Update your project description to get different image styles and concepts
+                Update the description to get different image concepts.
               </p>
             </div>
 
@@ -129,7 +134,7 @@ export default function ImageGenerationModal({
                   <div className="space-y-2">
                     <h3 className="text-xl font-semibold">Generating Your Images...</h3>
                     <p className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
-                      Creating 4 unique pixel-art thumbnails based on your project
+                      Creating 4 unique pixel-art images based on your {subjectLabel.toLowerCase()}
                     </p>
                   </div>
                 </div>
@@ -148,7 +153,7 @@ export default function ImageGenerationModal({
                   AI Generate
                 </button>
                 <p className={`mt-2 text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
-                  AI will create 4 unique pixel-art thumbnails based on your project description
+                  AI will create 4 unique pixel-art images based on your {subjectLabel.toLowerCase()} description.
                 </p>
               </div>
             )}

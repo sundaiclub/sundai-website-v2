@@ -3,7 +3,7 @@ import { calculateProjectScore } from '@/lib/trending';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Listbox, ListboxButton, ListboxOption, ListboxOptions, Transition } from '@headlessui/react';
 import { MagnifyingGlassIcon, FunnelIcon, ChevronUpDownIcon, XMarkIcon, CalendarIcon } from '@heroicons/react/24/outline';
-import { Project } from './Project';
+import type { Project } from '@/types/project';
 import TagSelector from './TagSelector';
 
 const HOT_PROJECT_LIKE_WINDOW_DAYS = 7;
@@ -19,8 +19,8 @@ const SORT_OPTIONS: SortOption[] = [
     label: "Trending",
     value: "trending",
     sortFn: (a: Project, b: Project) => {
-      const scoreA = calculateProjectScore(a as any, { recentLikeWindowDays: HOT_PROJECT_LIKE_WINDOW_DAYS });
-      const scoreB = calculateProjectScore(b as any, { recentLikeWindowDays: HOT_PROJECT_LIKE_WINDOW_DAYS });
+      const scoreA = calculateProjectScore(a, { recentLikeWindowDays: HOT_PROJECT_LIKE_WINDOW_DAYS });
+      const scoreB = calculateProjectScore(b, { recentLikeWindowDays: HOT_PROJECT_LIKE_WINDOW_DAYS });
       return scoreB - scoreA;
     }
   },
@@ -63,7 +63,6 @@ const SORT_OPTIONS: SortOption[] = [
   }
 ];
 
-// Helper function to format date for input
 const formatDateForInput = (date: string) => {
   if (!date) return '';
   try {
@@ -73,7 +72,6 @@ const formatDateForInput = (date: string) => {
   }
 };
 
-// Helper function to parse date from input
 const parseDateFromInput = (dateStr: string) => {
   if (!dateStr) return null;
   try {
@@ -83,7 +81,6 @@ const parseDateFromInput = (dateStr: string) => {
   }
 };
 
-// Add this helper function to count projects per tag
 const getTagCount = (tagName: string, projects: Project[]) => {
   return projects.filter(project => 
     project.techTags.some(t => t.name === tagName) || 
@@ -91,7 +88,15 @@ const getTagCount = (tagName: string, projects: Project[]) => {
   ).length;
 };
 
-// calculateProjectScore is now imported from '@/lib/trending' for reuse across client and server
+type ProjectSearchFilters = {
+  searchTerm?: string;
+  selectedTechTags?: string[];
+  selectedDomainTags?: string[];
+  selectedStatus?: string[];
+  fromDate?: string;
+  toDate?: string;
+  sortBy?: SortOption;
+};
 
 export default function ProjectSearch({ 
   projects,
@@ -117,7 +122,6 @@ export default function ProjectSearch({
   const router = useRouter();
   const searchParams = useSearchParams();
   
-  // Initialize state from URL parameters
   const [searchTerm, setSearchTerm] = useState(urlFilters.search || '');
   const [selectedStatus, setSelectedStatus] = useState<string[]>(urlFilters.status || []);
   const [selectedTechTags, setSelectedTechTags] = useState<string[]>(urlFilters.techTags || []);
@@ -129,11 +133,9 @@ export default function ProjectSearch({
   const [showTechTagModal, setShowTechTagModal] = useState(false);
   const [showDomainTagModal, setShowDomainTagModal] = useState(false);
   
-  // Date filtering state
   const [fromDate, setFromDate] = useState(formatDateForInput(urlFilters.fromDate || ''));
   const [toDate, setToDate] = useState(formatDateForInput(urlFilters.toDate || ''));
 
-  // Sync state with URL parameters when they change
   useEffect(() => {
     setSearchTerm(urlFilters.search || '');
     setSelectedStatus(urlFilters.status || []);
@@ -144,31 +146,25 @@ export default function ProjectSearch({
     setToDate(formatDateForInput(urlFilters.toDate || ''));
   }, [urlFilters]);
 
-  // Function to update URL parameters
-  const updateURL = useCallback((newFilters: any) => {
+  const updateURL = useCallback((newFilters: ProjectSearchFilters) => {
     const params = new URLSearchParams();
     
-    // Add search term
     if (newFilters.searchTerm) {
       params.set('search', newFilters.searchTerm);
     }
     
-    // Add tech tags
     newFilters.selectedTechTags?.forEach((tag: string) => {
       params.append('tech_tag', tag);
     });
     
-    // Add domain tags
     newFilters.selectedDomainTags?.forEach((tag: string) => {
       params.append('domain_tag', tag);
     });
     
-    // Add status
     newFilters.selectedStatus?.forEach((status: string) => {
       params.append('status', status);
     });
     
-    // Add dates
     if (newFilters.fromDate) {
       params.set('from_date', newFilters.fromDate);
     }
@@ -176,7 +172,6 @@ export default function ProjectSearch({
       params.set('to_date', newFilters.toDate);
     }
     
-    // Add sort
     if (newFilters.sortBy?.value && newFilters.sortBy.value !== 'trending') {
       params.set('sort', newFilters.sortBy.value);
     }
@@ -185,7 +180,6 @@ export default function ProjectSearch({
     router.push(newURL, { scroll: false });
   }, [router]);
 
-  // Get unique tags from all projects
   const allTechTags = useMemo(() => {
     const tags = new Set<string>();
     projects.forEach(project => {
@@ -202,7 +196,6 @@ export default function ProjectSearch({
     return Array.from(tags).sort();
   }, [projects]);
 
-  // Modify the tag arrays to include sorting by count
   const techTagsWithCount = allTechTags
     .map(tag => ({
       id: tag,
@@ -225,28 +218,23 @@ export default function ProjectSearch({
         ).length
       }
     }))
-    .sort((a, b) => b._count.projects - a._count.projects); // Sort by count descending
+    .sort((a, b) => b._count.projects - a._count.projects);
 
-  // Filter and sort projects
   const filteredProjects = useMemo(() => {
     return projects
       .filter(project => {
-        // Filter by search term
         const searchMatch = 
           project.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
           project.preview.toLowerCase().includes(searchTerm.toLowerCase());
 
-        // Filter by status
         const statusMatch = selectedStatus.length === 0 || 
           selectedStatus.includes(project.status);
 
-        // Filter by tech tags
         const techTagMatch = selectedTechTags.length === 0 ||
           selectedTechTags.every(tag => 
             project.techTags.some(t => t.name === tag)
           );
 
-        // Filter by domain tags
         const domainTagMatch = selectedDomainTags.length === 0 ||
           selectedDomainTags.every(tag => 
             project.domainTags.some(t => t.name === tag)
@@ -256,23 +244,9 @@ export default function ProjectSearch({
         const projectDate = new Date(project.startDate);
         const projectDateStr = `${projectDate.getFullYear()}-${String(projectDate.getMonth() + 1).padStart(2, '0')}-${String(projectDate.getDate()).padStart(2, '0')}`;
         
-        // Debug logging if needed
-        // if (fromDate || toDate) {
-        //   console.log('DEBUG Filter:', {
-        //     projectTitle: project.title,
-        //     projectStartDate: project.startDate,
-        //     projectDateStr,
-        //     fromDate,
-        //     toDate,
-        //     fromMatch: !fromDate || projectDateStr >= fromDate,
-        //     toMatch: !toDate || projectDateStr <= toDate
-        //   });
-        // }
-        
         const dateMatch = (!fromDate || projectDateStr >= fromDate) &&
                          (!toDate || projectDateStr <= toDate);
 
-        // Filter broken projects
         const brokenMatch = showBroken || !project.is_broken;
 
         return searchMatch && statusMatch && techTagMatch && domainTagMatch && dateMatch && brokenMatch;
@@ -312,7 +286,6 @@ export default function ProjectSearch({
     );
   }, [searchTerm, selectedStatus, selectedTechTags, selectedDomainTags, fromDate, toDate, showBroken]);
 
-  // Update parent component with filtered projects
   useEffect(() => {
     onFilteredProjectsChange(filteredProjects);
   }, [filteredProjects, onFilteredProjectsChange]);
@@ -321,7 +294,6 @@ export default function ProjectSearch({
     onSearchStateChange?.(hasActiveFilters);
   }, [hasActiveFilters, onSearchStateChange]);
 
-  // Update URL when filters change
   useEffect(() => {
     const timeoutId = setTimeout(() => {
       updateURL({
@@ -535,7 +507,6 @@ export default function ProjectSearch({
   );
 }
 
-// Helper MultiSelect Component
 function MultiSelect({ 
   options, 
   selected, 

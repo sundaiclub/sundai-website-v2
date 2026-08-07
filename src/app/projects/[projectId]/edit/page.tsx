@@ -15,11 +15,12 @@ import {
 
 import { useTheme } from "../../../contexts/ThemeContext";
 import { useUserContext } from "../../../contexts/UserContext";
-import { Project } from "../../../components/Project";
+import type { Project } from "@/types/project";
 import PermissionDenied from "../../../components/PermissionDenied";
 import TagSelector from "../../../components/TagSelector";
 import { XMarkIcon, PlusIcon, ArrowLeftIcon, SparklesIcon } from "@heroicons/react/24/outline";
-import { HackerSelector, ProjectRoles, Hacker } from "../../../components/HackerSelector";
+import { HackerSelector, ProjectRoles } from "../../../components/HackerSelector";
+import type { HackerSelectionOption } from '@/types/hacker';
 import { swapFirstLetters } from "../../../utils/nameUtils";
 import ImageGenerationModal from "../../../components/ImageGenerationModal";
 import ProjectMarkdown from "../../../components/ProjectMarkdown";
@@ -27,7 +28,16 @@ import ProjectMarkdown from "../../../components/ProjectMarkdown";
 const MAX_TITLE_LENGTH = 32;
 const MAX_PREVIEW_LENGTH = 100;
 
-/* --- Helper: Upload Image to GCS --- */
+type ProjectRouteParams = {
+  projectId: string;
+};
+
+type AppRouter = ReturnType<typeof useRouter>;
+
+type UploadImageResponse = {
+  url: string;
+};
+
 const uploadImage = async (file: File): Promise<string> => {
   const loadingToast = toast.loading("Uploading image...");
   const formData = new FormData();
@@ -42,12 +52,12 @@ const uploadImage = async (file: File): Promise<string> => {
   if (!response.ok) {
     throw new Error("Failed to upload image");
   }
-  const data = await response.json();
+  const data = (await response.json()) as UploadImageResponse;
   return data.url;
 };
 
 function ButtonPanel({ params, router, isDarkMode, handleSave, handlePublish, saving, publishing, isDraft }:
-  { params: any, router: any, isDarkMode: boolean, handleSave: () => void, handlePublish: () => void, saving: boolean, publishing: boolean, isDraft: boolean }) {
+  { params: ProjectRouteParams, router: AppRouter, isDarkMode: boolean, handleSave: () => void, handlePublish: () => void, saving: boolean, publishing: boolean, isDraft: boolean }) {
   return (
     <div className="flex items-center space-x-4 mt-4">
       <button
@@ -100,7 +110,6 @@ function ButtonPanel({ params, router, isDarkMode, handleSave, handlePublish, sa
   );
 }
 
-// Helper to extract image name from URL (if needed)
 function getImageNameFromUrl(url: string): string {
   try {
     const filename = url.split("/").pop() || "";
@@ -111,7 +120,7 @@ function getImageNameFromUrl(url: string): string {
 }
 
 export default function ProjectEditPage() {
-  const params = useParams();
+  const params = useParams<ProjectRouteParams>();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const { isAdmin, userInfo } = useUserContext();
@@ -140,7 +149,7 @@ export default function ProjectEditPage() {
 
   const formRef = useRef<HTMLFormElement>(null);
 
-  const [hackers, setHackers] = useState<Hacker[]>([]);
+  const [hackers, setHackers] = useState<HackerSelectionOption[]>([]);
   const [showTeamModal, setShowTeamModal] = useState(false);
   const [showLaunchLeadModal, setShowLaunchLeadModal] = useState(false);
   const [showImageGenerationModal, setShowImageGenerationModal] = useState(false);
@@ -149,12 +158,12 @@ export default function ProjectEditPage() {
 
   const filteredTeamHackers = hackers.filter(hacker =>
     hacker.name.toLowerCase().includes(teamSearchTerm.toLowerCase()) ||
-    hacker.email.toLowerCase().includes(teamSearchTerm.toLowerCase())
+    hacker.email?.toLowerCase().includes(teamSearchTerm.toLowerCase())
   );
 
   const filteredLeadHackers = hackers.filter(hacker =>
     hacker.name.toLowerCase().includes(leadSearchTerm.toLowerCase()) ||
-    hacker.email.toLowerCase().includes(leadSearchTerm.toLowerCase())
+    hacker.email?.toLowerCase().includes(leadSearchTerm.toLowerCase())
   );
 
   useEffect(() => {
@@ -248,7 +257,6 @@ export default function ProjectEditPage() {
     prompt: string;
   }) => {
     try {
-      // Download the image and convert it to a File object
       const response = await fetch(url);
       const blob = await response.blob();
       const file = new File([blob], 'ai-generated-thumbnail.webp', { type: 'image/webp' });
@@ -266,7 +274,6 @@ export default function ProjectEditPage() {
   const handleSave = async () => {
     if (!project) return;
 
-    // Trigger form validation
     if (formRef.current && !formRef.current.checkValidity()) {
       formRef.current.reportValidity();
       return;
@@ -295,7 +302,6 @@ export default function ProjectEditPage() {
       formData.append("demoUrl", editableDemoUrl);
       formData.append("blogUrl", editableBlogUrl);
 
-      // Add team members data
       formData.append("participants", JSON.stringify(project.participants));
       formData.append("launchLead", project.launchLead.id);
 
@@ -325,7 +331,6 @@ export default function ProjectEditPage() {
   const handlePublish = async () => {
     if (!project) return;
 
-    // Trigger form validation
     if (formRef.current && !formRef.current.checkValidity()) {
       formRef.current.reportValidity();
       return;
@@ -333,7 +338,6 @@ export default function ProjectEditPage() {
 
     setPublishing(true);
     try {
-      // First save changes
       const formData = new FormData();
       formData.append("title", editableTitle);
       if (thumbnail) {
@@ -367,7 +371,6 @@ export default function ProjectEditPage() {
         throw new Error("Failed to save project");
       }
 
-      // Then publish
       const publishResponse = await fetch(`/api/projects/${params?.projectId}/submit`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -418,10 +421,10 @@ export default function ProjectEditPage() {
       const fetchTags = async () => {
         try {
           const response = await fetch(`/api/tags/${type}`);
-          const data = await response.json();
+          const data = (await response.json()) as Project["techTags"];
           if (type === "tech") {
             setAvailableTechTags(data);
-            const newTag = data.find((tag: any) => tag.id === tagId);
+            const newTag = data.find((tag) => tag.id === tagId);
             if (newTag) {
               setProject({
                 ...project,
@@ -437,7 +440,7 @@ export default function ProjectEditPage() {
             }
           } else {
             setAvailableDomainTags(data);
-            const newTag = data.find((tag: any) => tag.id === tagId);
+            const newTag = data.find((tag) => tag.id === tagId);
             if (newTag) {
               setProject({
                 ...project,
@@ -474,7 +477,7 @@ export default function ProjectEditPage() {
     });
   };
 
-  const handleAddMember = (hacker: Hacker, role: string) => {
+  const handleAddMember = (hacker: HackerSelectionOption, role: string) => {
     if (!project) return;
     setProject({
       ...project,
@@ -492,7 +495,7 @@ export default function ProjectEditPage() {
     });
   };
 
-  const handleChangeLaunchLead = (hacker: Hacker) => {
+  const handleChangeLaunchLead = (hacker: HackerSelectionOption) => {
     if (!project || !userInfo) return;
     if (project.launchLead.id === userInfo.id && hacker.id !== userInfo.id) {
       if (!confirm("Warning: If you change the launch lead from yourself, you will lose access to managing team members after saving. Continue?")) {
@@ -767,9 +770,13 @@ export default function ProjectEditPage() {
             <ImageGenerationModal
               showModal={showImageGenerationModal}
               setShowModal={setShowImageGenerationModal}
-              projectId={params?.projectId as string}
-              projectTitle={project?.title || ""}
-              projectDescription={project?.preview || ""}
+              generationEndpoint={`/api/projects/${params?.projectId as string}/generate-images`}
+              generationBody={{
+                prompt: "Generate pixel-art thumbnails based on project description",
+              }}
+              subjectLabel="Project"
+              subjectTitle={project?.title || ""}
+              subjectDescription={project?.preview || ""}
               onImageSelect={handleAIGeneratedImageSelect}
               isDarkMode={isDarkMode}
             />
@@ -1125,9 +1132,8 @@ export default function ProjectEditPage() {
                 e.preventDefault();
                 e.currentTarget.classList.remove('border-indigo-500');
                 const textarea = e.currentTarget;
-                textarea.focus(); // Ensure textarea is focused before accessing selection
+                textarea.focus();
 
-                // First check for image files
                 const file = e.dataTransfer.files[0];
                 if (file && file.type.startsWith('image/')) {
                   try {
@@ -1166,7 +1172,6 @@ export default function ProjectEditPage() {
                   }
                 }
 
-                // Then check for URLs
                 const urlData = e.dataTransfer.getData('text/uri-list') || e.dataTransfer.getData('text/plain');
                 if (urlData && (urlData.startsWith('http://') || urlData.startsWith('https://'))) {
                   const isImageUrl = /\.(jpg|jpeg|png|gif|webp)$/i.test(urlData);

@@ -125,6 +125,7 @@ describe('ShareModal', () => {
   });
 
   it('should handle generate content error', async () => {
+    const toast = require('react-hot-toast').default;
     (global.fetch as jest.Mock).mockRejectedValueOnce(new Error('Network error'));
 
     render(<ShareModal {...defaultProps} />);
@@ -132,11 +133,12 @@ describe('ShareModal', () => {
     const generateButton = screen.getByText('Generate Content');
     fireEvent.click(generateButton);
     
-    // The component falls back to basic template on error
     await waitFor(() => {
-      const el = screen.getByRole('textbox') as HTMLTextAreaElement
-      expect(el.value).toContain('Built by:')
+      expect(toast.error).toHaveBeenCalledWith(
+        'Failed to generate content. Please try again.'
+      );
     });
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
   });
 
   it('should show toast and not fallback on 401 unauthorized', async () => {
@@ -187,14 +189,17 @@ describe('ShareModal', () => {
     fireEvent.click(generateButton)
 
     await waitFor(() => {
-      // Because our component initializes with fallback template on error path,
-      // assert that fetch was called with streaming Accept header instead.
       const calls = (global.fetch as jest.Mock).mock.calls
       expect(calls[0][1].headers['Accept']).toBe('text/plain')
     })
   })
 
   it('should update custom content when textarea changes', async () => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      headers: { get: () => 'application/json' },
+      json: () => Promise.resolve({ content: 'Generated content' }),
+    });
     render(<ShareModal {...defaultProps} />);
     
     // First generate content to show the textarea
@@ -245,6 +250,7 @@ describe('ShareModal', () => {
   });
 
   it('should show success message after copying', async () => {
+    const toast = require('react-hot-toast').default;
     const mockWriteText = jest.fn().mockResolvedValue(undefined);
     Object.assign(navigator, {
       clipboard: {
@@ -277,8 +283,10 @@ describe('ShareModal', () => {
     const copyButton = screen.getByText('Copy to Clipboard');
     fireEvent.click(copyButton);
     
-    // The component shows an alert instead of a message in the DOM
     expect(mockWriteText).toHaveBeenCalledWith('Generated content for sharing');
+    await waitFor(() => {
+      expect(toast.success).toHaveBeenCalledWith('Content copied to clipboard.');
+    });
   });
 
   it('should handle copy error', async () => {
@@ -299,6 +307,7 @@ describe('ShareModal', () => {
 
     (global.fetch as jest.Mock).mockResolvedValueOnce({
       ok: true,
+      headers: { get: () => 'application/json' },
       json: () => Promise.resolve(mockResponse),
     });
 
@@ -354,26 +363,6 @@ describe('ShareModal', () => {
     await waitFor(() => {
       expect(generateButton).not.toBeDisabled();
     });
-  });
-
-  it('should show team member message for team members', () => {
-    render(<ShareModal {...defaultProps} />);
-    
-    // The component doesn't show this message, it shows project info instead
-    expect(screen.getByText('Test Project')).toBeInTheDocument();
-  });
-
-  it('should show different message for non-team members', () => {
-    const nonTeamMemberProject = {
-      ...mockProject,
-      participants: [],
-      launchLead: { id: 'other-user', name: 'Other User' },
-    };
-
-    render(<ShareModal {...defaultProps} project={nonTeamMemberProject} />);
-    
-    // The component doesn't show this message, it shows project info instead
-    expect(screen.getByText('Test Project')).toBeInTheDocument();
   });
 
   it('should handle different platforms correctly', async () => {

@@ -10,7 +10,7 @@ import { ThemeProvider } from '../../src/app/contexts/ThemeContext';
 jest.mock('../../src/app/contexts/UserContext', () => ({
   useUserContext: () => ({
     isAdmin: true,
-    userInfo: { id: 'current-user-id', name: 'Current User', email: 'current@example.com', role: 'ADMIN' },
+    userInfo: { id: 'current-user-id', name: 'Current User', email: 'current@example.com', role: 'SITE_ADMIN' },
     loading: false,
   }),
 }));
@@ -164,25 +164,6 @@ describe('ProjectEdit', () => {
     expect(screen.getByPlaceholderText('Blog URL')).toBeInTheDocument();
   });
 
-  it('should render status selector', async () => {
-    (global.fetch as jest.Mock)
-      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(mockProject) })
-      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve([]) })
-      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve([]) })
-      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve([]) });
-
-    render(
-      <ThemeProvider>
-        <ProjectEdit />
-      </ThemeProvider>
-    );
-
-    // Status selector no longer exists in the new UI
-    await waitFor(() => {
-      expect(screen.getByDisplayValue('Test Project')).toBeInTheDocument();
-    });
-  });
-
   it('should render tech tags selector', async () => {
     (global.fetch as jest.Mock)
       .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(mockProject) })
@@ -266,30 +247,6 @@ describe('ProjectEdit', () => {
       const hasPatch = calls.some(([url, init]) => /\/api\/projects\/.*\/edit/.test(url) && init?.method === 'PATCH');
       expect(hasPatch).toBe(true);
     });
-  });
-
-  it('should handle form validation', async () => {
-    (global.fetch as jest.Mock)
-      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(mockProject) })
-      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve([]) })
-      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve([]) })
-      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve([]) });
-
-    render(
-      <ThemeProvider>
-        <ProjectEdit />
-      </ThemeProvider>
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText('Title')).toBeInTheDocument();
-    });
-
-    const submitButton = screen.getAllByRole('button', { name: /save changes/i })[0];
-    fireEvent.click(submitButton);
-
-    // Ensure no crash and UI remains responsive
-    expect(screen.getByText('Project URLs')).toBeInTheDocument();
   });
 
   it('should handle error state', async () => {

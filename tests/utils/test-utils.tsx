@@ -52,7 +52,6 @@ jest.mock('../../src/app/contexts/UserContext', () => ({
   ),
 }))
 
-// Simple wrapper without context providers for now
 const AllTheProviders = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>
 }
@@ -137,57 +136,6 @@ export const mockHacker = {
   },
   createdAt: new Date('2024-01-01T00:00:00Z'),
   updatedAt: new Date('2024-01-01T00:00:00Z'),
-}
-
-export const mockWeek = {
-  id: 'test-week-id',
-  number: 1,
-  startDate: new Date('2024-01-01'),
-  endDate: new Date('2024-01-07'),
-  theme: 'AI Innovation',
-  description: 'A week focused on AI innovation',
-  createdAt: new Date('2024-01-01T00:00:00Z'),
-  updatedAt: new Date('2024-01-01T00:00:00Z'),
-}
-
-export const mockTechTag = {
-  id: 'tech-1',
-  name: 'React',
-  description: 'A JavaScript library for building user interfaces',
-  createdAt: new Date('2024-01-01T00:00:00Z'),
-  updatedAt: new Date('2024-01-01T00:00:00Z'),
-}
-
-export const mockDomainTag = {
-  id: 'domain-1',
-  name: 'AI/ML',
-  description: 'Artificial Intelligence and Machine Learning',
-  createdAt: new Date('2024-01-01T00:00:00Z'),
-  updatedAt: new Date('2024-01-01T00:00:00Z'),
-}
-
-// Mock API responses
-export const mockApiResponse = (data: any, status = 200) => ({
-  ok: status >= 200 && status < 300,
-  status,
-  json: jest.fn().mockResolvedValue(data),
-  text: jest.fn().mockResolvedValue(JSON.stringify(data)),
-})
-
-// Mock fetch for API calls
-export const mockFetch = (response: any, status = 200) => {
-  global.fetch = jest.fn().mockResolvedValue(mockApiResponse(response, status))
-}
-
-// Mock fetch error
-export const mockFetchError = (message = 'Network error') => {
-  global.fetch = jest.fn().mockRejectedValue(new Error(message))
-}
-
-// Reset all mocks
-export const resetMocks = () => {
-  jest.clearAllMocks()
-  global.fetch = jest.fn()
 }
 
 // Re-export everything

@@ -111,15 +111,15 @@ ${bodyOnly}`;
       const stream = new ReadableStream({
         async start(controller) {
           try {
-            const response: any = await ai.models.generateContentStream({
+            const response = await ai.models.generateContentStream({
               model: "gemini-2.5-flash",
               contents: prompt,
             });
 
             // Buffer chunks to sanitize wrappers (```html, <pre>/<code>) correctly
             let buffer = "";
-            for await (const chunk of response as any) {
-              const text = (chunk && (chunk.text as any)) || '';
+            for await (const chunk of response) {
+              const text = chunk.text || '';
               if (text) buffer += text;
             }
 
@@ -127,8 +127,8 @@ ${bodyOnly}`;
             const finalBody = stripped ? sanitizeReturn(stripped) : sanitizeReturn(bodyOnly);
             controller.enqueue(encoder.encode(finalBody));
             controller.close();
-          } catch (e: any) {
-            console.error('[NEWS_GENERATE_STREAM]', e?.message || e);
+          } catch (e: unknown) {
+            console.error('[NEWS_GENERATE_STREAM]', e instanceof Error ? e.message : e);
             try {
               controller.enqueue(encoder.encode(sanitizeReturn(bodyOnly)));
             } finally {
@@ -149,13 +149,13 @@ ${bodyOnly}`;
     // Fallback to non-streaming JSON response
     let generated = "";
     try {
-      const resp: any = await ai.models.generateContent({
+      const resp = await ai.models.generateContent({
         model: "gemini-2.5-flash",
         contents: prompt,
       });
-      generated = (resp && (resp.text as any)) || "";
-    } catch (e: any) {
-      console.error('[NEWS_GENERATE]', e?.message || e);
+      generated = resp.text || "";
+    } catch (e: unknown) {
+      console.error('[NEWS_GENERATE]', e instanceof Error ? e.message : e);
       return NextResponse.json({ htmlBody: sanitizeReturn(bodyOnly), error: `LLM error` }, { status: 200 });
     }
     const stripped = stripModelOutput(generated);
@@ -168,5 +168,4 @@ ${bodyOnly}`;
     return new NextResponse('Internal Error', { status: 500 });
   }
 }
-
 

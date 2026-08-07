@@ -1,6 +1,35 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
+import type { Prisma, ProjectStatus } from "@prisma/client";
 import prisma from "@/lib/prisma";
+
+const PROJECT_STATUSES = ["DRAFT", "PENDING", "APPROVED"] as const satisfies readonly ProjectStatus[];
+
+type SubmittedParticipant = {
+  role?: string | null;
+  hacker: {
+    id: string;
+  };
+};
+
+function isProjectStatus(value: FormDataEntryValue): value is ProjectStatus {
+  return typeof value === "string" && PROJECT_STATUSES.some(status => status === value);
+}
+function isSubmittedParticipant(value: unknown): value is SubmittedParticipant {
+  return (
+    value !== null &&
+    typeof value === "object" &&
+    "hacker" in value &&
+    value.hacker !== null &&
+    typeof value.hacker === "object" &&
+    "id" in value.hacker &&
+    typeof value.hacker.id === "string" &&
+    (!("role" in value) ||
+      value.role === null ||
+      value.role === undefined ||
+      typeof value.role === "string")
+  );
+}
 
 export async function PATCH(
   req: Request,
@@ -31,7 +60,7 @@ export async function PATCH(
       select: { id: true, role: true },
     });
 
-    const isAdmin = user?.role === "ADMIN";
+    const isAdmin = user?.role === "SITE_ADMIN";
     const canEdit = 
       isAdmin ||
       project.launchLeadId === user?.id ||
@@ -42,10 +71,13 @@ export async function PATCH(
     }
 
     const formData = await req.formData();
-    const updateData: any = {};
+    const updateData: Prisma.ProjectUpdateInput = {};
 
     const newStatus = formData.get('status');
     if (newStatus) {
+      if (!isProjectStatus(newStatus)) {
+        return new NextResponse("Invalid project status", { status: 400 });
+      }
       const currentStatus = project.status;
       
       if (newStatus === "APPROVED" && !isAdmin) {
@@ -56,7 +88,7 @@ export async function PATCH(
         return new NextResponse("Only admins can change status of pending projects", { status: 403 });
       }
 
-      updateData.status = newStatus.toString();
+      updateData.status = newStatus;
     }
 
     const isStarred = formData.get('is_starred');
@@ -135,7 +167,7 @@ export async function PATCH(
       }
     }
 
-    const canManageTeam = user?.role === "ADMIN" || project.launchLeadId === user?.id;
+    const canManageTeam = user?.role === "SITE_ADMIN" || project.launchLeadId === user?.id;
     
     if (canManageTeam) {
       const participantsJson = formData.get('participants');
@@ -148,7 +180,10 @@ export async function PATCH(
       }
 
       if (participantsJson) {
-        const participants = JSON.parse(participantsJson.toString());
+        const parsedParticipants: unknown = JSON.parse(participantsJson.toString());
+        const participants = Array.isArray(parsedParticipants)
+          ? parsedParticipants.filter(isSubmittedParticipant)
+          : [];
         
         await prisma.projectToParticipant.deleteMany({
           where: { projectId: params.projectId }
@@ -156,8 +191,8 @@ export async function PATCH(
 
         updateData.participants = {
           create: participants
-            .filter((p: any) => p.hacker.id !== launchLeadId)
-            .map((p: any) => ({
+            .filter((p) => p.hacker.id !== launchLeadId)
+            .map((p) => ({
               hackerId: p.hacker.id,
               role: p.role
             }))
