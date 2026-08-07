@@ -3,8 +3,12 @@ import { useEffect } from "react";
 import { useUser } from "@clerk/nextjs";
 import { useRouter, useSearchParams } from "next/navigation";
 
+type AutoLikeUser = ReturnType<typeof useUser> & {
+  openSignIn?: (options: { redirectUrl: string }) => unknown | Promise<unknown>;
+};
+
 export function useAutoLike(projectId: string | null) {
-  const { isSignedIn, isLoaded, openSignIn } = useUser() as any;
+  const { isSignedIn, isLoaded, openSignIn } = useUser() as AutoLikeUser;
   const searchParams = useSearchParams();
   const router = useRouter();
 
@@ -26,7 +30,9 @@ export function useAutoLike(projectId: string | null) {
               redirectUrl: `/projects/${projectId}?like=1`,
             });
           }
-        } catch {}
+        } catch (error) {
+          console.error("Unable to open sign-in for automatic like:", error);
+        }
         return;
       }
 
@@ -34,18 +40,15 @@ export function useAutoLike(projectId: string | null) {
         const res = await fetch(`/api/projects/${projectId}/like`, { method: "POST" });
         if (res.ok) {
           sessionStorage.setItem(likeOnceKey, "1");
-          // Remove like=1 in URL after applying
           const params = new URLSearchParams(Array.from(searchParams?.entries() || []));
           params.delete("like");
           router.replace(`?${params.toString()}`);
         }
-      } catch (e) {
-        // no-op
+      } catch (error) {
+        console.error("Unable to apply automatic project like:", error);
       }
     };
 
     trigger();
-  }, [projectId, isSignedIn, isLoaded]);
+  }, [projectId, isSignedIn, isLoaded, openSignIn, router, searchParams]);
 }
-
-

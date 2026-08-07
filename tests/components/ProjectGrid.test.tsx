@@ -46,6 +46,7 @@ describe('ProjectGrid', () => {
         json: jest.fn().mockResolvedValue({
           projects: [firstProject],
           hasMore: true,
+          totalCount: 2,
         }),
       })
       .mockResolvedValueOnce({
@@ -53,6 +54,7 @@ describe('ProjectGrid', () => {
         json: jest.fn().mockResolvedValue({
           projects: [secondProject],
           hasMore: false,
+          totalCount: 2,
         }),
       })
 
@@ -96,5 +98,32 @@ describe('ProjectGrid', () => {
     await waitFor(() => {
       expect(screen.getByText('Project 2')).toBeInTheDocument()
     })
+  })
+
+  it('shows the total Sundai project count from paginated responses', async () => {
+    const firstProject = makeProject('project-1', 'Project 1', '2024-02-02T00:00:00Z')
+
+    global.fetch = jest.fn().mockResolvedValueOnce({
+      ok: true,
+      json: jest.fn().mockResolvedValue({
+        projects: [firstProject],
+        hasMore: true,
+        totalCount: 42,
+      }),
+    })
+
+    render(
+      <ProjectGrid
+        enablePagination={true}
+        showSearch={true}
+        statusFilter="APPROVED"
+      />
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText('Project 1')).toBeInTheDocument()
+    })
+
+    expect(screen.getByText('42').parentElement).toHaveTextContent('42 projects found')
   })
 })

@@ -75,13 +75,13 @@ describe('UserContext', () => {
     expect(global.fetch).toHaveBeenCalledWith('/api/hackers/hacker-123');
   });
 
-  it('should set isAdmin to true when user role is ADMIN', async () => {
+  it('should set isAdmin to true when user role is SITE_ADMIN', async () => {
     const mockHackerData = { id: 'hacker-123' };
     const mockProfileData = {
       id: 'hacker-123',
       name: 'Admin User',
       email: 'admin@example.com',
-      role: 'ADMIN',
+      role: 'SITE_ADMIN',
       avatar: null,
       bio: null,
       githubUrl: null,

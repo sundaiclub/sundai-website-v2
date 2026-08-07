@@ -1,6 +1,3 @@
-// Shared trending score used by both client and server.
-// Matches the client-side logic from ProjectSearch/TrendingSections.
-
 export type Trendable = {
   likes?: Array<{ hackerId?: string; createdAt?: string | Date }>;
 };
@@ -24,7 +21,8 @@ export function calculateTrendingScore(
     cutoff.setDate(now.getDate() - recentLikeWindowDays);
 
     return likes.filter((like) => {
-      const likeDate = new Date(like.createdAt as any);
+      if (!like.createdAt) return false;
+      const likeDate = new Date(like.createdAt);
       return (
         !Number.isNaN(likeDate.getTime()) &&
         likeDate >= cutoff &&
@@ -44,7 +42,10 @@ export function calculateTrendingScore(
   const now = new Date();
 
   return likes.reduce((score, like) => {
-    const likeDate = new Date(like.createdAt as any);
+    if (!like.createdAt) {
+      return score + 1;
+    }
+    const likeDate = new Date(like.createdAt);
     if (Number.isNaN(likeDate.getTime())) {
       return score + 1;
     }
@@ -56,7 +57,6 @@ export function calculateTrendingScore(
   }, 0);
 }
 
-// Alias with the same name used in client code
 export function calculateProjectScore(
   project: Trendable,
   options: { timeDecayDays?: number; recentLikeWindowDays?: number } = {}

@@ -126,9 +126,8 @@ export default function HackerProfile() {
         return;
       }
       try {
-        const GlobalImage = (typeof globalThis !== 'undefined' ? (globalThis as any).Image : undefined);
-        const preloader = GlobalImage ? new GlobalImage() : null;
-        if (preloader) {
+        if (typeof window !== "undefined" && window.Image) {
+          const preloader = new window.Image();
           preloader.onload = () => setImgSrc(src);
           preloader.onerror = () => setImgSrc(defaultSrc);
           preloader.src = src;
@@ -141,15 +140,15 @@ export default function HackerProfile() {
     }, [src]);
 
     return (
-      <img
+      <NextImage
         src={imgSrc}
         alt={alt}
         width={size}
         height={size}
         className="object-cover rounded-full"
-        onError={(e) => {
-          if ((e.currentTarget as HTMLImageElement).src !== defaultSrc) {
-            (e.currentTarget as HTMLImageElement).src = defaultSrc;
+        unoptimized
+        onError={() => {
+          if (imgSrc !== defaultSrc) {
             setImgSrc(defaultSrc);
           }
         }}

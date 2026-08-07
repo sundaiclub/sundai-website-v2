@@ -1,33 +1,36 @@
-import { ProjectStatus } from "@prisma/client";
-import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
-import { uploadToGCS } from "@/lib/gcp-storage";
-import prisma from "@/lib/prisma";
+import { HackType, Prisma, ProjectStatus } from '@prisma/client';
+import { NextResponse } from 'next/server';
+import { auth } from '@clerk/nextjs/server';
+import { uploadToGCS } from '@/lib/gcp-storage';
+import prisma from '@/lib/prisma';
+import { getOrCreateCurrentWeek } from '@/lib/weeks';
 
-const ignoredDomainTags = (process.env.IGNORE_DOMAIN_TAGS || "")
-  .split(",")
-  .map((tag) => tag.trim())
-  .filter((tag) => tag.length > 0);
+const ignoredDomainTags = (process.env.IGNORE_DOMAIN_TAGS || '')
+  .split(',')
+  .map(tag => tag.trim())
+  .filter(tag => tag.length > 0);
 
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
-    const status = searchParams.get("status");
-    const limitParam = searchParams.get("limit");
-    const offsetParam = searchParams.get("offset");
-    const shouldReturnAll = searchParams.get("all") === "true";
-    const limit = Number.parseInt(limitParam || "", 10);
-    const offset = Number.parseInt(offsetParam || "", 10);
-    const hasPagination = !shouldReturnAll && Number.isFinite(limit) && limit > 0;
+    const status = searchParams.get('status');
+    const limitParam = searchParams.get('limit');
+    const offsetParam = searchParams.get('offset');
+    const shouldReturnAll = searchParams.get('all') === 'true';
+    const limit = Number.parseInt(limitParam || '', 10);
+    const offset = Number.parseInt(offsetParam || '', 10);
+    const hasPagination =
+      !shouldReturnAll && Number.isFinite(limit) && limit > 0;
     const safeLimit = hasPagination ? Math.min(limit, 50) : undefined;
     const safeOffset = Number.isFinite(offset) && offset >= 0 ? offset : 0;
 
-    // Determine hack_type based on environment
     const isResearchSite = process.env.IS_RESEARCH_SITE === 'true';
-    const hack_type = isResearchSite ? 'RESEARCH' : 'REGULAR';
+    const hack_type: HackType = isResearchSite
+      ? HackType.RESEARCH
+      : HackType.REGULAR;
     const ignoredDomainTagsFilter =
       ignoredDomainTags.length > 0
-        ? [
+        ? ([
             {
               domainTags: {
                 none: {
@@ -37,17 +40,19 @@ export async function GET(req: Request) {
                 },
               },
             },
-          ]
+          ] satisfies Prisma.ProjectWhereInput[])
         : [];
 
+    const projectWhere: Prisma.ProjectWhereInput = {
+      AND: [
+        status ? { status: status as ProjectStatus } : {},
+        { hack_type },
+        ...ignoredDomainTagsFilter,
+      ],
+    };
+
     const projects = await prisma.project.findMany({
-      where: {
-        AND: [
-          status ? { status: status as ProjectStatus } : {},
-          { hack_type },
-          ...ignoredDomainTagsFilter,
-        ],
-      },
+      where: projectWhere,
       include: {
         thumbnail: {
           select: {
@@ -80,10 +85,10 @@ export async function GET(req: Request) {
       },
       orderBy: [
         {
-          status: status === "PENDING" ? "asc" : "desc",
+          status: status === 'PENDING' ? 'asc' : 'desc',
         },
         {
-          createdAt: "desc",
+          createdAt: 'desc',
         },
       ],
       ...(hasPagination
@@ -94,9 +99,9 @@ export async function GET(req: Request) {
         : {}),
     });
 
-    const serializedProjects = projects.map((project) => ({
+    const serializedProjects = projects.map(project => ({
       ...project,
-      likes: project.likes.map((like) => ({
+      likes: project.likes.map(like => ({
         hackerId: like.hackerId,
         createdAt: like.createdAt,
       })),
@@ -105,17 +110,22 @@ export async function GET(req: Request) {
     }));
 
     if (hasPagination) {
+      const totalCount = await prisma.project.count({
+        where: projectWhere,
+      });
+
       return NextResponse.json({
         projects: serializedProjects.slice(0, safeLimit),
         hasMore: serializedProjects.length > safeLimit!,
+        totalCount,
       });
     }
 
     return NextResponse.json(serializedProjects);
   } catch (error) {
-    console.error("Error fetching projects:", error);
+    console.error('Error fetching projects:', error);
     return NextResponse.json(
-      { error: "Error fetching projects" },
+      { error: 'Error fetching projects' },
       { status: 500 }
     );
   }
@@ -125,86 +135,87 @@ export async function POST(req: Request) {
   try {
     const { userId } = auth();
     if (!userId) {
-      return new NextResponse("Unauthorized", { status: 401 });
+      return new NextResponse('Unauthorized', { status: 401 });
     }
 
     const formData = await req.formData();
-    const title = formData.get("title") as string;
-    const preview = formData.get("preview") as string;
-    const members = JSON.parse(formData.get("members") as string);
+    const title = formData.get('title') as string;
+    const preview = formData.get('preview') as string;
+    const members = JSON.parse(formData.get('members') as string);
 
     if (!title) {
-      return NextResponse.json({ 
-        message: "Title is required" 
-      }, { status: 400 });
+      return NextResponse.json(
+        {
+          message: 'Title is required',
+        },
+        { status: 400 }
+      );
     }
 
     if (!preview) {
-      return NextResponse.json({ 
-        message: "Preview is required" 
-      }, { status: 400 });
+      return NextResponse.json(
+        {
+          message: 'Preview is required',
+        },
+        { status: 400 }
+      );
     }
 
     if (preview.length > 100) {
-      return NextResponse.json({ 
-        message: "Preview must be 100 characters or less" 
-      }, { status: 400 });
+      return NextResponse.json(
+        {
+          message: 'Preview must be 100 characters or less',
+        },
+        { status: 400 }
+      );
     }
 
-    // Get the hacker using clerkId
     const hacker = await prisma.hacker.findUnique({
       where: { clerkId: userId },
     });
 
     if (!hacker) {
-      return new NextResponse("Builder not found", { status: 404 });
+      return new NextResponse('Builder not found', { status: 404 });
     }
 
-    // Get or create current week
+    const currentWeek = await getOrCreateCurrentWeek();
     const now = new Date();
-    let currentWeek = await prisma.week.findFirst({
+    const activeEvents = await prisma.event.findMany({
       where: {
-        startDate: { lte: now },
-        endDate: { gte: now },
+        status: 'PUBLISHED',
+        startTime: { lte: now },
+        endTime: { gte: now },
+        OR: [
+          {
+            chapter: {
+              memberships: {
+                some: { hackerId: hacker.id, status: 'ACTIVE' },
+              },
+            },
+          },
+          {
+            registrations: {
+              some: {
+                hackerId: hacker.id,
+                status: 'APPROVED',
+                cancelledAt: null,
+              },
+            },
+          },
+        ],
       },
+      select: { id: true },
     });
 
-    if (!currentWeek) {
-      // Create a new week if none exists
-      const startDate = new Date(now);
-      startDate.setHours(0, 0, 0, 0);
-      const endDate = new Date(startDate);
-      endDate.setDate(endDate.getDate() + 6);
-      endDate.setHours(23, 59, 59, 999);
-
-      // Get the latest week number
-      const latestWeek = await prisma.week.findFirst({
-        orderBy: { number: "desc" },
-      });
-      const weekNumber = (latestWeek?.number || 0) + 1;
-
-      currentWeek = await prisma.week.create({
-        data: {
-          number: weekNumber,
-          startDate,
-          endDate,
-          theme: `Week ${weekNumber}`,
-          description: `Projects for week ${weekNumber}`,
-        },
-      });
-    }
-
-    // Determine hack_type based on environment
     const isResearchSite = process.env.IS_RESEARCH_SITE === 'true';
     const hack_type = isResearchSite ? 'RESEARCH' : 'REGULAR';
 
-    // Create project with participants and thumbnail
     const project = await prisma.project.create({
       data: {
         title,
         preview,
         launchLeadId: hacker.id,
-        status: "DRAFT",
+        status: 'DRAFT',
         hack_type,
         is_broken: false,
         is_starred: false,
@@ -217,6 +228,12 @@ export async function POST(req: Request) {
           create: members.map((member: { id: string; role: string }) => ({
             hackerId: member.id,
             role: member.role,
+          })),
+        },
+        eventParticipations: {
+          create: activeEvents.map(event => ({
+            eventId: event.id,
+            addedById: hacker.id,
           })),
         },
       },
@@ -232,7 +249,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json(project);
   } catch (error) {
-    console.error("[PROJECTS_POST]", error);
-    return new NextResponse("Internal Error", { status: 500 });
+    console.error('[PROJECTS_POST]', error);
+    return new NextResponse('Internal Error', { status: 500 });
   }
 }

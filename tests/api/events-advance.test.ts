@@ -1,12 +1,14 @@
 import { NextRequest } from 'next/server';
-import { POST as POST_ADVANCE } from '../../src/app/api/events/[eventId]/advance/route';
+import { POST as POST_ADVANCE } from '../../src/app/api/events/[eventId]/pitch/advance/route';
 
 jest.mock('../../src/lib/prisma', () => ({
   __esModule: true,
   default: {
     hacker: { findUnique: jest.fn() },
+    chapterMembership: { findFirst: jest.fn() },
     event: { findUnique: jest.fn(), update: jest.fn() },
-    eventProject: { findMany: jest.fn(), update: jest.fn() },
+    pitchSession: { findFirst: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
+    pitchProject: { findMany: jest.fn(), update: jest.fn() },
   },
 }));
 
@@ -16,19 +18,25 @@ const prisma = require('../../src/lib/prisma').default;
 const mockAuth = require('@clerk/nextjs/server').auth as jest.Mock;
 
 describe('/api/events/[eventId]/advance', () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.resetAllMocks();
+    prisma.chapterMembership.findFirst.mockResolvedValue(null);
+    prisma.pitchSession.findFirst.mockResolvedValue({ id: 'ps1', eventId: 'e1', phase: 'PITCHING' });
+    prisma.pitchSession.findUnique.mockResolvedValue({ id: 'ps1', phase: 'PITCHING', projects: [] });
+    prisma.pitchSession.update.mockResolvedValue({});
+  });
 
   it('rejects when phase is VOTING', async () => {
     mockAuth.mockReturnValue({ userId: 'clerk-admin' });
-    prisma.hacker.findUnique.mockResolvedValue({ id: 'h-admin', role: 'ADMIN' });
+    prisma.hacker.findUnique.mockResolvedValue({ id: 'h-admin', role: 'SITE_ADMIN' });
     prisma.event.findUnique.mockResolvedValue({
       id: 'e1',
-      phase: 'VOTING',
-      mcs: [],
+      staff: [],
       projects: [],
     });
+    prisma.pitchSession.findFirst.mockResolvedValue({ id: 'ps1', eventId: 'e1', phase: 'VOTING' });
 
-    const request = new NextRequest('http://localhost:3000/api/events/e1/advance', { method: 'POST' });
+    const request = new NextRequest('http://localhost:3000/api/events/e1/pitch/advance', { method: 'POST' });
     const res = await POST_ADVANCE(request as any, { params: { eventId: 'e1' } } as any);
     expect(res.status).toBe(400);
     const body = await res.json();
@@ -37,12 +45,12 @@ describe('/api/events/[eventId]/advance', () => {
 
   it('works when phase is PITCHING', async () => {
     mockAuth.mockReturnValue({ userId: 'clerk-admin' });
-    prisma.hacker.findUnique.mockResolvedValue({ id: 'h-admin', role: 'ADMIN' });
+    prisma.hacker.findUnique.mockResolvedValue({ id: 'h-admin', role: 'SITE_ADMIN' });
     prisma.event.findUnique
       .mockResolvedValueOnce({
         id: 'e1',
         phase: 'PITCHING',
-        mcs: [],
+        staff: [],
         projects: [
           { id: 'ep1', position: 1, status: 'QUEUED' },
         ],
@@ -55,24 +63,76 @@ describe('/api/events/[eventId]/advance', () => {
         ],
       });
 
-    prisma.eventProject.findMany.mockResolvedValue([
+    prisma.pitchProject.findMany.mockResolvedValue([
       { id: 'ep1', position: 1, status: 'QUEUED', pitchPhase: 'WAITING' },
     ]);
-    prisma.eventProject.update.mockResolvedValue({});
+    prisma.pitchProject.update.mockResolvedValue({});
 
-    const request = new NextRequest('http://localhost:3000/api/events/e1/advance', { method: 'POST' });
+    const request = new NextRequest('http://localhost:3000/api/events/e1/pitch/advance', { method: 'POST' });
+    const res = await POST_ADVANCE(request as any, { params: { eventId: 'e1' } } as any);
+    expect(res.status).toBe(200);
+  });
+
+  it('allows assigned EventStaff MCs to advance pitches', async () => {
+    mockAuth.mockReturnValue({ userId: 'clerk-mc' });
+    prisma.hacker.findUnique.mockResolvedValue({ id: 'h-mc', role: 'HACKER' });
+    prisma.event.findUnique
+      .mockResolvedValueOnce({
+        id: 'e1',
+        phase: 'PITCHING',
+        staff: [{ hackerId: 'h-mc', role: 'MC' }],
+        projects: [],
+      })
+      .mockResolvedValueOnce({
+        id: 'e1',
+        phase: 'PITCHING',
+        projects: [{ id: 'ep1', position: 1, status: 'CURRENT' }],
+      });
+
+    prisma.pitchProject.findMany.mockResolvedValue([
+      { id: 'ep1', position: 1, status: 'QUEUED', pitchPhase: 'WAITING' },
+    ]);
+    prisma.pitchProject.update.mockResolvedValue({});
+
+    const request = new NextRequest('http://localhost:3000/api/events/e1/pitch/advance', { method: 'POST' });
+    const res = await POST_ADVANCE(request as any, { params: { eventId: 'e1' } } as any);
+    expect(res.status).toBe(200);
+  });
+
+  it('allows assigned EventStaff co-MCs to advance pitches', async () => {
+    mockAuth.mockReturnValue({ userId: 'clerk-co-mc' });
+    prisma.hacker.findUnique.mockResolvedValue({ id: 'h-co-mc', role: 'HACKER' });
+    prisma.event.findUnique
+      .mockResolvedValueOnce({
+        id: 'e1',
+        phase: 'PITCHING',
+        staff: [{ hackerId: 'h-co-mc', role: 'CO_MC' }],
+        projects: [],
+      })
+      .mockResolvedValueOnce({
+        id: 'e1',
+        phase: 'PITCHING',
+        projects: [{ id: 'ep1', position: 1, status: 'CURRENT' }],
+      });
+
+    prisma.pitchProject.findMany.mockResolvedValue([
+      { id: 'ep1', position: 1, status: 'QUEUED', pitchPhase: 'WAITING' },
+    ]);
+    prisma.pitchProject.update.mockResolvedValue({});
+
+    const request = new NextRequest('http://localhost:3000/api/events/e1/pitch/advance', { method: 'POST' });
     const res = await POST_ADVANCE(request as any, { params: { eventId: 'e1' } } as any);
     expect(res.status).toBe(200);
   });
 
   it('finishes the event when there is no next project', async () => {
     mockAuth.mockReturnValue({ userId: 'clerk-admin' });
-    prisma.hacker.findUnique.mockResolvedValue({ id: 'h-admin', role: 'ADMIN' });
+    prisma.hacker.findUnique.mockResolvedValue({ id: 'h-admin', role: 'SITE_ADMIN' });
     prisma.event.findUnique
       .mockResolvedValueOnce({
         id: 'e1',
         phase: 'PITCHING',
-        mcs: [],
+        staff: [],
         projects: [],
       })
       .mockResolvedValueOnce({
@@ -83,29 +143,29 @@ describe('/api/events/[eventId]/advance', () => {
         ],
       });
 
-    prisma.eventProject.findMany.mockResolvedValue([
+    prisma.pitchProject.findMany.mockResolvedValue([
       { id: 'ep1', position: 1, status: 'CURRENT', pitchPhase: 'COMPLETED' },
     ]);
-    prisma.eventProject.update.mockResolvedValue({});
-    prisma.event.update.mockResolvedValue({});
+    prisma.pitchProject.update.mockResolvedValue({});
+    prisma.pitchSession.update.mockResolvedValue({});
 
-    const request = new NextRequest('http://localhost:3000/api/events/e1/advance', { method: 'POST' });
+    const request = new NextRequest('http://localhost:3000/api/events/e1/pitch/advance', { method: 'POST' });
     const res = await POST_ADVANCE(request as any, { params: { eventId: 'e1' } } as any);
     expect(res.status).toBe(200);
-    expect(prisma.event.update).toHaveBeenCalledWith({
-      where: { id: 'e1' },
+    expect(prisma.pitchSession.update).toHaveBeenCalledWith({
+      where: { id: 'ps1' },
       data: { phase: 'FINISHED' },
     });
   });
 
   it('auto-completes timer when advancing from PRESENTING', async () => {
     mockAuth.mockReturnValue({ userId: 'clerk-admin' });
-    prisma.hacker.findUnique.mockResolvedValue({ id: 'h-admin', role: 'ADMIN' });
+    prisma.hacker.findUnique.mockResolvedValue({ id: 'h-admin', role: 'SITE_ADMIN' });
     prisma.event.findUnique
       .mockResolvedValueOnce({
         id: 'e1',
         phase: 'PITCHING',
-        mcs: [],
+        staff: [],
         projects: [],
       })
       .mockResolvedValueOnce({
@@ -114,37 +174,37 @@ describe('/api/events/[eventId]/advance', () => {
         projects: [],
       });
 
-    prisma.eventProject.findMany.mockResolvedValue([
+    prisma.pitchProject.findMany.mockResolvedValue([
       { id: 'ep1', position: 1, status: 'CURRENT', pitchPhase: 'PRESENTING', presentingStartedAt: new Date() },
       { id: 'ep2', position: 2, status: 'QUEUED', pitchPhase: 'WAITING' },
     ]);
-    prisma.eventProject.update.mockResolvedValue({});
+    prisma.pitchProject.update.mockResolvedValue({});
 
-    const request = new NextRequest('http://localhost:3000/api/events/e1/advance', { method: 'POST' });
+    const request = new NextRequest('http://localhost:3000/api/events/e1/pitch/advance', { method: 'POST' });
     const res = await POST_ADVANCE(request as any, { params: { eventId: 'e1' } } as any);
     expect(res.status).toBe(200);
 
     // Current project should be marked DONE with COMPLETED pitchPhase
-    const doneCall = prisma.eventProject.update.mock.calls[0];
+    const doneCall = prisma.pitchProject.update.mock.calls[0];
     expect(doneCall[0].data.status).toBe('DONE');
     expect(doneCall[0].data.pitchPhase).toBe('COMPLETED');
     expect(doneCall[0].data.completedAt).toBeDefined();
     expect(doneCall[0].data.questionsStartedAt).toBeDefined();
 
     // Next project should be set to CURRENT with WAITING pitchPhase
-    const nextCall = prisma.eventProject.update.mock.calls[1];
+    const nextCall = prisma.pitchProject.update.mock.calls[1];
     expect(nextCall[0].data.status).toBe('CURRENT');
     expect(nextCall[0].data.pitchPhase).toBe('WAITING');
   });
 
   it('auto-completes timer when advancing from QUESTIONS', async () => {
     mockAuth.mockReturnValue({ userId: 'clerk-admin' });
-    prisma.hacker.findUnique.mockResolvedValue({ id: 'h-admin', role: 'ADMIN' });
+    prisma.hacker.findUnique.mockResolvedValue({ id: 'h-admin', role: 'SITE_ADMIN' });
     prisma.event.findUnique
       .mockResolvedValueOnce({
         id: 'e1',
         phase: 'PITCHING',
-        mcs: [],
+        staff: [],
         projects: [],
       })
       .mockResolvedValueOnce({
@@ -153,17 +213,17 @@ describe('/api/events/[eventId]/advance', () => {
         projects: [],
       });
 
-    prisma.eventProject.findMany.mockResolvedValue([
+    prisma.pitchProject.findMany.mockResolvedValue([
       { id: 'ep1', position: 1, status: 'CURRENT', pitchPhase: 'QUESTIONS', questionsStartedAt: new Date() },
       { id: 'ep2', position: 2, status: 'QUEUED', pitchPhase: 'WAITING' },
     ]);
-    prisma.eventProject.update.mockResolvedValue({});
+    prisma.pitchProject.update.mockResolvedValue({});
 
-    const request = new NextRequest('http://localhost:3000/api/events/e1/advance', { method: 'POST' });
+    const request = new NextRequest('http://localhost:3000/api/events/e1/pitch/advance', { method: 'POST' });
     const res = await POST_ADVANCE(request as any, { params: { eventId: 'e1' } } as any);
     expect(res.status).toBe(200);
 
-    const doneCall = prisma.eventProject.update.mock.calls[0];
+    const doneCall = prisma.pitchProject.update.mock.calls[0];
     expect(doneCall[0].data.status).toBe('DONE');
     expect(doneCall[0].data.pitchPhase).toBe('COMPLETED');
     expect(doneCall[0].data.completedAt).toBeDefined();

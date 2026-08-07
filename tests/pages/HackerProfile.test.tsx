@@ -124,8 +124,6 @@ describe('HackerProfile', () => {
     });
   });
 
-  // Skills, interests, and social links are not rendered in current UI
-
   it('should handle error state', async () => {
     (global.fetch as jest.Mock).mockImplementation((url: string) => {
       if (url.includes('/api/hackers/test-hacker-id')) {

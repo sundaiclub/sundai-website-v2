@@ -17,6 +17,16 @@ jest.mock('../../src/lib/prisma', () => ({
   projectToParticipant: {
     deleteMany: jest.fn(),
   },
+  pitchProject: {
+    findMany: jest.fn(),
+    deleteMany: jest.fn(),
+  },
+  pitchProjectVote: {
+    deleteMany: jest.fn(),
+  },
+  eventProject: {
+    deleteMany: jest.fn(),
+  },
   $transaction: jest.fn(),
 }));
 
@@ -31,6 +41,7 @@ const mockAuth = require('@clerk/nextjs/server').auth as jest.Mock;
 describe('/api/projects/[projectId]', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockPrisma.pitchProject.findMany.mockResolvedValue([] as never);
   });
 
   describe('GET', () => {
@@ -103,7 +114,7 @@ describe('/api/projects/[projectId]', () => {
       const mockHacker = {
         id: 'hacker-1',
         clerkId: 'clerk-123',
-        role: 'ADMIN',
+        role: 'SITE_ADMIN',
       };
 
       const mockProject = {
@@ -231,7 +242,7 @@ describe('/api/projects/[projectId]', () => {
       const mockHacker = {
         id: 'hacker-1',
         clerkId: 'clerk-123',
-        role: 'ADMIN',
+        role: 'SITE_ADMIN',
       };
 
       const mockProject = {
