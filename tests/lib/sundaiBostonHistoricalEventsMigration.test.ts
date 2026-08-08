@@ -59,6 +59,7 @@ describe('Sundai Boston historical event data migration', () => {
       expect(event.title).not.toMatch(/\b(retreat|research)\b/i);
       expect(event.sourceUrl).toBe(`https://partiful.com/e/${event.sourceId}`);
       expect(event.description).not.toBeNull();
+      expect(event.description).not.toContain('\n\n');
       expect(event.image.url).toMatch(/^https:\/\//);
       expect(event.image.url).not.toContain('token=');
     }

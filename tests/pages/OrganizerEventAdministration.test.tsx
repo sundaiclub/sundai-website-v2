@@ -1,5 +1,11 @@
 import React from 'react';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 
 const mockUseTheme = jest.fn();
 const mockUseUserContext = jest.fn();
@@ -14,7 +20,11 @@ jest.mock('../../src/app/contexts/UserContext', () => ({
 
 jest.mock('next/navigation', () => ({
   usePathname: () => '/organizer/events/event-ai-build-night',
-  useRouter: () => ({ push: jest.fn(), replace: jest.fn(), refresh: jest.fn() }),
+  useRouter: () => ({
+    push: jest.fn(),
+    replace: jest.fn(),
+    refresh: jest.fn(),
+  }),
 }));
 
 const eventId = 'event-ai-build-night';
@@ -41,6 +51,7 @@ const adminWorkspace = {
   effectiveRole: 'CHAPTER_ADMIN',
   capabilities: {
     administerEvent: true,
+    editEventSettings: true,
     assignStaff: true,
     decideApplicants: true,
     manageOperations: true,
@@ -54,13 +65,28 @@ const adminWorkspace = {
     { id: 'staff-mc', hackerId: 'hacker-mc', name: 'Morgan MC', role: 'MC' },
   ],
   counts: {
-    registrations: { pending: 1, approved: 2, waitlisted: 0, declined: 0, cancelled: 0 },
+    registrations: {
+      pending: 1,
+      approved: 2,
+      waitlisted: 0,
+      declined: 0,
+      cancelled: 0,
+    },
     projects: { total: 0, submittedCards: 0 },
     pitch: { queued: 0, pitched: 0, highlighted: 0 },
     materials: 0,
     communications: 0,
   },
-  availableSections: ['overview', 'registrations', 'communications', 'materials', 'projects', 'pitch', 'notes', 'reporting'],
+  availableSections: [
+    'overview',
+    'registrations',
+    'communications',
+    'materials',
+    'projects',
+    'pitch',
+    'notes',
+    'reporting',
+  ],
   unavailable: ['checkIn', 'attendance', 'noShows'],
 };
 
@@ -74,13 +100,18 @@ function jsonResponse(data: unknown, status = 200) {
 }
 
 function requestUrl(input: RequestInfo | URL) {
-  return typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+  return typeof input === 'string'
+    ? input
+    : input instanceof URL
+      ? input.toString()
+      : input.url;
 }
 
 function mockAdministrationFetch(workspace = adminWorkspace) {
   global.fetch = jest.fn((input: RequestInfo | URL, init?: RequestInit) => {
     const url = new URL(requestUrl(input), 'http://localhost');
-    if (url.pathname === `/api/events/${eventId}/workspace`) return jsonResponse(workspace);
+    if (url.pathname === `/api/events/${eventId}/workspace`)
+      return jsonResponse(workspace);
     if (url.pathname === '/api/hackers') return jsonResponse(staffCandidates);
     if (url.pathname === `/api/events/${eventId}/staff` && !init?.method) {
       return jsonResponse(workspace.staff);
@@ -99,20 +130,34 @@ function mockAdministrationFetch(workspace = adminWorkspace) {
         ],
       });
     }
-    if (url.pathname === `/api/events/${eventId}/staff` && init?.method === 'POST') {
+    if (
+      url.pathname === `/api/events/${eventId}/staff` &&
+      init?.method === 'POST'
+    ) {
       return jsonResponse(
-        { id: 'staff-new', hackerId: 'hacker-casey', name: 'Casey Organizer', ...JSON.parse(String(init.body)) },
+        {
+          id: 'staff-new',
+          hackerId: 'hacker-casey',
+          name: 'Casey Organizer',
+          ...JSON.parse(String(init.body)),
+        },
         201
       );
     }
-    if (url.pathname === `/api/events/${eventId}/staff/staff-mc` && init?.method === 'DELETE') {
+    if (
+      url.pathname === `/api/events/${eventId}/staff/staff-mc` &&
+      init?.method === 'DELETE'
+    ) {
       return jsonResponse(null, 204);
     }
     return jsonResponse({ error: `Unexpected request: ${url.pathname}` }, 500);
   }) as jest.Mock;
 }
 
-function loadLayout(): React.ComponentType<{ children: React.ReactNode; params: { eventId: string } }> {
+function loadLayout(): React.ComponentType<{
+  children: React.ReactNode;
+  params: { eventId: string };
+}> {
   return require('../../src/app/organizer/events/[eventId]/layout').default;
 }
 
@@ -134,45 +179,91 @@ describe('/organizer/events/[eventId] administration', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockUseTheme.mockReturnValue({ isDarkMode: false });
-    mockUseUserContext.mockReturnValue({ isAdmin: false, loading: false, userInfo: { id: 'hacker-admin', role: 'HACKER' } });
+    mockUseUserContext.mockReturnValue({
+      isAdmin: false,
+      loading: false,
+      userInfo: { id: 'hacker-admin', role: 'HACKER' },
+    });
     mockAdministrationFetch();
   });
 
   afterEach(cleanup);
 
-  it('shows settings, lifecycle, and staff controls only to event administrators', async () => {
+  it('lets MCs edit settings while keeping lifecycle and staff controls admin-only', async () => {
     renderAdministration();
-    expect(await screen.findByRole('link', { name: /edit event details/i })).toHaveAttribute(
-      'href',
-      `/organizer/events/${eventId}/settings`
-    );
-    expect(screen.getByRole('button', { name: /add|assign staff/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /unpublish/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /cancel event/i })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('link', { name: /edit event details/i })
+    ).toHaveAttribute('href', `/organizer/events/${eventId}/settings`);
+    expect(
+      screen.getByRole('button', { name: /add|assign staff/i })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /unpublish/i })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /cancel event/i })
+    ).toBeInTheDocument();
 
     cleanup();
     mockAdministrationFetch({
       ...adminWorkspace,
       effectiveRole: 'MC',
-      capabilities: { ...adminWorkspace.capabilities, administerEvent: false, assignStaff: false, viewNoteHistory: false },
+      capabilities: {
+        ...adminWorkspace.capabilities,
+        administerEvent: false,
+        editEventSettings: true,
+        assignStaff: false,
+        viewNoteHistory: false,
+      },
     });
     renderAdministration();
     await screen.findByText('AI Build Night');
-    expect(screen.queryByRole('button', { name: /add|assign staff/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /publish|unpublish|cancel event/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: /edit event details/i })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /add|assign staff/i })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /publish|unpublish|cancel event/i })
+    ).not.toBeInTheDocument();
+    expect(
+      await screen.findByRole('link', { name: /edit event details/i })
+    ).toHaveAttribute('href', `/organizer/events/${eventId}/settings`);
+
+    cleanup();
+    mockAdministrationFetch({
+      ...adminWorkspace,
+      effectiveRole: 'CO_MC',
+      capabilities: {
+        ...adminWorkspace.capabilities,
+        administerEvent: false,
+        editEventSettings: false,
+        assignStaff: false,
+        viewNoteHistory: false,
+      },
+    });
+    renderAdministration();
+    await screen.findByText('AI Build Night');
+    expect(
+      screen.queryByRole('link', { name: /edit event details/i })
+    ).not.toBeInTheDocument();
   });
 
   it('assigns an MC or co-MC through the event-scoped staff endpoint', async () => {
     renderAdministration();
-    fireEvent.click(await screen.findByRole('button', { name: /add|assign staff/i }));
+    fireEvent.click(
+      await screen.findByRole('button', { name: /add|assign staff/i })
+    );
     fireEvent.change(await screen.findByPlaceholderText(/search members/i), {
       target: { value: 'Casey' },
     });
-    fireEvent.click(await screen.findByRole('button', { name: /casey organizer/i }));
-    fireEvent.change(await screen.findByLabelText(/staff role for casey organizer/i), {
-      target: { value: 'CO_MC' },
-    });
+    fireEvent.click(
+      await screen.findByRole('button', { name: /casey organizer/i })
+    );
+    fireEvent.change(
+      await screen.findByLabelText(/staff role for casey organizer/i),
+      {
+        target: { value: 'CO_MC' },
+      }
+    );
 
     expect(global.fetch).not.toHaveBeenCalledWith(
       `/api/events/${eventId}/staff`,
@@ -194,7 +285,9 @@ describe('/organizer/events/[eventId] administration', () => {
   it('confirms staff removal and refreshes the visible assignment list', async () => {
     const confirm = jest.spyOn(window, 'confirm').mockReturnValue(true);
     renderAdministration();
-    fireEvent.click(await screen.findByRole('button', { name: /remove morgan mc/i }));
+    fireEvent.click(
+      await screen.findByRole('button', { name: /remove morgan mc/i })
+    );
     expect(confirm).toHaveBeenCalled();
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith(
@@ -208,7 +301,9 @@ describe('/organizer/events/[eventId] administration', () => {
 
   it('shows immutable staff audit history with actor, action, role, and time', async () => {
     renderAdministration();
-    fireEvent.click(await screen.findByRole('button', { name: /staff audit|view history/i }));
+    fireEvent.click(
+      await screen.findByRole('button', { name: /staff audit|view history/i })
+    );
     expect(await screen.findByText('Alex Admin')).toBeInTheDocument();
     expect(screen.getByText(/assigned/i)).toBeInTheDocument();
     expect(screen.getByText(/morgan mc/i)).toBeInTheDocument();

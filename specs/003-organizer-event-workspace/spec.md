@@ -8,7 +8,7 @@
 
 **Input**: User description: "Phase 4 from GitHub issue #145, using parent issue #147 and its linked phase issues for context. Phase 3 in issue #144 is intentionally skipped because it is optional for the next steps and will be redesigned."
 
-## User Scenarios & Testing *(mandatory)*
+## User Scenarios & Testing _(mandatory)_
 
 ### User Story 1 - Organizers Run an Event From One Workspace (Priority: P1)
 
@@ -122,7 +122,7 @@ Site admins and chapter admins can manage event staff and lifecycle actions with
 - If a hacker is globally blocked, non-site-admin organizers do not see the hacker, a hidden count, or ban information through workspace audiences, notes, registrations, projects, or exports.
 - If phase 3-derived concepts such as checked-in attendees or no-shows are requested, the workspace treats them as unavailable until the redesigned check-in and attendance phase is specified and delivered.
 
-## Requirements *(mandatory)*
+## Requirements _(mandatory)_
 
 ### Functional Requirements
 
@@ -132,9 +132,9 @@ Site admins and chapter admins can manage event staff and lifecycle actions with
 - **FR-004**: The workspace overview MUST show current registration counts by supported status and current project-card and pitch counts without exposing globally blocked registrations to non-site-admin roles.
 - **FR-005**: Site admins MUST be able to access and administratively manage any event workspace.
 - **FR-006**: Chapter admins MUST be able to access and administratively manage event workspaces only for their chapters.
-- **FR-007**: Assigned MCs MUST be able to manage event operations, communications, materials, projects, pitch controls, organizer notes, and applicant decisions for their assigned events.
+- **FR-007**: Assigned MCs MUST be able to edit event settings and manage event operations, communications, materials, projects, pitch controls, organizer notes, and applicant decisions for their assigned events.
 - **FR-008**: Assigned co-MCs MUST be able to manage event operations, communications, materials, projects, pitch controls, and organizer notes for their assigned events, but MUST NOT approve, waitlist, decline, block, or otherwise decide applicants.
-- **FR-009**: MC and co-MC assignments alone MUST NOT grant staff-assignment, publishing, unpublishing, cancellation, or cross-event administrative authority.
+- **FR-009**: MC and co-MC assignments alone MUST NOT grant staff-assignment, publishing, unpublishing, cancellation, application open/close, or cross-event administrative authority; co-MC assignments alone MUST NOT grant event-settings edit authority.
 - **FR-010**: Site admins and in-scope chapter admins MUST be able to assign and remove event MCs and co-MCs.
 - **FR-011**: All workspace reads and writes MUST verify the organizer's current role and current event or chapter scope at the time of the action.
 - **FR-012**: The workspace MUST integrate the completed registration-review experience so organizer role boundaries and global-ban filtering remain unchanged.
@@ -173,7 +173,7 @@ Site admins and chapter admins can manage event staff and lifecycle actions with
 - **FR-045**: Creating a project while a published event is in progress MUST attach it to each relevant event where the creator has active chapter membership or an approved, non-cancelled registration.
 - **FR-046**: Adding a project to a pitch session linked to an event MUST also attach the project to that event, atomically and without duplicating project identity.
 
-### Key Entities *(include if feature involves data)*
+### Key Entities _(include if feature involves data)_
 
 - **Organizer Event Workspace**: The event-scoped operational view that assembles overview, registrations, communications, materials, projects, pitch, notes, and reporting-preview capabilities according to the current organizer's role.
 - **Event Staff Assignment**: An event-scoped MC or co-MC relationship controlling operational access, with applicant-decision authority reserved for MCs.
@@ -184,7 +184,7 @@ Site admins and chapter admins can manage event staff and lifecycle actions with
 - **Event Project Participation**: The relationship connecting a reusable project to an event, including event-specific card readiness, pitch state, outcome, and highlight state.
 - **Audit Record**: A timestamped record of a significant organizer action and its actor, retained for operational accountability.
 
-## Success Criteria *(mandatory)*
+## Success Criteria _(mandatory)_
 
 ### Measurable Outcomes
 

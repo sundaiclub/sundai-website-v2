@@ -208,7 +208,7 @@ describe('event management permission contexts', () => {
         canViewPublicChapter: true,
         canViewPrivateChapter: false,
         canManageChapterSettings: false,
-        canManageEventSettings: false,
+        canManageEventSettings: true,
         canManagePitch: true,
         canManageRegistrations: true,
         canDecideRegistrations: true,
@@ -607,9 +607,9 @@ describe('event management permission contexts', () => {
         expect(canEditOrganizerNoteWithContext(organizerContext)).toBe(
           expected.canEditRelevantNote
         );
-        expect(
-          canViewOrganizerNoteRevisionsWithContext(organizerContext)
-        ).toBe(expected.canViewRelevantNoteRevisions);
+        expect(canViewOrganizerNoteRevisionsWithContext(organizerContext)).toBe(
+          expected.canViewRelevantNoteRevisions
+        );
       }
     );
   });

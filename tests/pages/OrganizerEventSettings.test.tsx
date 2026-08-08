@@ -137,7 +137,9 @@ function mockEventFetch(event = eventSettings) {
     const url = requestUrl(input);
 
     if (url === `/api/events/${event.id}/workspace`) {
-      return jsonResponse({ capabilities: { administerEvent: true } });
+      return jsonResponse({
+        capabilities: { administerEvent: true, editEventSettings: true },
+      });
     }
 
     if (url === `/api/events/${event.id}?management=true`) {
@@ -236,7 +238,9 @@ describe('/organizer/events/[eventId]/settings', () => {
       const url = requestUrl(input);
 
       if (url === `/api/events/${draftEventSettings.id}/workspace`) {
-        return jsonResponse({ capabilities: { administerEvent: true } });
+        return jsonResponse({
+          capabilities: { administerEvent: true, editEventSettings: true },
+        });
       }
 
       if (url === `/api/events/${draftEventSettings.id}?management=true`) {
@@ -320,7 +324,9 @@ describe('/organizer/events/[eventId]/settings', () => {
       const url = requestUrl(input);
 
       if (url === `/api/events/${eventSettings.id}/workspace`) {
-        return jsonResponse({ capabilities: { administerEvent: true } });
+        return jsonResponse({
+          capabilities: { administerEvent: true, editEventSettings: true },
+        });
       }
 
       if (url === `/api/events/${eventSettings.id}?management=true`) {
@@ -371,7 +377,9 @@ describe('/organizer/events/[eventId]/settings', () => {
       const url = requestUrl(input);
 
       if (url === `/api/events/${closedEventSettings.id}/workspace`) {
-        return jsonResponse({ capabilities: { administerEvent: true } });
+        return jsonResponse({
+          capabilities: { administerEvent: true, editEventSettings: true },
+        });
       }
 
       if (url === `/api/events/${closedEventSettings.id}?management=true`) {
@@ -495,7 +503,9 @@ describe('/organizer/events/[eventId]/settings', () => {
       const url = requestUrl(input);
 
       if (url === `/api/events/${eventSettings.id}/workspace`) {
-        return jsonResponse({ capabilities: { administerEvent: true } });
+        return jsonResponse({
+          capabilities: { administerEvent: true, editEventSettings: true },
+        });
       }
 
       if (url === `/api/events/${eventSettings.id}?management=true`) {
@@ -599,6 +609,61 @@ describe('/organizer/events/[eventId]/settings', () => {
       })
     );
     expect(patchBodyForEvent()).not.toHaveProperty('visibility');
+  });
+
+  it('lets an MC save event details without staff or lifecycle authority', async () => {
+    global.fetch = jest.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = requestUrl(input);
+
+      if (url === `/api/events/${eventSettings.id}/workspace`) {
+        return jsonResponse({
+          capabilities: {
+            administerEvent: false,
+            editEventSettings: true,
+          },
+        });
+      }
+      if (url === `/api/events/${eventSettings.id}?management=true`) {
+        return jsonResponse({
+          ...eventSettings,
+          canAdminister: false,
+          canDelete: false,
+        });
+      }
+      if (
+        url === `/api/events/${eventSettings.id}` &&
+        init?.method === 'PATCH'
+      ) {
+        return jsonResponse({ ...eventSettings, title: 'MC updated title' });
+      }
+      return jsonResponse({});
+    }) as jest.Mock;
+
+    renderSettingsPage();
+
+    fireEvent.change(await screen.findByLabelText(/title/i), {
+      target: { value: 'MC updated title' },
+    });
+    expect(
+      screen.queryByRole('checkbox', { name: /applications open/i })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /^mcs$/i })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /^co-mcs$/i })
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(topSaveSettingsButton()!);
+
+    await waitFor(() => expect(patchBodyForEvent()).not.toBeNull());
+    expect(patchBodyForEvent()).toEqual(
+      expect.objectContaining({ title: 'MC updated title' })
+    );
+    expect(patchBodyForEvent()).not.toHaveProperty('staff');
+    expect(patchBodyForEvent()).not.toHaveProperty('applicationsOpen');
+    expect(patchBodyForEvent()).not.toHaveProperty('applicationsCloseReason');
+    expect(patchBodyForEvent()).not.toHaveProperty('status');
   });
 
   it('denies event settings controls when the management read is forbidden', async () => {

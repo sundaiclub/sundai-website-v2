@@ -180,14 +180,20 @@ export function canManageChapterMembersWithContext(
 export function canManageEventSettingsWithContext({
   actor,
   chapterMembership,
+  staff,
 }: EventPermissionContext): boolean {
-  return isSiteAdminActor(actor) || isChapterAdminMembership(chapterMembership);
+  return (
+    isSiteAdminActor(actor) ||
+    isChapterAdminMembership(chapterMembership) ||
+    isEventMcStaff(staff)
+  );
 }
 
-export function canAdministerEventWithContext(
-  context: EventPermissionContext
-): boolean {
-  return canManageEventSettingsWithContext(context);
+export function canAdministerEventWithContext({
+  actor,
+  chapterMembership,
+}: EventPermissionContext): boolean {
+  return isSiteAdminActor(actor) || isChapterAdminMembership(chapterMembership);
 }
 
 export function canAccessEventWorkspaceWithContext({
