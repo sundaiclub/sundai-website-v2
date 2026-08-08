@@ -547,7 +547,7 @@ export default function ChapterLandingPage({
           </ManagementSection>
 
           <ManagementSection title="Previous events">
-            <div className="grid max-w-2xl gap-4 sm:grid-cols-2">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {(chapter?.previousEvents ?? []).map(event => (
                 <EventSummaryCard
                   event={event}
@@ -558,7 +558,7 @@ export default function ChapterLandingPage({
                 />
               ))}
               {(chapter?.previousEvents ?? []).length === 0 && (
-                <div className="sm:col-span-2">
+                <div className="sm:col-span-2 lg:col-span-3">
                   <ManagementEmptyState>
                     No previous events are listed.
                   </ManagementEmptyState>

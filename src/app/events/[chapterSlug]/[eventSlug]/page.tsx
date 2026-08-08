@@ -5,7 +5,6 @@ import {
   EventDetailSections,
   EventMaterialsSection,
   EventPitchSection,
-  EventProgramHighlights,
   type PublicEventMaterialLink,
 } from '@/app/components/EventDetailSections';
 import { PublicEventHero } from '@/app/components/EventHeroImage';
@@ -179,12 +178,7 @@ export default async function PublicEventDetailPage({
         }
       />
 
-      <div className="mt-6 grid gap-5">
-        <EventProgramHighlights
-          experts={event.publicExpertText}
-          format={event.publicProgramLabel}
-          partners={event.publicSponsorText}
-        />
+      <div className="mt-6 grid min-w-0 gap-5">
         <EventProjectCarousel projects={eventProjects} />
         <EventDetailSections
           event={event}
