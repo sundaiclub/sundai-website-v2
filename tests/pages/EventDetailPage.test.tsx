@@ -493,9 +493,6 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
     await expectSomeText(/ai build night/i);
     await expectSomeText(/sundai boston/i);
     await expectSomeText(/bring a laptop and a project idea/i);
-    await expectSomeText(/builder sprint/i);
-    await expectSomeText(/community dinner sponsored/i);
-    await expectSomeText(/expert mentors/i);
     await expectSomeText(/boston, ma/i);
     await expectSomeText(/july 10, 2026/i);
     await expectSomeText(/6:00\s*pm|6 pm/i);
@@ -510,6 +507,30 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
       'src',
       expect.stringContaining('sundai_logo_light_horizontal.svg')
     );
+    expect(
+      screen.queryByRole('heading', { name: /what to expect/i })
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/builder sprint/i)).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/community dinner sponsored/i)
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/expert mentors/i)).not.toBeInTheDocument();
+  });
+
+  it('preserves line breaks in the event description', async () => {
+    await renderDetailPage(
+      buildEventDetail({ description: 'First event line\nSecond event line' })
+    );
+
+    const description = screen.getByText((_, element) => {
+      return element?.tagName === 'DIV' &&
+        element.classList.contains('whitespace-pre-wrap') &&
+        element.textContent === 'First event line\nSecond event line'
+        ? true
+        : false;
+    });
+
+    expect(description).toHaveClass('whitespace-pre-wrap');
   });
 
   it('shows uploaded event artwork on the public event page', async () => {
@@ -572,6 +593,17 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
       Array.from(new Set(projectLinks.map(link => link.getAttribute('href'))))
     ).toEqual(['/projects/project-high', '/projects/project-low']);
     expect(screen.getByText(/8 votes/)).toBeInTheDocument();
+    expect(
+      screen.getByRole('list', {
+        name: /event projects ranked by pitch votes/i,
+      })
+    ).toHaveClass(
+      'min-w-0',
+      'max-w-full',
+      'snap-x',
+      'overflow-x-auto',
+      'overscroll-x-contain'
+    );
     expect(
       carouselHeading.compareDocumentPosition(registrationHeading) &
         Node.DOCUMENT_POSITION_FOLLOWING

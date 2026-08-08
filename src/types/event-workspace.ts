@@ -21,6 +21,7 @@ export type WorkspaceUnavailableMetric = 'checkIn' | 'attendance' | 'noShows';
 
 export interface EventWorkspaceCapabilities {
   administerEvent: boolean;
+  editEventSettings: boolean;
   assignStaff: boolean;
   decideApplicants: boolean;
   manageOperations: boolean;

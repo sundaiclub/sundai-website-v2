@@ -25,6 +25,7 @@ Returns event identity, capability flags, overview aggregates, staff, public URL
   },
   "capabilities": {
     "administerEvent": false,
+    "editEventSettings": false,
     "assignStaff": false,
     "decideApplicants": false,
     "manageOperations": true,

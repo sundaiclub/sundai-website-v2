@@ -70,56 +70,58 @@ export function EventProjectCarousel({
   }
 
   return (
-    <ManagementSection
-      title="Projects from this event"
-      description="Explore every project, ordered by the number of likes it received during the pitch vote."
-      actions={
-        projects.length > 1 ? (
-          <div className="flex gap-2">
-            <button
-              aria-label="Show previous event projects"
-              className={classes.secondaryButton}
-              onClick={() => move(-1)}
-              type="button"
-            >
-              <span aria-hidden="true">←</span>
-            </button>
-            <button
-              aria-label="Show next event projects"
-              className={classes.secondaryButton}
-              onClick={() => move(1)}
-              type="button"
-            >
-              <span aria-hidden="true">→</span>
-            </button>
-          </div>
-        ) : null
-      }
-      size="large"
-    >
-      <ol
-        aria-label="Event projects ranked by pitch votes"
-        className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-3"
-        ref={listRef}
+    <div className="min-w-0 max-w-full overflow-hidden">
+      <ManagementSection
+        title="Projects from this event"
+        description="Explore every project, ordered by the number of likes it received during the pitch vote."
+        actions={
+          projects.length > 1 ? (
+            <div className="flex gap-2">
+              <button
+                aria-label="Show previous event projects"
+                className={classes.secondaryButton}
+                onClick={() => move(-1)}
+                type="button"
+              >
+                <span aria-hidden="true">←</span>
+              </button>
+              <button
+                aria-label="Show next event projects"
+                className={classes.secondaryButton}
+                onClick={() => move(1)}
+                type="button"
+              >
+                <span aria-hidden="true">→</span>
+              </button>
+            </div>
+          ) : null
+        }
+        size="large"
       >
-        {eventProjects.map((project, index) => (
-          <li
-            className="w-[85%] shrink-0 snap-start sm:w-80"
-            key={project.id}
-          >
-            <ProjectCard
-              project={project}
-              userInfo={userInfo}
-              handleLike={handleLike}
-              isDarkMode={isDarkMode}
-              show_status={false}
-              show_team={true}
-              variant="trending"
-              imageBadge={`#${index + 1} · ${project.pitchVoteCount} ${project.pitchVoteCount === 1 ? 'vote' : 'votes'}`}
-            />
-          </li>
-        ))}
-      </ol>
-    </ManagementSection>
+        <ol
+          aria-label="Event projects ranked by pitch votes"
+          className="flex min-w-0 max-w-full snap-x snap-mandatory gap-4 overflow-x-auto overscroll-x-contain pb-3"
+          ref={listRef}
+        >
+          {eventProjects.map((project, index) => (
+            <li
+              className="w-[85%] min-w-0 shrink-0 snap-start sm:w-80"
+              key={project.id}
+            >
+              <ProjectCard
+                project={project}
+                userInfo={userInfo}
+                handleLike={handleLike}
+                isDarkMode={isDarkMode}
+                show_status={false}
+                show_team={true}
+                variant="trending"
+                imageBadge={`#${index + 1} · ${project.pitchVoteCount} ${project.pitchVoteCount === 1 ? 'vote' : 'votes'}`}
+              />
+            </li>
+          ))}
+        </ol>
+      </ManagementSection>
+    </div>
   );
 }

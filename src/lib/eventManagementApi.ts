@@ -158,7 +158,7 @@ async function requireCurrentEventCapability(
     hacker.id,
     event.chapterId
   );
-  const staff = event.staff[0] ?? null;
+  const staff = event.staff?.[0] ?? null;
 
   if (!canAccess({ actor: hacker, chapterMembership, staff })) {
     return { hacker, event: null, response: forbidden() };

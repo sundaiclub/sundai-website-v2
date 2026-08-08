@@ -189,7 +189,7 @@ export default function OrganizerEventOverviewPage({
                 Open pitch controller
               </ManagementLinkButton>
             )}
-            {capabilities.administerEvent && (
+            {capabilities.editEventSettings && (
               <ManagementLinkButton
                 href={`/organizer/events/${params.eventId}/settings`}
                 variant="primary"

@@ -114,48 +114,6 @@ export function AddToCalendarAction({
   );
 }
 
-export function EventProgramHighlights({
-  format,
-  partners,
-  experts,
-}: {
-  format?: string | null;
-  partners?: string | null;
-  experts?: string | null;
-}) {
-  const classes = useManagementClasses();
-  const highlights = [
-    { label: 'Format', value: format, emphasize: true },
-    { label: 'Partners', value: partners },
-    { label: 'Experts', value: experts },
-  ].filter(highlight => highlight.value);
-
-  if (highlights.length === 0) return null;
-
-  return (
-    <ManagementSection
-      title="What to expect"
-      description="A quick look at the event program and community."
-      size="large"
-    >
-      <div className="grid gap-3 text-base leading-7 sm:grid-cols-3">
-        {highlights.map(highlight => (
-          <div className={`${classes.subtlePanel} p-4`} key={highlight.label}>
-            <p
-              className={`text-xs font-bold uppercase tracking-wide ${classes.mutedText}`}
-            >
-              {highlight.label}
-            </p>
-            <p className={`mt-2 ${highlight.emphasize ? 'font-semibold' : ''}`}>
-              {highlight.value}
-            </p>
-          </div>
-        ))}
-      </div>
-    </ManagementSection>
-  );
-}
-
 export function EventDetailSections({
   event,
   viewerProfile,

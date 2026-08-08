@@ -78,7 +78,7 @@ export function PublicEventHero({
         </h1>
         {event.description && (
           <EventMarkdown
-            className={`prose mt-4 max-w-3xl text-base leading-7 prose-headings:mb-2 prose-headings:mt-4 prose-p:my-2 prose-a:text-current prose-li:my-0 ${
+            className={`prose mt-4 max-w-3xl whitespace-pre-wrap text-base leading-7 prose-headings:mb-2 prose-headings:mt-4 prose-p:my-2 prose-a:text-current prose-li:my-0 ${
               classes.isDarkMode ? 'prose-invert' : 'prose-gray'
             } ${classes.mutedText}`}
             markdown={event.description}

@@ -9,6 +9,7 @@ import {
   canManageEventNotesWithContext,
   canManageEventOperationsWithContext,
   canManageEventPitchWithContext,
+  canManageEventSettingsWithContext,
   isSiteAdminActor,
 } from '@/lib/eventManagementAuth';
 import type {
@@ -58,6 +59,7 @@ function projectCapabilities(
 
   return {
     administerEvent,
+    editEventSettings: canManageEventSettingsWithContext(context),
     assignStaff: administerEvent,
     decideApplicants: canDecideEventApplicantsWithContext(context),
     manageOperations: canManageEventOperationsWithContext(context),
