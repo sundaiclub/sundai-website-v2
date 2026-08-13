@@ -24,7 +24,12 @@ function sortChapters(chapters: PublicEventChapterSummary[]) {
 
 export default function EventsPage() {
   const classes = useManagementClasses();
-  const [events, setEvents] = useState<PublicEventCardData[]>([]);
+  const [upcomingEvents, setUpcomingEvents] = useState<PublicEventCardData[]>(
+    []
+  );
+  const [previousEvents, setPreviousEvents] = useState<PublicEventCardData[]>(
+    []
+  );
   const [chapters, setChapters] = useState<PublicEventChapterSummary[]>([]);
   const [selectedChapter, setSelectedChapter] = useState('');
   const [isLoading, setIsLoading] = useState(true);
@@ -38,17 +43,27 @@ export default function EventsPage() {
     setIsLoading(true);
     setLoadError('');
 
-    const queryString = params.toString();
+    const upcomingQueryString = params.toString();
+    params.set('period', 'previous');
+    const previousQueryString = params.toString();
 
     Promise.all([
-      fetch(`/api/events${queryString ? `?${queryString}` : ''}`).then(
-        response => {
-          if (!response.ok) {
-            throw new Error(`Events request failed with ${response.status}`);
-          }
-          return response.json() as Promise<PublicEventCardData[]>;
+      fetch(
+        `/api/events${upcomingQueryString ? `?${upcomingQueryString}` : ''}`
+      ).then(response => {
+        if (!response.ok) {
+          throw new Error(`Events request failed with ${response.status}`);
         }
-      ),
+        return response.json() as Promise<PublicEventCardData[]>;
+      }),
+      fetch(`/api/events?${previousQueryString}`).then(response => {
+        if (!response.ok) {
+          throw new Error(
+            `Previous events request failed with ${response.status}`
+          );
+        }
+        return response.json() as Promise<PublicEventCardData[]>;
+      }),
       fetch('/api/chapters').then(response => {
         if (!response.ok) {
           throw new Error(`Chapters request failed with ${response.status}`);
@@ -56,14 +71,16 @@ export default function EventsPage() {
         return response.json() as Promise<PublicEventChapterSummary[]>;
       }),
     ])
-      .then(([nextEvents, chaptersPayload]) => {
+      .then(([nextUpcomingEvents, nextPreviousEvents, chaptersPayload]) => {
         if (cancelled) return;
-        setEvents(nextEvents);
+        setUpcomingEvents(nextUpcomingEvents);
+        setPreviousEvents(nextPreviousEvents);
         setChapters(sortChapters(chaptersPayload));
       })
       .catch(() => {
         if (!cancelled) {
-          setEvents([]);
+          setUpcomingEvents([]);
+          setPreviousEvents([]);
           setLoadError('Unable to load events.');
         }
       })
@@ -84,8 +101,8 @@ export default function EventsPage() {
   return (
     <ManagementPage>
       <ManagementHeader
-        title="Upcoming Events"
-        description="Browse published Sundai events and find the next gathering in your chapter."
+        title="Events"
+        description="Browse published Sundai events from chapters around the world."
       />
 
       {loadError && (
@@ -116,35 +133,61 @@ export default function EventsPage() {
         </select>
       </div>
 
-      {isLoading ? (
-        <ManagementEmptyState>Loading events.</ManagementEmptyState>
-      ) : events.length === 0 ? (
-        <ManagementEmptyState>
-          No upcoming events are available.
-        </ManagementEmptyState>
-      ) : (
-        <div className="flex flex-wrap gap-4">
-          {events.map(event => (
-            <div className="w-full sm:w-80" key={event.id}>
-              <EventSummaryCard
-                badges={
-                  <>
-                    <PublicEventStatusBadge status={event.publicStatus} />
-                    {event.viewerRegistrationStatus && (
-                      <ViewerRegistrationStatusBadge
-                        status={event.viewerRegistrationStatus}
-                      />
-                    )}
-                  </>
-                }
-                event={event}
-                eyebrow={event.chapterName}
-                href={`/events/${event.chapterSlug}/${event.slug}`}
-              />
-            </div>
-          ))}
-        </div>
-      )}
+      <section aria-labelledby="upcoming-events-heading">
+        <h2 className="mb-4 text-2xl font-bold" id="upcoming-events-heading">
+          Upcoming events
+        </h2>
+        {isLoading ? (
+          <ManagementEmptyState>Loading events.</ManagementEmptyState>
+        ) : upcomingEvents.length === 0 ? (
+          <ManagementEmptyState>
+            No upcoming events are available.
+          </ManagementEmptyState>
+        ) : (
+          <EventCardGrid events={upcomingEvents} />
+        )}
+      </section>
+
+      <section aria-labelledby="previous-events-heading" className="mt-12">
+        <h2 className="mb-4 text-2xl font-bold" id="previous-events-heading">
+          Previous events
+        </h2>
+        {isLoading ? (
+          <ManagementEmptyState>Loading events.</ManagementEmptyState>
+        ) : previousEvents.length === 0 ? (
+          <ManagementEmptyState>
+            No previous events are available.
+          </ManagementEmptyState>
+        ) : (
+          <EventCardGrid events={previousEvents} />
+        )}
+      </section>
     </ManagementPage>
+  );
+}
+
+function EventCardGrid({ events }: { events: PublicEventCardData[] }) {
+  return (
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+      {events.map(event => (
+        <div className="min-w-0" key={event.id}>
+          <EventSummaryCard
+            badges={
+              <>
+                <PublicEventStatusBadge status={event.publicStatus} />
+                {event.viewerRegistrationStatus && (
+                  <ViewerRegistrationStatusBadge
+                    status={event.viewerRegistrationStatus}
+                  />
+                )}
+              </>
+            }
+            event={event}
+            eyebrow={event.chapterName}
+            href={`/events/${event.chapterSlug}/${event.slug}`}
+          />
+        </div>
+      ))}
+    </div>
   );
 }

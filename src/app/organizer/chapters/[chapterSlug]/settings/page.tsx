@@ -29,6 +29,7 @@ import type {
   OrganizerChapterSettings,
 } from '@/types/event-management';
 import { CHAPTER_TIMEZONE_GROUPS } from '@/lib/chapterTimezones';
+import { DEFAULT_EVENT_MESSAGES } from '@/lib/eventMessageDefaults';
 
 function firstChapter(payload: unknown): OrganizerChapterSettings | null {
   if (payload && typeof payload === 'object' && 'id' in payload) {
@@ -124,6 +125,19 @@ export default function OrganizerChapterSettingsPage({
   const [isLoadingAdminCandidates, setIsLoadingAdminCandidates] =
     useState(false);
   const [isInvitingAdmin, setIsInvitingAdmin] = useState(false);
+  const [approvalMessageDraft, setApprovalMessageDraft] = useState<string>(
+    DEFAULT_EVENT_MESSAGES.confirmation
+  );
+  const [rejectionMessageDraft, setRejectionMessageDraft] = useState<string>(
+    DEFAULT_EVENT_MESSAGES.decline
+  );
+  const [waitlistMessageDraft, setWaitlistMessageDraft] = useState<string>(
+    DEFAULT_EVENT_MESSAGES.waitlist
+  );
+  const [decisionDefaultsMessage, setDecisionDefaultsMessage] = useState('');
+  const [decisionDefaultsError, setDecisionDefaultsError] = useState('');
+  const [isSavingDecisionDefaults, setIsSavingDecisionDefaults] =
+    useState(false);
   const [flagHackerQuery, setFlagHackerQuery] = useState('');
   const [selectedFlagHacker, setSelectedFlagHacker] =
     useState<HackerSelectionOption | null>(null);
@@ -210,6 +224,16 @@ export default function OrganizerChapterSettingsPage({
         setChapter(nextChapter);
         setDescriptionDraft(nextChapter.description ?? '');
         setTimezoneDraft(nextChapter.timezone);
+        setApprovalMessageDraft(
+          nextChapter.defaultApprovalMessage ??
+            DEFAULT_EVENT_MESSAGES.confirmation
+        );
+        setRejectionMessageDraft(
+          nextChapter.defaultRejectionMessage ?? DEFAULT_EVENT_MESSAGES.decline
+        );
+        setWaitlistMessageDraft(
+          nextChapter.defaultWaitlistMessage ?? DEFAULT_EVENT_MESSAGES.waitlist
+        );
         setMembers(Array.isArray(membersPayload) ? membersPayload : []);
         setTemplates(templateList(templatesPayload));
         setBanFlags(Array.isArray(banFlagsPayload) ? banFlagsPayload : []);
@@ -272,7 +296,8 @@ export default function OrganizerChapterSettingsPage({
     event: React.ChangeEvent<HTMLInputElement>
   ) {
     if (!chapter) return;
-    const file = event.currentTarget.files?.[0];
+    const input = event.currentTarget;
+    const file = input.files?.[0];
     if (!file) return;
 
     setIsUploadingImage(true);
@@ -303,8 +328,48 @@ export default function OrganizerChapterSettingsPage({
           : 'Unable to upload chapter image.'
       );
     } finally {
-      event.currentTarget.value = '';
+      input.value = '';
       setIsUploadingImage(false);
+    }
+  }
+
+  async function saveDecisionDefaults(event: React.FormEvent) {
+    event.preventDefault();
+    if (!chapter) return;
+
+    setIsSavingDecisionDefaults(true);
+    setDecisionDefaultsMessage('');
+    setDecisionDefaultsError('');
+
+    try {
+      const response = await fetch(`/api/chapters/${chapter.id}`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          defaultApprovalMessage: approvalMessageDraft.trim(),
+          defaultWaitlistMessage: waitlistMessageDraft.trim(),
+          defaultRejectionMessage: rejectionMessageDraft.trim(),
+        }),
+      });
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        throw new Error(
+          payload?.message || 'Unable to save decision message defaults.'
+        );
+      }
+
+      const updatedChapter = firstChapter(await response.json());
+      if (updatedChapter) setChapter(updatedChapter);
+      setDecisionDefaultsMessage('Decision message defaults saved.');
+    } catch (error) {
+      setDecisionDefaultsError(
+        error instanceof Error
+          ? error.message
+          : 'Unable to save decision message defaults.'
+      );
+    } finally {
+      setIsSavingDecisionDefaults(false);
     }
   }
 
@@ -525,10 +590,10 @@ export default function OrganizerChapterSettingsPage({
             <div className="grid gap-4 md:grid-cols-[180px_minmax(0,1fr)]">
               <div className="min-w-0">
                 {chapter.heroImage?.url ? (
-                  <div className="relative aspect-[4/3] w-full overflow-hidden rounded-md">
+                  <div className="relative aspect-[3/2] w-full overflow-hidden rounded-md bg-black">
                     <Image
                       alt={chapter.heroImage.alt || `${chapter.name} chapter`}
-                      className="object-cover"
+                      className="object-contain"
                       fill
                       sizes="180px"
                       src={chapter.heroImage.url}
@@ -537,7 +602,7 @@ export default function OrganizerChapterSettingsPage({
                   </div>
                 ) : (
                   <div
-                    className={`${classes.subtlePanel} flex aspect-[4/3] items-center justify-center px-4 text-center text-sm ${classes.mutedText}`}
+                    className={`${classes.subtlePanel} flex aspect-[3/2] items-center justify-center px-4 text-center text-sm ${classes.mutedText}`}
                   >
                     No chapter image
                   </div>
@@ -737,49 +802,77 @@ export default function OrganizerChapterSettingsPage({
         </ManagementSection>
 
         <ManagementSection
-          title="Members"
-          description="Membership and notification state for this chapter."
-          actions={
-            <button className={classes.secondaryButton} type="button">
-              Invite member
-            </button>
-          }
+          title="Default decision messages"
+          description="Set the messages that new chapter events use by default."
         >
-          <div className={`divide-y ${classes.divider}`}>
-            {members.map(member => (
-              <div
-                key={member.id}
-                className="grid gap-3 py-3 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-center"
-              >
-                <div className="min-w-0">
-                  <div className="truncate font-semibold">
-                    {member.hacker?.name ||
-                      member.hacker?.email ||
-                      'Unnamed member'}
-                  </div>
-                  {member.hacker?.email && (
-                    <div className={`truncate text-sm ${classes.mutedText}`}>
-                      {member.hacker.email}
-                    </div>
-                  )}
-                </div>
-                <ManagementBadge
-                  tone={member.status === 'ACTIVE' ? 'success' : 'warning'}
-                >
-                  {member.status}
-                </ManagementBadge>
-                <div className={`text-sm ${classes.mutedText}`}>
-                  Notifications{' '}
-                  {member.notificationsAllowed ? 'enabled' : 'disabled'}
-                </div>
-              </div>
-            ))}
-            {members.length === 0 && (
-              <ManagementEmptyState>
-                No members have been added.
-              </ManagementEmptyState>
+          <form className="grid gap-4" onSubmit={saveDecisionDefaults}>
+            <p className={`text-sm ${classes.mutedText}`}>
+              These messages override the site defaults. Organizers can still
+              change them for each event.
+            </p>
+            {decisionDefaultsError && (
+              <ManagementAlert tone="danger">
+                {decisionDefaultsError}
+              </ManagementAlert>
             )}
-          </div>
+            {decisionDefaultsMessage && (
+              <ManagementAlert tone="success">
+                {decisionDefaultsMessage}
+              </ManagementAlert>
+            )}
+            <label className="grid gap-2">
+              <span className="text-sm font-semibold">
+                Default approval message
+              </span>
+              <textarea
+                aria-label="Default approval message"
+                className={classes.textarea}
+                onChange={event => setApprovalMessageDraft(event.target.value)}
+                required
+                value={approvalMessageDraft}
+              />
+            </label>
+            <label className="grid gap-2">
+              <span className="text-sm font-semibold">
+                Default waitlist message
+              </span>
+              <textarea
+                aria-label="Default waitlist message"
+                className={classes.textarea}
+                onChange={event => setWaitlistMessageDraft(event.target.value)}
+                required
+                value={waitlistMessageDraft}
+              />
+            </label>
+            <label className="grid gap-2">
+              <span className="text-sm font-semibold">
+                Default rejection message
+              </span>
+              <textarea
+                aria-label="Default rejection message"
+                className={classes.textarea}
+                onChange={event => setRejectionMessageDraft(event.target.value)}
+                required
+                value={rejectionMessageDraft}
+              />
+            </label>
+            <div>
+              <button
+                className={classes.primaryButton}
+                disabled={
+                  isSavingDecisionDefaults ||
+                  !approvalMessageDraft.trim() ||
+                  !waitlistMessageDraft.trim() ||
+                  !rejectionMessageDraft.trim()
+                }
+                type="submit"
+              >
+                {isSavingDecisionDefaults
+                  ? 'Saving...'
+                  : 'Save decision messages'}
+              </button>
+            </div>
+          </form>
         </ManagementSection>
 
         <ManagementSection
@@ -858,6 +951,52 @@ export default function OrganizerChapterSettingsPage({
             {banFlags.length === 0 && (
               <ManagementEmptyState>
                 No ban flags are open.
+              </ManagementEmptyState>
+            )}
+          </div>
+        </ManagementSection>
+
+        <ManagementSection
+          title="Members"
+          description="Membership and notification state for this chapter."
+          actions={
+            <button className={classes.secondaryButton} type="button">
+              Invite member
+            </button>
+          }
+        >
+          <div className={`divide-y ${classes.divider}`}>
+            {members.map(member => (
+              <div
+                key={member.id}
+                className="grid gap-3 py-3 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-center"
+              >
+                <div className="min-w-0">
+                  <div className="truncate font-semibold">
+                    {member.hacker?.name ||
+                      member.hacker?.email ||
+                      'Unnamed member'}
+                  </div>
+                  {member.hacker?.email && (
+                    <div className={`truncate text-sm ${classes.mutedText}`}>
+                      {member.hacker.email}
+                    </div>
+                  )}
+                </div>
+                <ManagementBadge
+                  tone={member.status === 'ACTIVE' ? 'success' : 'warning'}
+                >
+                  {member.status}
+                </ManagementBadge>
+                <div className={`text-sm ${classes.mutedText}`}>
+                  Notifications{' '}
+                  {member.notificationsAllowed ? 'enabled' : 'disabled'}
+                </div>
+              </div>
+            ))}
+            {members.length === 0 && (
+              <ManagementEmptyState>
+                No members have been added.
               </ManagementEmptyState>
             )}
           </div>

@@ -57,11 +57,11 @@ export default function EventSummaryCard({
         href={href}
       >
         <div
-          className={`${classes.subtlePanel} relative aspect-[16/9] w-full overflow-hidden`}
+          className={`${classes.subtlePanel} relative aspect-[3/2] w-full overflow-hidden !bg-black`}
         >
           <Image
             alt={event.image?.alt || `${event.title} event`}
-            className={event.image?.url ? 'object-cover' : 'object-contain p-8'}
+            className={event.image?.url ? 'object-contain' : 'object-contain p-8'}
             fill
             src={event.image?.url || placeholderLogo}
             sizes="(min-width: 640px) 420px, 100vw"

@@ -9,6 +9,7 @@ import {
   requireEventWorkspaceAccess,
   unauthorized,
 } from '@/lib/eventManagementApi';
+import { approveEventStaffRegistrations } from '@/lib/eventStaffRegistrations';
 import { canManageChapterSettings } from '@/lib/eventManagementAuth';
 
 export async function GET(
@@ -74,6 +75,11 @@ export async function POST(
         select: { id: true, role: true },
       });
       if (existing && existing.role === role) {
+        await approveEventStaffRegistrations(tx, {
+          eventId: event.id,
+          hackerIds: [hackerId],
+          actorId: actor.id,
+        });
         const unchanged = await tx.eventStaff.findFirst({
           where: { id: existing.id },
           include: {
@@ -109,6 +115,11 @@ export async function POST(
           fromRole: existing?.role ?? null,
           toRole: role,
         },
+      });
+      await approveEventStaffRegistrations(tx, {
+        eventId: event.id,
+        hackerIds: [hackerId],
+        actorId: actor.id,
       });
       return { staff, created: !existing };
     });

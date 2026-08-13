@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { sanitizeApprovedDetailsJson } from '@/lib/approvedEventDetails';
 import type {
   AddToCalendarPayload,
@@ -8,9 +9,15 @@ import type {
   PublicEventDetail,
   RegistrationStatus,
 } from '@/types/event-management';
-import { ManagementSection, useManagementClasses } from './ManagementSurface';
+import {
+  ManagementAlert,
+  ManagementSection,
+  useManagementClasses,
+} from './ManagementSurface';
 import { EventApplicationForm } from './EventApplicationForm';
 import { ViewerRegistrationStatusBadge } from './PublicEventCard';
+import ProjectMarkdown from './ProjectMarkdown';
+import { SignInAction } from './SignInAction';
 
 function encodeCalendarDate(value: string | Date) {
   return new Date(value)
@@ -67,8 +74,7 @@ function ApprovedOnlyDetails({
 
   return (
     <div>
-      <h3 className="text-base font-bold">Event-specific details</h3>
-      <dl className="mt-4 grid gap-4">
+      <dl className="grid gap-4">
         {entries.map(([key, value]) => (
           <div key={key}>
             {key.replace(/[^a-z0-9]/gi, '').toLowerCase() !== 'details' && (
@@ -87,6 +93,82 @@ function ApprovedOnlyDetails({
         ))}
       </dl>
     </div>
+  );
+}
+
+function EventApprovedDetailsSection({ event }: { event: PublicEventDetail }) {
+  const entries = event.approvedDetailsJson
+    ? detailEntries(event.approvedDetailsJson)
+    : [];
+
+  if (!event.approvedDetailsVisible || entries.length === 0) return null;
+
+  return (
+    <ManagementSection title="Event-specific details" size="large">
+      <ApprovedOnlyDetails event={event} />
+    </ManagementSection>
+  );
+}
+
+function EventTopRegistrationStatusSection({
+  event,
+}: {
+  event: PublicEventDetail;
+}) {
+  const classes = useManagementClasses();
+  const registration = event.viewerRegistration;
+  const registrationStatus =
+    registration?.status ?? event.viewerRegistrationStatus;
+  const isEventStaff = Boolean(event.viewerEventStaffRole);
+  const displayStatus = isEventStaff ? 'APPROVED' : registrationStatus;
+
+  if (!displayStatus) {
+    if (
+      event.applicationControls.publicMessage &&
+      !event.applicationControls.signInRequired
+    ) {
+      return (
+        <ManagementAlert>{event.applicationControls.publicMessage}</ManagementAlert>
+      );
+    }
+
+    return null;
+  }
+
+  const isPending = displayStatus === 'PENDING';
+
+  return (
+    <ManagementSection
+      actions={<ViewerRegistrationStatusBadge status={displayStatus} />}
+      description={
+        isEventStaff
+          ? 'Use the Manage button in the top right to approve users or make changes to the event.'
+          : event.applicationControls.publicMessage ||
+            registration?.publicSafeMessage ||
+            (isPending
+              ? 'Your application is pending review.'
+              : 'Your place at this event is confirmed.')
+      }
+      size="large"
+      title={
+        isEventStaff ? 'You are an MC' : registrationHeading(registrationStatus)
+      }
+    >
+      <div className="flex flex-wrap gap-2">
+        {isPending && registration?.canEditAnswers && (
+          <EventRegistrationAction
+            allowEditing
+            event={event}
+            viewerProfile={event.viewerProfile}
+          />
+        )}
+        {!isEventStaff && registration?.canCancel && (
+          <button type="button" className={classes.secondaryButton}>
+            Cancel registration
+          </button>
+        )}
+      </div>
+    </ManagementSection>
   );
 }
 
@@ -114,70 +196,172 @@ export function AddToCalendarAction({
   );
 }
 
-export function EventDetailSections({
+export function EventRegistrationAction({
   event,
   viewerProfile,
+  allowEditing = false,
 }: {
   event: PublicEventDetail;
   viewerProfile?: ProfilePrefillSource | null;
+  allowEditing?: boolean;
 }) {
   const classes = useManagementClasses();
-  const registration = event.viewerRegistration;
-  const registrationStatus =
-    registration?.status ?? event.viewerRegistrationStatus;
-  const showStatus = Boolean(
-    registrationStatus || event.applicationControls.publicMessage
+  const [isOpen, setIsOpen] = useState(false);
+  const canRegister =
+    !event.viewerRegistration &&
+    (event.applicationControls.signInRequired ||
+      (event.applicationControls.canSubmit &&
+        event.applicationQuestionSet.composedFields.length > 0));
+  const canEdit = Boolean(
+    allowEditing && event.viewerRegistration?.canEditAnswers
   );
-  const showApplication = Boolean(
-    registration?.canEditAnswers ||
-      (event.applicationQuestionSet.composedFields.length > 0 &&
-        event.applicationControls.canSubmit)
-  );
-  const approvedEntries = event.approvedDetailsJson
-    ? detailEntries(event.approvedDetailsJson)
-    : [];
-  const showApproved =
-    event.approvedDetailsVisible && approvedEntries.length > 0;
 
-  if (!showStatus && !showApplication && !showApproved) return null;
+  useEffect(() => {
+    if (!isOpen) return;
+    function closeOnEscape(keyEvent: KeyboardEvent) {
+      if (keyEvent.key === 'Escape') setIsOpen(false);
+    }
+    document.addEventListener('keydown', closeOnEscape);
+    return () => document.removeEventListener('keydown', closeOnEscape);
+  }, [isOpen]);
+
+  if (!canRegister && !canEdit) return null;
 
   return (
-    <ManagementSection
-      title={registrationHeading(registrationStatus)}
-      description={
-        event.applicationControls.publicMessage ||
-        (registrationStatus === 'APPROVED'
-          ? 'Your place at this event is confirmed.'
-          : 'Apply to take part in this event.')
-      }
-      actions={
-        registrationStatus ? (
-          <ViewerRegistrationStatusBadge status={registrationStatus} />
-        ) : null
-      }
-      size="large"
-    >
-      <div className={`grid gap-6 divide-y ${classes.divider}`}>
-        {showApproved && <ApprovedOnlyDetails event={event} />}
-        {showApplication && (
-          <div className={showApproved ? 'pt-6' : ''}>
-            <h3 className="mb-4 text-lg font-bold">Application</h3>
-            <EventApplicationForm
-              embedded
-              event={event}
-              viewerProfile={viewerProfile}
-            />
+    <>
+      <button
+        aria-haspopup="dialog"
+        className={canEdit ? classes.secondaryButton : classes.primaryButton}
+        onClick={() => setIsOpen(true)}
+        type="button"
+      >
+        {canEdit ? 'Edit application' : 'Register'}
+      </button>
+      {isOpen && (
+        <div
+          aria-labelledby="registration-dialog-title"
+          aria-modal="true"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+          onMouseDown={event => {
+            if (event.currentTarget === event.target) setIsOpen(false);
+          }}
+          role="dialog"
+        >
+          <div
+            className={`${classes.panel} max-h-[90vh] w-full max-w-2xl overflow-y-auto p-5 sm:p-7`}
+            style={{
+              backgroundColor: classes.isDarkMode ? '#111827' : '#ffffff',
+            }}
+          >
+            <div className="mb-6 flex items-start justify-between gap-4">
+              <div>
+                <p
+                  className={`text-xs font-bold uppercase ${classes.mutedText}`}
+                >
+                  {event.title}
+                </p>
+                <h2
+                  className="mt-1 text-2xl font-bold"
+                  id="registration-dialog-title"
+                >
+                  {canEdit
+                    ? 'Edit your application'
+                    : 'Register for this event'}
+                </h2>
+              </div>
+              <button
+                aria-label="Close registration"
+                className={classes.ghostButton}
+                onClick={() => setIsOpen(false)}
+                type="button"
+              >
+                <span aria-hidden="true">✕</span>
+              </button>
+            </div>
+            {event.applicationControls.signInRequired ? (
+              <SignInAction label="Sign in to register" />
+            ) : (
+              <EventApplicationForm
+                embedded
+                event={event}
+                hideStartButton
+                initialEditing
+                viewerProfile={viewerProfile}
+              />
+            )}
           </div>
-        )}
-        {registration?.canCancel && (
-          <div className={showApproved || showApplication ? 'pt-6' : ''}>
-            <button type="button" className={classes.secondaryButton}>
-              Cancel registration
-            </button>
-          </div>
-        )}
-      </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+function EventDescriptionSection({ event }: { event: PublicEventDetail }) {
+  const classes = useManagementClasses();
+
+  if (!event.description) return null;
+
+  return (
+    <ManagementSection title="About this event" size="large">
+      <ProjectMarkdown
+        className={`prose prose-lg max-w-none ${
+          classes.isDarkMode
+            ? 'prose-invert prose-pre:bg-gray-800 prose-a:text-indigo-400 hover:prose-a:text-indigo-300'
+            : 'prose-gray prose-pre:bg-gray-100 prose-a:text-indigo-600 hover:prose-a:text-indigo-700'
+        }`}
+        markdown={event.description}
+      />
     </ManagementSection>
+  );
+}
+
+export function EventNarrativeColumn({ event }: { event: PublicEventDetail }) {
+  const midpoint = event.endTime
+    ? (new Date(event.startTime).getTime() +
+        new Date(event.endTime).getTime()) /
+      2
+    : Number.POSITIVE_INFINITY;
+  const [pitchFirst, setPitchFirst] = useState(false);
+
+  useEffect(() => {
+    let timeout: number | undefined;
+
+    function updateAndSchedule() {
+      const isPastMidpoint = Date.now() >= midpoint;
+      setPitchFirst(isPastMidpoint);
+      if (!Number.isFinite(midpoint) || isPastMidpoint) return;
+      timeout = window.setTimeout(
+        updateAndSchedule,
+        Math.min(midpoint - Date.now(), 2_147_000_000)
+      );
+    }
+
+    updateAndSchedule();
+    return () => {
+      if (timeout !== undefined) window.clearTimeout(timeout);
+    };
+  }, [midpoint]);
+
+  const pitch = (
+    <EventPitchSection
+      eventId={event.pitchSession ? event.id : null}
+      phase={event.pitchSession?.phase}
+    />
+  );
+  const description = <EventDescriptionSection event={event} />;
+  const registrationStatus = (
+    <EventTopRegistrationStatusSection event={event} />
+  );
+  const approvedDetails = <EventApprovedDetailsSection event={event} />;
+
+  return (
+    <div className="grid content-start gap-5">
+      {pitchFirst && pitch}
+      {registrationStatus}
+      {approvedDetails}
+      {description}
+      {!pitchFirst && pitch}
+    </div>
   );
 }
 
@@ -197,8 +381,11 @@ export function EventPitchSection({
       title="Pitch session"
       description="At the end of the event, use the pitch session to present projects to the group."
       actions={
-        <a className={classes.primaryButton} href={`/pitch/${eventId}`}>
-          Open pitch event
+        <a
+          className={`${classes.primaryButton} whitespace-nowrap !px-3`}
+          href={`/pitch/${eventId}`}
+        >
+          Go to pitch
           <span aria-hidden="true">→</span>
         </a>
       }

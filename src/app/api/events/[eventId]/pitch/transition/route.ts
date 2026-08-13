@@ -95,11 +95,9 @@ export async function POST(
           data: {
             status: idx === 0 ? 'CURRENT' : 'APPROVED',
             approved: true,
-            pitchPhase: 'WAITING',
-            presentingStartedAt: null,
-            questionsStartedAt: null,
+            timerPhase: 'WAITING',
+            timerStartedAt: null,
             completedAt: null,
-            pausedAt: null,
           },
         })
       );
@@ -128,17 +126,12 @@ export async function POST(
             status: idx === 0 ? 'CURRENT' : 'APPROVED',
             approved: true,
             isTopProject,
-            pitchPhase: 'WAITING',
-            presentingStartedAt: null,
-            questionsStartedAt: null,
+            timerPhase: 'WAITING',
+            timerStartedAt: null,
             completedAt: null,
-            pausedAt: null,
-            allottedPresentingSec: isTopProject
-              ? pitchSession.topPresentingSec
-              : pitchSession.defaultPresentingSec,
-            allottedQuestionsSec: isTopProject
-              ? pitchSession.topQuestionsSec
-              : pitchSession.defaultQuestionsSec,
+            allottedSec: isTopProject
+              ? pitchSession.topPitchSec
+              : pitchSession.defaultPitchSec,
           },
         });
       });

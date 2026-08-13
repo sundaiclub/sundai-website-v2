@@ -108,13 +108,17 @@ export function ManagementPage({
 
 export function ManagementHeader({
   title,
+  titleMeta,
   eyebrow,
   description,
+  descriptionSize = 'default',
   actions,
 }: {
   title: ReactNode;
+  titleMeta?: ReactNode;
   eyebrow?: ReactNode;
   description?: ReactNode;
+  descriptionSize?: 'default' | 'large';
   actions?: ReactNode;
 }) {
   const classes = useManagementClasses();
@@ -129,10 +133,17 @@ export function ManagementHeader({
             {eyebrow}
           </div>
         )}
-        <h1 className="text-3xl font-bold sm:text-4xl">{title}</h1>
+        <div className="flex flex-wrap items-center gap-3">
+          <h1 className="text-3xl font-bold sm:text-4xl">{title}</h1>
+          {titleMeta && <div className="flex flex-wrap gap-2">{titleMeta}</div>}
+        </div>
         {description && (
           <p
-            className={`mt-3 max-w-3xl text-sm leading-6 ${classes.mutedText}`}
+            className={`mt-3 max-w-3xl ${
+              descriptionSize === 'large'
+                ? 'text-lg leading-7 sm:text-xl sm:leading-8'
+                : 'text-sm leading-6'
+            } ${classes.mutedText}`}
           >
             {description}
           </p>

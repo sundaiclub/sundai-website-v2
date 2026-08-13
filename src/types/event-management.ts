@@ -61,7 +61,7 @@ export type PitchProjectStatus =
 
 export type PitchProjectVoteValue = 'LIKE' | 'DISLIKE';
 
-export type PitchPhase = 'WAITING' | 'PRESENTING' | 'QUESTIONS' | 'COMPLETED';
+export type PitchTimerPhase = 'WAITING' | 'RUNNING' | 'COMPLETED';
 
 interface EventManagementHackerSummary {
   id: EntityId;
@@ -93,6 +93,9 @@ export interface Chapter {
   accessMode: ChapterAccessMode;
   mailingListName?: string | null;
   mailingListExternalId?: string | null;
+  defaultApprovalMessage?: string | null;
+  defaultWaitlistMessage?: string | null;
+  defaultRejectionMessage?: string | null;
   createdAt: ISODateTimeString | Date;
   updatedAt: ISODateTimeString | Date;
 }
@@ -210,6 +213,9 @@ export type ManageableChapterListItem = Pick<
   | 'timezone'
   | 'status'
   | 'accessMode'
+  | 'defaultApprovalMessage'
+  | 'defaultWaitlistMessage'
+  | 'defaultRejectionMessage'
   | 'heroImage'
 > & {
   viewerMembership?: Pick<ChapterMembership, 'role' | 'status'> | null;
@@ -524,6 +530,7 @@ export interface PublicEventDetail extends PublicEventCard {
     | 'smsConsentVersion'
   > | null;
   viewerRegistration?: PublicViewerRegistrationState | null;
+  viewerEventStaffRole?: EventStaffRole | null;
   viewerCanManageRegistrations?: boolean;
   viewerCanEditEvent?: boolean;
   viewerCanManageEvent?: boolean;
@@ -696,6 +703,9 @@ export type OrganizerChapterSettings = Pick<
   | 'description'
   | 'status'
   | 'accessMode'
+  | 'defaultApprovalMessage'
+  | 'defaultWaitlistMessage'
+  | 'defaultRejectionMessage'
   | 'heroImage'
 >;
 

@@ -61,7 +61,7 @@ Subject Context:
 ${subjectContext}
 
 Requirements for variation ${index + 1}:
-- Keep the same pixel-art style and 16:9 aspect ratio
+- Keep the same pixel-art style and 3:2 aspect ratio
 - Maintain the same core concept or idea
 - Change the visual composition, colors, or perspective
 - Make it distinctly different from the other variations
@@ -86,7 +86,7 @@ Generate only the new prompt text, with no explanations.`,
       const output = await replicate.run(IMAGE_MODEL, {
         input: {
           prompt,
-          aspect_ratio: '16:9',
+          aspect_ratio: '3:2',
           output_format: 'webp',
           output_quality: 90,
           seed: Math.floor(Math.random() * 10000),
