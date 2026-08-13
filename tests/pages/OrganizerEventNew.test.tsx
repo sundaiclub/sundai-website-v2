@@ -4,6 +4,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import OrganizerNewEventPage from '../../src/app/organizer/events/new/page';
 
 const mockUseTheme = jest.fn();
+const mockRouterPush = jest.fn();
 
 jest.mock('../../src/app/contexts/ThemeContext', () => ({
   useTheme: () => mockUseTheme(),
@@ -13,7 +14,7 @@ jest.mock('next/navigation', () => ({
   usePathname: () => '/organizer/events/new',
   useSearchParams: () => new URLSearchParams(),
   useRouter: () => ({
-    push: jest.fn(),
+    push: mockRouterPush,
     replace: jest.fn(),
     prefetch: jest.fn(),
     back: jest.fn(),
@@ -331,7 +332,7 @@ describe('/organizer/events/new', () => {
     );
     expect((imageCall?.[1].body as FormData).get('image')).toBe(image);
     expect(
-      screen.getByText(/event draft was successfully created/i)
+      await screen.findByText(/event draft was successfully created/i)
     ).toBeInTheDocument();
   });
 
@@ -463,11 +464,14 @@ describe('/organizer/events/new', () => {
     });
 
     expect(
-      screen.getByText(/event draft was successfully created/i)
+      await screen.findByText(/event draft was successfully created/i)
     ).toBeInTheDocument();
     expect(
       screen.getByRole('link', { name: /event settings page/i })
     ).toHaveAttribute('href', '/organizer/events/event-created/settings');
+    expect(mockRouterPush).toHaveBeenCalledWith(
+      '/organizer/events/event-created/settings'
+    );
   });
 
   it('keeps publish visible but disabled until required fields are present', async () => {
@@ -483,6 +487,59 @@ describe('/organizer/events/new', () => {
     ).not.toBeDisabled();
     expect(screen.getByRole('button', { name: /publish/i })).not.toBeDisabled();
   });
+
+  it.each([
+    ['Save draft', 'Publish'],
+    ['Publish', 'Save draft'],
+  ])(
+    'shows saving and blocks the other action after clicking %s',
+    async (action, otherAction) => {
+      await renderNewEventPage();
+      fillRequiredEventFields();
+
+      const regularFetch = global.fetch as jest.Mock;
+      let resolveCreate: ((response: unknown) => void) | undefined;
+      const pendingCreate = new Promise(resolve => {
+        resolveCreate = resolve;
+      });
+      global.fetch = jest.fn((input: RequestInfo | URL, init?: RequestInit) => {
+        const url = requestUrl(input);
+        if (url.endsWith('/api/events') && init?.method === 'POST') {
+          return pendingCreate;
+        }
+        return regularFetch(input, init);
+      }) as jest.Mock;
+
+      fireEvent.click(
+        screen.getByRole('button', { name: new RegExp(`^${action}$`, 'i') })
+      );
+
+      expect(
+        await screen.findByRole('button', { name: /^saving\.\.\.$/i })
+      ).toBeDisabled();
+      expect(
+        screen.getByRole('button', {
+          name: new RegExp(`^${otherAction}$`, 'i'),
+        })
+      ).toBeDisabled();
+
+      resolveCreate?.(
+        await jsonResponse(
+          {
+            id: 'event-created',
+            status: 'DRAFT',
+          },
+          201
+        )
+      );
+
+      await waitFor(() => {
+        expect(mockRouterPush).toHaveBeenCalledWith(
+          '/organizer/events/event-created/settings'
+        );
+      });
+    }
+  );
 
   it('greys out and disables capacity when no capacity limit is selected', async () => {
     await renderNewEventPage();
@@ -582,6 +639,9 @@ describe('/organizer/events/new', () => {
     expect(
       screen.getByRole('link', { name: /event settings page/i })
     ).toHaveAttribute('href', '/organizer/events/event-created/settings');
+    expect(mockRouterPush).toHaveBeenCalledWith(
+      '/organizer/events/event-created/settings'
+    );
 
     expect(latestFetchBody()).toEqual(
       expect.objectContaining({

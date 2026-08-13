@@ -222,6 +222,7 @@ export type PublicEventViewer = {
 
 export type ListPublicEventsOptions = {
   chapterSlug?: string | null;
+  period?: 'upcoming' | 'previous';
   viewer?: PublicEventViewer | null;
   now?: Date;
   take?: number;
@@ -342,8 +343,17 @@ function publicEventVisibilityWhere(
 
 function publicEventListingWhere(
   now: Date,
-  chapterSlug?: string | null
+  chapterSlug?: string | null,
+  period: 'upcoming' | 'previous' = 'upcoming'
 ): Prisma.EventWhereInput {
+  if (period === 'previous') {
+    return {
+      ...publicEventVisibilityWhere(chapterSlug),
+      startTime: { lt: now },
+      OR: [{ endTime: null }, { endTime: { lte: now } }],
+    };
+  }
+
   return {
     ...publicEventVisibilityWhere(chapterSlug),
     OR: [
@@ -365,10 +375,14 @@ export async function listPublicEvents(
 ): Promise<PublicEventCard[]> {
   const client = options.prismaClient ?? defaultPrisma;
   const now = options.now ?? new Date();
+  const period = options.period ?? 'upcoming';
   const events = await client.event.findMany({
-    where: publicEventListingWhere(now, options.chapterSlug),
+    where: publicEventListingWhere(now, options.chapterSlug, period),
     include: publicEventInclude(),
-    orderBy: [{ startTime: 'asc' }, { title: 'asc' }],
+    orderBy:
+      period === 'previous'
+        ? [{ startTime: 'desc' }, { title: 'asc' }]
+        : [{ startTime: 'asc' }, { title: 'asc' }],
     take: options.take,
     skip: options.skip,
   });

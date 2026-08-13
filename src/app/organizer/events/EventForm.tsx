@@ -243,7 +243,10 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
   const [message, setMessage] = useState('');
   const [savedEventId, setSavedEventId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
+  const [savingAction, setSavingAction] = useState<'draft' | 'publish' | null>(
+    null
+  );
+  const isSaving = savingAction !== null;
   const [savedSettingsFingerprint, setSavedSettingsFingerprint] = useState<
     string | null
   >(null);
@@ -751,86 +754,102 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
   async function saveEvent(shouldPublish: boolean) {
     setMessage('');
     setSavedEventId(null);
-    setIsSaving(true);
-    const eventPayload = buildEventPayload();
-    const savedFingerprint = settingsFingerprint(eventPayload, null);
-    const response = await fetch(
-      isEditing ? `/api/events/${eventId}` : '/api/events',
-      {
-        method: isEditing ? 'PATCH' : 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(eventPayload),
+    setSavingAction(shouldPublish ? 'publish' : 'draft');
+    try {
+      const eventPayload = buildEventPayload();
+      const savedFingerprint = settingsFingerprint(eventPayload, null);
+      const response = await fetch(
+        isEditing ? `/api/events/${eventId}` : '/api/events',
+        {
+          method: isEditing ? 'PATCH' : 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(eventPayload),
+        }
+      );
+      const nextAuthStatus = authStatusFromResponse(response);
+      if (nextAuthStatus) {
+        setAuthStatus(nextAuthStatus);
+        return;
       }
-    ).finally(() => setIsSaving(false));
-    const nextAuthStatus = authStatusFromResponse(response);
-    if (nextAuthStatus) {
-      setAuthStatus(nextAuthStatus);
-      return;
-    }
 
-    if (!response.ok) {
+      if (!response.ok) {
+        setMessage(
+          isEditing ? 'Unable to save event settings' : 'Unable to save event'
+        );
+        return;
+      }
+
+      const savedEvent = await response.json().catch(() => null);
+      if (eventImageFile && savedEvent?.id) {
+        const imageFormData = new FormData();
+        imageFormData.append('image', eventImageFile);
+        if (eventImagePrompt) imageFormData.append('prompt', eventImagePrompt);
+        const imageResponse = await fetch(
+          `/api/events/${savedEvent.id}/image`,
+          {
+            method: 'POST',
+            body: imageFormData,
+          }
+        );
+        if (!imageResponse.ok) {
+          setSavedEventId(savedEvent.id);
+          setMessage('Unable to upload the event image. The event was saved.');
+          return;
+        }
+        const image = await imageResponse.json();
+        setEventImageFile(null);
+        setEventImagePrompt(null);
+        setEventImagePreview(image.url);
+        if (isEditing) {
+          setLoadedEvent(current =>
+            current ? { ...current, image } : current
+          );
+        }
+      }
+      if (isEditing) setSavedSettingsFingerprint(savedFingerprint);
+      if (shouldPublish && savedEvent?.id) {
+        const publishResponse = await fetch(
+          `/api/events/${savedEvent.id}/publish`,
+          {
+            method: 'POST',
+          }
+        );
+        if (!publishResponse.ok) {
+          setMessage('Event saved, but publishing failed.');
+          return;
+        }
+        setSavedEventId(savedEvent.id);
+        setMessage('Event was successfully published.');
+        if (isEditing) {
+          setLoadedEvent(current =>
+            current ? { ...current, status: 'PUBLISHED' } : current
+          );
+        } else {
+          router.push(`/organizer/events/${savedEvent.id}/settings`);
+        }
+        return;
+      }
+
+      if (isEditing) {
+        setMessage('Event settings saved');
+        return;
+      }
+
+      if (savedEvent?.id) {
+        setSavedEventId(savedEvent.id);
+        setMessage('Event draft was successfully created.');
+        router.push(`/organizer/events/${savedEvent.id}/settings`);
+        return;
+      }
+
+      setMessage('Event was successfully created.');
+    } catch {
       setMessage(
         isEditing ? 'Unable to save event settings' : 'Unable to save event'
       );
-      return;
+    } finally {
+      setSavingAction(null);
     }
-
-    const savedEvent = await response.json().catch(() => null);
-    if (eventImageFile && savedEvent?.id) {
-      const imageFormData = new FormData();
-      imageFormData.append('image', eventImageFile);
-      if (eventImagePrompt) imageFormData.append('prompt', eventImagePrompt);
-      const imageResponse = await fetch(`/api/events/${savedEvent.id}/image`, {
-        method: 'POST',
-        body: imageFormData,
-      });
-      if (!imageResponse.ok) {
-        setSavedEventId(savedEvent.id);
-        setMessage('Unable to upload the event image. The event was saved.');
-        return;
-      }
-      const image = await imageResponse.json();
-      setEventImageFile(null);
-      setEventImagePrompt(null);
-      setEventImagePreview(image.url);
-      if (isEditing) {
-        setLoadedEvent(current => (current ? { ...current, image } : current));
-      }
-    }
-    if (isEditing) setSavedSettingsFingerprint(savedFingerprint);
-    if (shouldPublish && savedEvent?.id) {
-      const publishResponse = await fetch(
-        `/api/events/${savedEvent.id}/publish`,
-        {
-          method: 'POST',
-        }
-      );
-      if (!publishResponse.ok) {
-        setMessage('Event saved, but publishing failed.');
-        return;
-      }
-      setSavedEventId(savedEvent.id);
-      setMessage('Event was successfully published.');
-      if (isEditing) {
-        setLoadedEvent(current =>
-          current ? { ...current, status: 'PUBLISHED' } : current
-        );
-      }
-      return;
-    }
-
-    if (isEditing) {
-      setMessage('Event settings saved');
-      return;
-    }
-
-    if (savedEvent?.id) {
-      setSavedEventId(savedEvent.id);
-      setMessage('Event draft was successfully created.');
-      return;
-    }
-
-    setMessage('Event was successfully created.');
   }
 
   async function deleteDraft() {
@@ -1549,16 +1568,20 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
             disabled={!canSubmit || isSaving}
             type="submit"
           >
-            {isEditing ? 'Save settings' : 'Save draft'}
+            {savingAction === 'draft'
+              ? 'Saving...'
+              : isEditing
+                ? 'Save settings'
+                : 'Save draft'}
           </button>
           {(!isEditing || loadedEvent?.status === 'DRAFT') && (
             <button
               className={classes.secondaryButton}
-              disabled={!canSubmit}
+              disabled={!canSubmit || isSaving}
               onClick={() => void saveEvent(true)}
               type="button"
             >
-              Publish
+              {savingAction === 'publish' ? 'Saving...' : 'Publish'}
             </button>
           )}
           {isEditing &&

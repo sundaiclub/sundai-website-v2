@@ -383,6 +383,35 @@ describe('public event helpers', () => {
     expect(prisma.eventRegistration.findMany).not.toHaveBeenCalled();
   });
 
+  it('queries previous events from newest to oldest', async () => {
+    const prisma = buildPrismaMock();
+    prisma.event.findMany.mockResolvedValue([]);
+
+    await listPublicEvents({
+      chapterSlug: 'boston',
+      period: 'previous',
+      now,
+      prismaClient: prisma,
+    });
+
+    expect(prisma.event.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          status: 'PUBLISHED',
+          visibility: 'PUBLIC',
+          chapter: {
+            status: 'ACTIVE',
+            accessMode: 'PUBLIC',
+            slug: 'boston',
+          },
+          startTime: { lt: now },
+          OR: [{ endTime: null }, { endTime: { lte: now } }],
+        },
+        orderBy: [{ startTime: 'desc' }, { title: 'asc' }],
+      })
+    );
+  });
+
   it('loads public event detail by public chapter and event slug with viewer registration state', async () => {
     const event = buildPublicEvent({
       pitchSessions: [{ phase: 'VOTING' }],

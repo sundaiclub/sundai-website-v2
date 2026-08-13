@@ -39,6 +39,8 @@ export async function GET(req: Request) {
         : null;
       const events = await listPublicEvents({
         chapterSlug: searchParams.get('chapterSlug'),
+        period:
+          searchParams.get('period') === 'previous' ? 'previous' : 'upcoming',
         viewer: viewer ? { hackerId: viewer.id } : null,
       });
 
