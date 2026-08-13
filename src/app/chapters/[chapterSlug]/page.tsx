@@ -4,6 +4,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import EventSummaryCard from '../../components/EventSummaryCard';
+import { SignInAction } from '../../components/SignInAction';
 import {
   SMS_CONSENT_CONFIGURED,
   SMS_CONSENT_COPY,
@@ -406,7 +407,13 @@ export default function ChapterLandingPage({
             {(actionMessage || actionError) && (
               <div className="mb-5">
                 <ManagementAlert tone={actionError ? 'danger' : 'success'}>
-                  {actionError || actionMessage}
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <span>{actionError || actionMessage}</span>
+                    {actionError ===
+                      'Please sign in to join this chapter.' && (
+                      <SignInAction label="Sign in to join" />
+                    )}
+                  </div>
                 </ManagementAlert>
               </div>
             )}

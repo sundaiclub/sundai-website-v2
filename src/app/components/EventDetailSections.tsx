@@ -9,10 +9,15 @@ import type {
   PublicEventDetail,
   RegistrationStatus,
 } from '@/types/event-management';
-import { ManagementSection, useManagementClasses } from './ManagementSurface';
+import {
+  ManagementAlert,
+  ManagementSection,
+  useManagementClasses,
+} from './ManagementSurface';
 import { EventApplicationForm } from './EventApplicationForm';
 import { ViewerRegistrationStatusBadge } from './PublicEventCard';
 import EventMarkdown from './EventMarkdown';
+import { SignInAction } from './SignInAction';
 
 function encodeCalendarDate(value: string | Date) {
   return new Date(value)
@@ -117,7 +122,16 @@ function EventTopRegistrationStatusSection({
   const isEventStaff = Boolean(event.viewerEventStaffRole);
   const displayStatus = isEventStaff ? 'APPROVED' : registrationStatus;
 
-  if (displayStatus !== 'APPROVED' && displayStatus !== 'PENDING') {
+  if (!displayStatus) {
+    if (
+      event.applicationControls.publicMessage &&
+      !event.applicationControls.signInRequired
+    ) {
+      return (
+        <ManagementAlert>{event.applicationControls.publicMessage}</ManagementAlert>
+      );
+    }
+
     return null;
   }
 
@@ -129,8 +143,8 @@ function EventTopRegistrationStatusSection({
       description={
         isEventStaff
           ? 'Use the Manage button in the top right to approve users or make changes to the event.'
-          : registration?.publicSafeMessage ||
-            event.applicationControls.publicMessage ||
+          : event.applicationControls.publicMessage ||
+            registration?.publicSafeMessage ||
             (isPending
               ? 'Your application is pending review.'
               : 'Your place at this event is confirmed.')
@@ -194,9 +208,10 @@ export function EventRegistrationAction({
   const classes = useManagementClasses();
   const [isOpen, setIsOpen] = useState(false);
   const canRegister =
-    event.applicationControls.canSubmit &&
     !event.viewerRegistration &&
-    event.applicationQuestionSet.composedFields.length > 0;
+    (event.applicationControls.signInRequired ||
+      (event.applicationControls.canSubmit &&
+        event.applicationQuestionSet.composedFields.length > 0));
   const canEdit = Boolean(
     allowEditing && event.viewerRegistration?.canEditAnswers
   );
@@ -234,6 +249,9 @@ export function EventRegistrationAction({
         >
           <div
             className={`${classes.panel} max-h-[90vh] w-full max-w-2xl overflow-y-auto p-5 sm:p-7`}
+            style={{
+              backgroundColor: classes.isDarkMode ? '#111827' : '#ffffff',
+            }}
           >
             <div className="mb-6 flex items-start justify-between gap-4">
               <div>
@@ -260,13 +278,17 @@ export function EventRegistrationAction({
                 <span aria-hidden="true">✕</span>
               </button>
             </div>
-            <EventApplicationForm
-              embedded
-              event={event}
-              hideStartButton
-              initialEditing
-              viewerProfile={viewerProfile}
-            />
+            {event.applicationControls.signInRequired ? (
+              <SignInAction label="Sign in to register" />
+            ) : (
+              <EventApplicationForm
+                embedded
+                event={event}
+                hideStartButton
+                initialEditing
+                viewerProfile={viewerProfile}
+              />
+            )}
           </div>
         </div>
       )}
@@ -378,64 +400,6 @@ export function EventProgramHighlights({
             </p>
           </div>
         ))}
-      </div>
-    </ManagementSection>
-  );
-}
-
-export function EventDetailSections({
-  event,
-  viewerProfile,
-}: {
-  event: PublicEventDetail;
-  viewerProfile?: ProfilePrefillSource | null;
-}) {
-  const classes = useManagementClasses();
-  const registration = event.viewerRegistration;
-  const registrationStatus =
-    registration?.status ?? event.viewerRegistrationStatus;
-  const showStatus = Boolean(
-    registrationStatus || event.applicationControls.publicMessage
-  );
-  const showApplication = Boolean(registration?.canEditAnswers);
-
-  if (registrationStatus === 'APPROVED' || registrationStatus === 'PENDING') {
-    return null;
-  }
-  if (!showStatus && !showApplication) return null;
-
-  return (
-    <ManagementSection
-      title={registrationHeading(registrationStatus)}
-      description={
-        event.applicationControls.publicMessage ||
-        'Apply to take part in this event.'
-      }
-      actions={
-        registrationStatus ? (
-          <ViewerRegistrationStatusBadge status={registrationStatus} />
-        ) : null
-      }
-      size="large"
-    >
-      <div className={`grid gap-6 divide-y ${classes.divider}`}>
-        {showApplication && (
-          <div>
-            <h3 className="mb-4 text-lg font-bold">Application</h3>
-            <EventApplicationForm
-              embedded
-              event={event}
-              viewerProfile={viewerProfile}
-            />
-          </div>
-        )}
-        {registration?.canCancel && (
-          <div className={showApplication ? 'pt-6' : ''}>
-            <button type="button" className={classes.secondaryButton}>
-              Cancel registration
-            </button>
-          </div>
-        )}
       </div>
     </ManagementSection>
   );

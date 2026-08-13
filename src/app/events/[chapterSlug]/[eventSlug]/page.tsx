@@ -2,7 +2,6 @@ import { notFound } from 'next/navigation';
 import { auth } from '@clerk/nextjs/server';
 import {
   AddToCalendarAction,
-  EventDetailSections,
   EventMaterialsSection,
   EventNarrativeColumn,
   EventProgramHighlights,
@@ -198,10 +197,6 @@ export default async function PublicEventDetailPage({
           partners={event.publicSponsorText}
         />
         <EventProjectCarousel projects={eventProjects} />
-        <EventDetailSections
-          event={event}
-          viewerProfile={event.viewerProfile}
-        />
         <EventMaterialsSection materials={materialLinks} />
       </div>
     </ManagementPage>

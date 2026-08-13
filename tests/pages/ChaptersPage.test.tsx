@@ -628,6 +628,23 @@ describe('chapter public directory and landing pages', () => {
   });
 
   describe('/chapters/[chapterSlug]', () => {
+    it('shows a sign-in button when a signed-out visitor tries to join', async () => {
+      mockSignedOut();
+
+      renderLandingPage('boston');
+
+      fireEvent.click(
+        await screen.findByRole('button', { name: /^join chapter$/i })
+      );
+
+      expect(
+        screen.getByText('Please sign in to join this chapter.')
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: /sign in to join/i })
+      ).toBeInTheDocument();
+    });
+
     it('renders public chapter details, upcoming events, and a join action for signed-in non-members', async () => {
       mockSignedIn(regularUser);
 

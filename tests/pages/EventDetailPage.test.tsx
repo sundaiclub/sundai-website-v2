@@ -499,7 +499,25 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
     await expectSomeText(/boston, ma/i);
     await expectSomeText(/july 10, 2026/i);
     await expectSomeText(/6:00\s*pm|6 pm/i);
-    await expectSomeText(/sign in/i);
+    expect(
+      screen.getByRole('button', { name: /^register$/i })
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText('Sign in to apply for this event.')
+    ).not.toBeInTheDocument();
+
+    await openRegistrationForm();
+
+    const registrationDialog = screen.getByRole('dialog', {
+      name: /register for this event/i,
+    });
+    expect(registrationDialog).toBeInTheDocument();
+    expect(registrationDialog.firstElementChild).toHaveStyle({
+      backgroundColor: '#ffffff',
+    });
+    expect(
+      screen.getByRole('button', { name: /sign in to register/i })
+    ).toBeInTheDocument();
     expect(
       screen.getByRole('link', { name: /back to sundai boston/i })
     ).toHaveAttribute('href', '/chapters/boston');
@@ -528,7 +546,7 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
     ).toHaveAttribute('src', 'https://cdn.example.com/ai-build-night.webp');
   });
 
-  it('shows event projects as a pitch-vote-ranked carousel above registration', async () => {
+  it('shows event projects as a pitch-vote-ranked carousel without a lower registration section', async () => {
     mockListPublicEventProjects.mockResolvedValue([
       {
         ...mockProject,
@@ -561,9 +579,6 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
     const carouselHeading = screen.getByRole('heading', {
       name: /projects from this event/i,
     });
-    const registrationHeading = screen.getByRole('heading', {
-      name: /^registration$/i,
-    });
     const projectLinks = screen.getAllByRole('link', {
       name: /top project|second project/i,
     });
@@ -572,10 +587,10 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
       Array.from(new Set(projectLinks.map(link => link.getAttribute('href'))))
     ).toEqual(['/projects/project-high', '/projects/project-low']);
     expect(screen.getByText(/8 votes/)).toBeInTheDocument();
+    expect(carouselHeading).toBeInTheDocument();
     expect(
-      carouselHeading.compareDocumentPosition(registrationHeading) &
-        Node.DOCUMENT_POSITION_FOLLOWING
-    ).toBeTruthy();
+      screen.queryByRole('heading', { name: /^registration$/i })
+    ).not.toBeInTheDocument();
     expect(mockListPublicEventProjects).toHaveBeenCalledWith({
       eventId: eventFixture.id,
     });

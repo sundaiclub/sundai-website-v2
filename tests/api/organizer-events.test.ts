@@ -219,6 +219,53 @@ describe('/api/events organizer chapter-admin behavior', () => {
     expect(body).toEqual(expect.objectContaining({ id: createdEvent.id }));
   });
 
+  it('adds a numeric suffix when the event slug already exists in the chapter', async () => {
+    const { chapter, hacker, membership } = buildChapterAdminFixture();
+    const slugConflict = Object.assign(new Error('Unique constraint failed'), {
+      code: 'P2002',
+      meta: { target: ['chapterId', 'slug'] },
+    });
+
+    mockActor(hacker);
+    mockMembershipLookup(membership);
+    prisma.event.create
+      .mockRejectedValueOnce(slugConflict)
+      .mockResolvedValueOnce({
+        id: 'event-boston-demo-night-2',
+        title: 'Boston Demo Night',
+        chapterId: chapter.id,
+        slug: 'boston-demo-night-2',
+      });
+
+    const response = await POST_EVENTS(
+      createJsonRequest('/api/events', {
+        method: 'POST',
+        body: {
+          title: 'Boston Demo Night',
+          chapterId: chapter.id,
+          startTime: '2026-06-10T22:00:00.000Z',
+        },
+      }) as any
+    );
+
+    expect(response.status).toBe(200);
+    expect(prisma.event.create).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        data: expect.objectContaining({ slug: 'boston-demo-night' }),
+      })
+    );
+    expect(prisma.event.create).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        data: expect.objectContaining({ slug: 'boston-demo-night-2' }),
+      })
+    );
+    expect(await response.json()).toEqual(
+      expect.objectContaining({ slug: 'boston-demo-night-2' })
+    );
+  });
+
   it('creates native RSVP fields for chapter admins with approval and auto-promotion defaults', async () => {
     const { chapter, hacker, membership } = buildChapterAdminFixture();
     const eventBody = createNativeEventBody({ chapterId: chapter.id });

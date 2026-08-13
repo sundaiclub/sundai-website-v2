@@ -23,6 +23,29 @@ import {
   parseOptionalEventDateTimeInput,
 } from '@/lib/eventDateTime';
 
+const MAX_EVENT_SLUG_ATTEMPTS = 100;
+
+function isEventSlugConflict(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+
+  const prismaError = error as {
+    code?: unknown;
+    meta?: { target?: unknown };
+  };
+  const target = prismaError.meta?.target;
+
+  return (
+    prismaError.code === 'P2002' &&
+    Array.isArray(target) &&
+    target.includes('chapterId') &&
+    target.includes('slug')
+  );
+}
+
+function eventSlugCandidate(baseSlug: string, attempt: number): string {
+  return attempt === 1 ? baseSlug : `${baseSlug}-${attempt}`;
+}
+
 export async function GET(req: Request) {
   try {
     const searchParams = new URL(req.url).searchParams;
@@ -273,105 +296,127 @@ export async function POST(req: Request) {
       throw new EventDateTimeInputError('endTime must be after startTime');
     }
 
-    const event = await prisma.event.create({
-      data: {
-        title,
-        description: description || null,
-        startTime: parsedStartTime,
-        timezone,
-        ...(endTime !== undefined && {
-          endTime: parsedEndTime,
-        }),
-        chapterId,
-        slug: slugifyEventValue(slug || title),
-        meetingUrl: meetingUrl || null,
-        location: location || null,
-        venueName: venueName || null,
-        publicLocation: publicLocation ?? location ?? null,
-        address: address || null,
-        virtualUrl: virtualUrl ?? meetingUrl ?? null,
-        createdById: user.id,
-        ...(status !== undefined && { status }),
-        ...(visibility !== undefined && { visibility }),
-        ...(programType !== undefined && { programType: programType || null }),
-        ...(publicProgramLabel !== undefined && {
-          publicProgramLabel: publicProgramLabel || null,
-        }),
-        ...(capacity !== undefined && {
-          capacity: capacity === null ? null : Number(capacity),
-        }),
-        applicationMode: parsedApplicationMode,
-        autoPromoteWaitlist: Boolean(autoPromoteWaitlist),
-        ...(approvedDetailsJson !== undefined && {
-          approvedDetailsJson: sanitizeApprovedDetailsJson(approvedDetailsJson),
-        }),
-        ...(applicationQuestionsJson !== undefined && {
-          applicationQuestionsJson,
-        }),
-        ...(hideChapterDefaultQuestions !== undefined && {
-          hideChapterDefaultQuestions: Boolean(hideChapterDefaultQuestions),
-        }),
-        confirmationMessage:
-          confirmationMessage === undefined
-            ? DEFAULT_EVENT_MESSAGES.confirmation
-            : confirmationMessage || null,
-        waitlistMessage:
-          waitlistMessage === undefined
-            ? DEFAULT_EVENT_MESSAGES.waitlist
-            : waitlistMessage || null,
-        declineMessage:
-          declineMessage === undefined
-            ? DEFAULT_EVENT_MESSAGES.decline
-            : declineMessage || null,
-        applicationsOpen: parsedApplicationsOpen,
-        applicationsClosedAt: parsedApplicationsOpen
-          ? null
-          : (parsedApplicationsClosedAt.date ?? new Date()),
-        applicationsClosedById: parsedApplicationsOpen
-          ? null
-          : applicationsClosedById || user.id,
-        applicationsCloseReason: parsedApplicationsOpen
-          ? null
-          : applicationsCloseReason || null,
-        ...(checkInOpensAt !== undefined && {
-          checkInOpensAt: parsedCheckInOpensAt,
-        }),
-        ...(checkInClosesAt !== undefined && {
-          checkInClosesAt: parsedCheckInClosesAt,
-        }),
-        staff: {
-          create:
-            parsedStaff.length > 0
-              ? parsedStaff
-              : mcIds.map((hackerId: string) => ({
-                  hackerId,
-                  role: 'MC' as const,
-                })),
-        },
-        pitchSessions: {
-          create: {
-            chapterId,
-            title,
-            description: description || null,
-            startTime: parsedStartTime,
-            meetingUrl: meetingUrl || null,
-            location: location || null,
-            createdById: user.id,
-            audienceCanReorder,
-            votingEndTime:
-              parsedVotingEndTime ??
-              new Date(parsedStartTime.getTime() + 15 * 60 * 1000),
-            ...(topProjectCount !== undefined && { topProjectCount }),
-            ...(topPitchSec !== undefined && { topPitchSec }),
-            ...(defaultPitchSec !== undefined && { defaultPitchSec }),
+    const baseSlug = slugifyEventValue(slug || title);
+    const createEvent = (eventSlug: string) =>
+      prisma.event.create({
+        data: {
+          title,
+          description: description || null,
+          startTime: parsedStartTime,
+          timezone,
+          ...(endTime !== undefined && {
+            endTime: parsedEndTime,
+          }),
+          chapterId,
+          slug: eventSlug,
+          meetingUrl: meetingUrl || null,
+          location: location || null,
+          venueName: venueName || null,
+          publicLocation: publicLocation ?? location ?? null,
+          address: address || null,
+          virtualUrl: virtualUrl ?? meetingUrl ?? null,
+          createdById: user.id,
+          ...(status !== undefined && { status }),
+          ...(visibility !== undefined && { visibility }),
+          ...(programType !== undefined && {
+            programType: programType || null,
+          }),
+          ...(publicProgramLabel !== undefined && {
+            publicProgramLabel: publicProgramLabel || null,
+          }),
+          ...(capacity !== undefined && {
+            capacity: capacity === null ? null : Number(capacity),
+          }),
+          applicationMode: parsedApplicationMode,
+          autoPromoteWaitlist: Boolean(autoPromoteWaitlist),
+          ...(approvedDetailsJson !== undefined && {
+            approvedDetailsJson:
+              sanitizeApprovedDetailsJson(approvedDetailsJson),
+          }),
+          ...(applicationQuestionsJson !== undefined && {
+            applicationQuestionsJson,
+          }),
+          ...(hideChapterDefaultQuestions !== undefined && {
+            hideChapterDefaultQuestions: Boolean(hideChapterDefaultQuestions),
+          }),
+          confirmationMessage:
+            confirmationMessage === undefined
+              ? DEFAULT_EVENT_MESSAGES.confirmation
+              : confirmationMessage || null,
+          waitlistMessage:
+            waitlistMessage === undefined
+              ? DEFAULT_EVENT_MESSAGES.waitlist
+              : waitlistMessage || null,
+          declineMessage:
+            declineMessage === undefined
+              ? DEFAULT_EVENT_MESSAGES.decline
+              : declineMessage || null,
+          applicationsOpen: parsedApplicationsOpen,
+          applicationsClosedAt: parsedApplicationsOpen
+            ? null
+            : (parsedApplicationsClosedAt.date ?? new Date()),
+          applicationsClosedById: parsedApplicationsOpen
+            ? null
+            : applicationsClosedById || user.id,
+          applicationsCloseReason: parsedApplicationsOpen
+            ? null
+            : applicationsCloseReason || null,
+          ...(checkInOpensAt !== undefined && {
+            checkInOpensAt: parsedCheckInOpensAt,
+          }),
+          ...(checkInClosesAt !== undefined && {
+            checkInClosesAt: parsedCheckInClosesAt,
+          }),
+          staff: {
+            create:
+              parsedStaff.length > 0
+                ? parsedStaff
+                : mcIds.map((hackerId: string) => ({
+                    hackerId,
+                    role: 'MC' as const,
+                  })),
+          },
+          pitchSessions: {
+            create: {
+              chapterId,
+              title,
+              description: description || null,
+              startTime: parsedStartTime,
+              meetingUrl: meetingUrl || null,
+              location: location || null,
+              createdById: user.id,
+              audienceCanReorder,
+              votingEndTime:
+                parsedVotingEndTime ??
+                new Date(parsedStartTime.getTime() + 15 * 60 * 1000),
+              ...(topProjectCount !== undefined && { topProjectCount }),
+              ...(topPitchSec !== undefined && { topPitchSec }),
+              ...(defaultPitchSec !== undefined && { defaultPitchSec }),
+            },
           },
         },
-      },
-      include: {
-        pitchSessions: true,
-        staff: true,
-      },
-    });
+        include: {
+          pitchSessions: true,
+          staff: true,
+        },
+      });
+
+    let event: Awaited<ReturnType<typeof createEvent>> | null = null;
+    for (let attempt = 1; attempt <= MAX_EVENT_SLUG_ATTEMPTS; attempt += 1) {
+      try {
+        event = await createEvent(eventSlugCandidate(baseSlug, attempt));
+        break;
+      } catch (error) {
+        if (!isEventSlugConflict(error)) throw error;
+      }
+    }
+
+    if (!event) {
+      return NextResponse.json(
+        { message: 'Unable to allocate a unique event URL' },
+        { status: 409 }
+      );
+    }
 
     const staffHackerIds =
       parsedStaff.length > 0
