@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import prisma from '@/lib/prisma';
 import { requireEventPitchAccess } from '@/lib/eventManagementApi';
+import { canViewApprovedOnlyEventDetailsWithContext } from '@/lib/eventManagementAuth';
 
 // Join queue by adding one of user's projects
 export async function POST(
@@ -12,7 +13,10 @@ export async function POST(
     const { userId } = auth();
     if (!userId) return new NextResponse('Unauthorized', { status: 401 });
 
-    const user = await prisma.hacker.findUnique({ where: { clerkId: userId } });
+    const user = await prisma.hacker.findUnique({
+      where: { clerkId: userId },
+      select: { id: true, role: true },
+    });
     if (!user) return new NextResponse('User not found', { status: 404 });
 
     const body = await req.json();
@@ -25,13 +29,59 @@ export async function POST(
 
     const pitchSession = await prisma.pitchSession.findFirst({
       where: { eventId: params.eventId },
+      include: {
+        event: {
+          select: { chapterId: true },
+        },
+      },
     });
-    if (!pitchSession)
+    if (!pitchSession || !pitchSession.event)
       return new NextResponse('Pitch session not found', { status: 404 });
     if (pitchSession.phase === 'FINISHED') {
       return NextResponse.json(
         { message: 'Cannot add projects to a finished event' },
         { status: 400 }
+      );
+    }
+
+    const [viewerRegistration, chapterMembership, staff] = await Promise.all([
+      prisma.eventRegistration.findFirst({
+        where: {
+          eventId: params.eventId,
+          hackerId: user.id,
+          cancelledAt: null,
+        },
+        orderBy: { createdAt: 'desc' },
+        select: { status: true },
+      }),
+      prisma.chapterMembership.findFirst({
+        where: {
+          chapterId: pitchSession.event.chapterId,
+          hackerId: user.id,
+        },
+        select: { role: true, status: true },
+      }),
+      prisma.eventStaff.findFirst({
+        where: {
+          eventId: params.eventId,
+          hackerId: user.id,
+          role: { in: ['MC', 'CO_MC'] },
+        },
+        select: { role: true },
+      }),
+    ]);
+
+    if (
+      !canViewApprovedOnlyEventDetailsWithContext({
+        actor: user,
+        chapterMembership,
+        staff,
+        viewerRegistration,
+      })
+    ) {
+      return NextResponse.json(
+        { message: 'You must be part of this event to add a project' },
+        { status: 403 }
       );
     }
 
