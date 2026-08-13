@@ -16,7 +16,7 @@ import {
 } from './ManagementSurface';
 import { EventApplicationForm } from './EventApplicationForm';
 import { ViewerRegistrationStatusBadge } from './PublicEventCard';
-import EventMarkdown from './EventMarkdown';
+import ProjectMarkdown from './ProjectMarkdown';
 import { SignInAction } from './SignInAction';
 
 function encodeCalendarDate(value: string | Date) {
@@ -303,10 +303,12 @@ function EventDescriptionSection({ event }: { event: PublicEventDetail }) {
 
   return (
     <ManagementSection title="About this event" size="large">
-      <EventMarkdown
-        className={`prose max-w-none whitespace-pre-wrap text-base leading-7 prose-headings:mb-2 prose-headings:mt-4 prose-p:my-2 prose-a:text-current prose-li:my-0 ${
-          classes.isDarkMode ? 'prose-invert' : 'prose-gray'
-        } ${classes.mutedText}`}
+      <ProjectMarkdown
+        className={`prose prose-lg max-w-none ${
+          classes.isDarkMode
+            ? 'prose-invert prose-pre:bg-gray-800 prose-a:text-indigo-400 hover:prose-a:text-indigo-300'
+            : 'prose-gray prose-pre:bg-gray-100 prose-a:text-indigo-600 hover:prose-a:text-indigo-700'
+        }`}
         markdown={event.description}
       />
     </ManagementSection>

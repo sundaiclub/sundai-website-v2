@@ -535,20 +535,19 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
     expect(screen.queryByText(/expert mentors/i)).not.toBeInTheDocument();
   });
 
-  it('preserves line breaks in the event description', async () => {
+  it('uses project Markdown spacing for the event description', async () => {
     await renderDetailPage(
-      buildEventDetail({ description: 'First event line\nSecond event line' })
+      buildEventDetail({ description: 'First paragraph\n\nSecond paragraph' })
     );
 
-    const description = screen.getByText((_, element) => {
-      return element?.tagName === 'DIV' &&
-        element.classList.contains('whitespace-pre-wrap') &&
-        element.textContent === 'First event line\nSecond event line'
-        ? true
-        : false;
-    });
+    const description = screen
+      .getByRole('heading', { name: 'About this event' })
+      .closest('section')
+      ?.querySelector('.prose');
 
-    expect(description).toHaveClass('whitespace-pre-wrap');
+    expect(description).toHaveTextContent('First paragraph Second paragraph');
+    expect(description).toHaveClass('prose', 'prose-lg', 'max-w-none');
+    expect(description).not.toHaveClass('whitespace-pre-wrap');
   });
 
   it('shows uploaded event artwork on the public event page', async () => {

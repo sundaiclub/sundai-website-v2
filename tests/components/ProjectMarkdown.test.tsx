@@ -30,21 +30,23 @@ jest.mock('react-markdown', () => ({
   default: (props: MockReactMarkdownProps) => mockReactMarkdown(props),
 }));
 
-import EventMarkdown from '../../src/app/components/EventMarkdown';
+import ProjectMarkdown from '../../src/app/components/ProjectMarkdown';
 
-describe('EventMarkdown', () => {
+describe('ProjectMarkdown', () => {
   beforeEach(() => {
     mockReactMarkdown.mockClear();
   });
 
-  it('passes event descriptions to the GFM renderer and secures links', () => {
+  it('passes descriptions to the GFM renderer and secures links', () => {
     const markdown =
       'Meet **local builders** and read the [event guide](https://example.com/guide).';
 
-    render(<EventMarkdown className="event-description" markdown={markdown} />);
+    render(
+      <ProjectMarkdown className="project-description" markdown={markdown} />
+    );
 
     expect(screen.getByTestId('markdown-renderer')).toHaveClass(
-      'event-description'
+      'project-description'
     );
     expect(mockReactMarkdown).toHaveBeenCalledWith(
       expect.objectContaining({
