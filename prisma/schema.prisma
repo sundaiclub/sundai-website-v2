@@ -508,27 +508,30 @@ model PitchSession {
 }
 
 model Chapter {
-  id                    String                @id @default(uuid())
-  name                  String
-  slug                  String                @unique
-  city                  String
-  region                String?
-  country               String
-  timezone              String
-  description           String?
-  heroImage             Image?                @relation("ChapterHeroImage", fields: [heroImageId], references: [id])
-  heroImageId           String?               @unique
-  status                ChapterStatus         @default(ACTIVE)
-  accessMode            ChapterAccessMode     @default(PUBLIC)
-  mailingListName       String?
-  mailingListExternalId String?
-  createdAt             DateTime              @default(now())
-  updatedAt             DateTime              @updatedAt
-  memberships           ChapterMembership[]
-  events                Event[]
-  pitchSessions         PitchSession[]
-  applicationTemplates  ApplicationTemplate[]
-  banFlags              UserBanFlag[]
+  id                      String                @id @default(uuid())
+  name                    String
+  slug                    String                @unique
+  city                    String
+  region                  String?
+  country                 String
+  timezone                String
+  description             String?
+  heroImage               Image?                @relation("ChapterHeroImage", fields: [heroImageId], references: [id])
+  heroImageId             String?               @unique
+  status                  ChapterStatus         @default(ACTIVE)
+  accessMode              ChapterAccessMode     @default(PUBLIC)
+  mailingListName         String?
+  mailingListExternalId   String?
+  defaultApprovalMessage  String?
+  defaultWaitlistMessage  String?
+  defaultRejectionMessage String?
+  createdAt               DateTime              @default(now())
+  updatedAt               DateTime              @updatedAt
+  memberships             ChapterMembership[]
+  events                  Event[]
+  pitchSessions           PitchSession[]
+  applicationTemplates    ApplicationTemplate[]
+  banFlags                UserBanFlag[]
 
   @@index([status, accessMode])
   @@index([slug])

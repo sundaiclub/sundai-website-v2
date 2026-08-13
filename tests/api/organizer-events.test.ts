@@ -219,6 +219,46 @@ describe('/api/events organizer chapter-admin behavior', () => {
     expect(body).toEqual(expect.objectContaining({ id: createdEvent.id }));
   });
 
+  it('uses chapter decision message defaults when event messages are omitted', async () => {
+    const { chapter, hacker, membership } = buildChapterAdminFixture({
+      chapter: {
+        defaultApprovalMessage: 'Boston approves your application.',
+        defaultWaitlistMessage: 'Boston added you to the waitlist.',
+        defaultRejectionMessage: 'Boston cannot offer you a spot.',
+      },
+    });
+
+    mockActor(hacker);
+    mockMembershipLookup(membership);
+    prisma.chapter.findUnique.mockResolvedValue(chapter);
+    prisma.event.create.mockResolvedValue({
+      id: 'event-with-chapter-defaults',
+      chapterId: chapter.id,
+    });
+
+    const response = await POST_EVENTS(
+      createJsonRequest('/api/events', {
+        method: 'POST',
+        body: {
+          title: 'Boston Chapter Defaults',
+          chapterId: chapter.id,
+          startTime: '2026-08-16T14:00:00.000Z',
+        },
+      }) as any
+    );
+
+    expect(response.status).toBe(200);
+    expect(prisma.event.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          confirmationMessage: 'Boston approves your application.',
+          waitlistMessage: 'Boston added you to the waitlist.',
+          declineMessage: 'Boston cannot offer you a spot.',
+        }),
+      })
+    );
+  });
+
   it('adds a numeric suffix when the event slug already exists in the chapter', async () => {
     const { chapter, hacker, membership } = buildChapterAdminFixture();
     const slugConflict = Object.assign(new Error('Unique constraint failed'), {

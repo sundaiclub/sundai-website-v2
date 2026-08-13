@@ -444,6 +444,16 @@ describe('/organizer/events/new', () => {
     );
   });
 
+  it('selects the first chapter application template by default', async () => {
+    await renderNewEventPage();
+
+    await waitFor(() => {
+      expect(
+        screen.getByLabelText(/chapter application template/i)
+      ).toHaveValue('template-chapter-boston');
+    });
+  });
+
   it('submits the site message defaults when the organizer leaves them unchanged', async () => {
     await renderNewEventPage();
 
@@ -745,7 +755,11 @@ describe('/organizer/events/new', () => {
         (field: { label: string }) => field.label
       );
 
-      expect(labels).toEqual(['What do you want to build?']);
+      expect(labels).toEqual([
+        'Project URL',
+        'Dietary restrictions',
+        'What do you want to build?',
+      ]);
     });
   });
 
@@ -765,13 +779,15 @@ describe('/organizer/events/new', () => {
     fireEvent.click(screen.getByRole('button', { name: /save draft/i }));
 
     await waitFor(() => {
-      expect(latestFetchBody().applicationQuestionsJson).toEqual([
-        expect.objectContaining({
-          label: 'I agree to the event guidelines',
-          type: 'CHECKBOX',
-          required: true,
-        }),
-      ]);
+      expect(latestFetchBody().applicationQuestionsJson).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            label: 'I agree to the event guidelines',
+            type: 'CHECKBOX',
+            required: true,
+          }),
+        ])
+      );
     });
   });
 
@@ -789,12 +805,14 @@ describe('/organizer/events/new', () => {
     fireEvent.click(screen.getByRole('button', { name: /save draft/i }));
 
     await waitFor(() => {
-      expect(latestFetchBody().applicationQuestionsJson).toEqual([
-        expect.objectContaining({
-          label: 'What do you want to build?',
-          reusePreviousAnswer: true,
-        }),
-      ]);
+      expect(latestFetchBody().applicationQuestionsJson).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            label: 'What do you want to build?',
+            reusePreviousAnswer: true,
+          }),
+        ])
+      );
     });
   });
 });

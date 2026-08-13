@@ -209,6 +209,16 @@ export async function POST(req: Request) {
       (user && (await canManageChapterSettings(prisma, user.id, chapterId)));
     if (!canCreate) return new NextResponse('Forbidden', { status: 403 });
 
+    const chapterDefaults = await prisma.chapter.findUnique({
+      where: { id: chapterId },
+      select: {
+        defaultApprovalMessage: true,
+        defaultWaitlistMessage: true,
+        defaultRejectionMessage: true,
+      },
+    });
+    if (!chapterDefaults) return new NextResponse('Not Found', { status: 404 });
+
     if (!title || !startTime) {
       return NextResponse.json(
         { message: 'title and startTime are required' },
@@ -341,15 +351,18 @@ export async function POST(req: Request) {
           }),
           confirmationMessage:
             confirmationMessage === undefined
-              ? DEFAULT_EVENT_MESSAGES.confirmation
+              ? (chapterDefaults.defaultApprovalMessage ??
+                DEFAULT_EVENT_MESSAGES.confirmation)
               : confirmationMessage || null,
           waitlistMessage:
             waitlistMessage === undefined
-              ? DEFAULT_EVENT_MESSAGES.waitlist
+              ? (chapterDefaults.defaultWaitlistMessage ??
+                DEFAULT_EVENT_MESSAGES.waitlist)
               : waitlistMessage || null,
           declineMessage:
             declineMessage === undefined
-              ? DEFAULT_EVENT_MESSAGES.decline
+              ? (chapterDefaults.defaultRejectionMessage ??
+                DEFAULT_EVENT_MESSAGES.decline)
               : declineMessage || null,
           applicationsOpen: parsedApplicationsOpen,
           applicationsClosedAt: parsedApplicationsOpen

@@ -507,6 +507,18 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
   useEffect(() => {
     if (!isEditing && selectedChapter) {
       setTimezone(selectedChapter.timezone);
+      setConfirmationMessage(
+        selectedChapter.defaultApprovalMessage ??
+          DEFAULT_EVENT_MESSAGES.confirmation
+      );
+      setWaitlistMessage(
+        selectedChapter.defaultWaitlistMessage ??
+          DEFAULT_EVENT_MESSAGES.waitlist
+      );
+      setDeclineMessage(
+        selectedChapter.defaultRejectionMessage ??
+          DEFAULT_EVENT_MESSAGES.decline
+      );
     }
   }, [isEditing, selectedChapter]);
 
@@ -529,8 +541,12 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
       })
       .then(payload => {
         if (!isCurrent) return;
-        setTemplates(applicationTemplateList(payload));
-        setSelectedChapterTemplateId('');
+        const nextTemplates = applicationTemplateList(payload);
+        const firstChapterTemplate = nextTemplates.find(
+          template => template.scope === 'CHAPTER'
+        );
+        setTemplates(nextTemplates);
+        setSelectedChapterTemplateId(firstChapterTemplate?.id ?? '');
       })
       .catch(() => {
         if (!isCurrent) return;

@@ -93,6 +93,9 @@ export interface Chapter {
   accessMode: ChapterAccessMode;
   mailingListName?: string | null;
   mailingListExternalId?: string | null;
+  defaultApprovalMessage?: string | null;
+  defaultWaitlistMessage?: string | null;
+  defaultRejectionMessage?: string | null;
   createdAt: ISODateTimeString | Date;
   updatedAt: ISODateTimeString | Date;
 }
@@ -210,6 +213,9 @@ export type ManageableChapterListItem = Pick<
   | 'timezone'
   | 'status'
   | 'accessMode'
+  | 'defaultApprovalMessage'
+  | 'defaultWaitlistMessage'
+  | 'defaultRejectionMessage'
   | 'heroImage'
 > & {
   viewerMembership?: Pick<ChapterMembership, 'role' | 'status'> | null;
@@ -696,6 +702,9 @@ export type OrganizerChapterSettings = Pick<
   | 'description'
   | 'status'
   | 'accessMode'
+  | 'defaultApprovalMessage'
+  | 'defaultWaitlistMessage'
+  | 'defaultRejectionMessage'
   | 'heroImage'
 >;
 
