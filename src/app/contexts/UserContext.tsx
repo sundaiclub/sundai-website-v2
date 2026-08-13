@@ -2,24 +2,26 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { useUser } from "@clerk/nextjs";
 
+export type UserInfo = {
+  id: string;
+  name: string;
+  email: string | null;
+  role: string | null;
+  avatar?: {
+    url: string;
+  } | null;
+  bio?: string | null;
+  githubUrl?: string | null;
+  phoneNumber?: string | null;
+  likes?: Array<{
+    projectId: string;
+    createdAt: string;
+  }>;
+};
+
 type UserContextType = {
   isAdmin: boolean;
-  userInfo: {
-    id: string;
-    name: string;
-    email: string | null;
-    role: string | null;
-    avatar?: {
-      url: string;
-    } | null;
-    bio?: string | null;
-    githubUrl?: string | null;
-    phoneNumber?: string | null;
-    likes?: Array<{
-      projectId: string;
-      createdAt: string;
-    }>;
-  } | null;
+  userInfo: UserInfo | null;
   loading: boolean;
 };
 
@@ -39,18 +41,16 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     const fetchUserInfo = async () => {
       if (user?.id) {
         try {
-          // Get the hacker using clerkId
           const hackerResponse = await fetch(`/api/hackers?clerkId=${user.id}`);
           if (!hackerResponse.ok) throw new Error("Failed to fetch hacker ID");
           const hackerData = await hackerResponse.json();
 
-          // Get the full hacker profile using the Prisma ID
           const profileResponse = await fetch(`/api/hackers/${hackerData.id}`);
           if (!profileResponse.ok)
             throw new Error("Failed to fetch hacker profile");
           const profileData = await profileResponse.json();
 
-          const isUserAdmin = profileData.role === "ADMIN";
+          const isUserAdmin = profileData.role === "SITE_ADMIN";
           setIsAdmin(isUserAdmin);
           setUserInfo({
             id: profileData.id,

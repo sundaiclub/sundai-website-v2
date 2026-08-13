@@ -4,6 +4,7 @@ import { toast } from "react-hot-toast";
 import { useTheme } from "../contexts/ThemeContext";
 import { useUserContext } from "../contexts/UserContext";
 import { calculateProjectScore } from "@/lib/trending";
+import type { Project } from "@/types/project";
  
 
 type WeeklyTopProject = {
@@ -16,6 +17,12 @@ type WeeklyTopProject = {
   launchLead: { id: string; name: string; linkedinUrl: string | null; twitterUrl: string | null };
   team: { id: string; name: string; linkedinUrl: string | null; twitterUrl: string | null }[];
   projectUrl: string;
+};
+
+type NewsProject = Omit<Project, "preview" | "createdAt" | "startDate"> & {
+  preview: string | null;
+  createdAt: string | Date;
+  startDate?: string | Date | null;
 };
 
 export default function NewsClient() {
@@ -39,19 +46,19 @@ export default function NewsClient() {
   const loadTopProjects = useCallback(async () => {
     // Fetch all approved projects fresh and compute trending weekly list client-side
     const resp = await fetch('/api/projects?status=APPROVED', { cache: 'no-store' });
-    const projects = await resp.json();
+    const projects = (await resp.json()) as NewsProject[];
 
     const now = new Date();
     const cutoffDate = new Date(now);
     cutoffDate.setDate(now.getDate() - 7);
     cutoffDate.setHours(0, 0, 0, 0);
 
-    const inCutoffDate = projects.filter((p: any) => {
-      const startOrCreated = new Date((p.startDate as any) || (p.createdAt as any));
+    const inCutoffDate = projects.filter((p) => {
+      const startOrCreated = new Date(p.startDate || p.createdAt);
       return startOrCreated >= cutoffDate;
     });
 
-    const byTrending = (a: any, b: any) =>
+    const byTrending = (a: NewsProject, b: NewsProject) =>
       calculateProjectScore(b, { timeDecayDays: 1 }) - calculateProjectScore(a, { timeDecayDays: 1 });
 
     const trendingThisWeek = inCutoffDate.length >= 5
@@ -59,29 +66,29 @@ export default function NewsClient() {
       : [
           ...inCutoffDate.sort(byTrending),
           ...projects
-            .filter((p: any) => !inCutoffDate.includes(p))
+            .filter((p) => !inCutoffDate.includes(p))
             .sort(byTrending)
             .slice(0, 5 - inCutoffDate.length),
         ];
 
-    const result: WeeklyTopProject[] = trendingThisWeek.map((p: any) => ({
+    const result: WeeklyTopProject[] = trendingThisWeek.map((p) => ({
       id: p.id,
       title: p.title,
       preview: p.preview || p.title,
-      createdAt: (p.createdAt instanceof Date ? p.createdAt : new Date(p.createdAt as any)).toISOString(),
-      likeCount: (p.likes?.length as number) || 0,
+      createdAt: (p.createdAt instanceof Date ? p.createdAt : new Date(p.createdAt)).toISOString(),
+      likeCount: p.likes?.length || 0,
       thumbnailUrl: p.thumbnail?.url || null,
       launchLead: {
         id: p.launchLead?.id,
         name: p.launchLead?.name,
-        linkedinUrl: (p.launchLead as any)?.linkedinUrl || null,
-        twitterUrl: (p.launchLead as any)?.twitterUrl || null,
+        linkedinUrl: p.launchLead?.linkedinUrl || null,
+        twitterUrl: p.launchLead?.twitterUrl || null,
       },
-      team: (p.participants || []).map((pp: any) => ({
+      team: (p.participants || []).map((pp) => ({
         id: pp.hacker?.id,
         name: pp.hacker?.name,
-        linkedinUrl: (pp.hacker as any)?.linkedinUrl || null,
-        twitterUrl: (pp.hacker as any)?.twitterUrl || null,
+        linkedinUrl: pp.hacker?.linkedinUrl || null,
+        twitterUrl: pp.hacker?.twitterUrl || null,
       })),
       projectUrl: `https://www.sundai.club/projects/${p.id}`,
     }));
@@ -105,7 +112,7 @@ export default function NewsClient() {
     return lines.join("\n");
   }, [topProjects]);
 
-  const buildEmailHtml = useCallback((projects: WeeklyTopProject[], aiNewsHtml?: string) => {
+  const buildEmailHtml = useCallback((projects: WeeklyTopProject[], aiNewsHtml: string) => {
     const projectsItems = projects.map((p, idx) => {
       const likeUrl = `${p.projectUrl}?like=1`;
       const people = [
@@ -163,7 +170,7 @@ export default function NewsClient() {
           <li>Adaptive quantization in training</li>
         </ul>
         <div style="margin-top:12px">
-          <a href="https://partiful.com/e/C3mnrNSv8YGnZefXcL0D" style="display:inline-block;padding:10px 14px;background:#111827;color:#ffffff;text-decoration:none;border-radius:0;border:1px solid #111827">RSVP on Partiful</a>
+          <a href="https://www.sundai.club/events" style="display:inline-block;padding:10px 14px;background:#111827;color:#ffffff;text-decoration:none;border-radius:0;border:1px solid #111827">Browse Sundai events</a>
         </div>
       </section>`;
 
@@ -174,12 +181,12 @@ export default function NewsClient() {
           <li>We discuss AI tools and frameworks every week</li>
           <li>Meets virtually on <a href="https://discord.com/invite/EVbrS8aEC9">Discord</a> </li>
           <li>Community toolbox - <a href="http://www.tiny.cc/sundai-toolbox">tiny.cc/sundai-toolbox</a></li>
-          <li>Add it to your <a href="https://calendar.google.com/calendar/event?action=TEMPLATE&tmeid=N3U0bThmcTZjM2oxcjBiajU0djYxaG85bThfMjAyNTEwMTRUMjEwMDAwWiBiOTYwOGM1MWQ4Nzg0OGQzMGFhNmFiMzZkNjQ5MzJmOTIxNmZmZmM5NzZlMzQ4NzNkZjcxNWRjN2QyNDBiNjhiQGc&tmsrc=b9608c51d87848d30aa6ab36d64932f9216fffc976e34873df715dc7d240b68b%40group.calendar.google.com&scp=ALL">calendar </a></li>
+          <li>Find the next session on <a href="/events">Sundai events</a></li>
           <li>[YouTube channel is coming]</li>
 
         </ul>
         <div style="margin-top:8px">
-          <a href="https://partiful.com/e/xZtVjYqjTCVZQ2wlAjCg" style="display:inline-block;padding:10px 14px;background:#111827;color:#ffffff;text-decoration:none;border-radius:0;border:1px solid #111827">Join us Tuesdays @ 5pm</a>
+          <a href="https://www.sundai.club/events" style="display:inline-block;padding:10px 14px;background:#111827;color:#ffffff;text-decoration:none;border-radius:0;border:1px solid #111827">Find the next session</a>
         </div>
       </section>`;
 
@@ -187,8 +194,8 @@ export default function NewsClient() {
       <section id="community" style="padding:20px 16px;border-bottom:1px solid #e5e7eb">
         <h2 style="margin:0 0 8px;font-size:18px;line-height:26px;color:#111827;display:flex;align-items:center;gap:8px"> Community News</h2>
         <ul style="margin:8px 0 0 18px;color:#374151;padding:0">
-          <li>Subscribe to <a href="https://calendar.google.com/calendar/u/0?cid=Yjk2MDhjNTFkODc4NDhkMzBhYTZhYjM2ZDY0OTMyZjkyMTZmZmZjOTc2ZTM0ODczZGY3MTVkYzdkMjQwYjY4YkBncm91cC5jYWxlbmRhci5nb29nbGUuY29t">our calendar</a></li> to get all the events handy; </li>
-          <li>Weekly Community Meeting - Tuesdays @8:30 - <a href="https://calendar.google.com/calendar/u/0?cid=Yjk2MDhjNTFkODc4NDhkMzBhYTZhYjM2ZDY0OTMyZjkyMTZmZmZjOTc2ZTM0ODczZGY3MTVkYzdkMjQwYjY4YkBncm91cC5jYWxlbmRhci5nb29nbGUuY29t">calendar invite</a>  -- give us feedback, propose a new Sundai initiative;</li>
+          <li>Browse <a href="/events">Sundai events</a> to get all the events handy;</li>
+          <li>Weekly Community Meeting - Tuesdays @8:30 - give us feedback, propose a new Sundai initiative;</li>
           <li>Get promoted to <a href="https://partiful.com/e/GZfEKvYQlIrk21mzx6Qe">#hacker role</a> - attend at least 4+ sundais</li>
           <li>Organize a <a href="https://partiful.com/e/iROjbe4j0PiKtaGop8SD">Sundai Hack as an MC</a> - get featured on our website</li>
           <li>Start <a href="https://partiful.com/e/dEh518Skq6MZqcXVNa3d">a chapter in your city</a>. Read our <a href="https://github.com/sergeicu/sundai-global">Constitution & Guide</a>. </li>
@@ -196,21 +203,10 @@ export default function NewsClient() {
         </ul>
       </section>`;
 
-    const fallbackAiNews = `
-        <ul style="margin:8px 0 0 18px;color:#374151;padding:0">
-          <li>GLM Coding plan is 10% off if you use the Vector Lab signup code</li>
-          <li>OpenAI releases Chat with Apps, Agentkit, and more at Dev Day</li>
-          <li>Qwen3 VL gets a small variant</li>
-          <li>Can you give an LLM a gambling addiction</li>
-          <li>And more in this week's news</li>
-        </ul>
-        <p style="margin:10px 0 0;color:#374151">Shoutout to Andrew for leading Sundai News.</p>
-        <p style="margin:6px 0 0;color:#374151">Audio version available <a href="https://open.spotify.com/show/7LKYxvGAGSj1pso4aklh9O" style="color:#111827;text-decoration:underline">on Spotify</a>. Join the <a href="https://discord.gg/HrNXgwpVzd" style="color:#111827;text-decoration:underline">Discord</a>. Read the <a href="https://vectorlab.dev/weekly-10-6-to-10-12" style="color:#111827;text-decoration:underline">full article on the VectorLab website</a>.</p>`;
-
     const newsTLDR = `
       <section id="ai-news" style="padding:20px 16px;border-bottom:1px solid #e5e7eb">
         <h2 style="margin:0 0 8px;font-size:18px;line-height:26px;color:#111827">Weekly AI News · TL;DR</h2>
-        ${aiNewsHtml && aiNewsHtml.trim().length > 0 ? aiNewsHtml : fallbackAiNews}
+        ${aiNewsHtml}
       </section>`;
 
     const projectsBlock = `
@@ -270,15 +266,13 @@ export default function NewsClient() {
     try {
       const freshTop = await loadTopProjects();
       setTopProjects(freshTop);
-      // Fetch TLDR HTML from VectorLab
-      let aiNewsHtml: string | undefined = undefined;
-      try {
-        const tldrResp = await fetch('https://vectorlab.dev/api/tldr', { cache: 'no-store' });
-        if (tldrResp.ok) {
-          aiNewsHtml = await tldrResp.text();
-        }
-      } catch (e) {
-        // Silent fallback to built-in TLDR
+      const tldrResp = await fetch('https://vectorlab.dev/api/tldr', { cache: 'no-store' });
+      if (!tldrResp.ok) {
+        throw new Error(`TLDR request failed with status ${tldrResp.status}`);
+      }
+      const aiNewsHtml = await tldrResp.text();
+      if (!aiNewsHtml.trim()) {
+        throw new Error('TLDR request returned no content');
       }
 
       let built = buildEmailHtml(freshTop, aiNewsHtml);
@@ -290,14 +284,12 @@ export default function NewsClient() {
           body: JSON.stringify({ htmlBody: bodyInner, instruction }),
         });
         if (!resp.ok) {
-          toast.error('Generation failed. Please try again.');
+          throw new Error(`News generation failed with status ${resp.status}`);
         }
         // Try streaming first
-        const contentType = (resp as any).headers && typeof (resp as any).headers.get === 'function'
-          ? ((resp as any).headers.get('Content-Type') || '')
-          : '';
-        if ((resp as any).body && typeof (resp as any).body.getReader === 'function' && contentType.includes('text/plain')) {
-          const reader = (resp as any).body.getReader();
+        const contentType = resp.headers.get('Content-Type') || '';
+        if (resp.body && contentType.includes('text/plain')) {
+          const reader = resp.body.getReader();
           const decoder = new TextDecoder();
           let accum = '';
           // Set initial HTML while streaming starts
@@ -401,5 +393,3 @@ export default function NewsClient() {
     </div>
   );
 }
-
-

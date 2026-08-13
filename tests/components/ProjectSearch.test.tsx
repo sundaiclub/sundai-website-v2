@@ -1,7 +1,7 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import ProjectSearch from '../../src/app/components/ProjectSearch';
-import type { Project } from '../../src/app/components/Project';
+import type { Project } from '../../src/types/project';
 
 // Mock dependencies
 jest.mock('next/navigation', () => ({
@@ -106,9 +106,55 @@ describe('ProjectSearch', () => {
   it('should call onFilteredProjectsChange with all projects initially', () => {
     render(<ProjectSearch {...defaultProps} />);
     
-    // Default sort is Trending (time-decayed likes); newer Project 2 comes first
-    const expectedOrder = [mockProjects[1], mockProjects[0]];
+    // Default sort is Trending (recency-weighted likes).
+    const expectedOrder = [mockProjects[0], mockProjects[1]];
     expect(defaultProps.onFilteredProjectsChange).toHaveBeenCalledWith(expectedOrder);
+  });
+
+  it('should sort trending by likes from the previous 7 days across all projects', () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-04-14T00:00:00.000Z'));
+
+    const olderProjectWithRecentLikes: Project = {
+      ...mockProjects[0],
+      id: 'older-with-recent-likes',
+      title: 'Older Project With Recent Likes',
+      startDate: new Date('2024-01-01'),
+      likes: [
+        { hackerId: 'recent-1', createdAt: '2026-04-13T00:00:00Z' },
+        { hackerId: 'recent-2', createdAt: '2026-04-14T00:00:00Z' },
+      ],
+    };
+
+    const newerProjectWithOldLikes: Project = {
+      ...mockProjects[1],
+      id: 'newer-with-old-likes',
+      title: 'Newer Project With Old Likes',
+      startDate: new Date('2026-04-14'),
+      likes: [
+        { hackerId: 'old-1', createdAt: '2026-03-01T00:00:00Z' },
+        { hackerId: 'old-2', createdAt: '2026-03-02T00:00:00Z' },
+        { hackerId: 'old-3', createdAt: '2026-03-03T00:00:00Z' },
+      ],
+    };
+
+    try {
+      const onFilteredProjectsChange = jest.fn();
+
+      render(
+        <ProjectSearch
+          {...defaultProps}
+          projects={[newerProjectWithOldLikes, olderProjectWithRecentLikes]}
+          onFilteredProjectsChange={onFilteredProjectsChange}
+        />
+      );
+
+      expect(onFilteredProjectsChange).toHaveBeenCalledWith([
+        olderProjectWithRecentLikes,
+        newerProjectWithOldLikes,
+      ]);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('should filter projects by search term', async () => {
@@ -123,6 +169,20 @@ describe('ProjectSearch', () => {
           expect.objectContaining({ title: 'Project 1' })
         ])
       );
+    });
+  });
+
+  it('should notify when filters become active', async () => {
+    const onSearchStateChange = jest.fn();
+    render(<ProjectSearch {...defaultProps} onSearchStateChange={onSearchStateChange} />);
+
+    expect(onSearchStateChange).toHaveBeenCalledWith(false);
+
+    const searchInput = screen.getByPlaceholderText('Search projects...');
+    fireEvent.change(searchInput, { target: { value: 'Project 1' } });
+
+    await waitFor(() => {
+      expect(onSearchStateChange).toHaveBeenLastCalledWith(true);
     });
   });
 
@@ -266,9 +326,9 @@ describe('ProjectSearch', () => {
     const resetButton = screen.getByText('Reset');
     fireEvent.click(resetButton);
     
-    // Should call callback with all projects again (default trending => Project 2 first)
+    // Should call callback with all projects again using the default trending order.
     await waitFor(() => {
-      const expectedOrder = [mockProjects[1], mockProjects[0]];
+      const expectedOrder = [mockProjects[0], mockProjects[1]];
       expect(defaultProps.onFilteredProjectsChange).toHaveBeenCalledWith(expectedOrder);
     });
   });

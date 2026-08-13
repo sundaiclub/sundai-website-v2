@@ -65,6 +65,9 @@ jobs:
     - name: Run linter
       run: npm run lint
 
+    - name: Refresh Prisma client
+      run: npx prisma generate
+
     - name: Run type checking
       run: npx tsc --noEmit
 

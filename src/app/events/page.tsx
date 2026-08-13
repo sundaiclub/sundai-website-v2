@@ -1,99 +1,150 @@
-"use client";
+'use client';
 
-import { useTheme } from "../contexts/ThemeContext";
-import { motion } from "framer-motion";
-import { usePullToRefresh } from "../hooks/usePullToRefresh";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from 'react';
+import EventSummaryCard from '../components/EventSummaryCard';
+import {
+  PublicEventStatusBadge,
+  ViewerRegistrationStatusBadge,
+} from '../components/PublicEventCard';
+import {
+  ManagementAlert,
+  ManagementEmptyState,
+  ManagementHeader,
+  ManagementPage,
+  useManagementClasses,
+} from '../components/ManagementSurface';
+import type {
+  PublicEventCard as PublicEventCardData,
+  PublicEventChapterSummary,
+} from '@/types/event-management';
+
+function sortChapters(chapters: PublicEventChapterSummary[]) {
+  return [...chapters].sort((a, b) => a.name.localeCompare(b.name));
+}
 
 export default function EventsPage() {
-  const { isDarkMode } = useTheme();
-  const [isMobile, setIsMobile] = useState(false);
-  
-  usePullToRefresh();
+  const classes = useManagementClasses();
+  const [events, setEvents] = useState<PublicEventCardData[]>([]);
+  const [chapters, setChapters] = useState<PublicEventChapterSummary[]>([]);
+  const [selectedChapter, setSelectedChapter] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
 
   useEffect(() => {
-    const checkIfMobile = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
-    
-    checkIfMobile();
-    window.addEventListener('resize', checkIfMobile);
-    
-    return () => window.removeEventListener('resize', checkIfMobile);
-  }, []);
+    let cancelled = false;
+    const params = new URLSearchParams();
+    if (selectedChapter) params.set('chapterSlug', selectedChapter);
 
-  const calendarSrc = isMobile 
-    ? "https://calendar.google.com/calendar/embed?src=b9608c51d87848d30aa6ab36d64932f9216fffc976e34873df715dc7d240b68b%40group.calendar.google.com&ctz=America%2FNew_York&mode=AGENDA"
-    : "https://calendar.google.com/calendar/embed?src=b9608c51d87848d30aa6ab36d64932f9216fffc976e34873df715dc7d240b68b%40group.calendar.google.com&ctz=America%2FNew_York";
+    setIsLoading(true);
+    setLoadError('');
+
+    const queryString = params.toString();
+
+    Promise.all([
+      fetch(`/api/events${queryString ? `?${queryString}` : ''}`).then(
+        response => {
+          if (!response.ok) {
+            throw new Error(`Events request failed with ${response.status}`);
+          }
+          return response.json() as Promise<PublicEventCardData[]>;
+        }
+      ),
+      fetch('/api/chapters').then(response => {
+        if (!response.ok) {
+          throw new Error(`Chapters request failed with ${response.status}`);
+        }
+        return response.json() as Promise<PublicEventChapterSummary[]>;
+      }),
+    ])
+      .then(([nextEvents, chaptersPayload]) => {
+        if (cancelled) return;
+        setEvents(nextEvents);
+        setChapters(sortChapters(chaptersPayload));
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setEvents([]);
+          setLoadError('Unable to load events.');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedChapter]);
+
+  const visibleChapters = useMemo(
+    () => chapters.filter(chapter => chapter.slug && chapter.name),
+    [chapters]
+  );
 
   return (
-    <div
-      className={`min-h-screen ${
-        isDarkMode
-          ? "bg-gradient-to-b from-gray-900 to-black text-gray-100"
-          : "bg-gradient-to-b from-[#E5E5E5] to-[#F0F0F0] text-gray-800"
-      } font-space-mono`}
-    >
-      <section className="relative py-16 md:py-24 lg:py-26 px-4 md:px-8 overflow-hidden">
-        <div className="container mx-auto relative z-10">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-            className="text-center mb-12"
-          >
-            <h1 className="text-4xl md:text-5xl font-bold mb-4 font-space-mono">
-              Upcoming Events
-            </h1>
-            <p className="text-lg md:text-xl max-w-3xl mx-auto">
-              Join us for our upcoming events and activities. Stay connected with the Sundai community!
-            </p>
-          </motion.div>
+    <ManagementPage>
+      <ManagementHeader
+        title="Upcoming Events"
+        description="Browse published Sundai events and find the next gathering in your chapter."
+      />
 
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.2 }}
-            className="calendar-container w-full overflow-hidden rounded-lg shadow-lg"
-          >
-            <div className={`w-full ${isDarkMode ? 'bg-gray-800' : 'bg-white'} p-4 rounded-lg shadow-lg`}>
-              <iframe 
-                src={calendarSrc}
-                style={{ border: 0 }} 
-                width="100%" 
-                height={isMobile ? "500" : "700"} 
-                frameBorder="0" 
-                scrolling="no"
-                title="Sundai Events Calendar"
-                className="w-full rounded-lg"
-              ></iframe>
-            </div>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.4 }}
-            className="mt-12 text-center"
-          >
-            <p className="text-lg mb-4">
-              Want to add our events to your personal calendar?
-            </p>
-            <a 
-              href="https://calendar.google.com/calendar/u/0?cid=Yjk2MDhjNTFkODc4NDhkMzBhYTZhYjM2ZDY0OTMyZjkyMTZmZmZjOTc2ZTM0ODczZGY3MTVkYzdkMjQwYjY4YkBncm91cC5jYWxlbmRhci5nb29nbGUuY29t" 
-              className={`inline-block px-6 py-3 rounded-full ${
-                isDarkMode 
-                  ? 'bg-indigo-600 hover:bg-indigo-700' 
-                  : 'bg-indigo-600 hover:bg-indigo-700'
-              } text-white font-medium transition duration-300`}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Add to Google Calendar
-            </a>
-          </motion.div>
+      {loadError && (
+        <div className="mb-5">
+          <ManagementAlert tone="danger">{loadError}</ManagementAlert>
         </div>
-      </section>
-    </div>
+      )}
+
+      <div className="mb-6 flex flex-col gap-2 sm:max-w-xs">
+        <label
+          className={`text-sm font-semibold ${classes.mutedText}`}
+          htmlFor="chapter-filter"
+        >
+          Chapter
+        </label>
+        <select
+          className={classes.input}
+          id="chapter-filter"
+          onChange={event => setSelectedChapter(event.target.value)}
+          value={selectedChapter}
+        >
+          <option value="">All chapters</option>
+          {visibleChapters.map(chapter => (
+            <option key={chapter.id} value={chapter.slug}>
+              {chapter.name}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {isLoading ? (
+        <ManagementEmptyState>Loading events.</ManagementEmptyState>
+      ) : events.length === 0 ? (
+        <ManagementEmptyState>
+          No upcoming events are available.
+        </ManagementEmptyState>
+      ) : (
+        <div className="flex flex-wrap gap-4">
+          {events.map(event => (
+            <div className="w-full sm:w-80" key={event.id}>
+              <EventSummaryCard
+                badges={
+                  <>
+                    <PublicEventStatusBadge status={event.publicStatus} />
+                    {event.viewerRegistrationStatus && (
+                      <ViewerRegistrationStatusBadge
+                        status={event.viewerRegistrationStatus}
+                      />
+                    )}
+                  </>
+                }
+                event={event}
+                eyebrow={event.chapterName}
+                href={`/events/${event.chapterSlug}/${event.slug}`}
+              />
+            </div>
+          ))}
+        </div>
+      )}
+    </ManagementPage>
   );
-} 
+}

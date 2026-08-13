@@ -1,14 +1,34 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useParams } from "next/navigation";
 import { useUser } from "@clerk/nextjs";
 import NextImage from "next/image";
 import Link from "next/link";
-import { Cog6ToothIcon } from "@heroicons/react/24/outline";
-import { HeartIcon } from "@heroicons/react/24/solid";
-import { PencilIcon, XMarkIcon, CheckIcon } from "@heroicons/react/24/outline";
+import { HeartIcon, StarIcon as StarIconSolid } from "@heroicons/react/24/solid";
+import {
+  PencilIcon,
+  XMarkIcon,
+  CameraIcon,
+  StarIcon as StarIconOutline,
+} from "@heroicons/react/24/outline";
 import { useTheme } from "../../contexts/ThemeContext";
 import { swapFirstLetters } from "../../utils/nameUtils";
+
+type ProjectSummary = {
+  id: string;
+  title: string;
+  description: string;
+  thumbnail?: {
+    url: string;
+  } | null;
+  status: "PENDING" | "APPROVED";
+  startDate?: string | null;
+  createdAt?: string | null;
+  likes: Array<{
+    hackerId: string;
+    createdAt: string;
+  }>;
+};
 
 type HackerProfile = {
   id: string;
@@ -27,68 +47,14 @@ type HackerProfile = {
   } | null;
   projects: Array<{
     role: string;
-    project: {
-      id: string;
-      title: string;
-      description: string;
-      thumbnail?: {
-        url: string;
-      } | null;
-      status: "PENDING" | "APPROVED";
-      likes: Array<{
-        hackerId: string;
-        createdAt: string;
-      }>;
-    };
+    project: ProjectSummary;
   }>;
-  ledProjects: Array<{
-    id: string;
-    title: string;
-    description: string;
-    thumbnail?: {
-      url: string;
-    } | null;
-    status: "PENDING" | "APPROVED";
-    likes: Array<{
-      hackerId: string;
-      createdAt: string;
-    }>;
-  }>;
-  likedProjects: Array<{
-    createdAt: string;
-    project: {
-      id: string;
-      title: string;
-      description: string;
-      thumbnail?: {
-        url: string;
-      } | null;
-      status: "PENDING" | "APPROVED";
-      launchLead: {
-        name: string;
-        avatar?: {
-          url: string;
-        } | null;
-      };
-    };
-  }>;
+  ledProjects: ProjectSummary[];
+  featuredProjectIds: string[];
 };
 
-// Add this CSS class to your globals.css or a new CSS module
-const scrollableSection = `
-  overflow-x-auto
-  flex
-  space-x-6
-  pb-4
-  scrollbar-thin
-  scrollbar-thumb-gray-300
-  scrollbar-track-transparent
-  hover:scrollbar-thumb-gray-400
-  -mx-4
-  px-4
-`;
+const MAX_FEATURED = 3;
 
-// Add this type for the edit form
 type EditableFields = {
   name: string;
   username: string;
@@ -101,17 +67,25 @@ type EditableFields = {
   phoneNumber: string;
 };
 
-// Add this helper function at the top of the file, after the types
+type ProjectFilter = "all" | "led" | "contributed";
+type ProjectSort = "recent" | "liked";
+
+type DisplayProject = {
+  project: ProjectSummary;
+  source: "led" | "contributed";
+  role: string;
+};
+
 const getStatusBadgeClasses = (status: string) => {
   switch (status) {
-    case 'DRAFT':
-      return 'bg-gray-500';
-    case 'PENDING':
-      return 'bg-orange-500';
-    case 'APPROVED':
-      return 'bg-green-500';
+    case "DRAFT":
+      return "bg-gray-500";
+    case "PENDING":
+      return "bg-orange-500";
+    case "APPROVED":
+      return "bg-green-500";
     default:
-      return 'bg-gray-500';
+      return "bg-gray-500";
   }
 };
 
@@ -135,6 +109,10 @@ export default function HackerProfile() {
   const [currentUserHackerId, setCurrentUserHackerId] = useState<string | null>(
     null
   );
+  const [projectFilter, setProjectFilter] = useState<ProjectFilter>("all");
+  const [projectSort, setProjectSort] = useState<ProjectSort>("recent");
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [avatarError, setAvatarError] = useState<string | null>(null);
   const { isDarkMode } = useTheme();
 
   const AvatarImage = ({ src, alt, size }: { src: string | null; alt: string; size: number }) => {
@@ -148,14 +126,12 @@ export default function HackerProfile() {
         return;
       }
       try {
-        const GlobalImage = (typeof globalThis !== 'undefined' ? (globalThis as any).Image : undefined);
-        const preloader = GlobalImage ? new GlobalImage() : null;
-        if (preloader) {
+        if (typeof window !== "undefined" && window.Image) {
+          const preloader = new window.Image();
           preloader.onload = () => setImgSrc(src);
           preloader.onerror = () => setImgSrc(defaultSrc);
           preloader.src = src;
         } else {
-          // If Image constructor not available, optimistically use src
           setImgSrc(src);
         }
       } catch {
@@ -164,15 +140,15 @@ export default function HackerProfile() {
     }, [src]);
 
     return (
-      <img
+      <NextImage
         src={imgSrc}
         alt={alt}
         width={size}
         height={size}
         className="object-cover rounded-full"
-        onError={(e) => {
-          if ((e.currentTarget as HTMLImageElement).src !== defaultSrc) {
-            (e.currentTarget as HTMLImageElement).src = defaultSrc;
+        unoptimized
+        onError={() => {
+          if (imgSrc !== defaultSrc) {
             setImgSrc(defaultSrc);
           }
         }}
@@ -231,7 +207,7 @@ export default function HackerProfile() {
           ...data,
           ledProjects: data.ledProjects || [],
           projects: data.projects || [],
-          likedProjects: data.likedProjects || [],
+          featuredProjectIds: data.featuredProjectIds || [],
         });
       } catch (error) {
         console.error("Error fetching hacker data:", error);
@@ -245,6 +221,58 @@ export default function HackerProfile() {
       fetchHacker();
     }
   }, [params?.hackerId]);
+
+  useEffect(() => {
+    if (!isEditing) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setIsEditing(false);
+    };
+    window.addEventListener("keydown", onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [isEditing]);
+
+  const handleAvatarUpload = async (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setAvatarError("Please select an image file");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setAvatarError("Image must be smaller than 5MB");
+      return;
+    }
+
+    setAvatarError(null);
+    setUploadingAvatar(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const response = await fetch(
+        `/api/hackers/${params?.hackerId}/avatar`,
+        { method: "POST", body: formData }
+      );
+      if (!response.ok) {
+        throw new Error("Failed to upload avatar");
+      }
+      const updated = await response.json();
+      setHacker((prev) => (prev ? { ...prev, avatar: updated.avatar } : prev));
+    } catch (error) {
+      console.error("Error uploading avatar:", error);
+      setAvatarError("Upload failed. Please try again.");
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
 
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -268,6 +296,93 @@ export default function HackerProfile() {
       console.error("Error updating profile:", error);
     }
   };
+
+  const allProjects: DisplayProject[] = useMemo(() => {
+    if (!hacker) return [];
+    const seen = new Set<string>();
+    const out: DisplayProject[] = [];
+    for (const project of hacker.ledProjects || []) {
+      if (seen.has(project.id)) continue;
+      seen.add(project.id);
+      out.push({ project, source: "led", role: "Lead" });
+    }
+    for (const { project, role } of hacker.projects || []) {
+      if (seen.has(project.id)) continue;
+      seen.add(project.id);
+      out.push({ project, source: "contributed", role: role || "Contributor" });
+    }
+    return out;
+  }, [hacker]);
+
+  const totalLikes = useMemo(
+    () => allProjects.reduce((sum, p) => sum + (p.project.likes?.length || 0), 0),
+    [allProjects]
+  );
+
+  const totalProjectCount = allProjects.length;
+  const ledProjectCount = useMemo(
+    () => allProjects.filter((p) => p.source === "led").length,
+    [allProjects]
+  );
+
+  const featuredProjects = useMemo(() => {
+    if (!hacker) return [] as DisplayProject[];
+    const ids = hacker.featuredProjectIds || [];
+    const byId = new Map(allProjects.map((p) => [p.project.id, p]));
+    return ids
+      .map((id) => byId.get(id))
+      .filter((p): p is DisplayProject => Boolean(p));
+  }, [hacker, allProjects]);
+
+  const toggleFeatured = async (projectId: string) => {
+    if (!hacker || !isOwnProfile) return;
+    const current = hacker.featuredProjectIds || [];
+    const isCurrentlyFeatured = current.includes(projectId);
+    let next: string[];
+    if (isCurrentlyFeatured) {
+      next = current.filter((id) => id !== projectId);
+    } else {
+      if (current.length >= MAX_FEATURED) return;
+      next = [...current, projectId];
+    }
+
+    const previous = current;
+    setHacker((prev) => (prev ? { ...prev, featuredProjectIds: next } : prev));
+    try {
+      const response = await fetch(
+        `/api/hackers/${params?.hackerId}/featured-projects`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ featuredProjectIds: next }),
+        }
+      );
+      if (!response.ok) throw new Error("Failed to update featured projects");
+    } catch (error) {
+      console.error(error);
+      setHacker((prev) =>
+        prev ? { ...prev, featuredProjectIds: previous } : prev
+      );
+    }
+  };
+
+  const visibleProjects = useMemo(() => {
+    const filtered = allProjects.filter((p) => {
+      if (projectFilter === "all") return true;
+      return p.source === projectFilter;
+    });
+    const getRecency = (p: DisplayProject) => {
+      const v = p.project.startDate || p.project.createdAt;
+      return v ? new Date(v).getTime() : 0;
+    };
+    const sorted = [...filtered].sort((a, b) => {
+      if (projectSort === "liked") {
+        return (b.project.likes?.length || 0) - (a.project.likes?.length || 0);
+      }
+      return getRecency(b) - getRecency(a);
+    });
+    return sorted;
+  }, [allProjects, projectFilter, projectSort]);
 
   if (loading) {
     return (
@@ -313,6 +428,250 @@ export default function HackerProfile() {
     );
   }
 
+  const renderSocialLinks = () => {
+    const iconClass = "h-4 w-4";
+    const linkClass = `inline-flex items-center justify-center w-9 h-9 rounded-md transition-colors ${
+      isDarkMode
+        ? "bg-gray-700 text-gray-200 hover:bg-gray-600"
+        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+    }`;
+    const items: Array<{ key: string; node: React.ReactNode } | null> = [];
+
+    if (hacker.githubUrl) {
+      items.push({
+        key: "github",
+        node: (
+          <a
+            key="github"
+            href={hacker.githubUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="GitHub"
+            title="GitHub"
+            className={linkClass}
+          >
+            <svg className={iconClass} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M12 .5C5.73.5.5 5.73.5 12c0 5.08 3.29 9.39 7.86 10.91.58.11.79-.25.79-.56 0-.28-.01-1.02-.02-2-3.2.69-3.87-1.54-3.87-1.54-.52-1.32-1.27-1.67-1.27-1.67-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.18 1.76 1.18 1.02 1.75 2.69 1.24 3.35.95.1-.74.4-1.24.72-1.53-2.55-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.29 1.18-3.1-.12-.29-.51-1.46.11-3.05 0 0 .96-.31 3.15 1.18a10.95 10.95 0 0 1 5.74 0c2.19-1.49 3.15-1.18 3.15-1.18.62 1.59.23 2.76.11 3.05.74.81 1.18 1.84 1.18 3.1 0 4.42-2.69 5.39-5.25 5.68.41.36.78 1.07.78 2.16 0 1.56-.01 2.81-.01 3.19 0 .31.21.68.8.56C20.21 21.39 23.5 17.08 23.5 12 23.5 5.73 18.27.5 12 .5z" />
+            </svg>
+          </a>
+        ),
+      });
+    }
+    if (hacker.linkedinUrl) {
+      items.push({
+        key: "linkedin",
+        node: (
+          <a
+            key="linkedin"
+            href={hacker.linkedinUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="LinkedIn"
+            title="LinkedIn"
+            className={linkClass}
+          >
+            <svg className={iconClass} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M20.45 20.45h-3.55v-5.57c0-1.33-.03-3.04-1.85-3.04-1.85 0-2.13 1.45-2.13 2.95v5.66H9.36V9h3.41v1.56h.05c.48-.9 1.64-1.85 3.37-1.85 3.6 0 4.27 2.37 4.27 5.45v6.29ZM5.34 7.43a2.06 2.06 0 1 1 0-4.12 2.06 2.06 0 0 1 0 4.12ZM7.12 20.45H3.56V9h3.56v11.45ZM22.22 0H1.77C.79 0 0 .77 0 1.72v20.56C0 23.23.79 24 1.77 24h20.45c.98 0 1.78-.77 1.78-1.72V1.72C24 .77 23.2 0 22.22 0Z" />
+            </svg>
+          </a>
+        ),
+      });
+    }
+    if (hacker.twitterUrl) {
+      items.push({
+        key: "twitter",
+        node: (
+          <a
+            key="twitter"
+            href={hacker.twitterUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Twitter / X"
+            title="Twitter / X"
+            className={linkClass}
+          >
+            <svg className={iconClass} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231 5.451-6.231Zm-1.161 17.52h1.833L7.084 4.126H5.117L17.083 19.77Z" />
+            </svg>
+          </a>
+        ),
+      });
+    }
+    if (hacker.websiteUrl) {
+      items.push({
+        key: "website",
+        node: (
+          <a
+            key="website"
+            href={hacker.websiteUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Website"
+            title="Website"
+            className={linkClass}
+          >
+            <svg className={iconClass} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="10" />
+              <path d="M2 12h20" />
+              <path d="M12 2a15.3 15.3 0 0 1 0 20" />
+              <path d="M12 2a15.3 15.3 0 0 0 0 20" />
+            </svg>
+          </a>
+        ),
+      });
+    }
+    if (hacker.discordName) {
+      items.push({
+        key: "discord",
+        node: (
+          <span
+            key="discord"
+            aria-label={`Discord: ${hacker.discordName}`}
+            title={`Discord: ${hacker.discordName}`}
+            className={`inline-flex items-center gap-1.5 px-2.5 h-9 rounded-md text-sm font-fira-code ${
+              isDarkMode
+                ? "bg-gray-700 text-gray-200"
+                : "bg-gray-100 text-gray-700"
+            }`}
+          >
+            <svg className={iconClass} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M20.317 4.369A19.79 19.79 0 0 0 16.558 3.2a.077.077 0 0 0-.082.038c-.357.636-.752 1.464-1.029 2.114a18.27 18.27 0 0 0-5.487 0 12.57 12.57 0 0 0-1.045-2.114.08.08 0 0 0-.082-.038A19.736 19.736 0 0 0 5.07 4.369a.069.069 0 0 0-.032.027C1.42 9.737.508 14.945.97 20.082a.082.082 0 0 0 .031.056 19.9 19.9 0 0 0 5.993 3.029.078.078 0 0 0 .084-.028c.462-.63.873-1.295 1.226-1.994a.076.076 0 0 0-.041-.105 13.1 13.1 0 0 1-1.872-.892.077.077 0 0 1-.008-.128c.126-.094.252-.192.372-.291a.074.074 0 0 1 .078-.01c3.927 1.793 8.18 1.793 12.061 0a.074.074 0 0 1 .078.009c.12.099.246.198.373.292a.077.077 0 0 1-.006.128 12.3 12.3 0 0 1-1.873.891.077.077 0 0 0-.04.106c.36.699.772 1.364 1.225 1.993a.076.076 0 0 0 .084.029 19.84 19.84 0 0 0 6.002-3.029.077.077 0 0 0 .032-.054c.5-5.94-.838-11.105-3.549-15.687a.061.061 0 0 0-.031-.028zM8.02 16.96c-1.183 0-2.157-1.087-2.157-2.421 0-1.334.955-2.421 2.157-2.421 1.21 0 2.176 1.096 2.157 2.421 0 1.334-.955 2.421-2.157 2.421zm7.974 0c-1.183 0-2.157-1.087-2.157-2.421 0-1.334.955-2.421 2.157-2.421 1.21 0 2.176 1.096 2.157 2.421 0 1.334-.946 2.421-2.157 2.421z" />
+            </svg>
+            <span className="truncate max-w-[12rem]">{hacker.discordName}</span>
+          </span>
+        ),
+      });
+    }
+
+    if (items.length === 0) return null;
+
+    return (
+      <div className="mt-3 flex flex-wrap items-center justify-center sm:justify-start gap-2">
+        {items.map((item) => item!.node)}
+      </div>
+    );
+  };
+
+  const filterButton = (value: ProjectFilter, label: string) => {
+    const active = projectFilter === value;
+    return (
+      <button
+        key={value}
+        onClick={() => setProjectFilter(value)}
+        className={`px-3 py-1.5 rounded-md text-sm font-fira-code transition-colors ${
+          active
+            ? "bg-indigo-600 text-white"
+            : isDarkMode
+            ? "bg-gray-700 text-gray-200 hover:bg-gray-600"
+            : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+        }`}
+      >
+        {label}
+      </button>
+    );
+  };
+
+  const renderProjectCard = ({ project }: DisplayProject) => {
+    const isFeatured = (hacker?.featuredProjectIds || []).includes(project.id);
+    const canFeatureMore =
+      (hacker?.featuredProjectIds || []).length < MAX_FEATURED;
+    const starDisabled = !isFeatured && !canFeatureMore;
+    return (
+      <div
+        key={project.id}
+        className={`relative ${
+          isDarkMode ? "bg-gray-800" : "bg-white"
+        } rounded-lg shadow-md hover:shadow-lg transition-shadow overflow-hidden`}
+      >
+        <Link href={`/projects/${project.id}`} className="block">
+          <div className="relative h-48">
+            <NextImage
+              src={
+                project.thumbnail?.url ||
+                (isDarkMode
+                  ? "/images/default_project_thumbnail_dark.svg"
+                  : "/images/default_project_thumbnail_light.svg")
+              }
+              alt={project.title}
+              fill
+              className="object-cover"
+            />
+            <div className="absolute top-2 left-2 flex items-center space-x-1 bg-black/50 px-2 py-1 rounded-md">
+              <HeartIcon className="h-4 w-4 text-white" />
+              <span className="text-white text-sm">
+                {project.likes?.length || 0}
+              </span>
+            </div>
+            {isOwnProfile && (
+              <div
+                className={`absolute top-2 right-2 px-2 py-1 ${getStatusBadgeClasses(
+                  project.status
+                )} text-white text-sm rounded-md`}
+              >
+                {project.status.charAt(0) +
+                  project.status.slice(1).toLowerCase()}
+              </div>
+            )}
+          </div>
+          <div className="p-4">
+            <h3
+              className={`text-xl font-semibold ${
+                isDarkMode ? "text-gray-100" : "text-gray-900"
+              } mb-2`}
+            >
+              {project.title}
+            </h3>
+            <p
+              className={`${
+                isDarkMode ? "text-gray-300" : "text-gray-600"
+              } line-clamp-2 font-fira-code`}
+            >
+              {project.description}
+            </p>
+          </div>
+        </Link>
+        {isOwnProfile && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              if (!starDisabled) toggleFeatured(project.id);
+            }}
+            disabled={starDisabled}
+            aria-label={
+              isFeatured
+                ? "Unfeature project"
+                : starDisabled
+                ? `Featured limit reached (${MAX_FEATURED})`
+                : "Feature project"
+            }
+            title={
+              isFeatured
+                ? "Unfeature"
+                : starDisabled
+                ? `You can feature up to ${MAX_FEATURED} projects`
+                : "Feature on profile"
+            }
+            className={`absolute bottom-2 right-2 p-1.5 rounded-md shadow ${
+              isFeatured
+                ? "bg-yellow-400 text-white hover:bg-yellow-500"
+                : isDarkMode
+                ? "bg-gray-900/70 text-gray-200 hover:bg-gray-900"
+                : "bg-white/90 text-gray-700 hover:bg-white"
+            } ${starDisabled ? "opacity-50 cursor-not-allowed" : ""}`}
+          >
+            {isFeatured ? (
+              <StarIconSolid className="h-4 w-4" />
+            ) : (
+              <StarIconOutline className="h-4 w-4" />
+            )}
+          </button>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div
       className={`min-h-screen py-20 ${
@@ -326,527 +685,206 @@ export default function HackerProfile() {
             isDarkMode ? "bg-gray-800" : "bg-white"
           } rounded-xl shadow-lg overflow-hidden mb-8`}
         >
-          <div className="bg-gradient-to-r from-indigo-500 to-purple-600 h-32 sm:h-48"></div>
-          <div className="px-4 sm:px-8 pb-8">
-            <div className="flex flex-col sm:flex-row items-center sm:items-end -mt-16 sm:-mt-24 mb-4 sm:mb-8">
-              <div className="relative w-32 h-32 sm:w-48 sm:h-48 rounded-full border-4 border-white overflow-hidden bg-white shadow-lg">
-                <AvatarImage src={hacker.avatar?.url || null} alt={swapFirstLetters(hacker.name)} size={192} />
-              </div>
-              <div className="mt-4 sm:mt-0 sm:ml-6 text-center sm:text-left flex-grow">
-                {isEditing ? (
-                  <form onSubmit={handleEditSubmit} className="space-y-4">
+          <div className="px-4 sm:px-8 py-6 sm:py-8">
+            <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 sm:gap-6">
+              <div
+                className={`relative w-32 h-32 sm:w-40 sm:h-40 rounded-full overflow-hidden bg-white shadow-md flex-shrink-0 ${
+                  isDarkMode ? "ring-1 ring-gray-700" : "ring-1 ring-gray-200"
+                }`}
+              >
+                <AvatarImage
+                  src={hacker.avatar?.url || null}
+                  alt={swapFirstLetters(hacker.name)}
+                  size={160}
+                />
+                {isOwnProfile && (
+                  <label
+                    className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 hover:opacity-100 transition-opacity cursor-pointer"
+                    aria-label="Change profile picture"
+                  >
                     <input
-                      type="text"
-                      value={editForm.name}
-                      onChange={(e) =>
-                        setEditForm({ ...editForm, name: e.target.value })
-                      }
-                      className={`w-full px-3 py-2 border rounded-lg ${
-                        isDarkMode
-                          ? "bg-gray-700 border-gray-600 text-gray-100"
-                          : "bg-white border-gray-300 text-gray-900"
-                      }`}
-                      placeholder="Name"
+                      type="file"
+                      accept="image/*"
+                      className="sr-only"
+                      onChange={handleAvatarUpload}
+                      disabled={uploadingAvatar}
                     />
-                    <input
-                      type="text"
-                      value={editForm.username}
-                      onChange={(e) =>
-                        setEditForm({ ...editForm, username: e.target.value })
-                      }
-                      className={`w-full px-3 py-2 border rounded-lg ${
-                        isDarkMode
-                          ? "bg-gray-700 border-gray-600 text-gray-100"
-                          : "bg-white border-gray-300 text-gray-900"
-                      }`}
-                      placeholder="Username"
-                    />
-                    <textarea
-                      value={editForm.bio}
-                      onChange={(e) =>
-                        setEditForm({ ...editForm, bio: e.target.value })
-                      }
-                      className={`w-full px-3 py-2 border rounded-lg ${
-                        isDarkMode
-                          ? "bg-gray-700 border-gray-600 text-gray-100"
-                          : "bg-white border-gray-300 text-gray-900"
-                      }`}
-                      placeholder="Bio"
-                      rows={3}
-                    />
-                    <input
-                      type="url"
-                      value={editForm.githubUrl}
-                      onChange={(e) =>
-                        setEditForm({ ...editForm, githubUrl: e.target.value })
-                      }
-                      className={`w-full px-3 py-2 border rounded-lg ${
-                        isDarkMode
-                          ? "bg-gray-700 border-gray-600 text-gray-100"
-                          : "bg-white border-gray-300 text-gray-900"
-                      }`}
-                      placeholder="GitHub URL"
-                    />
-                    <input
-                      type="url"
-                      value={editForm.linkedinUrl}
-                      onChange={(e) =>
-                        setEditForm({ ...editForm, linkedinUrl: e.target.value })
-                      }
-                      className={`w-full px-3 py-2 border rounded-lg ${
-                        isDarkMode
-                          ? "bg-gray-700 border-gray-600 text-gray-100"
-                          : "bg-white border-gray-300 text-gray-900"
-                      }`}
-                      placeholder="LinkedIn URL"
-                    />
-                    <input
-                      type="url"
-                      value={editForm.twitterUrl}
-                      onChange={(e) =>
-                        setEditForm({ ...editForm, twitterUrl: e.target.value })
-                      }
-                      className={`w-full px-3 py-2 border rounded-lg ${
-                        isDarkMode
-                          ? "bg-gray-700 border-gray-600 text-gray-100"
-                          : "bg-white border-gray-300 text-gray-900"
-                      }`}
-                      placeholder="Twitter URL"
-                    />
-                    <input
-                      type="text"
-                      value={editForm.discordName}
-                      onChange={(e) =>
-                        setEditForm({ ...editForm, discordName: e.target.value })
-                      }
-                      className={`w-full px-3 py-2 border rounded-lg ${
-                        isDarkMode
-                          ? "bg-gray-700 border-gray-600 text-gray-100"
-                          : "bg-white border-gray-300 text-gray-900"
-                      }`}
-                      placeholder="Discord Handle (e.g. @username)"
-                    />
-                    <input
-                      type="url"
-                      value={editForm.websiteUrl}
-                      onChange={(e) =>
-                        setEditForm({ ...editForm, websiteUrl: e.target.value })
-                      }
-                      className={`w-full px-3 py-2 border rounded-lg ${
-                        isDarkMode
-                          ? "bg-gray-700 border-gray-600 text-gray-100"
-                          : "bg-white border-gray-300 text-gray-900"
-                      }`}
-                      placeholder="Website URL"
-                    />
-                    <input
-                      type="tel"
-                      value={editForm.phoneNumber}
-                      onChange={(e) =>
-                        setEditForm({
-                          ...editForm,
-                          phoneNumber: e.target.value,
-                        })
-                      }
-                      className={`w-full px-3 py-2 border rounded-lg ${
-                        isDarkMode
-                          ? "bg-gray-700 border-gray-600 text-gray-100"
-                          : "bg-white border-gray-300 text-gray-900"
-                      }`}
-                      placeholder="Phone Number"
-                    />
-                    <div className="flex justify-end space-x-2">
-                      <button
-                        type="button"
-                        onClick={() => setIsEditing(false)}
-                        className="px-4 py-2 text-gray-600 hover:text-gray-800"
-                      >
-                        <XMarkIcon className="h-5 w-5" />
-                      </button>
-                      <button
-                        type="submit"
-                        className="px-4 py-2 text-green-600 hover:text-green-800"
-                      >
-                        <CheckIcon className="h-5 w-5" />
-                      </button>
-                    </div>
-                  </form>
-                ) : (
-                  <>
-                    <div className="flex justify-between items-start">
-                      <h1
-                        className={`text-3xl font-bold ${
-                          isDarkMode ? "text-gray-100" : "text-gray-900"
-                        }`}
-                      >
-                        {swapFirstLetters(hacker.name)}
-                      </h1>
-                      {isOwnProfile && (
-                        <button
-                          onClick={() => setIsEditing(true)}
-                          className="p-2 text-gray-600 hover:text-gray-800"
-                        >
-                          <PencilIcon className="h-5 w-5" />
-                        </button>
-                      )}
-                    </div>
-                    {hacker.bio && (
-                      <p
-                        className={`mt-2 ${
-                          isDarkMode ? "text-gray-300" : "text-gray-600"
-                        } max-w-2xl font-fira-code`}
-                      >
-                        {hacker.bio.length > 100 
-                          ? `${hacker.bio.substring(0, 100)}...` 
-                          : hacker.bio}
-                      </p>
+                    {uploadingAvatar ? (
+                      <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-white" />
+                    ) : (
+                      <div className="flex flex-col items-center text-white">
+                        <CameraIcon className="h-8 w-8" />
+                        <span className="text-xs mt-1 font-fira-code">Change</span>
+                      </div>
                     )}
-                  </>
+                  </label>
                 )}
+              </div>
+              <div className="text-center sm:text-left flex-grow w-full">
+                <div className="flex justify-between items-start gap-2">
+                  <h1
+                    className={`text-3xl font-bold ${
+                      isDarkMode ? "text-gray-100" : "text-gray-900"
+                    }`}
+                  >
+                    {swapFirstLetters(hacker.name)}
+                  </h1>
+                  {isOwnProfile && (
+                    <button
+                      onClick={() => setIsEditing(true)}
+                      aria-label="Edit profile"
+                      className={`p-2 ${
+                        isDarkMode
+                          ? "text-gray-400 hover:text-gray-200"
+                          : "text-gray-600 hover:text-gray-800"
+                      }`}
+                    >
+                      <PencilIcon className="h-5 w-5" />
+                    </button>
+                  )}
+                </div>
+                {hacker.bio && (
+                  <p
+                    className={`mt-2 ${
+                      isDarkMode ? "text-gray-300" : "text-gray-600"
+                    } max-w-2xl font-fira-code`}
+                  >
+                    {hacker.bio.length > 100
+                      ? `${hacker.bio.substring(0, 100)}...`
+                      : hacker.bio}
+                  </p>
+                )}
+                {avatarError && (
+                  <p className="mt-2 text-sm text-red-500 font-fira-code">
+                    {avatarError}
+                  </p>
+                )}
+                <div className="mt-3 flex flex-wrap items-center justify-center sm:justify-start gap-2">
+                  <div
+                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-fira-code ${
+                      isDarkMode
+                        ? "bg-gray-700 text-gray-100"
+                        : "bg-indigo-50 text-indigo-700"
+                    }`}
+                    aria-label="Total projects"
+                  >
+                    <span>
+                      <span className="font-semibold">{totalProjectCount}</span>{" "}
+                      {totalProjectCount === 1 ? "project" : "projects"}
+                    </span>
+                  </div>
+                  <div
+                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-fira-code ${
+                      isDarkMode
+                        ? "bg-gray-700 text-gray-100"
+                        : "bg-purple-50 text-purple-700"
+                    }`}
+                    aria-label="Projects led"
+                  >
+                    <span>
+                      <span className="font-semibold">{ledProjectCount}</span>{" "}
+                      led
+                    </span>
+                  </div>
+                  <div
+                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-fira-code ${
+                      isDarkMode
+                        ? "bg-gray-700 text-gray-100"
+                        : "bg-pink-50 text-pink-700"
+                    }`}
+                    aria-label="Total likes across all projects"
+                  >
+                    <HeartIcon className="h-4 w-4 text-pink-500" />
+                    <span>
+                      <span className="font-semibold">{totalLikes}</span>{" "}
+                      total {totalLikes === 1 ? "like" : "likes"}
+                    </span>
+                  </div>
+                </div>
+                {renderSocialLinks()}
               </div>
             </div>
-
-            {/* Contact & Links */}
-            {/* !isEditing && (
-              <div className="flex flex-wrap gap-4 justify-center sm:justify-start">
-                {hacker.githubUrl && (
-                  <Link
-                    href={hacker.githubUrl}
-                    target="_blank"
-                    className={`flex items-center px-4 py-2 ${
-                      isDarkMode
-                        ? "bg-gray-700 hover:bg-gray-600"
-                        : "bg-gray-100 hover:bg-gray-200"
-                    } rounded-full transition-colors`}
-                  >
-                    <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
-                      <path
-                        fill="currentColor"
-                        d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"
-                      />
-                    </svg>
-                    GitHub
-                  </Link>
-                )}
-                {hacker.linkedinUrl && (
-                  <Link
-                    href={hacker.linkedinUrl}
-                    target="_blank"
-                    className={`flex items-center px-4 py-2 ${
-                      isDarkMode
-                        ? "bg-gray-700 hover:bg-gray-600"
-                        : "bg-blue-100 hover:bg-blue-200"
-                    } rounded-full transition-colors`}
-                  >
-                    <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
-                      <path
-                        fill="currentColor"
-                        d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"
-                      />
-                    </svg>
-                    LinkedIn
-                  </Link>
-                )}
-                {hacker.twitterUrl && (
-                  <Link
-                    href={hacker.twitterUrl}
-                    target="_blank"
-                    className={`flex items-center px-4 py-2 ${
-                      isDarkMode
-                        ? "bg-gray-700 hover:bg-gray-600"
-                        : "bg-sky-100 hover:bg-sky-200"
-                    } rounded-full transition-colors`}
-                  >
-                    <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
-                      <path
-                        fill="currentColor"
-                        d="M24 4.557c-.883.392-1.832.656-2.828.775 1.017-.609 1.798-1.574 2.165-2.724-.951.564-2.005.974-3.127 1.195-.897-.957-2.178-1.555-3.594-1.555-3.179 0-5.515 2.966-4.797 6.045-4.091-.205-7.719-2.165-10.148-5.144-1.29 2.213-.669 5.108 1.523 6.574-.806-.026-1.566-.247-2.229-.616-.054 2.281 1.581 4.415 3.949 4.89-.693.188-1.452.232-2.224.084.626 1.956 2.444 3.379 4.6 3.419-2.07 1.623-4.678 2.348-7.29 2.04 2.179 1.397 4.768 2.212 7.548 2.212 9.142 0 14.307-7.721 13.995-14.646.962-.695 1.797-1.562 2.457-2.549z"
-                      />
-                    </svg>
-                    Twitter
-                  </Link>
-                )}
-                {hacker.email && (
-                  <Link
-                    href={`mailto:${hacker.email}`}
-                    className={`flex items-center px-4 py-2 ${
-                      isDarkMode
-                        ? "bg-gray-700 hover:bg-gray-600 text-gray-200"
-                        : "bg-indigo-100 hover:bg-indigo-200 text-indigo-700"
-                    } rounded-full transition-colors`}
-                  >
-                    <svg
-                      className="w-5 h-5 mr-2"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-                      />
-                    </svg>
-                    Email
-                  </Link>
-                )}
-                {hacker.discordName && (
-                  <Link
-                    href={`https://discord.com/users/${hacker.discordName}`}
-                    target="_blank"
-                    className={`flex items-center px-4 py-2 ${
-                      isDarkMode
-                        ? "bg-gray-700 hover:bg-gray-600"
-                        : "bg-indigo-100 hover:bg-indigo-200"
-                    } rounded-full transition-colors`}
-                  >
-                    <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
-                      <path
-                        fill="currentColor"
-                        d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515a.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0a12.64 12.64 0 0 0-.617-1.25a.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057a19.9 19.9 0 0 0 5.993 3.03a.078.078 0 0 0 .084-.028a14.09 14.09 0 0 0 1.226-1.994a.076.076 0 0 0-.041-.106a13.107 13.107 0 0 1-1.872-.892a.077.077 0 0 1-.008-.128a10.2 10.2 0 0 0 .372-.292a.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127a12.299 12.299 0 0 1-1.873.892a.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028a19.839 19.839 0 0 0 6.002-3.03a.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419c0-1.333.956-2.419 2.157-2.419c1.21 0 2.176 1.096 2.157 2.42c0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419c0-1.333.955-2.419 2.157-2.419c1.21 0 2.176 1.096 2.157 2.42c0 1.333-.946 2.418-2.157 2.418z"
-                      />
-                    </svg>
-                    {hacker.discordName}
-                  </Link>
-                )}
-                {hacker.websiteUrl && (
-                  <Link
-                    href={hacker.websiteUrl}
-                    target="_blank"
-                    className={`flex items-center px-4 py-2 ${
-                      isDarkMode
-                        ? "bg-gray-700 hover:bg-gray-600"
-                        : "bg-purple-100 hover:bg-purple-200"
-                    } rounded-full transition-colors`}
-                  >
-                    <svg 
-                      className="w-5 h-5 mr-2" 
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z"/>
-                      <path d="M3.6 9h16.8"/>
-                      <path d="M3.6 15h16.8"/>
-                      <path d="M12 3a15 15 0 0 1 0 18"/>
-                      <path d="M12 3a15 15 0 0 0 0 18"/>
-                    </svg>
-                    Website
-                  </Link>
-                )}
-              </div>
-            )} */}
           </div>
         </div>
 
-        {/* Projects Section */}
-        <div className="space-y-8">
-          {/* Led Projects */}
-          {Array.isArray(hacker.ledProjects) &&
-            hacker.ledProjects.length > 0 && (
-              <div className="mb-12">
-                <h2
-                  className={`text-2xl font-bold ${
-                    isDarkMode ? "text-gray-100" : "text-gray-900"
-                  } mb-4`}
+        {/* Featured Projects Section */}
+        {(featuredProjects.length > 0 || isOwnProfile) && (
+          <div className="mb-8">
+            <div className="flex items-center justify-between mb-4">
+              <h2
+                className={`text-2xl font-bold flex items-center gap-2 ${
+                  isDarkMode ? "text-gray-100" : "text-gray-900"
+                }`}
+              >
+                <StarIconSolid className="h-6 w-6 text-yellow-400" />
+                Featured
+              </h2>
+              {isOwnProfile && (
+                <span
+                  className={`text-sm font-fira-code ${
+                    isDarkMode ? "text-gray-400" : "text-gray-500"
+                  }`}
                 >
-                  Projects Led
-                </h2>
-                <div className={scrollableSection}>
-                  {hacker.ledProjects.map((project) => (
-                    <Link
-                      key={project.id}
-                      href={`/projects/${project.id}`}
-                      className={`flex-shrink-0 w-80 ${
-                        isDarkMode ? "bg-gray-800" : "bg-white"
-                      } rounded-lg shadow-md hover:shadow-lg transition-shadow overflow-hidden`}
-                    >
-                      <div className="relative h-48">
-                        <NextImage
-                          src={
-                            project.thumbnail?.url ||
-                            (isDarkMode
-                              ? "/images/default_project_thumbnail_dark.svg"
-                              : "/images/default_project_thumbnail_light.svg")
-                          }
-                          alt={project.title}
-                          fill
-                          className="object-cover"
-                        />
-                        <div className="absolute top-2 left-2 flex items-center space-x-1 bg-black/50 px-2 py-1 rounded-full">
-                          <HeartIcon className="h-4 w-4 text-white" />
-                          <span className="text-white text-sm">
-                            {project.likes?.length || 0}
-                          </span>
-                        </div>
-                        <div className={`absolute top-2 right-2 px-2 py-1 ${getStatusBadgeClasses(project.status)} text-white text-sm rounded-full`}>
-                          {project.status.charAt(0) + project.status.slice(1).toLowerCase()}
-                        </div>
-                      </div>
-                      <div className="p-4">
-                        <h3
-                          className={`text-xl font-semibold ${
-                            isDarkMode ? "text-gray-100" : "text-gray-900"
-                          } mb-2`}
-                        >
-                          {project.title}
-                        </h3>
-                        <p
-                          className={`${
-                            isDarkMode ? "text-gray-300" : "text-gray-600"
-                          } line-clamp-2 font-fira-code`}
-                        >
-                          {project.description}
-                        </p>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
+                  {featuredProjects.length}/{MAX_FEATURED}
+                </span>
+              )}
+            </div>
+            {featuredProjects.length === 0 ? (
+              <div
+                className={`text-center py-8 ${
+                  isDarkMode ? "bg-gray-800" : "bg-white"
+                } rounded-lg shadow`}
+              >
+                <p
+                  className={`${
+                    isDarkMode ? "text-gray-300" : "text-gray-600"
+                  } font-fira-code text-sm`}
+                >
+                  Tap the star on any project below to feature it here (up to {MAX_FEATURED}).
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {featuredProjects.map((dp) => renderProjectCard(dp))}
               </div>
             )}
+          </div>
+        )}
 
-          {/* Participated Projects */}
-          {Array.isArray(hacker.projects) && hacker.projects.length > 0 && (
-            <div className="mb-12">
+        {/* Projects Section */}
+        <div className="space-y-8">
+          <div className="mb-12">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
               <h2
                 className={`text-2xl font-bold ${
                   isDarkMode ? "text-gray-100" : "text-gray-900"
-                } mb-4`}
+                }`}
               >
-                Projects Contributed To
+                Projects
               </h2>
-              <div className={scrollableSection}>
-                {hacker.projects.map(({ project, role }) => (
-                  <Link
-                    key={project.id}
-                    href={`/projects/${project.id}`}
-                    className={`flex-shrink-0 w-80 ${
-                      isDarkMode ? "bg-gray-800" : "bg-white"
-                    } rounded-lg shadow-md hover:shadow-lg transition-shadow overflow-hidden`}
-                  >
-                    <div className="relative h-48">
-                      <NextImage
-                        src={
-                          project.thumbnail?.url ||
-                          (isDarkMode
-                            ? "/images/default_project_thumbnail_dark.svg"
-                            : "/images/default_project_thumbnail_light.svg")
-                        }
-                        alt={project.title}
-                        fill
-                        className="object-cover"
-                      />
-                      <div className="absolute bottom-2 left-2 px-2 py-1 bg-indigo-600 text-white text-sm rounded-full">
-                        {role}
-                      </div>
-                      <div className={`absolute top-2 right-2 px-2 py-1 ${getStatusBadgeClasses(project.status)} text-white text-sm rounded-full`}>
-                        {project.status.charAt(0) + project.status.slice(1).toLowerCase()}
-                      </div>
-                      <div className="absolute top-2 left-2 flex items-center space-x-1 bg-black/50 px-2 py-1 rounded-full">
-                        <HeartIcon className="h-4 w-4 text-white" />
-                        <span className="text-white text-sm">
-                          {project.likes?.length || 0}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="p-4">
-                      <h3
-                        className={`text-xl font-semibold ${
-                          isDarkMode ? "text-gray-100" : "text-gray-900"
-                        } mb-2`}
-                      >
-                        {project.title}
-                      </h3>
-                      <p
-                        className={`${
-                          isDarkMode ? "text-gray-300" : "text-gray-600"
-                        } line-clamp-2 font-fira-code`}
-                      >
-                        {project.description}
-                      </p>
-                    </div>
-                  </Link>
-                ))}
+              <div className="flex flex-wrap items-center gap-2">
+                {filterButton("all", "All")}
+                {filterButton("led", "Led")}
+                {filterButton("contributed", "Contributed")}
+                <select
+                  value={projectSort}
+                  onChange={(e) =>
+                    setProjectSort(e.target.value as ProjectSort)
+                  }
+                  className={`px-3 py-1.5 rounded-md text-sm font-fira-code border ${
+                    isDarkMode
+                      ? "bg-gray-700 border-gray-600 text-gray-100"
+                      : "bg-white border-gray-300 text-gray-700"
+                  }`}
+                  aria-label="Sort projects"
+                >
+                  <option value="recent">Most Recent</option>
+                  <option value="liked">Most Liked</option>
+                </select>
               </div>
             </div>
-          )}
 
-          {/* Liked Projects */}
-          {Array.isArray(hacker.likedProjects) &&
-            hacker.likedProjects.length > 0 && (
-              <div className="mb-12">
-                <h2
-                  className={`text-2xl font-bold ${
-                    isDarkMode ? "text-gray-100" : "text-gray-900"
-                  } mb-4`}
-                >
-                  Liked Projects
-                </h2>
-                <div className={scrollableSection}>
-                  {hacker.likedProjects.map(({ project, createdAt }) => (
-                    <Link
-                      key={project.id}
-                      href={`/projects/${project.id}`}
-                      className={`flex-shrink-0 w-80 ${
-                        isDarkMode ? "bg-gray-800" : "bg-white"
-                      } rounded-lg shadow-md hover:shadow-lg transition-shadow overflow-hidden`}
-                    >
-                      <div className="relative h-48">
-                        <NextImage
-                          src={
-                            project.thumbnail?.url ||
-                            (isDarkMode
-                              ? "/images/default_project_thumbnail_dark.svg"
-                              : "/images/default_project_thumbnail_light.svg")
-                          }
-                          alt={project.title}
-                          fill
-                          className="object-cover"
-                        />
-                        <div className="absolute bottom-2 left-2 flex items-center space-x-2 bg-black/50 px-3 py-1 rounded-full">
-                          <AvatarImage src={project.launchLead.avatar?.url || null} alt={project.launchLead.name} size={20} />
-                          <span className="text-white text-sm">
-                            {project.launchLead.name}
-                          </span>
-                        </div>
-                        <div className={`absolute top-2 right-2 px-2 py-1 ${getStatusBadgeClasses(project.status)} text-white text-sm rounded-full`}>
-                          {project.status.charAt(0) + project.status.slice(1).toLowerCase()}
-                        </div>
-                      </div>
-                      <div className="p-4">
-                        <div className="flex justify-between items-start mb-2">
-                          <h3
-                            className={`text-xl font-semibold ${
-                              isDarkMode ? "text-gray-100" : "text-gray-900"
-                            }`}
-                          >
-                            {project.title}
-                          </h3>
-                          <span className="text-xs text-gray-500">
-                            {new Date(createdAt).toLocaleDateString()}
-                          </span>
-                        </div>
-                        <p
-                          className={`${
-                            isDarkMode ? "text-gray-300" : "text-gray-600"
-                          } line-clamp-2 font-fira-code`}
-                        >
-                          {project.description}
-                        </p>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              </div>
-            )}
-
-          {(!Array.isArray(hacker.projects) || hacker.projects.length === 0) &&
-            (!Array.isArray(hacker.ledProjects) ||
-              hacker.ledProjects.length === 0) && (
+            {visibleProjects.length === 0 ? (
               <div
                 className={`text-center py-12 ${
                   isDarkMode ? "bg-gray-800" : "bg-white"
@@ -857,12 +895,150 @@ export default function HackerProfile() {
                     isDarkMode ? "text-gray-300" : "text-gray-600"
                   } font-fira-code`}
                 >
-                  No projects yet
+                  No projects to show
                 </p>
               </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {visibleProjects.map((dp) => renderProjectCard(dp))}
+              </div>
             )}
+          </div>
         </div>
       </div>
+
+      {/* Edit Profile Modal */}
+      {isEditing && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Edit profile"
+          onClick={() => setIsEditing(false)}
+        >
+          <div
+            className={`relative w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-xl shadow-2xl ${
+              isDarkMode ? "bg-gray-800" : "bg-white"
+            }`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              className={`sticky top-0 flex items-center justify-between px-6 py-4 border-b ${
+                isDarkMode
+                  ? "bg-gray-800 border-gray-700"
+                  : "bg-white border-gray-200"
+              }`}
+            >
+              <h2
+                className={`text-xl font-bold ${
+                  isDarkMode ? "text-gray-100" : "text-gray-900"
+                }`}
+              >
+                Edit Profile
+              </h2>
+              <button
+                type="button"
+                onClick={() => setIsEditing(false)}
+                aria-label="Close"
+                className={`p-1 rounded-full ${
+                  isDarkMode
+                    ? "text-gray-300 hover:bg-gray-700"
+                    : "text-gray-500 hover:bg-gray-100"
+                }`}
+              >
+                <XMarkIcon className="h-6 w-6" />
+              </button>
+            </div>
+            <form onSubmit={handleEditSubmit} className="px-6 py-4 space-y-4">
+              {(() => {
+                const fieldClasses = `w-full px-3 py-2 border rounded-lg ${
+                  isDarkMode
+                    ? "bg-gray-700 border-gray-600 text-gray-100"
+                    : "bg-white border-gray-300 text-gray-900"
+                }`;
+                const labelClasses = `block text-xs font-fira-code mb-1 ${
+                  isDarkMode ? "text-gray-400" : "text-gray-500"
+                }`;
+                const fields: Array<{
+                  key: keyof EditableFields;
+                  label: string;
+                  type?: string;
+                  textarea?: boolean;
+                  placeholder?: string;
+                }> = [
+                  { key: "name", label: "Name" },
+                  { key: "username", label: "Username" },
+                  { key: "bio", label: "Bio", textarea: true },
+                  { key: "githubUrl", label: "GitHub URL", type: "url" },
+                  { key: "linkedinUrl", label: "LinkedIn URL", type: "url" },
+                  { key: "twitterUrl", label: "Twitter URL", type: "url" },
+                  {
+                    key: "discordName",
+                    label: "Discord Handle",
+                    placeholder: "Discord Handle (e.g. @username)",
+                  },
+                  { key: "websiteUrl", label: "Website URL", type: "url" },
+                  { key: "phoneNumber", label: "Phone Number", type: "tel" },
+                ];
+                return fields.map(
+                  ({ key, label, type = "text", textarea, placeholder }) => {
+                    const value = editForm[key];
+                    return (
+                      <div key={key}>
+                        <label htmlFor={`profile-${key}`} className={labelClasses}>
+                          {label}
+                        </label>
+                        {textarea ? (
+                          <textarea
+                            id={`profile-${key}`}
+                            value={value}
+                            onChange={(e) =>
+                              setEditForm({ ...editForm, [key]: e.target.value })
+                            }
+                            className={fieldClasses}
+                            placeholder={placeholder ?? label}
+                            rows={3}
+                          />
+                        ) : (
+                          <input
+                            id={`profile-${key}`}
+                            type={type}
+                            value={value}
+                            onChange={(e) =>
+                              setEditForm({ ...editForm, [key]: e.target.value })
+                            }
+                            className={fieldClasses}
+                            placeholder={placeholder ?? label}
+                          />
+                        )}
+                      </div>
+                    );
+                  }
+                );
+              })()}
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsEditing(false)}
+                  className={`px-4 py-2 rounded-lg ${
+                    isDarkMode
+                      ? "bg-gray-700 text-gray-200 hover:bg-gray-600"
+                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                  }`}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700"
+                >
+                  Save
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

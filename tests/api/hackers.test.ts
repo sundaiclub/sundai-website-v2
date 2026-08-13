@@ -66,7 +66,7 @@ describe('/api/hackers', () => {
           id: 'hacker-2',
           name: 'Jane Smith',
           email: 'jane@example.com',
-          role: 'ADMIN',
+          role: 'SITE_ADMIN',
         },
       ];
 

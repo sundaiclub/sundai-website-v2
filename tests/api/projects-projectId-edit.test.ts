@@ -120,7 +120,7 @@ describe('/api/projects/[projectId]/edit', () => {
       const mockUser = {
         id: mockHackerId,
         clerkId: mockUserId,
-        role: 'ADMIN',
+        role: 'SITE_ADMIN',
       };
 
       const mockUpdatedProject = {
@@ -319,7 +319,7 @@ describe('/api/projects/[projectId]/edit', () => {
       const mockUser = {
         id: mockHackerId,
         clerkId: mockUserId,
-        role: 'ADMIN',
+        role: 'SITE_ADMIN',
       };
 
       const mockUploadResult = {
@@ -379,7 +379,7 @@ describe('/api/projects/[projectId]/edit', () => {
       const mockUser = {
         id: mockHackerId,
         clerkId: mockUserId,
-        role: 'ADMIN',
+        role: 'SITE_ADMIN',
       };
 
       const mockUpdatedProject = {
@@ -422,7 +422,7 @@ describe('/api/projects/[projectId]/edit', () => {
       const mockUser = {
         id: mockHackerId,
         clerkId: mockUserId,
-        role: 'ADMIN',
+        role: 'SITE_ADMIN',
       };
 
       const mockUpdatedProject = {

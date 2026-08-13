@@ -1,79 +1,59 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useUser } from "@clerk/nextjs";
 import { HeartIcon } from "@heroicons/react/24/outline";
 import { HeartIcon as HeartIconSolid } from "@heroicons/react/24/solid";
 import { useUserContext } from "../contexts/UserContext";
+import type { UserInfo } from "../contexts/UserContext";
 import { useTheme } from "../contexts/ThemeContext";
 import { Listbox, Transition } from '@headlessui/react';
 import { ChevronUpDownIcon } from '@heroicons/react/24/solid';
 import { toast } from 'react-hot-toast';
 import ProjectSearch from "./ProjectSearch";
+import type { Project } from "@/types/project";
 import { swapFirstLetters } from "../utils/nameUtils";
-
-export type Project = {
-  id: string;
-  title: string;
-  status: 'DRAFT' | 'PENDING' | 'APPROVED';
-  preview: string;
-  description: string;
-  githubUrl?: string | null;
-  demoUrl?: string | null;
-  blogUrl?: string | null;
-  techTags: Array<{
-    id: string;
-    name: string;
-    description? : string | null;
-  }>;
-  domainTags: Array<{
-    id: string;
-    name: string;
-    description? : string | null;
-  }>;
-  is_starred: boolean;
-  is_broken: boolean;
-  thumbnail?: {
-    url: string;
-  } | null;
-  launchLead: {
-    id: string;
-    name: string;
-    twitterUrl?: string | null;
-    linkedinUrl?: string | null;
-    avatar?: {
-      url: string;
-    } | null;
-  };
-  participants: Array<{
-    role: string;
-    hacker: {
-      id: string;
-      name: string;
-      bio?: string | null;
-      twitterUrl?: string | null;
-      linkedinUrl?: string | null;
-      avatar?: {
-        url: string;
-      } | null;
-    };
-  }>;
-  startDate: Date;
-  endDate?: Date | null;
-  likes: Array<{
-    hackerId: string;
-    createdAt: string;
-  }>;
-  createdAt: string;
-  updatedAt: string;
-};
+import ProjectMarkdown from "./ProjectMarkdown";
 
 const STATUS_OPTIONS = ['DRAFT', 'PENDING', 'APPROVED'] as const;
+const PROJECTS_PAGE_SIZE = 18;
 
-export function ProjectCard({ project, userInfo, handleLike, isDarkMode, show_status, show_team = true, onStatusChange, onStarredChange, isAdmin, variant = "default", showTrendingBadge = false, openInNewTab = false }: {
+type ProjectsApiResponse =
+  | Project[]
+  | {
+      projects: Project[];
+      hasMore: boolean;
+      totalCount?: number;
+    };
+
+function sortProjectsByStartDate(projects: Project[]) {
+  return [...projects].sort((a, b) => {
+    const dateA = new Date(a.startDate).getTime();
+    const dateB = new Date(b.startDate).getTime();
+    return isNaN(dateB) || isNaN(dateA) ? 0 : dateB - dateA;
+  });
+}
+
+function normalizeProjectsResponse(data: ProjectsApiResponse) {
+  if (Array.isArray(data)) {
+    return {
+      projects: sortProjectsByStartDate(data),
+      hasMore: false,
+      totalCount: data.length,
+    };
+  }
+
+  return {
+    projects: sortProjectsByStartDate(data.projects),
+    hasMore: data.hasMore,
+    totalCount: data.totalCount ?? data.projects.length,
+  };
+}
+
+export function ProjectCard({ project, userInfo, handleLike, isDarkMode, show_status, show_team = true, onStatusChange, onStarredChange, isAdmin, variant = "default", showTrendingBadge = false, imageBadge, openInNewTab = false }: {
   project: Project;
-  userInfo: any;
+  userInfo: UserInfo | null;
   handleLike: (e: React.MouseEvent, projectId: string, isLiked: boolean) => void;
   isDarkMode: boolean;
   show_status: boolean;
@@ -83,6 +63,7 @@ export function ProjectCard({ project, userInfo, handleLike, isDarkMode, show_st
   isAdmin?: boolean;
   variant?: "default" | "compact" | "trending";
   showTrendingBadge?: boolean;
+  imageBadge?: React.ReactNode;
   openInNewTab?: boolean;
 }) {
   const AvatarImage = ({ src, alt, size }: { src: string | null; alt: string; size: number }) => {
@@ -142,14 +123,14 @@ export function ProjectCard({ project, userInfo, handleLike, isDarkMode, show_st
       } rounded-xl shadow-lg overflow-hidden transition-shadow transition-transform duration-200 hover:-translate-y-1 relative flex flex-col h-full`}
     >
       <div className={`relative ${imageHeightClass}`}>
-        {showTrendingBadge && (
+        {(showTrendingBadge || imageBadge) && (
           <div className="absolute top-3 left-3 z-10">
             <div className={`px-2 py-1 rounded-full text-xs font-semibold ${
               isDarkMode 
                 ? "bg-gradient-to-r from-purple-600 to-indigo-600 text-white" 
                 : "bg-gradient-to-r from-purple-500 to-indigo-500 text-white"
             }`}>
-              🔥 Trending
+              {imageBadge || '🔥 Trending'}
             </div>
           </div>
         )}
@@ -182,7 +163,12 @@ export function ProjectCard({ project, userInfo, handleLike, isDarkMode, show_st
             </div>
           </button>
         </div>
-        <Link href={`/projects/${project.id}`} target={openInNewTab ? "_blank" : undefined} rel={openInNewTab ? "noopener noreferrer" : undefined}>
+        <Link
+          href={`/projects/${project.id}`}
+          target={openInNewTab ? "_blank" : undefined}
+          rel={openInNewTab ? "noopener noreferrer" : undefined}
+          aria-label={`View project ${project.title}`}
+        >
           <Image
             src={
               project.thumbnail?.url ||
@@ -291,7 +277,12 @@ export function ProjectCard({ project, userInfo, handleLike, isDarkMode, show_st
       <div className={`${cardPaddingClass} flex-1 flex flex-col`}>
         <div className="flex justify-between items-start mb-4">
           <div>
-            <Link href={`/projects/${project.id}`} target={openInNewTab ? "_blank" : undefined} rel={openInNewTab ? "noopener noreferrer" : undefined}>
+            <Link
+              href={`/projects/${project.id}`}
+              target={openInNewTab ? "_blank" : undefined}
+              rel={openInNewTab ? "noopener noreferrer" : undefined}
+              aria-label={`View project ${project.title}`}
+            >
               <h3
                 className={`${titleClass} line-clamp-1 ${
                   isDarkMode
@@ -337,15 +328,12 @@ export function ProjectCard({ project, userInfo, handleLike, isDarkMode, show_st
           </div>
         </div>
 
-        <Link href={`/projects/${project.id}`} target={openInNewTab ? "_blank" : undefined} rel={openInNewTab ? "noopener noreferrer" : undefined}>
-          <p
-            className={`${previewClass} ${
-              isDarkMode ? "text-gray-300" : "text-gray-600"
-            } ${previewMinHeightClass} mb-2`}
-          >
-            {project.preview}
-          </p>
-        </Link>
+        <ProjectMarkdown
+          markdown={project.preview}
+          className={`${previewClass} ${
+            isDarkMode ? "text-gray-300 prose-invert" : "text-gray-600"
+          } ${previewMinHeightClass} mb-2 line-clamp-3 prose prose-sm max-w-none prose-p:m-0 prose-ul:m-0 prose-ol:m-0 prose-li:m-0 prose-a:text-current hover:prose-a:text-current`}
+        />
 
         {/* Tags Section - anchored at bottom of content */}
         <div className={`flex flex-wrap gap-2 mt-auto ${tagsBottomMarginClass} min-h-[24px]`}>
@@ -443,7 +431,8 @@ export default function ProjectGrid({
   show_team = true,
   showSearch = false,
   urlFilters = {},
-  variant = "default"
+  variant = "default",
+  enablePagination = false,
 }: {
   showStarredOnly?: boolean;
   statusFilter?: string;
@@ -460,13 +449,42 @@ export default function ProjectGrid({
     sort?: string;
   };
   variant?: "default" | "compact";
+  enablePagination?: boolean;
 }) {
   const { user } = useUser();
   const { isAdmin, userInfo } = useUserContext();
   const [projects, setProjects] = useState<Project[]>([]);
   const [filteredProjects, setFilteredProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
+  const [totalProjectCount, setTotalProjectCount] = useState<number | null>(null);
+  const [hasMoreProjects, setHasMoreProjects] = useState(false);
+  const [isFetchingMore, setIsFetchingMore] = useState(false);
+  const [requiresFullDataset, setRequiresFullDataset] = useState(false);
+  const [loadedFullDataset, setLoadedFullDataset] = useState(!enablePagination);
   const { isDarkMode } = useTheme();
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
+  const requestSequenceRef = useRef(0);
+
+  const buildProjectsUrl = useCallback(
+    (options?: { limit?: number; offset?: number; all?: boolean }) => {
+      const params = new URLSearchParams();
+
+      if (statusFilter !== "ALL") {
+        params.set("status", statusFilter);
+      }
+
+      if (options?.all) {
+        params.set("all", "true");
+      } else if (enablePagination) {
+        params.set("limit", String(options?.limit ?? PROJECTS_PAGE_SIZE));
+        params.set("offset", String(options?.offset ?? 0));
+      }
+
+      const queryString = params.toString();
+      return `/api/projects${queryString ? `?${queryString}` : ""}`;
+    },
+    [enablePagination, statusFilter]
+  );
 
   // Update projects when they're loaded (only if no search/filtering active)
   useEffect(() => {
@@ -476,29 +494,158 @@ export default function ProjectGrid({
   }, [projects, showSearch]);
 
   useEffect(() => {
+    let isCancelled = false;
+
     async function fetchProjects() {
+      const requestSequence = ++requestSequenceRef.current;
+      setLoading(true);
+      setProjects([]);
+      setFilteredProjects([]);
+      setTotalProjectCount(null);
+      setHasMoreProjects(false);
+      setIsFetchingMore(false);
+      setRequiresFullDataset(false);
+      setLoadedFullDataset(!enablePagination);
+
       try {
-        const queryParam = statusFilter === "ALL" ? "" : `?status=${statusFilter}`;
-        const response = await fetch(`/api/projects${queryParam}`);
-        const data = await response.json();
-        
-        // Sort projects by startDate (newest first) before setting state
-        const sortedProjects = [...data].sort((a, b) => {
-          const dateA = new Date(a.startDate).getTime();
-          const dateB = new Date(b.startDate).getTime();
-          return isNaN(dateB) || isNaN(dateA) ? 0 : dateB - dateA;
-        });
-        
-        setProjects(sortedProjects);
+        const response = await fetch(
+          buildProjectsUrl(
+            enablePagination
+              ? { limit: PROJECTS_PAGE_SIZE, offset: 0 }
+              : undefined
+          )
+        );
+        const data: ProjectsApiResponse = await response.json();
+        const normalized = normalizeProjectsResponse(data);
+
+        if (!isCancelled && requestSequence === requestSequenceRef.current) {
+          setProjects(normalized.projects);
+          setTotalProjectCount(normalized.totalCount);
+          setHasMoreProjects(enablePagination ? normalized.hasMore : false);
+        }
       } catch (error) {
         console.error("Error fetching projects:", error);
       } finally {
-        setLoading(false);
+        if (!isCancelled) {
+          setLoading(false);
+        }
       }
     }
 
     fetchProjects();
-  }, [statusFilter]);
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [buildProjectsUrl, enablePagination]);
+
+  useEffect(() => {
+    if (!enablePagination || !requiresFullDataset || loadedFullDataset) {
+      return;
+    }
+
+    let isCancelled = false;
+
+    async function fetchAllProjects() {
+      const requestSequence = ++requestSequenceRef.current;
+      setIsFetchingMore(true);
+
+      try {
+        const response = await fetch(buildProjectsUrl({ all: true }));
+        const data: ProjectsApiResponse = await response.json();
+        const normalized = normalizeProjectsResponse(data);
+
+        if (!isCancelled && requestSequence === requestSequenceRef.current) {
+          setProjects(normalized.projects);
+          setTotalProjectCount(normalized.totalCount);
+          setHasMoreProjects(false);
+          setLoadedFullDataset(true);
+        }
+      } catch (error) {
+        console.error("Error fetching all projects:", error);
+      } finally {
+        if (!isCancelled) {
+          setIsFetchingMore(false);
+        }
+      }
+    }
+
+    fetchAllProjects();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [buildProjectsUrl, enablePagination, loadedFullDataset, requiresFullDataset]);
+
+  const loadMoreProjects = useCallback(async () => {
+    if (!enablePagination || loading || isFetchingMore || !hasMoreProjects || requiresFullDataset) {
+      return;
+    }
+
+    setIsFetchingMore(true);
+
+    try {
+      const response = await fetch(
+        buildProjectsUrl({
+          limit: PROJECTS_PAGE_SIZE,
+          offset: projects.length,
+        })
+      );
+      const data: ProjectsApiResponse = await response.json();
+      const normalized = normalizeProjectsResponse(data);
+
+      setProjects((currentProjects) => {
+        const projectMap = new Map(currentProjects.map((project) => [project.id, project]));
+        normalized.projects.forEach((project) => {
+          projectMap.set(project.id, project);
+        });
+        return sortProjectsByStartDate(Array.from(projectMap.values()));
+      });
+      setTotalProjectCount(normalized.totalCount);
+      setHasMoreProjects(normalized.hasMore);
+    } catch (error) {
+      console.error("Error loading more projects:", error);
+    } finally {
+      setIsFetchingMore(false);
+    }
+  }, [
+    buildProjectsUrl,
+    enablePagination,
+    hasMoreProjects,
+    isFetchingMore,
+    loading,
+    projects.length,
+    requiresFullDataset,
+  ]);
+
+  useEffect(() => {
+    if (!enablePagination || loading || isFetchingMore || !hasMoreProjects || requiresFullDataset) {
+      return;
+    }
+
+    const sentinel = loadMoreRef.current;
+    if (!sentinel) {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        if (entry?.isIntersecting) {
+          void loadMoreProjects();
+        }
+      },
+      {
+        rootMargin: "600px 0px",
+      }
+    );
+
+    observer.observe(sentinel);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [enablePagination, hasMoreProjects, isFetchingMore, loadMoreProjects, loading, requiresFullDataset]);
 
   const handleLike = async (
     e: React.MouseEvent,
@@ -517,8 +664,8 @@ export default function ProjectGrid({
       });
 
       if (response.ok) {
-        setProjects(
-          projects.map((project) => {
+        setProjects((currentProjects) =>
+          currentProjects.map((project) => {
             if (project.id === projectId) {
               return {
                 ...project,
@@ -557,7 +704,7 @@ export default function ProjectGrid({
       });
 
       if (response.ok) {
-        setProjects(projects.map(p => 
+        setProjects((currentProjects) => currentProjects.map(p => 
           p.id === projectId ? { ...p, status: newStatus as "DRAFT" | "PENDING" | "APPROVED" } : p
         ));
         toast.success('Project status updated successfully');
@@ -583,7 +730,7 @@ export default function ProjectGrid({
       });
 
       if (response.ok) {
-        setProjects(projects.map(p => 
+        setProjects((currentProjects) => currentProjects.map(p => 
           p.id === projectId ? { ...p, is_starred: isStarred } : p
         ));
         toast.success(`Project ${isStarred ? 'starred' : 'unstarred'} successfully`);
@@ -619,6 +766,8 @@ export default function ProjectGrid({
           projects={projects} 
           onFilteredProjectsChange={setFilteredProjects} 
           urlFilters={urlFilters}
+          totalProjectCount={totalProjectCount}
+          onSearchStateChange={setRequiresFullDataset}
         />
       )}
       <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 ${variant === "compact" ? "gap-3 sm:gap-4" : "gap-4 sm:gap-6"}`}>
@@ -638,6 +787,26 @@ export default function ProjectGrid({
           />
         ))}
       </div>
+      {enablePagination && hasMoreProjects && !requiresFullDataset && (
+        <div ref={loadMoreRef} className="flex min-h-8 justify-center py-8" aria-hidden="true">
+          {isFetchingMore && (
+            <div
+              className={`animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 ${
+                isDarkMode ? "border-purple-400" : "border-indigo-600"
+              }`}
+            ></div>
+          )}
+        </div>
+      )}
+      {enablePagination && requiresFullDataset && isFetchingMore && (
+        <div className="flex justify-center py-8">
+          <div
+            className={`animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 ${
+              isDarkMode ? "border-purple-400" : "border-indigo-600"
+            }`}
+          ></div>
+        </div>
+      )}
     </div>
   );
 }

@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { XMarkIcon } from "@heroicons/react/24/solid";
 import toast from 'react-hot-toast';
 import { useTheme } from '../../contexts/ThemeContext';
-import {HackerSelector, ProjectRoles, Hacker, TeamMember} from '../../components/HackerSelector';
+import { HackerSelector, ProjectRoles } from '../../components/HackerSelector';
+import type { HackerSelectionOption, HackerTeamMember } from '@/types/hacker';
 
 const MAX_PREVIEW_LENGTH = 100;
 const MAX_TITLE_LENGTH = 32;
@@ -14,9 +15,9 @@ export default function NewProject() {
   const { user } = useUser();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
-  const [hackers, setHackers] = useState<Hacker[]>([]);
+  const [hackers, setHackers] = useState<HackerSelectionOption[]>([]);
   const [showModal, setShowModal] = useState(false);
-  const [selectedMembers, setSelectedMembers] = useState<TeamMember[]>([]);
+  const [selectedMembers, setSelectedMembers] = useState<HackerTeamMember[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [project, setProject] = useState({
     title: "",
@@ -51,15 +52,15 @@ export default function NewProject() {
 
   const filteredTeamHackers = hackers.filter(hacker =>
     hacker.name.toLowerCase().includes(teamSearchTerm.toLowerCase()) ||
-    hacker.email.toLowerCase().includes(teamSearchTerm.toLowerCase())
+    hacker.email?.toLowerCase().includes(teamSearchTerm.toLowerCase())
   );
 
   const filteredLeadHackers = hackers.filter(hacker =>
     hacker.name.toLowerCase().includes(leadSearchTerm.toLowerCase()) ||
-    hacker.email.toLowerCase().includes(leadSearchTerm.toLowerCase())
+    hacker.email?.toLowerCase().includes(leadSearchTerm.toLowerCase())
   );
 
-  const handleAddMember = (hacker: Hacker, role: string) => {
+  const handleAddMember = (hacker: HackerSelectionOption, role: string) => {
     if (selectedMembers.some(member => member.id === hacker.id)) {
       toast.error("This team member has already been added");
       return;

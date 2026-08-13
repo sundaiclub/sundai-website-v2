@@ -346,11 +346,6 @@ jest.mock('typewriter-effect', () => {
   }
 })
 
-// Mock react-intersection-observer
-jest.mock('react-intersection-observer', () => ({
-  useInView: () => [jest.fn(), true],
-}))
-
 // Mock PostHog
 jest.mock('posthog-js', () => ({
   init: jest.fn(),
@@ -381,13 +376,6 @@ jest.mock('replicate', () => ({
   Replicate: jest.fn().mockImplementation(() => ({
     run: jest.fn().mockResolvedValue(['https://example.com/generated-image.jpg']),
   })),
-}))
-
-// Mock Nodemailer
-jest.mock('nodemailer', () => ({
-  createTransport: jest.fn().mockReturnValue({
-    sendMail: jest.fn().mockResolvedValue({ messageId: 'test-message-id' }),
-  }),
 }))
 
 // Mock Svix
@@ -424,8 +412,6 @@ Object.defineProperty(window, 'matchMedia', {
     matches: false,
     media: query,
     onchange: null,
-    addListener: jest.fn(), // deprecated
-    removeListener: jest.fn(), // deprecated
     addEventListener: jest.fn(),
     removeEventListener: jest.fn(),
     dispatchEvent: jest.fn(),
@@ -449,3 +435,7 @@ const sessionStorageMock = {
   clear: jest.fn(),
 }
 global.sessionStorage = sessionStorageMock
+process.env.NEXT_PUBLIC_SMS_CONSENT_VERSION ??=
+  'site-application-checkbox-2026-08-04'
+process.env.NEXT_PUBLIC_SMS_CONSENT_COPY ??=
+  'I agree to receive recurring automated text messages from Sundai about event applications and updates. Message frequency varies. Message and data rates may apply. Reply STOP to unsubscribe or HELP for help. Consent is optional and is not a condition of registration.'

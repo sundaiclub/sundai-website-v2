@@ -1,19 +1,35 @@
-// Shared trending score used by both client and server.
-// Matches the client-side logic from ProjectSearch/TrendingSections.
-
 export type Trendable = {
   likes?: Array<{ hackerId?: string; createdAt?: string | Date }>;
-  startDate?: string | Date;
-  createdAt?: string | Date;
 };
 
 export function calculateTrendingScore(
   project: Trendable,
-  options: { timeDecayDays?: number } = {}
+  options: { timeDecayDays?: number; recentLikeWindowDays?: number } = {}
 ): number {
-  const { timeDecayDays } = options;
+  const { timeDecayDays, recentLikeWindowDays } = options;
 
-  const likesCount = (project.likes?.length as number) || 0;
+  const likes = project.likes || [];
+  const likesCount = likes.length;
+
+  if (recentLikeWindowDays !== undefined) {
+    if (recentLikeWindowDays <= 0) {
+      return likesCount;
+    }
+
+    const now = new Date();
+    const cutoff = new Date(now);
+    cutoff.setDate(now.getDate() - recentLikeWindowDays);
+
+    return likes.filter((like) => {
+      if (!like.createdAt) return false;
+      const likeDate = new Date(like.createdAt);
+      return (
+        !Number.isNaN(likeDate.getTime()) &&
+        likeDate >= cutoff &&
+        likeDate <= now
+      );
+    }).length;
+  }
 
   if (timeDecayDays === undefined) {
     return likesCount;
@@ -23,24 +39,27 @@ export function calculateTrendingScore(
     return likesCount;
   }
 
-  const rawDate = (project.startDate as any) || (project.createdAt as any);
-  const projectDate = new Date(rawDate);
-  if (Number.isNaN(projectDate.getTime())) {
-    return Math.log(Math.max(likesCount, Number.EPSILON));
-  }
-
   const now = new Date();
-  const projectAgeInDays = (now.getTime() - projectDate.getTime()) / (1000 * 60 * 60 * 24);
 
-  // Use log-space scoring to avoid numeric underflow on older projects.
-  return Math.log(Math.max(likesCount, Number.EPSILON)) - projectAgeInDays / timeDecayDays;
+  return likes.reduce((score, like) => {
+    if (!like.createdAt) {
+      return score + 1;
+    }
+    const likeDate = new Date(like.createdAt);
+    if (Number.isNaN(likeDate.getTime())) {
+      return score + 1;
+    }
+
+    const likeAgeInDays =
+      (now.getTime() - likeDate.getTime()) / (1000 * 60 * 60 * 24);
+
+    return score + Math.exp(-likeAgeInDays / timeDecayDays);
+  }, 0);
 }
 
-// Alias with the same name used in client code
 export function calculateProjectScore(
   project: Trendable,
-  options: { timeDecayDays?: number } = {}
+  options: { timeDecayDays?: number; recentLikeWindowDays?: number } = {}
 ): number {
   return calculateTrendingScore(project, options);
 }
-

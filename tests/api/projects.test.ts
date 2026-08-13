@@ -8,10 +8,14 @@ jest.mock('../../src/lib/prisma', () => ({
   default: {
     project: {
       findMany: jest.fn(),
+      count: jest.fn(),
       create: jest.fn(),
     },
     hacker: {
       findUnique: jest.fn(),
+    },
+    event: {
+      findMany: jest.fn(),
     },
     week: {
       findFirst: jest.fn(),
@@ -37,6 +41,7 @@ describe('/api/projects', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     process.env.IS_RESEARCH_SITE = 'false'
+    mockPrisma.event.findMany.mockResolvedValue([])
   })
 
   describe('GET', () => {
@@ -65,6 +70,39 @@ describe('/api/projects', () => {
 
       expect(response.status).toBe(200)
       expect(data).toHaveLength(1)
+    })
+
+    it('returns paginated projects when limit and offset are provided', async () => {
+      const secondProject = {
+        ...mockProject,
+        id: 'test-project-id-2',
+        title: 'Another Test Project',
+      }
+      mockPrisma.project.findMany.mockResolvedValue([mockProject, secondProject])
+      mockPrisma.project.count.mockResolvedValue(25)
+
+      const request = new NextRequest('http://localhost:3000/api/projects?status=APPROVED&limit=1&offset=2')
+      const response = await GET(request)
+      const data = await response.json()
+
+      expect(response.status).toBe(200)
+      expect(mockPrisma.project.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          skip: 2,
+          take: 2,
+        })
+      )
+      expect(data).toMatchObject({
+        hasMore: true,
+        totalCount: 25,
+        projects: [
+          expect.objectContaining({
+            id: 'test-project-id',
+            title: 'Test Project',
+          }),
+        ],
+      })
+      expect(data.projects).toHaveLength(1)
     })
 
     it('handles research site environment', async () => {
@@ -132,6 +170,51 @@ describe('/api/projects', () => {
         is_starred: mockProject.is_starred,
         is_broken: mockProject.is_broken,
       })
+      expect(mockPrisma.project.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            eventParticipations: { create: [] },
+          }),
+        })
+      )
+    })
+
+    it('attaches a new project to relevant chapter events happening now', async () => {
+      mockAuth.mockReturnValue({ userId: 'test-clerk-id' })
+      mockPrisma.hacker.findUnique.mockResolvedValue(mockHacker)
+      mockPrisma.week.findFirst.mockResolvedValue({ id: 'test-week-id', number: 1 })
+      mockPrisma.event.findMany.mockResolvedValue([{ id: 'active-event' }])
+      mockPrisma.project.create.mockResolvedValue(mockProject)
+
+      const formData = new FormData()
+      formData.append('title', 'Event Project')
+      formData.append('preview', 'Built during the event')
+      formData.append('members', JSON.stringify([]))
+      const request = new NextRequest('http://localhost:3000/api/projects', {
+        method: 'POST',
+        body: formData,
+      })
+      request.formData = jest.fn().mockResolvedValue(formData)
+
+      expect((await POST(request)).status).toBe(200)
+      expect(mockPrisma.event.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            status: 'PUBLISHED',
+            startTime: { lte: expect.any(Date) },
+            endTime: { gte: expect.any(Date) },
+          }),
+        })
+      )
+      expect(mockPrisma.project.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            eventParticipations: {
+              create: [{ eventId: 'active-event', addedById: mockHacker.id }],
+            },
+          }),
+        })
+      )
     })
 
     it('returns 401 when user is not authenticated', async () => {

@@ -8,7 +8,6 @@ import Image from "next/image";
 import {
   BoldIcon,
   ItalicIcon,
-  ListBulletIcon,
   PhotoIcon,
   LinkIcon,
   CodeBracketIcon
@@ -16,18 +15,29 @@ import {
 
 import { useTheme } from "../../../contexts/ThemeContext";
 import { useUserContext } from "../../../contexts/UserContext";
-import { Project } from "../../../components/Project";
+import type { Project } from "@/types/project";
 import PermissionDenied from "../../../components/PermissionDenied";
 import TagSelector from "../../../components/TagSelector";
 import { XMarkIcon, PlusIcon, ArrowLeftIcon, SparklesIcon } from "@heroicons/react/24/outline";
-import { HackerSelector, ProjectRoles, Hacker } from "../../../components/HackerSelector";
+import { HackerSelector, ProjectRoles } from "../../../components/HackerSelector";
+import type { HackerSelectionOption } from '@/types/hacker';
 import { swapFirstLetters } from "../../../utils/nameUtils";
 import ImageGenerationModal from "../../../components/ImageGenerationModal";
+import ProjectMarkdown from "../../../components/ProjectMarkdown";
 
 const MAX_TITLE_LENGTH = 32;
 const MAX_PREVIEW_LENGTH = 100;
 
-/* --- Helper: Upload Image to GCS --- */
+type ProjectRouteParams = {
+  projectId: string;
+};
+
+type AppRouter = ReturnType<typeof useRouter>;
+
+type UploadImageResponse = {
+  url: string;
+};
+
 const uploadImage = async (file: File): Promise<string> => {
   const loadingToast = toast.loading("Uploading image...");
   const formData = new FormData();
@@ -42,12 +52,12 @@ const uploadImage = async (file: File): Promise<string> => {
   if (!response.ok) {
     throw new Error("Failed to upload image");
   }
-  const data = await response.json();
+  const data = (await response.json()) as UploadImageResponse;
   return data.url;
 };
 
 function ButtonPanel({ params, router, isDarkMode, handleSave, handlePublish, saving, publishing, isDraft }:
-  { params: any, router: any, isDarkMode: boolean, handleSave: () => void, handlePublish: () => void, saving: boolean, publishing: boolean, isDraft: boolean }) {
+  { params: ProjectRouteParams, router: AppRouter, isDarkMode: boolean, handleSave: () => void, handlePublish: () => void, saving: boolean, publishing: boolean, isDraft: boolean }) {
   return (
     <div className="flex items-center space-x-4 mt-4">
       <button
@@ -100,7 +110,6 @@ function ButtonPanel({ params, router, isDarkMode, handleSave, handlePublish, sa
   );
 }
 
-// Helper to extract image name from URL (if needed)
 function getImageNameFromUrl(url: string): string {
   try {
     const filename = url.split("/").pop() || "";
@@ -111,7 +120,7 @@ function getImageNameFromUrl(url: string): string {
 }
 
 export default function ProjectEditPage() {
-  const params = useParams();
+  const params = useParams<ProjectRouteParams>();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const { isAdmin, userInfo } = useUserContext();
@@ -121,6 +130,7 @@ export default function ProjectEditPage() {
   const [editableTitle, setEditableTitle] = useState("");
   const [editablePreview, setEditablePreview] = useState("");
   const [editableDescription, setEditableDescription] = useState("");
+  const [descriptionView, setDescriptionView] = useState<"write" | "preview">("write");
   const [editableStartDate, setEditableStartDate] = useState<Date>(new Date());
   const [editableGithubUrl, setEditableGithubUrl] = useState("");
   const [editableDemoUrl, setEditableDemoUrl] = useState("");
@@ -135,10 +145,11 @@ export default function ProjectEditPage() {
 
   const [thumbnail, setThumbnail] = useState<File | null>(null);
   const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null);
+  const [thumbnailPrompt, setThumbnailPrompt] = useState<string | null>(null);
 
   const formRef = useRef<HTMLFormElement>(null);
 
-  const [hackers, setHackers] = useState<Hacker[]>([]);
+  const [hackers, setHackers] = useState<HackerSelectionOption[]>([]);
   const [showTeamModal, setShowTeamModal] = useState(false);
   const [showLaunchLeadModal, setShowLaunchLeadModal] = useState(false);
   const [showImageGenerationModal, setShowImageGenerationModal] = useState(false);
@@ -147,12 +158,12 @@ export default function ProjectEditPage() {
 
   const filteredTeamHackers = hackers.filter(hacker =>
     hacker.name.toLowerCase().includes(teamSearchTerm.toLowerCase()) ||
-    hacker.email.toLowerCase().includes(teamSearchTerm.toLowerCase())
+    hacker.email?.toLowerCase().includes(teamSearchTerm.toLowerCase())
   );
 
   const filteredLeadHackers = hackers.filter(hacker =>
     hacker.name.toLowerCase().includes(leadSearchTerm.toLowerCase()) ||
-    hacker.email.toLowerCase().includes(leadSearchTerm.toLowerCase())
+    hacker.email?.toLowerCase().includes(leadSearchTerm.toLowerCase())
   );
 
   useEffect(() => {
@@ -187,6 +198,7 @@ export default function ProjectEditPage() {
       setEditableDemoUrl(project.demoUrl || "");
       setEditableBlogUrl(project.blogUrl || "");
       setThumbnailPreview(project.thumbnail?.url || null);
+      setThumbnailPrompt(project.thumbnail?.prompt || null);
     }
   }, [project]);
 
@@ -219,6 +231,7 @@ export default function ProjectEditPage() {
     const file = e.target.files?.[0];
     if (file) {
       setThumbnail(file);
+      setThumbnailPrompt(null);
       const reader = new FileReader();
       reader.onloadend = () => {
         setThumbnailPreview(reader.result as string);
@@ -230,20 +243,27 @@ export default function ProjectEditPage() {
   const handleThumbnailDelete = () => {
     setThumbnail(null);
     setThumbnailPreview(null);
+    setThumbnailPrompt(null);
     if (project?.thumbnail) {
       setProject({ ...project, thumbnail: null });
     }
   };
 
-  const handleAIGeneratedImageSelect = async (imageUrl: string) => {
+  const handleAIGeneratedImageSelect = async ({
+    url,
+    prompt,
+  }: {
+    url: string;
+    prompt: string;
+  }) => {
     try {
-      // Download the image and convert it to a File object
-      const response = await fetch(imageUrl);
+      const response = await fetch(url);
       const blob = await response.blob();
       const file = new File([blob], 'ai-generated-thumbnail.webp', { type: 'image/webp' });
       
       setThumbnail(file);
-      setThumbnailPreview(imageUrl);
+      setThumbnailPreview(url);
+      setThumbnailPrompt(prompt);
       toast.success("AI-generated image selected!");
     } catch (error) {
       console.error("Error processing AI-generated image:", error);
@@ -254,7 +274,6 @@ export default function ProjectEditPage() {
   const handleSave = async () => {
     if (!project) return;
 
-    // Trigger form validation
     if (formRef.current && !formRef.current.checkValidity()) {
       formRef.current.reportValidity();
       return;
@@ -266,6 +285,9 @@ export default function ProjectEditPage() {
       formData.append("title", editableTitle);
       if (thumbnail) {
         formData.append("thumbnail", thumbnail);
+      }
+      if (thumbnailPrompt) {
+        formData.append("thumbnailPrompt", thumbnailPrompt);
       }
       formData.append("description", editableDescription);
       formData.append("preview", editablePreview);
@@ -280,7 +302,6 @@ export default function ProjectEditPage() {
       formData.append("demoUrl", editableDemoUrl);
       formData.append("blogUrl", editableBlogUrl);
 
-      // Add team members data
       formData.append("participants", JSON.stringify(project.participants));
       formData.append("launchLead", project.launchLead.id);
 
@@ -310,7 +331,6 @@ export default function ProjectEditPage() {
   const handlePublish = async () => {
     if (!project) return;
 
-    // Trigger form validation
     if (formRef.current && !formRef.current.checkValidity()) {
       formRef.current.reportValidity();
       return;
@@ -318,11 +338,13 @@ export default function ProjectEditPage() {
 
     setPublishing(true);
     try {
-      // First save changes
       const formData = new FormData();
       formData.append("title", editableTitle);
       if (thumbnail) {
         formData.append("thumbnail", thumbnail);
+      }
+      if (thumbnailPrompt) {
+        formData.append("thumbnailPrompt", thumbnailPrompt);
       }
       formData.append("description", editableDescription);
       formData.append("preview", editablePreview);
@@ -349,7 +371,6 @@ export default function ProjectEditPage() {
         throw new Error("Failed to save project");
       }
 
-      // Then publish
       const publishResponse = await fetch(`/api/projects/${params?.projectId}/submit`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -400,10 +421,10 @@ export default function ProjectEditPage() {
       const fetchTags = async () => {
         try {
           const response = await fetch(`/api/tags/${type}`);
-          const data = await response.json();
+          const data = (await response.json()) as Project["techTags"];
           if (type === "tech") {
             setAvailableTechTags(data);
-            const newTag = data.find((tag: any) => tag.id === tagId);
+            const newTag = data.find((tag) => tag.id === tagId);
             if (newTag) {
               setProject({
                 ...project,
@@ -419,7 +440,7 @@ export default function ProjectEditPage() {
             }
           } else {
             setAvailableDomainTags(data);
-            const newTag = data.find((tag: any) => tag.id === tagId);
+            const newTag = data.find((tag) => tag.id === tagId);
             if (newTag) {
               setProject({
                 ...project,
@@ -456,7 +477,7 @@ export default function ProjectEditPage() {
     });
   };
 
-  const handleAddMember = (hacker: Hacker, role: string) => {
+  const handleAddMember = (hacker: HackerSelectionOption, role: string) => {
     if (!project) return;
     setProject({
       ...project,
@@ -474,7 +495,7 @@ export default function ProjectEditPage() {
     });
   };
 
-  const handleChangeLaunchLead = (hacker: Hacker) => {
+  const handleChangeLaunchLead = (hacker: HackerSelectionOption) => {
     if (!project || !userInfo) return;
     if (project.launchLead.id === userInfo.id && hacker.id !== userInfo.id) {
       if (!confirm("Warning: If you change the launch lead from yourself, you will lose access to managing team members after saving. Continue?")) {
@@ -749,9 +770,13 @@ export default function ProjectEditPage() {
             <ImageGenerationModal
               showModal={showImageGenerationModal}
               setShowModal={setShowImageGenerationModal}
-              projectId={params?.projectId as string}
-              projectTitle={project?.title || ""}
-              projectDescription={project?.preview || ""}
+              generationEndpoint={`/api/projects/${params?.projectId as string}/generate-images`}
+              generationBody={{
+                prompt: "Generate pixel-art thumbnails based on project description",
+              }}
+              subjectLabel="Project"
+              subjectTitle={project?.title || ""}
+              subjectDescription={project?.preview || ""}
               onImageSelect={handleAIGeneratedImageSelect}
               isDarkMode={isDarkMode}
             />
@@ -837,143 +862,201 @@ export default function ProjectEditPage() {
               </a>
               ! Use the toolbar.
             </span>
-            <div className={`mt-2 flex gap-2 ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
-              <button
-                type="button"
-                onClick={() => {
-                  const textarea = document.getElementById("description-textarea") as HTMLTextAreaElement;
-                  const start = textarea.selectionStart;
-                  const end = textarea.selectionEnd;
-                  const text = textarea.value;
-                  const selectedText = text.substring(start, end);
-                  const replacement = selectedText ? `**${selectedText}**` : "**Bold text**";
-                  setEditableDescription(text.substring(0, start) + replacement + text.substring(end));
-                  setTimeout(() => {
-                    textarea.focus();
-                    if (selectedText) {
-                      textarea.selectionStart = start + 2;
-                      textarea.selectionEnd = start + 2 + selectedText.length;
-                    } else {
-                      textarea.selectionStart = start + 2;
-                      textarea.selectionEnd = start + 10;
-                    }
-                  }, 0);
-                }}
-                className={`p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700`}
-                title="Bold (Ctrl+B)"
-              >
-                <BoldIcon className="h-5 w-5" />
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  const textarea = document.getElementById("description-textarea") as HTMLTextAreaElement;
-                  const start = textarea.selectionStart;
-                  const end = textarea.selectionEnd;
-                  const text = textarea.value;
-                  const selectedText = text.substring(start, end);
-                  const replacement = selectedText ? `*${selectedText}*` : "*Italic text*";
-                  setEditableDescription(text.substring(0, start) + replacement + text.substring(end));
-                  setTimeout(() => {
-                    textarea.focus();
-                    if (selectedText) {
+            <div className={`mt-2 flex items-center justify-between gap-2 ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  disabled={descriptionView === "preview"}
+                  onClick={() => {
+                    const textarea = document.getElementById("description-textarea") as HTMLTextAreaElement;
+                    const start = textarea.selectionStart;
+                    const end = textarea.selectionEnd;
+                    const text = textarea.value;
+                    const selectedText = text.substring(start, end);
+                    const replacement = selectedText ? `**${selectedText}**` : "**Bold text**";
+                    setEditableDescription(text.substring(0, start) + replacement + text.substring(end));
+                    setTimeout(() => {
+                      textarea.focus();
+                      if (selectedText) {
+                        textarea.selectionStart = start + 2;
+                        textarea.selectionEnd = start + 2 + selectedText.length;
+                      } else {
+                        textarea.selectionStart = start + 2;
+                        textarea.selectionEnd = start + 10;
+                      }
+                    }, 0);
+                  }}
+                  className={`p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent`}
+                  title="Bold (Ctrl+B)"
+                >
+                  <BoldIcon className="h-5 w-5" />
+                </button>
+                <button
+                  type="button"
+                  disabled={descriptionView === "preview"}
+                  onClick={() => {
+                    const textarea = document.getElementById("description-textarea") as HTMLTextAreaElement;
+                    const start = textarea.selectionStart;
+                    const end = textarea.selectionEnd;
+                    const text = textarea.value;
+                    const selectedText = text.substring(start, end);
+                    const replacement = selectedText ? `*${selectedText}*` : "*Italic text*";
+                    setEditableDescription(text.substring(0, start) + replacement + text.substring(end));
+                    setTimeout(() => {
+                      textarea.focus();
+                      if (selectedText) {
+                        textarea.selectionStart = start + 1;
+                        textarea.selectionEnd = start + 1 + selectedText.length;
+                      } else {
+                        textarea.selectionStart = start + 1;
+                        textarea.selectionEnd = start + 11;
+                      }
+                    }, 0);
+                  }}
+                  className={`p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent`}
+                  title="Italic (Ctrl+I)"
+                >
+                  <ItalicIcon className="h-5 w-5" />
+                </button>
+                <button
+                  type="button"
+                  disabled={descriptionView === "preview"}
+                  onClick={() => {
+                    const textarea = document.getElementById("description-textarea") as HTMLTextAreaElement;
+                    const start = textarea.selectionStart;
+                    const end = textarea.selectionEnd;
+                    const text = textarea.value;
+                    const selectedText = text.substring(start, end);
+                    const replacement = selectedText ? `~~${selectedText}~~` : "~~Struck text~~";
+                    setEditableDescription(text.substring(0, start) + replacement + text.substring(end));
+                    setTimeout(() => {
+                      textarea.focus();
+                      if (selectedText) {
+                        textarea.selectionStart = start + 2;
+                        textarea.selectionEnd = start + 2 + selectedText.length;
+                      } else {
+                        textarea.selectionStart = start + 2;
+                        textarea.selectionEnd = start + 13;
+                      }
+                    }, 0);
+                  }}
+                  className={`p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent`}
+                  title="Strikethrough"
+                >
+                  <span className="inline-flex h-5 w-5 items-center justify-center text-sm font-bold line-through">S</span>
+                </button>
+                <button
+                  type="button"
+                  disabled={descriptionView === "preview"}
+                  onClick={() => {
+                    const textarea = document.getElementById("description-textarea") as HTMLTextAreaElement;
+                    const start = textarea.selectionStart;
+                    const end = textarea.selectionEnd;
+                    const text = textarea.value;
+                    const selectedText = text.substring(start, end);
+                    const replacement = selectedText ? `[${selectedText}](url)` : "[Link](url)";
+                    setEditableDescription(text.substring(0, start) + replacement + text.substring(end));
+                    setTimeout(() => {
+                      textarea.focus();
+                      if (selectedText) {
+                        textarea.selectionStart = start + selectedText.length + 3;
+                        textarea.selectionEnd = start + selectedText.length + 6;
+                      } else {
+                        textarea.selectionStart = start + 7;
+                        textarea.selectionEnd = start + 10;
+                      }
+                    }, 0);
+                  }}
+                  className={`p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent`}
+                  title="Add Link"
+                >
+                  <LinkIcon className="h-5 w-5" />
+                </button>
+                <button
+                  type="button"
+                  disabled={descriptionView === "preview"}
+                  onClick={() => {
+                    const textarea = document.getElementById("description-textarea") as HTMLTextAreaElement;
+                    const start = textarea.selectionStart;
+                    const end = textarea.selectionEnd;
+                    const text = textarea.value;
+                    const selectedText = text.substring(start, end);
+                    const replacement = `\`${selectedText}\``;
+                    setEditableDescription(text.substring(0, start) + replacement + text.substring(end));
+                    setTimeout(() => {
+                      textarea.focus();
                       textarea.selectionStart = start + 1;
                       textarea.selectionEnd = start + 1 + selectedText.length;
-                    } else {
-                      textarea.selectionStart = start + 1;
-                      textarea.selectionEnd = start + 11;
-                    }
-                  }, 0);
-                }}
-                className={`p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700`}
-                title="Italic (Ctrl+I)"
-              >
-                <ItalicIcon className="h-5 w-5" />
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  const textarea = document.getElementById("description-textarea") as HTMLTextAreaElement;
-                  const start = textarea.selectionStart;
-                  const end = textarea.selectionEnd;
-                  const text = textarea.value;
-                  const selectedText = text.substring(start, end);
-                  const replacement = selectedText ? `[${selectedText}](url)` : "[Link](url)";
-                  setEditableDescription(text.substring(0, start) + replacement + text.substring(end));
-                  setTimeout(() => {
-                    textarea.focus();
-                    if (selectedText) {
-                      textarea.selectionStart = start + selectedText.length + 3;
-                      textarea.selectionEnd = start + selectedText.length + 6;
-                    } else {
-                      textarea.selectionStart = start + 7;
-                      textarea.selectionEnd = start + 10;
-                    }
-                  }, 0);
-                }}
-                className={`p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700`}
-                title="Add Link"
-              >
-                <LinkIcon className="h-5 w-5" />
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  const textarea = document.getElementById("description-textarea") as HTMLTextAreaElement;
-                  const start = textarea.selectionStart;
-                  const end = textarea.selectionEnd;
-                  const text = textarea.value;
-                  const selectedText = text.substring(start, end);
-                  const replacement = `\`${selectedText}\``;
-                  setEditableDescription(text.substring(0, start) + replacement + text.substring(end));
-                  setTimeout(() => {
-                    textarea.focus();
-                    textarea.selectionStart = start + 1;
-                    textarea.selectionEnd = start + 1 + selectedText.length;
-                  }, 0);
-                }}
-                className={`p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700`}
-                title="Inline Code"
-              >
-                <CodeBracketIcon className="h-5 w-5" />
-              </button>
-              <label
-                className={`p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer`}
-                title="Upload Image"
-              >
-                <PhotoIcon className="h-5 w-5" />
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={async (e) => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      try {
-                        const imageUrl = await uploadImage(file);
-                        const textarea = document.getElementById("description-textarea") as HTMLTextAreaElement;
-                        const start = textarea.selectionStart;
-                        const text = textarea.value;
-                        const imageMarkdown = `![Image](${imageUrl})`;
-                        setEditableDescription(text.substring(0, start) + imageMarkdown + text.substring(start));
-                        setTimeout(() => {
-                          textarea.focus();
-                          textarea.selectionStart = textarea.selectionEnd = start + imageMarkdown.length;
-                        }, 0);
-                      } catch (error) {
-                        console.error("Error uploading image:", error);
-                        toast.error("Failed to upload image");
-                      }
-                    }
+                    }, 0);
                   }}
-                />
-              </label>
+                  className={`p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent`}
+                  title="Inline Code"
+                >
+                  <CodeBracketIcon className="h-5 w-5" />
+                </button>
+                <label
+                  className={`p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer ${
+                    descriptionView === "preview" ? "pointer-events-none opacity-50" : ""
+                  }`}
+                  title="Upload Image"
+                >
+                  <PhotoIcon className="h-5 w-5" />
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    disabled={descriptionView === "preview"}
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        try {
+                          const imageUrl = await uploadImage(file);
+                          const textarea = document.getElementById("description-textarea") as HTMLTextAreaElement;
+                          const start = textarea.selectionStart;
+                          const text = textarea.value;
+                          const imageMarkdown = `![Image](${imageUrl})`;
+                          setEditableDescription(text.substring(0, start) + imageMarkdown + text.substring(start));
+                          setTimeout(() => {
+                            textarea.focus();
+                            textarea.selectionStart = textarea.selectionEnd = start + imageMarkdown.length;
+                          }, 0);
+                        } catch (error) {
+                          console.error("Error uploading image:", error);
+                          toast.error("Failed to upload image");
+                        }
+                      }
+                    }}
+                  />
+                </label>
+              </div>
+              <div className={`inline-flex overflow-hidden rounded-md border ${isDarkMode ? "border-gray-600" : "border-gray-300"}`}>
+                {(["write", "preview"] as const).map((view) => (
+                  <button
+                    key={view}
+                    type="button"
+                    onClick={() => setDescriptionView(view)}
+                    className={`px-3 py-1.5 text-sm font-medium capitalize ${
+                      descriptionView === view
+                        ? isDarkMode
+                          ? "bg-gray-700 text-gray-100"
+                          : "bg-gray-100 text-gray-900"
+                        : isDarkMode
+                        ? "bg-gray-800 text-gray-300 hover:bg-gray-700"
+                        : "bg-white text-gray-600 hover:bg-gray-50"
+                    }`}
+                    aria-pressed={descriptionView === view}
+                  >
+                    {view}
+                  </button>
+                ))}
+              </div>
             </div>
-            <textarea
-              id="description-textarea"
-              value={editableDescription}
-              onChange={(e) => setEditableDescription(e.target.value)}
-              onKeyDown={(e) => {
+            {descriptionView === "write" ? (
+              <textarea
+                id="description-textarea"
+                value={editableDescription}
+                onChange={(e) => setEditableDescription(e.target.value)}
+                onKeyDown={(e) => {
                 if (e.ctrlKey || e.metaKey) {
                   const textarea = e.currentTarget;
                   const start = textarea.selectionStart;
@@ -997,6 +1080,16 @@ export default function ProjectEditPage() {
                       setTimeout(() => {
                         textarea.selectionStart = start + 1;
                         textarea.selectionEnd = start + 1 + selectedText.length;
+                      }, 0);
+                      break;
+                    case "x":
+                      if (!e.shiftKey) break;
+                      e.preventDefault();
+                      const strikeText = `~~${selectedText}~~`;
+                      setEditableDescription(text.substring(0, start) + strikeText + text.substring(end));
+                      setTimeout(() => {
+                        textarea.selectionStart = start + 2;
+                        textarea.selectionEnd = start + 2 + selectedText.length;
                       }, 0);
                       break;
                   }
@@ -1039,9 +1132,8 @@ export default function ProjectEditPage() {
                 e.preventDefault();
                 e.currentTarget.classList.remove('border-indigo-500');
                 const textarea = e.currentTarget;
-                textarea.focus(); // Ensure textarea is focused before accessing selection
+                textarea.focus();
 
-                // First check for image files
                 const file = e.dataTransfer.files[0];
                 if (file && file.type.startsWith('image/')) {
                   try {
@@ -1080,7 +1172,6 @@ export default function ProjectEditPage() {
                   }
                 }
 
-                // Then check for URLs
                 const urlData = e.dataTransfer.getData('text/uri-list') || e.dataTransfer.getData('text/plain');
                 if (urlData && (urlData.startsWith('http://') || urlData.startsWith('https://'))) {
                   const isImageUrl = /\.(jpg|jpeg|png|gif|webp)$/i.test(urlData);
@@ -1099,14 +1190,24 @@ export default function ProjectEditPage() {
                   }
                 }
               }}
-              className={`mt-1 block w-full border ${
+                className={`mt-1 block w-full border ${
                 isDarkMode
                   ? "border-gray-600 bg-gray-800 text-gray-100"
                   : "border-gray-300 bg-white text-gray-900"
               } rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 p-2`}
-              rows={15}
-              placeholder="Write your project description here..."
-            />
+                rows={15}
+                placeholder="Write your project description here..."
+              />
+            ) : (
+              <ProjectMarkdown
+                markdown={editableDescription}
+                className={`mt-1 min-h-[390px] w-full rounded-md border p-4 prose prose-lg max-w-none ${
+                  isDarkMode
+                    ? "border-gray-600 bg-gray-800 text-gray-100 prose-invert prose-pre:bg-gray-900 prose-a:text-indigo-400"
+                    : "border-gray-300 bg-white text-gray-900 prose-gray prose-pre:bg-gray-100 prose-a:text-indigo-600"
+                }`}
+              />
+            )}
           </div>
           <ButtonPanel
             params={params}

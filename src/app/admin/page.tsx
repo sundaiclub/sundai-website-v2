@@ -1,33 +1,56 @@
-"use client";
-import React from "react";
-import ProjectGrid from "../components/Project";
-import { useTheme } from "../contexts/ThemeContext";
-import { useUserContext } from "../contexts/UserContext";
+'use client';
 
-export default function AllProjectsList() {
-  const { isDarkMode } = useTheme();
-  const { isAdmin, userInfo } = useUserContext();
+import Link from 'next/link';
+import AdminAuthGate from './AdminAuthGate';
+import {
+  ManagementBackButton,
+  ManagementHeader,
+  ManagementPage,
+  useManagementClasses,
+} from '../components/ManagementSurface';
+import { useUserContext } from '../contexts/UserContext';
+
+const adminSections = [
+  { href: '/admin/projects', label: 'Project moderation' },
+  { href: '/admin/chapters', label: 'Chapters' },
+  { href: '/admin/application-templates', label: 'Application templates' },
+  { href: '/admin/bans', label: 'Global moderation' },
+  { href: '/admin/communications', label: 'Communications' },
+];
+
+export default function AdminConsolePage() {
+  const classes = useManagementClasses();
+  const { isAdmin, loading, userInfo } = useUserContext();
 
   return (
-    <div
-      className={`${
-        isDarkMode ? "bg-gray-900 text-gray-100" : "bg-white text-gray-900"
-      } font-space-mono`}
-    >
-      <div className={`max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 py-20`}>
-        {isAdmin ? (
-          <div className="flex flex-col space-y-4 mb-8">
-            <h1 className="text-3xl font-bold">
-              Full list of projects in Sundai
-            </h1>
-            <ProjectGrid show_status={true} statusFilter="ALL" showSearch={true}/>
+    <ManagementPage>
+      <AdminAuthGate
+        isAdmin={isAdmin}
+        isAuthenticated={Boolean(userInfo)}
+        loading={loading}
+      >
+        <>
+          <div className="mb-4">
+            <ManagementBackButton />
           </div>
-        ) : (
-          <div className="text-center text-red-500">
-            You do not have permission to view this page.
+          <ManagementHeader
+            eyebrow="Site admin"
+            title="Site admin console"
+            description="Moderate projects, chapters, communications, application templates, and global safety controls."
+          />
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {adminSections.map(section => (
+              <Link
+                key={section.href}
+                href={section.href}
+                className={`${classes.panel} p-5 transition hover:-translate-y-0.5 hover:shadow-md`}
+              >
+                <span className="font-semibold">{section.label}</span>
+              </Link>
+            ))}
           </div>
-        )}
-      </div>
-    </div>
+        </>
+      </AdminAuthGate>
+    </ManagementPage>
   );
 }

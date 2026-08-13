@@ -1,5 +1,6 @@
 import { XMarkIcon } from "@heroicons/react/24/solid";
 import { useState } from 'react';
+import type { HackerSelectionOption } from '@/types/hacker';
 
 export const ProjectRoles = [
     { id: "hacker", label: "Builder" },
@@ -11,29 +12,19 @@ export const ProjectRoles = [
     { id: "other", label: "Other" },
   ];
 
-export type Hacker = {
-  id: string;
-  name: string;
-  email: string;
-};
-
-export type TeamMember = Hacker & {
-    role: string;
-  };
-
 interface HackerSelectorProps {
   showModal: boolean;
   setShowModal: (show: boolean) => void;
   isDarkMode: boolean;
   searchTerm: string;
   setSearchTerm: (term: string) => void;
-  filteredHackers: Hacker[];
+  filteredHackers: HackerSelectionOption[];
   title?: string;
   singleSelect?: boolean;
   selectedIds?: string[];
   showRoleSelector?: boolean;
-  handleAddMember?: (hacker: Hacker) => void;
-  onAddMemberWithRole?: (hacker: Hacker, role: string) => void;
+  handleAddMember?: (hacker: HackerSelectionOption) => void;
+  onAddMemberWithRole?: (hacker: HackerSelectionOption, role: string) => void;
 }
 
 export function HackerSelector({
@@ -52,7 +43,7 @@ export function HackerSelector({
 }: HackerSelectorProps) {
   const [selectedRole, setSelectedRole] = useState(ProjectRoles[0].id);
 
-  const handleHackerClick = (hacker: Hacker) => {
+  const handleHackerClick = (hacker: HackerSelectionOption) => {
     if (showRoleSelector && onAddMemberWithRole) {
       onAddMemberWithRole(hacker, selectedRole);
     } else if (handleAddMember) {

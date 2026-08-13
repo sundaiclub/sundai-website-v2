@@ -17,7 +17,7 @@ export async function PATCH(
       select: { role: true },
     });
 
-    if (user?.role !== "ADMIN") {
+    if (user?.role !== "SITE_ADMIN") {
       return new NextResponse("Unauthorized", { status: 401 });
     }
 
