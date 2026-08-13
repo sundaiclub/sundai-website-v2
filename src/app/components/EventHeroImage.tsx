@@ -82,7 +82,6 @@ export function PublicEventHero({
         <h1 className="mt-3 text-balance text-3xl font-bold leading-tight sm:text-4xl">
           {event.title}
         </h1>
-
         {actions && (
           <div
             className={`mt-5 grid gap-2 border-t pt-5 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 ${classes.isDarkMode ? 'border-gray-800' : 'border-gray-200'}`}

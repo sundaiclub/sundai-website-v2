@@ -428,6 +428,7 @@ export type OrganizerEventSettings = {
   waitlistMessage?: string | null;
   declineMessage?: string | null;
   canDelete?: boolean;
+  canAdminister?: boolean;
   image?: Pick<EventManagementImageSummary, 'id' | 'url' | 'alt'> | null;
   chapter?: Pick<Chapter, 'id' | 'name' | 'slug' | 'timezone'>;
   staff?: Array<

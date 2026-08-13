@@ -4,7 +4,6 @@ import {
   AddToCalendarAction,
   EventMaterialsSection,
   EventNarrativeColumn,
-  EventProgramHighlights,
   EventRegistrationAction,
   type PublicEventMaterialLink,
 } from '@/app/components/EventDetailSections';
@@ -190,12 +189,7 @@ export default async function PublicEventDetailPage({
         <EventNarrativeColumn event={event} />
       </div>
 
-      <div className="mt-6 grid gap-5">
-        <EventProgramHighlights
-          experts={event.publicExpertText}
-          format={event.publicProgramLabel}
-          partners={event.publicSponsorText}
-        />
+      <div className="mt-6 grid min-w-0 gap-5">
         <EventProjectCarousel projects={eventProjects} />
         <EventMaterialsSection materials={materialLinks} />
       </div>

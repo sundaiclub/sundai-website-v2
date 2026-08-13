@@ -186,19 +186,19 @@
 
 **Goal**: Give site/chapter admins audited staff and lifecycle controls in scope while preventing MC/co-MC operational assignments from gaining administrative authority.
 
-**Independent Test**: Assign/change/remove MC/co-MC roles and attempt event settings/publish/unpublish/cancel actions as every role across in-scope and out-of-scope chapters, then verify immediate access revocation and audit actor/time.
+**Independent Test**: Assign/change/remove MC/co-MC roles and verify MC settings edits, co-MC settings denial, admin-only publish/unpublish/cancel/staff actions, immediate access revocation, and audit actor/time.
 
 ### Tests for User Story 6
 
 - [X] T071 [P] [US6] Add failing staff route tests for authorized reads, one-role assignment changes, transactional audits, removal, immediate revocation, and cross-chapter denial in `tests/api/event-staff.test.ts`
-- [X] T072 [P] [US6] Add failing lifecycle/settings permission tests for admin success and MC/co-MC denial in `tests/api/events.test.ts` and `tests/api/organizer-events.test.ts`
-- [X] T073 [P] [US6] Add failing workspace UI tests for admin-only staff/settings/lifecycle controls and audit history in `tests/pages/OrganizerEventAdministration.test.tsx`
+- [X] T072 [P] [US6] Add lifecycle/settings permission tests for admin success, MC settings access, co-MC settings denial, and admin-only lifecycle actions in `tests/api/events.test.ts` and `tests/api/organizer-events.test.ts`
+- [X] T073 [P] [US6] Add workspace UI tests for MC settings access, co-MC settings denial, admin-only staff/lifecycle controls, and audit history in `tests/pages/OrganizerEventAdministration.test.tsx`
 
 ### Implementation for User Story 6
 
 - [X] T074 [US6] Make staff listing require workspace access and make assignment/role-change writes admin-only with same-transaction `EventStaffAudit` records in `src/app/api/events/[eventId]/staff/route.ts`
 - [X] T075 [US6] Make staff removal admin-only with same-transaction audit and current-assignment revocation in `src/app/api/events/[eventId]/staff/[staffId]/route.ts`
-- [X] T076 [US6] Apply admin-only event settings and lifecycle guards to event update, publish, application open/close, and organizer settings routes in `src/app/api/events/[eventId]/route.ts`, `src/app/api/events/[eventId]/publish/route.ts`, `src/app/api/events/[eventId]/applications/open/route.ts`, and `src/app/api/events/[eventId]/applications/close/route.ts`
+- [X] T076 [US6] Allow assigned MCs to edit event settings while keeping staff and lifecycle fields admin-only across event update, publish, application open/close, and organizer settings routes in `src/app/api/events/[eventId]/route.ts`, `src/app/api/events/[eventId]/publish/route.ts`, `src/app/api/events/[eventId]/applications/open/route.ts`, and `src/app/api/events/[eventId]/applications/close/route.ts`
 - [X] T077 [US6] Build staff assignment/role/removal controls and admin-only audit history in `src/app/organizer/events/[eventId]/staff/EventStaffPanel.tsx`
 - [X] T078 [US6] Integrate capability-gated staff, event settings, and lifecycle actions into `src/app/organizer/events/[eventId]/page.tsx` and `src/app/organizer/events/[eventId]/settings/page.tsx`
 

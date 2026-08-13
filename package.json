@@ -25,6 +25,8 @@
     "db:reset": "prisma migrate reset --force",
     "db:migrate": "prisma migrate dev",
     "db:migrate:deploy": "./scripts/migrate_deploy.sh",
+    "db:backfill:sundai-boston": "ts-node --compiler-options '{\"module\":\"CommonJS\",\"moduleResolution\":\"node\"}' prisma/data-migrations/20260807000000_backfill_sundai_boston_events.ts",
+    "fetch:sundai-boston-images": "node scripts/fetch-sundai-boston-event-images.mjs",
     "db:populate": "./scripts/populate_db.sh"
   },
   "dependencies": {

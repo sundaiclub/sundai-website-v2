@@ -60,6 +60,7 @@ const event = {
 
 const operationalCapabilities = {
   administerEvent: false,
+  editEventSettings: true,
   assignStaff: false,
   decideApplicants: true,
   manageOperations: true,
@@ -138,6 +139,7 @@ describe('GET /api/events/[eventId]/workspace', () => {
       workspace({
         capabilities: {
           administerEvent: true,
+          editEventSettings: true,
           assignStaff: true,
           decideApplicants: true,
           manageOperations: true,
@@ -156,6 +158,7 @@ describe('GET /api/events/[eventId]/workspace', () => {
     expect(response.status).toBe(200);
     expect(body.capabilities).toEqual({
       administerEvent: true,
+      editEventSettings: true,
       assignStaff: true,
       decideApplicants: true,
       manageOperations: true,
@@ -178,6 +181,7 @@ describe('GET /api/events/[eventId]/workspace', () => {
         workspace({
           capabilities: {
             ...operationalCapabilities,
+            editEventSettings: role === 'MC',
             decideApplicants,
           },
         })
@@ -189,6 +193,7 @@ describe('GET /api/events/[eventId]/workspace', () => {
       expect(response.status).toBe(200);
       expect(body.capabilities).toMatchObject({
         administerEvent: false,
+        editEventSettings: role === 'MC',
         assignStaff: false,
         decideApplicants,
         manageOperations: true,
@@ -226,7 +231,9 @@ describe('GET /api/events/[eventId]/workspace', () => {
       materials: 0,
       communications: 0,
     };
-    mockLoadEventWorkspace.mockResolvedValue(workspace({ counts: emptyCounts }));
+    mockLoadEventWorkspace.mockResolvedValue(
+      workspace({ counts: emptyCounts })
+    );
 
     const response = await getWorkspace();
     const body = await response.json();

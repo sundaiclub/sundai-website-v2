@@ -15,7 +15,7 @@ Cut over organizer event operations to `/organizer/events/[eventId]`, providing 
 - `Project` is global; `EventProject` is the event-participation boundary, while `PitchProject` links optional pitch-session state. Project creation during a relevant running event and pitch-queue entry both ensure `EventProject` exists.
 - `/pitch/[eventId]` already implements the pitch controller and recognizes MC and co-MC access.
 - AWS SES and Twilio adapters already exist in `src/lib/eventDecisionNotifications.ts`; Google Cloud Storage upload support exists in `src/lib/gcp-storage.ts`.
-- The current `canManageEventSettingsWithContext` grants MCs broader settings access than this specification allows, and `GET /api/events/[eventId]/staff` does not currently authorize reads. Both are required permission cutovers, not compatibility cases.
+- Event-settings editing is distinct from administration: assigned MCs may edit event details, while co-MCs may not; staff assignment and lifecycle actions remain limited to site admins and in-scope chapter admins. `GET /api/events/[eventId]/staff` still requires workspace authorization.
 - Phase 3 issue #144 is intentionally deferred. No current `Week`/`Attendance` data may be represented as event attendance or used for workspace counts/audiences.
 
 ## Technical Context
@@ -40,7 +40,7 @@ Cut over organizer event operations to `/organizer/events/[eventId]`, providing 
 
 ## Constitution Check
 
-*GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
+_GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
 
 The current `.specify/memory/constitution.md` contains only template placeholders and defines no enforceable project-specific gates. Pre-design gate: PASS.
 

@@ -94,6 +94,7 @@ export async function GET(
           event.approvedDetailsJson
         ),
         canDelete,
+        canAdminister: canDelete,
       });
     }
 
@@ -338,6 +339,24 @@ export async function PATCH(
       topPitchSec,
       defaultPitchSec,
     } = body;
+
+    const canAdminister = await canManageChapterSettings(
+      prisma,
+      user.id,
+      existingEvent.chapterId
+    );
+    const includesAdministrativeChange =
+      status !== undefined ||
+      visibility !== undefined ||
+      applicationsOpen !== undefined ||
+      applicationsClosedAt !== undefined ||
+      applicationsClosedById !== undefined ||
+      applicationsCloseReason !== undefined ||
+      staff !== undefined ||
+      mcIds !== undefined;
+    if (includesAdministrativeChange && !canAdminister) {
+      return new NextResponse('Forbidden', { status: 403 });
+    }
 
     const parsedApplicationMode = parseEventApplicationMode(applicationMode);
     if (parsedApplicationMode === null) {

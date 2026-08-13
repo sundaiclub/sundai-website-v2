@@ -176,6 +176,7 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
   const [loadedEvent, setLoadedEvent] = useState<OrganizerEventSettings | null>(
     null
   );
+  const canAdminister = !isEditing || loadedEvent?.canAdminister !== false;
   const [title, setTitle] = useState('');
   const [slug, setSlug] = useState('');
   const [chapterId, setChapterId] = useState('');
@@ -719,17 +720,18 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
         address: approvedAddress,
         details: approvedDetails,
       },
-      staff,
+      ...(canAdminister && { staff }),
       applicationQuestionsJson,
       hideChapterDefaultQuestions: true,
       confirmationMessage,
       waitlistMessage,
       declineMessage,
       ...(!isEditing && { visibility: 'PUBLIC' }),
-      ...(isEditing && {
-        applicationsOpen,
-        applicationsCloseReason,
-      }),
+      ...(isEditing &&
+        canAdminister && {
+          applicationsOpen,
+          applicationsCloseReason,
+        }),
     };
   }
 
@@ -1241,7 +1243,7 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
                 Auto-promote waitlist
               </span>
             </label>
-            {isEditing && (
+            {isEditing && canAdminister && (
               <>
                 <label className="flex items-center gap-2">
                   <input
@@ -1286,68 +1288,72 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
                 )}
               </>
             )}
-            <div className="grid gap-2">
-              <span className="text-sm font-semibold">MCs</span>
-              <div className="flex min-h-8 flex-wrap items-center gap-2">
-                {selectedMcs.map(staff => (
-                  <ManagementBadge key={staff.id}>
-                    {staff.name}
-                    <button
-                      aria-label={`Remove ${staff.name} from MCs`}
-                      className="ml-2"
-                      onClick={() => removeMc(staff.id)}
-                      type="button"
-                    >
-                      x
-                    </button>
-                  </ManagementBadge>
-                ))}
-                {selectedMcs.length === 0 && (
-                  <span className={`text-sm ${classes.mutedText}`}>
-                    No MCs selected
-                  </span>
-                )}
+            {canAdminister && (
+              <div className="grid gap-2">
+                <span className="text-sm font-semibold">MCs</span>
+                <div className="flex min-h-8 flex-wrap items-center gap-2">
+                  {selectedMcs.map(staff => (
+                    <ManagementBadge key={staff.id}>
+                      {staff.name}
+                      <button
+                        aria-label={`Remove ${staff.name} from MCs`}
+                        className="ml-2"
+                        onClick={() => removeMc(staff.id)}
+                        type="button"
+                      >
+                        x
+                      </button>
+                    </ManagementBadge>
+                  ))}
+                  {selectedMcs.length === 0 && (
+                    <span className={`text-sm ${classes.mutedText}`}>
+                      No MCs selected
+                    </span>
+                  )}
+                </div>
+                <button
+                  aria-label="MCs"
+                  className={classes.secondaryButton}
+                  onClick={() => setIsMcModalOpen(true)}
+                  type="button"
+                >
+                  Add MCs
+                </button>
               </div>
-              <button
-                aria-label="MCs"
-                className={classes.secondaryButton}
-                onClick={() => setIsMcModalOpen(true)}
-                type="button"
-              >
-                Add MCs
-              </button>
-            </div>
-            <div className="grid gap-2">
-              <span className="text-sm font-semibold">Co-MCs</span>
-              <div className="flex min-h-8 flex-wrap items-center gap-2">
-                {selectedCoMcs.map(staff => (
-                  <ManagementBadge key={staff.id}>
-                    {staff.name}
-                    <button
-                      aria-label={`Remove ${staff.name} from Co-MCs`}
-                      className="ml-2"
-                      onClick={() => removeCoMc(staff.id)}
-                      type="button"
-                    >
-                      x
-                    </button>
-                  </ManagementBadge>
-                ))}
-                {selectedCoMcs.length === 0 && (
-                  <span className={`text-sm ${classes.mutedText}`}>
-                    No co-MCs selected
-                  </span>
-                )}
+            )}
+            {canAdminister && (
+              <div className="grid gap-2">
+                <span className="text-sm font-semibold">Co-MCs</span>
+                <div className="flex min-h-8 flex-wrap items-center gap-2">
+                  {selectedCoMcs.map(staff => (
+                    <ManagementBadge key={staff.id}>
+                      {staff.name}
+                      <button
+                        aria-label={`Remove ${staff.name} from Co-MCs`}
+                        className="ml-2"
+                        onClick={() => removeCoMc(staff.id)}
+                        type="button"
+                      >
+                        x
+                      </button>
+                    </ManagementBadge>
+                  ))}
+                  {selectedCoMcs.length === 0 && (
+                    <span className={`text-sm ${classes.mutedText}`}>
+                      No co-MCs selected
+                    </span>
+                  )}
+                </div>
+                <button
+                  aria-label="Co-MCs"
+                  className={classes.secondaryButton}
+                  onClick={() => setIsCoMcModalOpen(true)}
+                  type="button"
+                >
+                  Add Co-MCs
+                </button>
               </div>
-              <button
-                aria-label="Co-MCs"
-                className={classes.secondaryButton}
-                onClick={() => setIsCoMcModalOpen(true)}
-                type="button"
-              >
-                Add Co-MCs
-              </button>
-            </div>
+            )}
           </div>
         </ManagementSection>
 
@@ -1590,7 +1596,7 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
                 ? 'Save settings'
                 : 'Save draft'}
           </button>
-          {(!isEditing || loadedEvent?.status === 'DRAFT') && (
+          {canAdminister && (!isEditing || loadedEvent?.status === 'DRAFT') && (
             <button
               className={classes.secondaryButton}
               disabled={!canSubmit || isSaving}

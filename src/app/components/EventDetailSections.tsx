@@ -304,7 +304,7 @@ function EventDescriptionSection({ event }: { event: PublicEventDetail }) {
   return (
     <ManagementSection title="About this event" size="large">
       <EventMarkdown
-        className={`prose max-w-none text-base leading-7 prose-headings:mb-2 prose-headings:mt-4 prose-p:my-2 prose-a:text-current prose-li:my-0 ${
+        className={`prose max-w-none whitespace-pre-wrap text-base leading-7 prose-headings:mb-2 prose-headings:mt-4 prose-p:my-2 prose-a:text-current prose-li:my-0 ${
           classes.isDarkMode ? 'prose-invert' : 'prose-gray'
         } ${classes.mutedText}`}
         markdown={event.description}
@@ -360,48 +360,6 @@ export function EventNarrativeColumn({ event }: { event: PublicEventDetail }) {
       {description}
       {!pitchFirst && pitch}
     </div>
-  );
-}
-
-export function EventProgramHighlights({
-  format,
-  partners,
-  experts,
-}: {
-  format?: string | null;
-  partners?: string | null;
-  experts?: string | null;
-}) {
-  const classes = useManagementClasses();
-  const highlights = [
-    { label: 'Format', value: format, emphasize: true },
-    { label: 'Partners', value: partners },
-    { label: 'Experts', value: experts },
-  ].filter(highlight => highlight.value);
-
-  if (highlights.length === 0) return null;
-
-  return (
-    <ManagementSection
-      title="What to expect"
-      description="A quick look at the event program and community."
-      size="large"
-    >
-      <div className="grid gap-3 text-base leading-7 sm:grid-cols-3">
-        {highlights.map(highlight => (
-          <div className={`${classes.subtlePanel} p-4`} key={highlight.label}>
-            <p
-              className={`text-xs font-bold uppercase tracking-wide ${classes.mutedText}`}
-            >
-              {highlight.label}
-            </p>
-            <p className={`mt-2 ${highlight.emphasize ? 'font-semibold' : ''}`}>
-              {highlight.value}
-            </p>
-          </div>
-        ))}
-      </div>
-    </ManagementSection>
   );
 }
 

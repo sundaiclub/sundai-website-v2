@@ -322,6 +322,12 @@ describe('/chapters/[chapterSlug] public chapter page', () => {
     const previousHeading = screen.getByRole('heading', {
       name: /previous events/i,
     });
+    const previousEventsGrid = previousHeading
+      .closest('section')
+      ?.querySelector('div.grid');
+
+    expect(previousEventsGrid).toHaveClass('sm:grid-cols-2', 'lg:grid-cols-3');
+    expect(previousEventsGrid).not.toHaveClass('max-w-2xl');
     expect(
       upcomingHeading.compareDocumentPosition(previousHeading) &
         Node.DOCUMENT_POSITION_FOLLOWING

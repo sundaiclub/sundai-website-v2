@@ -10,9 +10,9 @@
 
 ## Permission Cutover
 
-**Decision**: Add explicit helpers for workspace access, event administration, applicant decisions, operational editing, communications, materials, notes, and pitch. Site admins and in-scope chapter admins administer events and staff; MCs and co-MCs operate the workspace; only MCs and admins decide applicants. Remove MC staff-role access from the generic event-settings helper and require authorization for staff reads.
+**Decision**: Add explicit helpers for workspace access, event-settings editing, event administration, applicant decisions, operational editing, communications, materials, notes, and pitch. Site admins and in-scope chapter admins administer events and staff; assigned MCs may edit event settings; co-MCs may not. MCs and co-MCs operate the workspace, while only MCs and admins decide applicants. Staff reads require workspace authorization.
 
-**Rationale**: Current helpers intentionally evolved across earlier phases and `canManageEventSettingsWithContext` is now broader than issue #145 permits. Capability-specific helpers make the role matrix testable and prevent an operational role from inheriting lifecycle or staffing authority.
+**Rationale**: Capability-specific helpers make the role matrix testable and let assigned MCs maintain event details without inheriting lifecycle or staffing authority.
 
 **Alternatives considered**: UI-only hiding was rejected because direct API calls would retain excessive authority. Keeping the broad helper and adding route exceptions was rejected because permission drift would continue.
 

@@ -25,7 +25,7 @@ export default function OrganizerEventSettingsPage({
       .then(workspace => {
         if (!current) return;
         setAccess(
-          workspace?.capabilities.administerEvent ? 'allowed' : 'denied'
+          workspace?.capabilities.editEventSettings ? 'allowed' : 'denied'
         );
       })
       .catch(() => {

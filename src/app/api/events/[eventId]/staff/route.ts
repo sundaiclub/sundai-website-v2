@@ -9,8 +9,8 @@ import {
   requireEventWorkspaceAccess,
   unauthorized,
 } from '@/lib/eventManagementApi';
-import { canManageEventSettings } from '@/lib/eventManagementAuth';
 import { approveEventStaffRegistrations } from '@/lib/eventStaffRegistrations';
+import { canManageChapterSettings } from '@/lib/eventManagementAuth';
 
 export async function GET(
   _request: Request,
@@ -50,7 +50,7 @@ export async function POST(
       select: { id: true, chapterId: true },
     });
     if (!event) return notFound();
-    if (!(await canManageEventSettings(prisma, actor.id, event.id))) {
+    if (!(await canManageChapterSettings(prisma, actor.id, event.chapterId))) {
       return forbidden();
     }
 

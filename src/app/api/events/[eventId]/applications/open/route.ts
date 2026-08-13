@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { requireEventSettingsManager } from '@/lib/eventManagementApi';
+import { requireEventAdministrator } from '@/lib/eventManagementApi';
 
 export async function POST(
   _req: Request,
   { params }: { params: { eventId: string } }
 ) {
   try {
-    const { response } = await requireEventSettingsManager(params.eventId);
+    const { response } = await requireEventAdministrator(params.eventId);
     if (response) return response;
 
     const event = await prisma.event.update({

@@ -508,7 +508,7 @@ describe('/api/events/[eventId]', () => {
     ['MC', 'hacker-event-mc'],
     ['CO_MC', 'hacker-event-co-mc'],
   ])(
-    'PATCH denies an assigned %s changing event settings',
+    'PATCH allows an MC and denies a co-MC changing event settings: %s',
     async (staffRole, hackerId) => {
       mockAuth.mockReturnValue({ userId: `clerk-${staffRole.toLowerCase()}` });
       prisma.hacker.findUnique.mockResolvedValue({
@@ -536,10 +536,46 @@ describe('/api/events/[eventId]', () => {
         { params: { eventId: 'evt-1' } } as any
       );
 
-      expect(response.status).toBe(403);
-      expect(prisma.event.update).not.toHaveBeenCalled();
+      if (staffRole === 'MC') {
+        expect(response.status).toBe(200);
+        expect(prisma.event.update).toHaveBeenCalled();
+      } else {
+        expect(response.status).toBe(403);
+        expect(prisma.event.update).not.toHaveBeenCalled();
+      }
     }
   );
+
+  it('denies an assigned MC administrative fields through the settings endpoint', async () => {
+    mockAuth.mockReturnValue({ userId: 'clerk-mc' });
+    prisma.hacker.findUnique.mockResolvedValue({
+      id: 'hacker-event-mc',
+      role: 'HACKER',
+    });
+    prisma.event.findUnique.mockResolvedValue({
+      id: 'evt-1',
+      chapterId: 'chapter-boston',
+    });
+    prisma.chapterMembership.findFirst.mockResolvedValue(null);
+    prisma.eventStaff.findFirst.mockResolvedValue({
+      id: 'staff-mc',
+      eventId: 'evt-1',
+      hackerId: 'hacker-event-mc',
+      role: 'MC',
+    });
+
+    const response = await PATCH_EVENT(
+      new NextRequest('http://localhost:3000/api/events/evt-1', {
+        method: 'PATCH',
+        body: JSON.stringify({ applicationsOpen: false }),
+        headers: { 'content-type': 'application/json' },
+      }) as any,
+      { params: { eventId: 'evt-1' } } as any
+    );
+
+    expect(response.status).toBe(403);
+    expect(prisma.event.update).not.toHaveBeenCalled();
+  });
 
   it('DELETE rejects non-draft events', async () => {
     mockAuth.mockReturnValue({ userId: 'clerk-admin' });

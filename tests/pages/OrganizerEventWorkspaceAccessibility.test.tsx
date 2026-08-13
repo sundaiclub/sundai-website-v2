@@ -36,6 +36,7 @@ const workspace = {
   effectiveRole: 'MC' as const,
   capabilities: {
     administerEvent: false,
+    editEventSettings: true,
     assignStaff: false,
     decideApplicants: true,
     manageOperations: true,

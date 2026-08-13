@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import {
   badRequest,
-  requireEventSettingsManager,
+  requireEventAdministrator,
 } from '@/lib/eventManagementApi';
 
 type CloseApplicationsBody = {
@@ -41,7 +41,7 @@ export async function POST(
   { params }: { params: { eventId: string } }
 ) {
   try {
-    const { hacker, response } = await requireEventSettingsManager(
+    const { hacker, response } = await requireEventAdministrator(
       params.eventId
     );
     if (response) return response;
