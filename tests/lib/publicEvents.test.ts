@@ -243,6 +243,22 @@ describe('public event helpers', () => {
     );
   });
 
+  it('exposes the viewer staff role and disables staff registration cancellation', () => {
+    const detail = redactPublicEventForViewer(buildPublicEvent(), {
+      viewerRegistration: {
+        id: 'registration-mc',
+        status: 'APPROVED',
+        canEditAnswers: false,
+        canCancel: true,
+      },
+      viewerEventStaffRole: 'MC',
+      now,
+    });
+
+    expect(detail.viewerEventStaffRole).toBe('MC');
+    expect(detail.viewerRegistration?.canCancel).toBe(false);
+  });
+
   it('queries only public published current and upcoming events in active public chapters', async () => {
     const event = buildPublicEvent({
       id: 'event-2',

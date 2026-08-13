@@ -523,6 +523,7 @@ export interface PublicEventDetail extends PublicEventCard {
     | 'smsConsentVersion'
   > | null;
   viewerRegistration?: PublicViewerRegistrationState | null;
+  viewerEventStaffRole?: EventStaffRole | null;
   viewerCanManageRegistrations?: boolean;
   viewerCanEditEvent?: boolean;
   viewerCanManageEvent?: boolean;

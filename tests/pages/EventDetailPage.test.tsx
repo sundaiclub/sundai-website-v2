@@ -618,6 +618,39 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
     );
   });
 
+  it.each([
+    ['MC', 'You are an MC'],
+    ['CO_MC', 'You are an MC'],
+  ] as const)(
+    'shows the staff event status without registration cancellation for %s viewers',
+    async (role, heading) => {
+      mockSignedIn();
+
+      await renderDetailPage(
+        buildEventDetail({
+          viewerCanManageEvent: true,
+          viewerEventStaffRole: role,
+          viewerRegistrationStatus: 'APPROVED',
+          viewerRegistration: registrationState('APPROVED', {
+            canCancel: false,
+          }),
+        })
+      );
+
+      expect(
+        screen.getByRole('heading', { name: heading })
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          'Use the Manage button in the top right to approve users or make changes to the event.'
+        )
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', { name: /cancel registration/i })
+      ).not.toBeInTheDocument();
+    }
+  );
+
   it('loads signed-in viewer status instead of anonymous application controls', async () => {
     mockSignedIn();
 

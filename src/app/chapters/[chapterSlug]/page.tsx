@@ -356,124 +356,141 @@ export default function ChapterLandingPage({
           <ManagementAlert tone="danger">{loadError}</ManagementAlert>
         </div>
       )}
-      {chapter && (
-        <div
-          className={`${classes.subtlePanel} relative mb-6 aspect-[3/2] overflow-hidden rounded-lg !bg-black`}
+      {chapter ? (
+        <section
+          aria-label="Chapter overview"
+          className="mb-8 grid gap-6 md:grid-cols-2 md:items-center"
         >
-          <Image
-            alt={chapter.heroImage?.alt || `${chapter.name} chapter`}
-            className={
-              chapter.heroImage?.url ? 'object-contain' : 'object-contain p-10'
-            }
-            fill
-            src={chapter.heroImage?.url || placeholderLogo}
-            sizes="(min-width: 1024px) 896px, 100vw"
-            unoptimized={Boolean(chapter.heroImage?.url)}
-          />
-        </div>
-      )}
-      <ManagementHeader
-        title={chapter?.name || 'Chapter'}
-        description={chapter?.description || chapter?.city}
-        actions={
-          <>
-            {canManageChapter && chapter && (
-              <>
-                <ManagementLinkButton
-                  href={`/organizer/chapters/${chapter.slug}/settings`}
-                  variant="primary"
-                >
-                  Manage
-                </ManagementLinkButton>
-                <ManagementLinkButton
-                  href={`/organizer/events/new?chapterId=${encodeURIComponent(chapter.id)}`}
-                >
-                  New event
-                </ManagementLinkButton>
-              </>
-            )}
-            {chapter?.accessMode && (
-              <ManagementBadge>{chapter.accessMode}</ManagementBadge>
-            )}
-            <ManagementBadge
-              tone={
-                membership?.status === 'ACTIVE'
-                  ? 'success'
-                  : membership?.status === 'INVITED'
-                    ? 'warning'
-                    : 'default'
+          <div
+            className={`${classes.subtlePanel} relative aspect-[3/2] w-full overflow-hidden rounded-lg !bg-black`}
+          >
+            <Image
+              alt={chapter.heroImage?.alt || `${chapter.name} chapter`}
+              className={
+                chapter.heroImage?.url
+                  ? 'object-contain'
+                  : 'object-contain p-10'
               }
-            >
-              {membership?.status === 'ACTIVE'
-                ? 'Active member'
-                : membership?.status === 'INVITED'
-                  ? 'Invited'
-                  : 'Not joined'}
-            </ManagementBadge>
-          </>
-        }
-      />
-      {(actionMessage || actionError) && (
-        <div className="mb-5">
-          <ManagementAlert tone={actionError ? 'danger' : 'success'}>
-            {actionError || actionMessage}
-          </ManagementAlert>
-        </div>
+              fill
+              src={chapter.heroImage?.url || placeholderLogo}
+              sizes="(min-width: 768px) 50vw, 100vw"
+              unoptimized={Boolean(chapter.heroImage?.url)}
+            />
+          </div>
+          <div className="min-w-0">
+            <ManagementHeader
+              title={chapter.name}
+              titleMeta={
+                <>
+                  <ManagementBadge>{chapter.accessMode}</ManagementBadge>
+                  <ManagementBadge
+                    tone={
+                      membership?.status === 'ACTIVE'
+                        ? 'success'
+                        : membership?.status === 'INVITED'
+                          ? 'warning'
+                          : 'default'
+                    }
+                  >
+                    {membership?.status === 'ACTIVE'
+                      ? 'Active member'
+                      : membership?.status === 'INVITED'
+                        ? 'Invited'
+                        : 'Not joined'}
+                  </ManagementBadge>
+                </>
+              }
+              description={chapter.description || chapter.city}
+              descriptionSize="large"
+            />
+            {(actionMessage || actionError) && (
+              <div className="mb-5">
+                <ManagementAlert tone={actionError ? 'danger' : 'success'}>
+                  {actionError || actionMessage}
+                </ManagementAlert>
+              </div>
+            )}
+            {canJoinChapter || canAcceptInvite ? (
+              <div className="flex flex-wrap gap-3">
+                {canJoinChapter && (
+                  <button
+                    className={classes.primaryButton}
+                    disabled={isActing}
+                    onClick={join}
+                    type="button"
+                  >
+                    Join chapter
+                  </button>
+                )}
+                {canAcceptInvite && (
+                  <button
+                    className={classes.primaryButton}
+                    disabled={isActing}
+                    onClick={acceptInvite}
+                    type="button"
+                  >
+                    Accept invitation
+                  </button>
+                )}
+              </div>
+            ) : null}
+          </div>
+        </section>
+      ) : (
+        <ManagementHeader title="Chapter" />
       )}
-      {canJoinChapter || canAcceptInvite ? (
-        <div className="mb-5 flex flex-wrap gap-3">
-          {canJoinChapter && (
-            <button
-              className={classes.primaryButton}
-              disabled={isActing}
-              onClick={join}
-              type="button"
-            >
-              Join chapter
-            </button>
-          )}
-          {canAcceptInvite && (
-            <button
-              className={classes.primaryButton}
-              disabled={isActing}
-              onClick={acceptInvite}
-              type="button"
-            >
-              Accept invitation
-            </button>
-          )}
-        </div>
-      ) : null}
       <div
-        aria-label="Chapter information"
-        className={`mb-5 flex gap-1 border-b ${
+        className={`mb-5 flex flex-wrap items-end gap-x-4 border-b ${
           classes.isDarkMode ? 'border-gray-800' : 'border-gray-300'
         }`}
-        role="tablist"
       >
-        {tabs.map(tab => (
-          <button
-            aria-controls={`chapter-${tab.id}-panel`}
-            aria-selected={activeTab === tab.id}
-            className={`border-b-2 px-4 py-3 text-sm font-semibold transition ${
-              activeTab === tab.id
-                ? classes.isDarkMode
-                  ? 'border-gray-100 text-gray-100'
-                  : 'border-gray-900 text-gray-900'
-                : `border-transparent ${classes.mutedText} hover:border-gray-400`
-            }`}
-            id={`chapter-${tab.id}-tab`}
-            key={tab.id}
-            onClick={() => {
-              if (tab.id === 'preferences') openPreferences();
-              else setActiveTab(tab.id);
-            }}
-            role="tab"
-            type="button"
+        <div
+          aria-label="Chapter information"
+          className="flex gap-1"
+          role="tablist"
+        >
+          {tabs.map(tab => (
+            <button
+              aria-controls={`chapter-${tab.id}-panel`}
+              aria-selected={activeTab === tab.id}
+              className={`border-b-2 px-4 py-3 text-sm font-semibold transition ${
+                activeTab === tab.id
+                  ? classes.isDarkMode
+                    ? 'border-gray-100 text-gray-100'
+                    : 'border-gray-900 text-gray-900'
+                  : `border-transparent ${classes.mutedText} hover:border-gray-400`
+              }`}
+              id={`chapter-${tab.id}-tab`}
+              key={tab.id}
+              onClick={() => {
+                if (tab.id === 'preferences') openPreferences();
+                else setActiveTab(tab.id);
+              }}
+              role="tab"
+              type="button"
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+        {canManageChapter && chapter && (
+          <div
+            aria-label="Chapter actions"
+            className="ml-auto flex flex-wrap gap-2 pb-2"
           >
-            {tab.label}
-          </button>
-        ))}
+            <ManagementLinkButton
+              href={`/organizer/chapters/${chapter.slug}/settings`}
+              variant="primary"
+            >
+              Manage
+            </ManagementLinkButton>
+            <ManagementLinkButton
+              href={`/organizer/events/new?chapterId=${encodeURIComponent(chapter.id)}`}
+            >
+              New event
+            </ManagementLinkButton>
+          </div>
+        )}
       </div>
 
       {activeTab === 'events' && (

@@ -24,6 +24,7 @@ import {
   redactPublicEventForViewer,
 } from '@/lib/publicEvents';
 import { requireEventSettingsManager } from '@/lib/eventManagementApi';
+import { approveEventStaffRegistrations } from '@/lib/eventStaffRegistrations';
 import {
   EventDateTimeInputError,
   parseEventDateTimeInput,
@@ -216,6 +217,7 @@ export async function GET(
       viewerRegistration,
       viewerCanManageRegistrations,
       viewerCanViewApprovedDetails,
+      viewerEventStaffRole: staff?.role ?? null,
       viewerIsSignedIn: Boolean(viewer),
     });
 
@@ -571,6 +573,11 @@ export async function PATCH(
             role: assignment.role,
           })),
         });
+        await approveEventStaffRegistrations(prisma, {
+          eventId: params.eventId,
+          hackerIds: parsedStaff.map(assignment => assignment.hackerId),
+          actorId: user.id,
+        });
       }
     } else if (mcIds !== undefined) {
       await prisma.eventStaff.deleteMany({
@@ -583,6 +590,11 @@ export async function PATCH(
             hackerId,
             role: 'MC' as const,
           })),
+        });
+        await approveEventStaffRegistrations(prisma, {
+          eventId: params.eventId,
+          hackerIds: mcIds,
+          actorId: user.id,
         });
       }
     }

@@ -114,25 +114,31 @@ function EventTopRegistrationStatusSection({
   const registration = event.viewerRegistration;
   const registrationStatus =
     registration?.status ?? event.viewerRegistrationStatus;
+  const isEventStaff = Boolean(event.viewerEventStaffRole);
+  const displayStatus = isEventStaff ? 'APPROVED' : registrationStatus;
 
-  if (registrationStatus !== 'APPROVED' && registrationStatus !== 'PENDING') {
+  if (displayStatus !== 'APPROVED' && displayStatus !== 'PENDING') {
     return null;
   }
 
-  const isPending = registrationStatus === 'PENDING';
+  const isPending = displayStatus === 'PENDING';
 
   return (
     <ManagementSection
-      actions={<ViewerRegistrationStatusBadge status={registrationStatus} />}
+      actions={<ViewerRegistrationStatusBadge status={displayStatus} />}
       description={
-        registration?.publicSafeMessage ||
-        event.applicationControls.publicMessage ||
-        (isPending
-          ? 'Your application is pending review.'
-          : 'Your place at this event is confirmed.')
+        isEventStaff
+          ? 'Use the Manage button in the top right to approve users or make changes to the event.'
+          : registration?.publicSafeMessage ||
+            event.applicationControls.publicMessage ||
+            (isPending
+              ? 'Your application is pending review.'
+              : 'Your place at this event is confirmed.')
       }
       size="large"
-      title={registrationHeading(registrationStatus)}
+      title={
+        isEventStaff ? 'You are an MC' : registrationHeading(registrationStatus)
+      }
     >
       <div className="flex flex-wrap gap-2">
         {isPending && registration?.canEditAnswers && (
@@ -142,7 +148,7 @@ function EventTopRegistrationStatusSection({
             viewerProfile={event.viewerProfile}
           />
         )}
-        {registration?.canCancel && (
+        {!isEventStaff && registration?.canCancel && (
           <button type="button" className={classes.secondaryButton}>
             Cancel registration
           </button>

@@ -139,12 +139,17 @@ describe('/chapters/[chapterSlug] public chapter page', () => {
   it('renders the public chapter description without exposing provider internals', async () => {
     renderChapterPage();
 
-    expect(
-      await screen.findByRole('heading', { name: /sundai boston/i })
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(/public builds and demos for boston hackers/i)
-    ).toBeInTheDocument();
+    const heading = await screen.findByRole('heading', {
+      name: /sundai boston/i,
+    });
+    const titleRow = heading.parentElement as HTMLElement;
+    const description = screen.getByText(
+      /public builds and demos for boston hackers/i
+    );
+
+    expect(within(titleRow).getByText('PUBLIC')).toBeInTheDocument();
+    expect(within(titleRow).getByText('Not joined')).toBeInTheDocument();
+    expect(description).toHaveClass('text-lg', 'sm:text-xl');
 
     expect(
       screen.getByRole('tab', { name: /preferences/i })
@@ -181,7 +186,15 @@ describe('/chapters/[chapterSlug] public chapter page', () => {
 
     renderChapterPage();
 
-    expect(await screen.findByAltText('Boston chapter mark')).toHaveAttribute(
+    const chapterImage = await screen.findByAltText('Boston chapter mark');
+    const chapterOverview = screen.getByRole('region', {
+      name: 'Chapter overview',
+    });
+
+    expect(chapterOverview).toHaveClass('md:grid-cols-2');
+    expect(chapterOverview).toHaveClass('md:items-center');
+    expect(chapterImage).toHaveClass('object-contain');
+    expect(chapterImage).toHaveAttribute(
       'src',
       'https://cdn.example.com/chapter.webp'
     );
@@ -377,10 +390,11 @@ describe('/chapters/[chapterSlug] public chapter page', () => {
     expect(
       await screen.findByRole('link', { name: /^manage$/i })
     ).toHaveAttribute('href', '/organizer/chapters/boston/settings');
-    expect(screen.getByRole('link', { name: /new event/i })).toHaveAttribute(
-      'href',
-      '/organizer/events/new?chapterId=chapter-boston'
-    );
+    const chapterActions = screen.getByLabelText('Chapter actions');
+    expect(chapterActions).toHaveClass('ml-auto');
+    expect(
+      within(chapterActions).getByRole('link', { name: /new event/i })
+    ).toHaveAttribute('href', '/organizer/events/new?chapterId=chapter-boston');
     expect(
       screen.getByRole('link', { name: /edit boston demo night/i })
     ).toHaveAttribute(

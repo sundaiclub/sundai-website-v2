@@ -15,6 +15,7 @@ import {
   slugifyEventValue,
 } from '@/lib/eventRequestParsing';
 import { DEFAULT_EVENT_MESSAGES } from '@/lib/eventMessageDefaults';
+import { approveEventStaffRegistrations } from '@/lib/eventStaffRegistrations';
 import { listPublicEvents } from '@/lib/publicEvents';
 import {
   EventDateTimeInputError,
@@ -371,6 +372,18 @@ export async function POST(req: Request) {
         staff: true,
       },
     });
+
+    const staffHackerIds =
+      parsedStaff.length > 0
+        ? parsedStaff.map(assignment => assignment.hackerId)
+        : (mcIds as string[]);
+    if (staffHackerIds.length > 0) {
+      await approveEventStaffRegistrations(prisma, {
+        eventId: event.id,
+        hackerIds: staffHackerIds,
+        actorId: user.id,
+      });
+    }
 
     return NextResponse.json(event);
   } catch (error) {

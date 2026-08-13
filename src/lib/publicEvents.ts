@@ -245,6 +245,7 @@ export type RedactPublicEventOptions = {
   viewerProfile?: ProfilePrefillSource | null;
   viewerNotificationPreferences?: PublicEventDetail['viewerNotificationPreferences'];
   viewerRegistration?: PublicViewerRegistrationState | null;
+  viewerEventStaffRole?: EventStaffRole | null;
   viewerCanManageRegistrations?: boolean;
   viewerCanViewApprovedDetails?: boolean;
   viewerCanEditEvent?: boolean;
@@ -486,6 +487,7 @@ export async function getPublicEventBySlug(
           }
         : null,
     viewerRegistration,
+    viewerEventStaffRole: readPermissionContext.staff?.role ?? null,
     viewerCanManageRegistrations,
     viewerCanViewApprovedDetails,
     viewerCanEditEvent,
@@ -520,8 +522,16 @@ export function redactPublicEventForViewer(
   options: RedactPublicEventOptions = {}
 ): PublicEventDetail {
   const now = options.now ?? new Date();
+  const viewerRegistration = options.viewerRegistration
+    ? {
+        ...options.viewerRegistration,
+        canCancel: options.viewerEventStaffRole
+          ? false
+          : options.viewerRegistration.canCancel,
+      }
+    : null;
   const approvedDetailsVisible = canViewApprovedDetails({
-    viewerRegistration: options.viewerRegistration,
+    viewerRegistration,
     viewerCanViewApprovedDetails: options.viewerCanViewApprovedDetails,
     viewerCanManageRegistrations: options.viewerCanManageRegistrations,
   });
@@ -530,9 +540,9 @@ export function redactPublicEventForViewer(
     : null;
   const applicationControls = buildApplicationControls({
     event,
-    viewerRegistration: options.viewerRegistration ?? null,
+    viewerRegistration,
     viewerIsSignedIn:
-      options.viewerIsSignedIn === true || Boolean(options.viewerRegistration),
+      options.viewerIsSignedIn === true || Boolean(viewerRegistration),
     approvedCount: options.approvedCount,
     now,
   });
@@ -557,7 +567,8 @@ export function redactPublicEventForViewer(
     viewerProfile: options.viewerProfile ?? null,
     viewerNotificationPreferences:
       options.viewerNotificationPreferences ?? null,
-    viewerRegistration: options.viewerRegistration ?? null,
+    viewerRegistration,
+    viewerEventStaffRole: options.viewerEventStaffRole ?? null,
     viewerCanManageRegistrations: options.viewerCanManageRegistrations === true,
     viewerCanEditEvent: options.viewerCanEditEvent === true,
     viewerCanManageEvent: options.viewerCanManageEvent === true,
