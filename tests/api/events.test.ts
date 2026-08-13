@@ -31,6 +31,9 @@ jest.mock('../../src/lib/prisma', () => ({
     hacker: {
       findUnique: jest.fn(),
     },
+    chapter: {
+      findUnique: jest.fn(),
+    },
     chapterMembership: {
       findMany: jest.fn(),
       findFirst: jest.fn(),
@@ -184,6 +187,12 @@ describe('/api/events', () => {
     prisma.hacker.findUnique.mockResolvedValue({
       id: 'h-admin',
       role: 'SITE_ADMIN',
+    });
+    prisma.chapter.findUnique.mockResolvedValue({
+      id: 'boston',
+      defaultApprovalMessage: null,
+      defaultWaitlistMessage: null,
+      defaultRejectionMessage: null,
     });
     const created = {
       id: 'evt-1',
