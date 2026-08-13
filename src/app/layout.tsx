@@ -9,6 +9,7 @@ import { ThemeProvider } from './contexts/ThemeContext';
 import { Analytics } from "@vercel/analytics/react"
 import { PostHogProvider } from './providers'
 import { Providers } from './components/Providers';
+import ExternalLinkBehavior from './components/ExternalLinkBehavior';
 import { Space_Mono, Fira_Code } from 'next/font/google'
 import Script from 'next/script';
 
@@ -75,6 +76,7 @@ export default function RootLayout({
               overscrollBehavior: "none",
             }}
           >
+            <ExternalLinkBehavior />
             <Analytics/>
             <Script src="https://www.googletagmanager.com/gtag/js?id=G-HV7HE6PBDD" strategy="afterInteractive" />
             <Script id="google-analytics" strategy="afterInteractive">

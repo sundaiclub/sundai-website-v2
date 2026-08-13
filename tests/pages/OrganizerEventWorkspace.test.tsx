@@ -127,6 +127,12 @@ function loadOverview(): React.ComponentType<{
   return require('../../src/app/organizer/events/[eventId]/page').default;
 }
 
+function loadPitch(): React.ComponentType<{
+  params: { eventId: string };
+}> {
+  return require('../../src/app/organizer/events/[eventId]/pitch/page').default;
+}
+
 function renderWorkspace(
   children: React.ReactNode = <div>Overview content</div>
 ) {
@@ -233,6 +239,42 @@ describe('/organizer/events/[eventId] workspace', () => {
     expect(screen.getByText(/8 queued/i)).toBeInTheDocument();
     expect(screen.getByText(/6 materials/i)).toBeInTheDocument();
     expect(screen.getByText(/3 communications/i)).toBeInTheDocument();
+  });
+
+  it('hides public event and pitch controller links for a draft event', async () => {
+    mockWorkspaceFetch({
+      ...workspace,
+      event: { ...workspace.event, status: 'DRAFT' },
+    });
+    const Overview = loadOverview();
+    renderWorkspace(<Overview params={{ eventId }} />);
+
+    await screen.findByText('AI Build Night');
+
+    expect(
+      screen.queryByRole('link', { name: /back to event/i })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: /view event/i })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: /open pitch controller/i })
+    ).not.toBeInTheDocument();
+  });
+
+  it('hides the pitch page controller link for a draft event', async () => {
+    mockWorkspaceFetch({
+      ...workspace,
+      event: { ...workspace.event, status: 'DRAFT' },
+    });
+    const Pitch = loadPitch();
+    renderWorkspace(<Pitch params={{ eventId }} />);
+
+    await screen.findByText('Pitch summary');
+
+    expect(
+      screen.queryByRole('link', { name: /open pitch controller/i })
+    ).not.toBeInTheDocument();
   });
 
   it('shows permission lost without retaining event metadata after access is denied', async () => {

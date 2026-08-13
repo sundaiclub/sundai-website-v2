@@ -525,10 +525,10 @@ export default function OrganizerChapterSettingsPage({
             <div className="grid gap-4 md:grid-cols-[180px_minmax(0,1fr)]">
               <div className="min-w-0">
                 {chapter.heroImage?.url ? (
-                  <div className="relative aspect-[4/3] w-full overflow-hidden rounded-md">
+                  <div className="relative aspect-[3/2] w-full overflow-hidden rounded-md bg-black">
                     <Image
                       alt={chapter.heroImage.alt || `${chapter.name} chapter`}
-                      className="object-cover"
+                      className="object-contain"
                       fill
                       sizes="180px"
                       src={chapter.heroImage.url}
@@ -537,7 +537,7 @@ export default function OrganizerChapterSettingsPage({
                   </div>
                 ) : (
                   <div
-                    className={`${classes.subtlePanel} flex aspect-[4/3] items-center justify-center px-4 text-center text-sm ${classes.mutedText}`}
+                    className={`${classes.subtlePanel} flex aspect-[3/2] items-center justify-center px-4 text-center text-sm ${classes.mutedText}`}
                   >
                     No chapter image
                   </div>

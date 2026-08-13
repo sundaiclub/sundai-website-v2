@@ -284,7 +284,7 @@ function SwipeCard({
       <div
         className={`${isDarkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl p-6 shadow-lg max-h-[70vh] overflow-y-auto`}
       >
-        <div className="relative mb-4 aspect-video max-h-[30vh] w-full overflow-hidden rounded-lg">
+        <div className="relative mb-4 aspect-[3/2] w-full overflow-hidden rounded-lg bg-black">
           <Image
             src={
               project.thumbnail?.url ||
@@ -293,7 +293,7 @@ function SwipeCard({
                 : '/images/default_project_thumbnail_light.svg')
             }
             alt={project.title}
-            className="object-cover"
+            className="object-contain"
             draggable={false}
             fill
             sizes="(min-width: 768px) 560px, 100vw"

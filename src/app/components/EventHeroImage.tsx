@@ -49,12 +49,12 @@ export function PublicEventHero({
   return (
     <article className={`${classes.panel} overflow-hidden`}>
       <div
-        className={`${classes.subtlePanel} relative aspect-[16/7] w-full overflow-hidden rounded-none border-0 border-b`}
+        className={`${classes.subtlePanel} relative aspect-[3/2] w-full overflow-hidden rounded-none border-0 border-b !bg-black`}
       >
         <Image
           alt={event.image?.alt || `${event.title} event`}
           className={
-            event.image?.url ? 'object-cover' : 'object-contain p-10 sm:p-16'
+            event.image?.url ? 'object-contain' : 'object-contain p-10 sm:p-16'
           }
           fill
           priority

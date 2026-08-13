@@ -1039,12 +1039,12 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
               <span className="text-sm font-semibold">Event image</span>
               <div className="grid gap-4 sm:grid-cols-[minmax(0,240px)_1fr] sm:items-center">
                 <div
-                  className={`${classes.subtlePanel} relative aspect-[16/9] overflow-hidden rounded-md`}
+                  className={`${classes.subtlePanel} relative aspect-[3/2] overflow-hidden rounded-md !bg-black`}
                 >
                   {eventImagePreview ? (
                     <Image
                       alt={`${title || 'Event'} preview`}
-                      className="object-cover"
+                      className="object-contain"
                       fill
                       src={eventImagePreview}
                       sizes="240px"

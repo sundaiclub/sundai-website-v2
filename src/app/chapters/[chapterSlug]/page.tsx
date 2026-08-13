@@ -297,13 +297,13 @@ export default function ChapterLandingPage({
                   href={`/projects/${project.id}`}
                 >
                   <div
-                    className={`${classes.subtlePanel} relative aspect-[16/9] overflow-hidden rounded-none border-x-0 border-t-0`}
+                    className={`${classes.subtlePanel} relative aspect-[3/2] overflow-hidden rounded-none border-x-0 border-t-0 !bg-black`}
                   >
                     <Image
                       alt={project.thumbnail?.alt || project.title}
                       className={
                         project.thumbnail?.url
-                          ? 'object-cover'
+                          ? 'object-contain'
                           : 'object-contain p-8'
                       }
                       fill
@@ -358,12 +358,12 @@ export default function ChapterLandingPage({
       )}
       {chapter && (
         <div
-          className={`${classes.subtlePanel} relative mb-6 aspect-[16/7] overflow-hidden rounded-lg`}
+          className={`${classes.subtlePanel} relative mb-6 aspect-[3/2] overflow-hidden rounded-lg !bg-black`}
         >
           <Image
             alt={chapter.heroImage?.alt || `${chapter.name} chapter`}
             className={
-              chapter.heroImage?.url ? 'object-cover' : 'object-contain p-10'
+              chapter.heroImage?.url ? 'object-contain' : 'object-contain p-10'
             }
             fill
             src={chapter.heroImage?.url || placeholderLogo}
