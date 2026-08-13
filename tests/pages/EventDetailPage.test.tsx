@@ -496,7 +496,25 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
     await expectSomeText(/boston, ma/i);
     await expectSomeText(/july 10, 2026/i);
     await expectSomeText(/6:00\s*pm|6 pm/i);
-    await expectSomeText(/sign in/i);
+    expect(
+      screen.getByRole('button', { name: /^register$/i })
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText('Sign in to apply for this event.')
+    ).not.toBeInTheDocument();
+
+    await openRegistrationForm();
+
+    const registrationDialog = screen.getByRole('dialog', {
+      name: /register for this event/i,
+    });
+    expect(registrationDialog).toBeInTheDocument();
+    expect(registrationDialog.firstElementChild).toHaveStyle({
+      backgroundColor: '#ffffff',
+    });
+    expect(
+      screen.getByRole('button', { name: /sign in to register/i })
+    ).toBeInTheDocument();
     expect(
       screen.getByRole('link', { name: /back to sundai boston/i })
     ).toHaveAttribute('href', '/chapters/boston');
@@ -517,20 +535,19 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
     expect(screen.queryByText(/expert mentors/i)).not.toBeInTheDocument();
   });
 
-  it('preserves line breaks in the event description', async () => {
+  it('uses project Markdown spacing for the event description', async () => {
     await renderDetailPage(
-      buildEventDetail({ description: 'First event line\nSecond event line' })
+      buildEventDetail({ description: 'First paragraph\n\nSecond paragraph' })
     );
 
-    const description = screen.getByText((_, element) => {
-      return element?.tagName === 'DIV' &&
-        element.classList.contains('whitespace-pre-wrap') &&
-        element.textContent === 'First event line\nSecond event line'
-        ? true
-        : false;
-    });
+    const description = screen
+      .getByRole('heading', { name: 'About this event' })
+      .closest('section')
+      ?.querySelector('.prose');
 
-    expect(description).toHaveClass('whitespace-pre-wrap');
+    expect(description).toHaveTextContent('First paragraph Second paragraph');
+    expect(description).toHaveClass('prose', 'prose-lg', 'max-w-none');
+    expect(description).not.toHaveClass('whitespace-pre-wrap');
   });
 
   it('shows uploaded event artwork on the public event page', async () => {
@@ -549,7 +566,7 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
     ).toHaveAttribute('src', 'https://cdn.example.com/ai-build-night.webp');
   });
 
-  it('shows event projects as a pitch-vote-ranked carousel above registration', async () => {
+  it('shows event projects as a pitch-vote-ranked carousel without a lower registration section', async () => {
     mockListPublicEventProjects.mockResolvedValue([
       {
         ...mockProject,
@@ -582,9 +599,6 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
     const carouselHeading = screen.getByRole('heading', {
       name: /projects from this event/i,
     });
-    const registrationHeading = screen.getByRole('heading', {
-      name: /^registration$/i,
-    });
     const projectLinks = screen.getAllByRole('link', {
       name: /top project|second project/i,
     });
@@ -593,21 +607,10 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
       Array.from(new Set(projectLinks.map(link => link.getAttribute('href'))))
     ).toEqual(['/projects/project-high', '/projects/project-low']);
     expect(screen.getByText(/8 votes/)).toBeInTheDocument();
+    expect(carouselHeading).toBeInTheDocument();
     expect(
-      screen.getByRole('list', {
-        name: /event projects ranked by pitch votes/i,
-      })
-    ).toHaveClass(
-      'min-w-0',
-      'max-w-full',
-      'snap-x',
-      'overflow-x-auto',
-      'overscroll-x-contain'
-    );
-    expect(
-      carouselHeading.compareDocumentPosition(registrationHeading) &
-        Node.DOCUMENT_POSITION_FOLLOWING
-    ).toBeTruthy();
+      screen.queryByRole('heading', { name: /^registration$/i })
+    ).not.toBeInTheDocument();
     expect(mockListPublicEventProjects).toHaveBeenCalledWith({
       eventId: eventFixture.id,
     });
@@ -623,10 +626,15 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
       })
     );
 
-    expect(screen.getByRole('link', { name: /^manage$/i })).toHaveAttribute(
+    const manageLink = screen.getByRole('link', { name: /^manage$/i });
+    const backLink = screen.getByRole('link', {
+      name: /back to sundai boston/i,
+    });
+    expect(manageLink).toHaveAttribute(
       'href',
       `/organizer/events/${eventFixture.id}`
     );
+    expect(manageLink.parentElement).toBe(backLink.parentElement);
     expect(screen.getAllByRole('link', { name: /^manage$/i })).toHaveLength(1);
   });
 
@@ -644,6 +652,39 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
       `/organizer/events/${eventFixture.id}`
     );
   });
+
+  it.each([
+    ['MC', 'You are an MC'],
+    ['CO_MC', 'You are an MC'],
+  ] as const)(
+    'shows the staff event status without registration cancellation for %s viewers',
+    async (role, heading) => {
+      mockSignedIn();
+
+      await renderDetailPage(
+        buildEventDetail({
+          viewerCanManageEvent: true,
+          viewerEventStaffRole: role,
+          viewerRegistrationStatus: 'APPROVED',
+          viewerRegistration: registrationState('APPROVED', {
+            canCancel: false,
+          }),
+        })
+      );
+
+      expect(
+        screen.getByRole('heading', { name: heading })
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          'Use the Manage button in the top right to approve users or make changes to the event.'
+        )
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', { name: /cancel registration/i })
+      ).not.toBeInTheDocument();
+    }
+  );
 
   it('loads signed-in viewer status instead of anonymous application controls', async () => {
     mockSignedIn();
@@ -819,9 +860,92 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
     expect(
       screen.getByRole('heading', { name: /pitch session/i })
     ).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /go to pitch/i })).toHaveAttribute(
+      'href',
+      `/pitch/${eventFixture.id}`
+    );
+  });
+
+  it('shows the description before pitch details during the first half of the event', async () => {
+    const now = Date.now();
+    await renderDetailPage(
+      buildEventDetail({
+        startTime: new Date(now + 60 * 60 * 1000).toISOString(),
+        endTime: new Date(now + 3 * 60 * 60 * 1000).toISOString(),
+        pitchSession: { phase: 'SETUP' },
+      })
+    );
+
+    const description = screen.getByRole('heading', {
+      name: /about this event/i,
+    });
+    const pitch = screen.getByRole('heading', { name: /pitch session/i });
     expect(
-      screen.getByRole('link', { name: /open pitch event/i })
-    ).toHaveAttribute('href', `/pitch/${eventFixture.id}`);
+      description.compareDocumentPosition(pitch) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+  });
+
+  it('moves pitch details above the description after the event midpoint', async () => {
+    const now = Date.now();
+    await renderDetailPage(
+      buildEventDetail({
+        startTime: new Date(now - 2 * 60 * 60 * 1000).toISOString(),
+        endTime: new Date(now + 60 * 60 * 1000).toISOString(),
+        pitchSession: { phase: 'PITCHING' },
+      })
+    );
+
+    const description = screen.getByRole('heading', {
+      name: /about this event/i,
+    });
+    const pitch = screen.getByRole('heading', { name: /pitch session/i });
+    await waitFor(() => {
+      expect(
+        pitch.compareDocumentPosition(description) &
+          Node.DOCUMENT_POSITION_FOLLOWING
+      ).toBeTruthy();
+    });
+  });
+
+  it('places approved details above the description and below promoted pitch details', async () => {
+    const now = Date.now();
+    await renderDetailPage(
+      buildEventDetail({
+        startTime: new Date(now - 2 * 60 * 60 * 1000).toISOString(),
+        endTime: new Date(now + 60 * 60 * 1000).toISOString(),
+        viewerRegistrationStatus: 'APPROVED',
+        viewerRegistration: registrationState('APPROVED'),
+        approvedDetailsVisible: true,
+        approvedDetailsJson: approvedOnlyDetails,
+        pitchSession: { phase: 'PITCHING' },
+      })
+    );
+
+    const pitch = screen.getByRole('heading', { name: /pitch session/i });
+    const details = screen.getByRole('heading', {
+      name: /event-specific details/i,
+    });
+    const approval = screen.getByRole('heading', {
+      name: /you have been approved/i,
+    });
+    const description = screen.getByRole('heading', {
+      name: /about this event/i,
+    });
+    await waitFor(() => {
+      expect(
+        pitch.compareDocumentPosition(approval) &
+          Node.DOCUMENT_POSITION_FOLLOWING
+      ).toBeTruthy();
+      expect(
+        approval.compareDocumentPosition(details) &
+          Node.DOCUMENT_POSITION_FOLLOWING
+      ).toBeTruthy();
+      expect(
+        details.compareDocumentPosition(description) &
+          Node.DOCUMENT_POSITION_FOLLOWING
+      ).toBeTruthy();
+    });
   });
 
   it('never renders organizer-only rows or private storage metadata on the public event surface', async () => {
@@ -981,8 +1105,6 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
     expect(
       screen.getAllByRole('link', { name: /add.*calendar/i })
     ).toHaveLength(1);
-    expect(calendarAction.parentElement).toHaveTextContent(/open/i);
-    expect(calendarAction.parentElement).toHaveTextContent(/registered/i);
 
     if (calendarAction.tagName.toLowerCase() === 'a') {
       expect(calendarAction).toHaveAttribute(
@@ -1010,10 +1132,21 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
       await renderDetailPage(buildApplicationEvent());
 
       expect(screen.queryByLabelText(/full name/i)).not.toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /^register$/i })).toBeEnabled();
+      const registerButton = screen.getByRole('button', {
+        name: /^register$/i,
+      });
+      const whenLabel = screen.getByText(/^when$/i);
+      expect(registerButton).toBeEnabled();
+      expect(
+        registerButton.compareDocumentPosition(whenLabel) &
+          Node.DOCUMENT_POSITION_FOLLOWING
+      ).toBeTruthy();
 
       await openRegistrationForm();
 
+      expect(
+        screen.getByRole('dialog', { name: /register for this event/i })
+      ).toBeInTheDocument();
       const nameInput = await screen.findByLabelText(/full name/i);
       const emailInput = screen.getByRole('textbox', { name: /email/i });
       const phoneInput = screen.getByLabelText(/phone number/i);
@@ -1244,6 +1377,9 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
         })
       );
 
+      expect(
+        screen.getByRole('dialog', { name: /edit your application/i })
+      ).toBeInTheDocument();
       expect(
         screen.getByDisplayValue('Scheduler prototype')
       ).toBeInTheDocument();

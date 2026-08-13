@@ -53,6 +53,11 @@ jest.mock('../../src/lib/prisma', () => ({
     },
     eventRegistration: {
       findFirst: jest.fn(),
+      findUnique: jest.fn(),
+      upsert: jest.fn(),
+    },
+    eventRegistrationAudit: {
+      create: jest.fn(),
     },
     $transaction: jest.fn(),
   },
@@ -120,6 +125,11 @@ describe('/api/events/[eventId]/staff', () => {
         : Promise.all(operation)
     );
     prisma.eventStaffAudit.create.mockResolvedValue({});
+    prisma.eventRegistration.findUnique.mockResolvedValue(null);
+    prisma.eventRegistration.upsert.mockResolvedValue({
+      id: 'registration-event-staff',
+    });
+    prisma.eventRegistrationAudit.create.mockResolvedValue({});
   });
 
   it('allows a site admin to assign an MC', async () => {
@@ -181,6 +191,36 @@ describe('/api/events/[eventId]/staff', () => {
           action: 'ASSIGNED',
           fromRole: null,
           toRole: 'MC',
+        }),
+      })
+    );
+    expect(prisma.eventRegistration.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          eventId_hackerId: {
+            eventId: event.id,
+            hackerId: mcHacker.id,
+          },
+        },
+        create: expect.objectContaining({
+          status: 'APPROVED',
+          source: 'INTERNAL',
+          decidedById: siteAdmin.id,
+        }),
+        update: expect.objectContaining({
+          status: 'APPROVED',
+          cancelledAt: null,
+        }),
+      })
+    );
+    expect(prisma.eventRegistrationAudit.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          eventId: event.id,
+          actorId: siteAdmin.id,
+          fromStatus: null,
+          toStatus: 'APPROVED',
+          changeJson: { reason: 'EVENT_STAFF_ASSIGNED' },
         }),
       })
     );
@@ -313,6 +353,14 @@ describe('/api/events/[eventId]/staff', () => {
     prisma.event.findUnique.mockResolvedValue(event);
     prisma.eventStaff.findFirst.mockResolvedValue(existing);
     prisma.eventStaff.upsert.mockResolvedValue(changed);
+    prisma.eventRegistration.findUnique.mockResolvedValue({
+      id: 'registration-role-change',
+      status: 'CANCELLED',
+      cancelledAt: new Date('2026-07-01T12:00:00.000Z'),
+    });
+    prisma.eventRegistration.upsert.mockResolvedValue({
+      id: 'registration-role-change',
+    });
 
     const response = await POST_EVENT_STAFF(
       createJsonRequest(`/api/events/${event.id}/staff`, {
@@ -337,6 +385,24 @@ describe('/api/events/[eventId]/staff', () => {
           action: 'ROLE_CHANGED',
           fromRole: 'MC',
           toRole: 'CO_MC',
+        }),
+      })
+    );
+    expect(prisma.eventRegistration.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: expect.objectContaining({
+          status: 'APPROVED',
+          cancelledById: null,
+          cancelledAt: null,
+          waitlistedAt: null,
+        }),
+      })
+    );
+    expect(prisma.eventRegistrationAudit.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          fromStatus: 'CANCELLED',
+          toStatus: 'APPROVED',
         }),
       })
     );

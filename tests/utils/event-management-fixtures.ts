@@ -73,6 +73,9 @@ export type ChapterFixture = {
   accessMode: ChapterAccessMode;
   mailingListName: string | null;
   mailingListExternalId: string | null;
+  defaultApprovalMessage: string | null;
+  defaultWaitlistMessage: string | null;
+  defaultRejectionMessage: string | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -405,6 +408,9 @@ export const buildChapter = (
   accessMode: 'PUBLIC',
   mailingListName: null,
   mailingListExternalId: null,
+  defaultApprovalMessage: null,
+  defaultWaitlistMessage: null,
+  defaultRejectionMessage: null,
   createdAt: fixtureNow(),
   updatedAt: fixtureNow(),
   ...overrides,

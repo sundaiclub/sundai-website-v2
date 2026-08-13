@@ -590,8 +590,20 @@ describe('/organizer/events/[eventId]/registrations', () => {
     ).toBeInTheDocument();
     expect(screen.getByText(/project url/i)).toBeInTheDocument();
     expect(
-      screen.getByText('https://example.com/applicant-project')
-    ).toBeInTheDocument();
+      screen.getByRole('link', {
+        name: 'https://example.com/applicant-project',
+      })
+    ).toHaveAttribute('href', 'https://example.com/applicant-project');
+    expect(
+      screen.getByRole('link', {
+        name: 'https://example.com/applicant-project',
+      })
+    ).toHaveAttribute('target', '_blank');
+    expect(
+      screen.getByRole('link', {
+        name: 'https://example.com/applicant-project',
+      })
+    ).toHaveAttribute('rel', 'noopener noreferrer');
     expect(
       screen.getByText(/strong previous sundai contributor/i)
     ).toBeInTheDocument();

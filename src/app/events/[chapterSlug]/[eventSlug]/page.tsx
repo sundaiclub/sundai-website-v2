@@ -2,9 +2,9 @@ import { notFound } from 'next/navigation';
 import { auth } from '@clerk/nextjs/server';
 import {
   AddToCalendarAction,
-  EventDetailSections,
   EventMaterialsSection,
-  EventPitchSection,
+  EventNarrativeColumn,
+  EventRegistrationAction,
   type PublicEventMaterialLink,
 } from '@/app/components/EventDetailSections';
 import { PublicEventHero } from '@/app/components/EventHeroImage';
@@ -145,7 +145,7 @@ export default async function PublicEventDetailPage({
 
   return (
     <ManagementPage maxWidth="max-w-6xl">
-      <div className="mb-4">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <ManagementLinkButton
           href={`/chapters/${event.chapterSlug}`}
           variant="ghost"
@@ -153,42 +153,45 @@ export default async function PublicEventDetailPage({
           <span aria-hidden="true">&larr;</span>
           Back to {event.chapterName}
         </ManagementLinkButton>
+        {event.viewerCanManageEvent && (
+          <ManagementLinkButton
+            href={`/organizer/events/${event.id}`}
+            variant="primary"
+          >
+            Manage
+          </ManagementLinkButton>
+        )}
       </div>
 
-      <PublicEventHero
-        event={heroEvent}
-        actions={
-          <>
-            <PublicEventStatusBadge status={event.publicStatus} />
-            {event.viewerRegistrationStatus && (
-              <ViewerRegistrationStatusBadge
-                status={event.viewerRegistrationStatus}
+      <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+        <PublicEventHero
+          event={heroEvent}
+          chapterActions={
+            <>
+              <PublicEventStatusBadge status={event.publicStatus} />
+              {event.viewerRegistrationStatus && (
+                <ViewerRegistrationStatusBadge
+                  status={event.viewerRegistrationStatus}
+                />
+              )}
+            </>
+          }
+          actions={
+            <>
+              <EventRegistrationAction
+                event={event}
+                viewerProfile={event.viewerProfile}
               />
-            )}
-            <AddToCalendarAction payload={heroEvent.addToCalendar} />
-            {event.viewerCanManageEvent && (
-              <ManagementLinkButton
-                href={`/organizer/events/${event.id}`}
-                variant="primary"
-              >
-                Manage
-              </ManagementLinkButton>
-            )}
-          </>
-        }
-      />
+              <AddToCalendarAction payload={heroEvent.addToCalendar} />
+            </>
+          }
+        />
+        <EventNarrativeColumn event={event} />
+      </div>
 
       <div className="mt-6 grid min-w-0 gap-5">
         <EventProjectCarousel projects={eventProjects} />
-        <EventDetailSections
-          event={event}
-          viewerProfile={event.viewerProfile}
-        />
         <EventMaterialsSection materials={materialLinks} />
-        <EventPitchSection
-          eventId={event.pitchSession ? event.id : null}
-          phase={event.pitchSession?.phase}
-        />
       </div>
     </ManagementPage>
   );

@@ -253,6 +253,7 @@ jest.mock('@clerk/nextjs', () => ({
     isSignedIn: true,
   }),
   ClerkProvider: ({ children }) => children,
+  SignInButton: ({ children }) => <button type="button">{children}</button>,
   SignIn: () => <div>Sign In</div>,
   SignUp: () => <div>Sign Up</div>,
   UserButton: () => <div>User Button</div>,

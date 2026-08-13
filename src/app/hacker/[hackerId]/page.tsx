@@ -584,7 +584,7 @@ export default function HackerProfile() {
         } rounded-lg shadow-md hover:shadow-lg transition-shadow overflow-hidden`}
       >
         <Link href={`/projects/${project.id}`} className="block">
-          <div className="relative h-48">
+          <div className="relative aspect-[3/2] w-full bg-black">
             <NextImage
               src={
                 project.thumbnail?.url ||
@@ -594,7 +594,7 @@ export default function HackerProfile() {
               }
               alt={project.title}
               fill
-              className="object-cover"
+              className="object-contain"
             />
             <div className="absolute top-2 left-2 flex items-center space-x-1 bg-black/50 px-2 py-1 rounded-md">
               <HeartIcon className="h-4 w-4 text-white" />

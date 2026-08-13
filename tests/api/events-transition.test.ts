@@ -20,10 +20,8 @@ const mockAuth = require('@clerk/nextjs/server').auth as jest.Mock;
 
 const eventTimingConfig = {
   topProjectCount: 5,
-  topPresentingSec: 120,
-  topQuestionsSec: 180,
-  defaultPresentingSec: 60,
-  defaultQuestionsSec: 120,
+  topPitchSec: 300,
+  defaultPitchSec: 180,
 };
 
 function makeRequest(body: object = {}) {
@@ -197,8 +195,8 @@ describe('/api/events/[eventId]/transition', () => {
       .mockResolvedValueOnce({ id: 'e1', phase: 'PITCHING', projects: [] });
     prisma.pitchSession.findFirst.mockResolvedValue({ id: 'ps1', eventId: 'e1', phase: 'FINISHED', ...eventTimingConfig });
     prisma.pitchProject.findMany.mockResolvedValue([
-      { id: 'ep1', position: 1, status: 'DONE', pitchPhase: 'COMPLETED' },
-      { id: 'ep2', position: 2, status: 'DONE', pitchPhase: 'COMPLETED' },
+      { id: 'ep1', position: 1, status: 'DONE', timerPhase: 'COMPLETED' },
+      { id: 'ep2', position: 2, status: 'DONE', timerPhase: 'COMPLETED' },
     ]);
     prisma.pitchProject.update.mockResolvedValue({});
     prisma.pitchSession.update.mockResolvedValue({});
@@ -216,9 +214,8 @@ describe('/api/events/[eventId]/transition', () => {
       data: expect.objectContaining({
         status: 'CURRENT',
         approved: true,
-        pitchPhase: 'WAITING',
-        presentingStartedAt: null,
-        questionsStartedAt: null,
+        timerPhase: 'WAITING',
+        timerStartedAt: null,
         completedAt: null,
       }),
     });
@@ -227,9 +224,8 @@ describe('/api/events/[eventId]/transition', () => {
       data: expect.objectContaining({
         status: 'APPROVED',
         approved: true,
-        pitchPhase: 'WAITING',
-        presentingStartedAt: null,
-        questionsStartedAt: null,
+        timerPhase: 'WAITING',
+        timerStartedAt: null,
         completedAt: null,
       }),
     });
@@ -268,18 +264,15 @@ describe('/api/events/[eventId]/transition', () => {
       status: 'CURRENT',
       approved: true,
       isTopProject: false,
-      pitchPhase: 'WAITING',
-      allottedPresentingSec: 60,
-      allottedQuestionsSec: 120,
-      presentingStartedAt: null,
-      questionsStartedAt: null,
+      timerPhase: 'WAITING',
+      allottedSec: 180,
+      timerStartedAt: null,
       completedAt: null,
     }));
     expect(updateCalls[1][0].data.status).toBe('APPROVED');
     expect(updateCalls[2][0].data.status).toBe('APPROVED');
     for (const call of updateCalls) {
-      expect(call[0].data.allottedPresentingSec).toBe(60);
-      expect(call[0].data.allottedQuestionsSec).toBe(120);
+      expect(call[0].data.allottedSec).toBe(180);
     }
   });
 
@@ -310,13 +303,11 @@ describe('/api/events/[eventId]/transition', () => {
     // Exactly the first 5 ranked projects are frozen as top projects.
     for (let i = 0; i < 5; i++) {
       expect(updateCalls[i][0].data.isTopProject).toBe(true);
-      expect(updateCalls[i][0].data.allottedPresentingSec).toBe(120);
-      expect(updateCalls[i][0].data.allottedQuestionsSec).toBe(180);
+      expect(updateCalls[i][0].data.allottedSec).toBe(300);
     }
     // 6th project gets the default times and is not promoted later.
     expect(updateCalls[5][0].data.isTopProject).toBe(false);
-    expect(updateCalls[5][0].data.allottedPresentingSec).toBe(60);
-    expect(updateCalls[5][0].data.allottedQuestionsSec).toBe(120);
+    expect(updateCalls[5][0].data.allottedSec).toBe(180);
   });
 
   it('includes all projects tied at the top-group cutoff', async () => {
@@ -348,8 +339,7 @@ describe('/api/events/[eventId]/transition', () => {
     expect(updateCalls).toHaveLength(7);
     for (const call of updateCalls) {
       expect(call[0].data.isTopProject).toBe(true);
-      expect(call[0].data.allottedPresentingSec).toBe(120);
-      expect(call[0].data.allottedQuestionsSec).toBe(180);
+      expect(call[0].data.allottedSec).toBe(300);
     }
   });
 

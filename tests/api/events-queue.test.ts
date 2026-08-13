@@ -7,6 +7,7 @@ jest.mock('../../src/lib/prisma', () => ({
   default: {
     hacker: { findUnique: jest.fn() },
     chapterMembership: { findFirst: jest.fn() },
+    eventRegistration: { findFirst: jest.fn() },
     eventStaff: { findFirst: jest.fn() },
     event: { findUnique: jest.fn() },
     pitchSession: { findFirst: jest.fn() },
@@ -32,14 +33,17 @@ describe('queue endpoints', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     prisma.chapterMembership.findFirst.mockResolvedValue(null);
+    prisma.eventRegistration.findFirst.mockResolvedValue({
+      status: 'APPROVED',
+    });
     prisma.eventStaff.findFirst.mockResolvedValue(null);
     prisma.pitchSession.findFirst.mockResolvedValue({
       id: 'ps1',
       eventId: 'e1',
+      event: { chapterId: 'chapter-boston' },
       phase: 'PITCHING',
       audienceCanReorder: true,
-      defaultPresentingSec: 60,
-      defaultQuestionsSec: 120,
+      defaultPitchSec: 180,
     });
     prisma.eventProject.upsert.mockResolvedValue({ id: 'event-project-1' });
   });
@@ -50,6 +54,38 @@ describe('queue endpoints', () => {
     request.json = jest.fn().mockResolvedValue({ projectId: 'p1' });
     const res = await POST_JOIN(request as any, { params: { eventId: 'e1' } } as any);
     expect(res.status).toBe(401);
+  });
+
+  it('join rejects a project owner who is not part of the event', async () => {
+    mockAuth.mockReturnValue({ userId: 'clerk-1' });
+    prisma.hacker.findUnique.mockResolvedValue({
+      id: 'h1',
+      clerkId: 'clerk-1',
+      role: 'HACKER',
+    });
+    prisma.eventRegistration.findFirst.mockResolvedValue(null);
+    prisma.project.findUnique.mockResolvedValue({
+      id: 'p1',
+      launchLeadId: 'h1',
+      participants: [],
+    });
+
+    const request = new NextRequest(
+      'http://localhost:3000/api/events/e1/pitch/queue',
+      { method: 'POST' }
+    );
+    request.json = jest.fn().mockResolvedValue({ projectId: 'p1' });
+
+    const res = await POST_JOIN(request as any, {
+      params: { eventId: 'e1' },
+    } as any);
+
+    expect(res.status).toBe(403);
+    await expect(res.json()).resolves.toEqual({
+      message: 'You must be part of this event to add a project',
+    });
+    expect(prisma.eventProject.upsert).not.toHaveBeenCalled();
+    expect(prisma.pitchProject.create).not.toHaveBeenCalled();
   });
 
   it('status patch requires site admin or assigned event staff', async () => {
@@ -121,8 +157,7 @@ describe('queue endpoints', () => {
       eventId: 'e1',
       phase: 'PITCHING',
       audienceCanReorder: false,
-      defaultPresentingSec: 60,
-      defaultQuestionsSec: 120,
+      defaultPitchSec: 180,
     });
     // Mock for top-group check (fewer than 5 projects → no top group)
     prisma.pitchProject.findMany.mockResolvedValue([]);
@@ -185,8 +220,7 @@ describe('queue endpoints', () => {
     prisma.event.findUnique.mockResolvedValue({
       id: 'e1',
       phase: 'PITCHING',
-      defaultPresentingSec: 60,
-      defaultQuestionsSec: 120,
+      defaultPitchSec: 180,
     });
     prisma.project.findUnique.mockResolvedValue({
       id: 'p1',
@@ -206,8 +240,7 @@ describe('queue endpoints', () => {
       data: expect.objectContaining({
         position: 6,
         isTopProject: false,
-        allottedPresentingSec: 60,
-        allottedQuestionsSec: 120,
+        allottedSec: 180,
       }),
     });
   });
@@ -218,10 +251,10 @@ describe('queue endpoints', () => {
     prisma.pitchSession.findFirst.mockResolvedValue({
       id: 'ps1',
       eventId: 'e1',
+      event: { chapterId: 'chapter-boston' },
       phase: 'FINISHED',
       audienceCanReorder: true,
-      defaultPresentingSec: 60,
-      defaultQuestionsSec: 120,
+      defaultPitchSec: 180,
     });
 
     const request = new NextRequest('http://localhost:3000/api/events/e1/pitch/queue', { method: 'POST' });
@@ -239,8 +272,7 @@ describe('queue endpoints', () => {
     prisma.event.findUnique.mockResolvedValue({
       id: 'e1',
       phase: 'PITCHING',
-      defaultPresentingSec: 60,
-      defaultQuestionsSec: 120,
+      defaultPitchSec: 180,
     });
     prisma.project.findUnique.mockResolvedValue({
       id: 'p1',

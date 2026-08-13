@@ -141,7 +141,20 @@ function RegistrationReviewRow({
               >
                 {field.label}
               </dt>
-              <dd className="mt-1 whitespace-pre-wrap text-sm">{value}</dd>
+              <dd className="mt-1 whitespace-pre-wrap text-sm">
+                {field.type === 'URL' ? (
+                  <a
+                    className="break-all underline underline-offset-2"
+                    href={value}
+                    rel="noopener noreferrer"
+                    target="_blank"
+                  >
+                    {value}
+                  </a>
+                ) : (
+                  value
+                )}
+              </dd>
             </div>
           );
         })}
