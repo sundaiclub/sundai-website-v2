@@ -1310,6 +1310,9 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
       );
 
       expect(
+        screen.getByRole('dialog', { name: /edit your application/i })
+      ).toBeInTheDocument();
+      expect(
         screen.getByDisplayValue('Scheduler prototype')
       ).toBeInTheDocument();
       expect(

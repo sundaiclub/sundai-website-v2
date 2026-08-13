@@ -105,30 +105,49 @@ function EventApprovedDetailsSection({ event }: { event: PublicEventDetail }) {
   );
 }
 
-function EventApprovalStatusSection({ event }: { event: PublicEventDetail }) {
+function EventTopRegistrationStatusSection({
+  event,
+}: {
+  event: PublicEventDetail;
+}) {
   const classes = useManagementClasses();
   const registration = event.viewerRegistration;
   const registrationStatus =
     registration?.status ?? event.viewerRegistrationStatus;
 
-  if (registrationStatus !== 'APPROVED') return null;
+  if (registrationStatus !== 'APPROVED' && registrationStatus !== 'PENDING') {
+    return null;
+  }
+
+  const isPending = registrationStatus === 'PENDING';
 
   return (
     <ManagementSection
-      actions={<ViewerRegistrationStatusBadge status="APPROVED" />}
+      actions={<ViewerRegistrationStatusBadge status={registrationStatus} />}
       description={
         registration?.publicSafeMessage ||
         event.applicationControls.publicMessage ||
-        'Your place at this event is confirmed.'
+        (isPending
+          ? 'Your application is pending review.'
+          : 'Your place at this event is confirmed.')
       }
       size="large"
-      title="You have been approved"
+      title={registrationHeading(registrationStatus)}
     >
-      {registration?.canCancel && (
-        <button type="button" className={classes.secondaryButton}>
-          Cancel registration
-        </button>
-      )}
+      <div className="flex flex-wrap gap-2">
+        {isPending && registration?.canEditAnswers && (
+          <EventRegistrationAction
+            allowEditing
+            event={event}
+            viewerProfile={event.viewerProfile}
+          />
+        )}
+        {registration?.canCancel && (
+          <button type="button" className={classes.secondaryButton}>
+            Cancel registration
+          </button>
+        )}
+      </div>
     </ManagementSection>
   );
 }
@@ -160,9 +179,11 @@ export function AddToCalendarAction({
 export function EventRegistrationAction({
   event,
   viewerProfile,
+  allowEditing = false,
 }: {
   event: PublicEventDetail;
   viewerProfile?: ProfilePrefillSource | null;
+  allowEditing?: boolean;
 }) {
   const classes = useManagementClasses();
   const [isOpen, setIsOpen] = useState(false);
@@ -170,6 +191,9 @@ export function EventRegistrationAction({
     event.applicationControls.canSubmit &&
     !event.viewerRegistration &&
     event.applicationQuestionSet.composedFields.length > 0;
+  const canEdit = Boolean(
+    allowEditing && event.viewerRegistration?.canEditAnswers
+  );
 
   useEffect(() => {
     if (!isOpen) return;
@@ -180,17 +204,17 @@ export function EventRegistrationAction({
     return () => document.removeEventListener('keydown', closeOnEscape);
   }, [isOpen]);
 
-  if (!canRegister) return null;
+  if (!canRegister && !canEdit) return null;
 
   return (
     <>
       <button
         aria-haspopup="dialog"
-        className={classes.primaryButton}
+        className={canEdit ? classes.secondaryButton : classes.primaryButton}
         onClick={() => setIsOpen(true)}
         type="button"
       >
-        Register
+        {canEdit ? 'Edit application' : 'Register'}
       </button>
       {isOpen && (
         <div
@@ -216,7 +240,9 @@ export function EventRegistrationAction({
                   className="mt-1 text-2xl font-bold"
                   id="registration-dialog-title"
                 >
-                  Register for this event
+                  {canEdit
+                    ? 'Edit your application'
+                    : 'Register for this event'}
                 </h2>
               </div>
               <button
@@ -293,13 +319,15 @@ export function EventNarrativeColumn({ event }: { event: PublicEventDetail }) {
     />
   );
   const description = <EventDescriptionSection event={event} />;
-  const approvalStatus = <EventApprovalStatusSection event={event} />;
+  const registrationStatus = (
+    <EventTopRegistrationStatusSection event={event} />
+  );
   const approvedDetails = <EventApprovedDetailsSection event={event} />;
 
   return (
     <div className="grid content-start gap-5">
       {pitchFirst && pitch}
-      {approvalStatus}
+      {registrationStatus}
       {approvedDetails}
       {description}
       {!pitchFirst && pitch}
@@ -365,7 +393,9 @@ export function EventDetailSections({
   );
   const showApplication = Boolean(registration?.canEditAnswers);
 
-  if (registrationStatus === 'APPROVED') return null;
+  if (registrationStatus === 'APPROVED' || registrationStatus === 'PENDING') {
+    return null;
+  }
   if (!showStatus && !showApplication) return null;
 
   return (
