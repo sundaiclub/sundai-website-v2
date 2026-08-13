@@ -96,8 +96,7 @@ export async function POST(
         position: nextPos,
         isTopProject: false,
         ...(pitchSession.phase === 'PITCHING' && {
-          allottedPresentingSec: pitchSession.defaultPresentingSec,
-          allottedQuestionsSec: pitchSession.defaultQuestionsSec,
+          allottedSec: pitchSession.defaultPitchSec,
         }),
         },
       }),

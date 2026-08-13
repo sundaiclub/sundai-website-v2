@@ -177,10 +177,8 @@ export async function POST(req: Request) {
       audienceCanReorder = true,
       votingEndTime,
       topProjectCount,
-      topPresentingSec,
-      topQuestionsSec,
-      defaultPresentingSec,
-      defaultQuestionsSec,
+      topPitchSec,
+      defaultPitchSec,
     } = body || {};
     const canCreate =
       user?.role === 'SITE_ADMIN' ||
@@ -363,12 +361,8 @@ export async function POST(req: Request) {
               parsedVotingEndTime ??
               new Date(parsedStartTime.getTime() + 15 * 60 * 1000),
             ...(topProjectCount !== undefined && { topProjectCount }),
-            ...(topPresentingSec !== undefined && { topPresentingSec }),
-            ...(topQuestionsSec !== undefined && { topQuestionsSec }),
-            ...(defaultPresentingSec !== undefined && {
-              defaultPresentingSec,
-            }),
-            ...(defaultQuestionsSec !== undefined && { defaultQuestionsSec }),
+            ...(topPitchSec !== undefined && { topPitchSec }),
+            ...(defaultPitchSec !== undefined && { defaultPitchSec }),
           },
         },
       },

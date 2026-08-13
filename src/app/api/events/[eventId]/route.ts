@@ -9,6 +9,7 @@ import { sanitizeApprovedDetailsJson } from '@/lib/approvedEventDetails';
 import {
   canDecideRegistrationsWithContext,
   canManageChapterSettings,
+  canManageEventPitchWithContext,
   canViewApprovedOnlyEventDetailsWithContext,
 } from '@/lib/eventManagementAuth';
 import {
@@ -205,6 +206,11 @@ export async function GET(
       chapterMembership,
       staff,
     });
+    const viewerCanManagePitch = canManageEventPitchWithContext({
+      actor: viewer,
+      chapterMembership,
+      staff,
+    });
 
     const publicEvent = redactPublicEventForViewer(event, {
       viewerRegistration,
@@ -220,6 +226,7 @@ export async function GET(
     const pitchEvent = await prisma.event.findUnique({
       where: { id: params.eventId },
       select: {
+        meetingUrl: true,
         staff: {
           select: {
             id: true,
@@ -260,6 +267,9 @@ export async function GET(
 
     return NextResponse.json({
       ...publicEvent,
+      ...(viewerCanManagePitch && pitchEvent?.meetingUrl
+        ? { meetingUrl: pitchEvent.meetingUrl }
+        : {}),
       staff: pitchEvent?.staff ?? [],
       pitchSessions: pitchEvent?.pitchSessions ?? [],
     });
@@ -323,10 +333,8 @@ export async function PATCH(
       mcIds,
       votingEndTime,
       topProjectCount,
-      topPresentingSec,
-      topQuestionsSec,
-      defaultPresentingSec,
-      defaultQuestionsSec,
+      topPitchSec,
+      defaultPitchSec,
     } = body;
 
     const parsedApplicationMode = parseEventApplicationMode(applicationMode);
@@ -406,10 +414,8 @@ export async function PATCH(
     const timingConfigChanged =
       votingEndTime !== undefined ||
       topProjectCount !== undefined ||
-      topPresentingSec !== undefined ||
-      topQuestionsSec !== undefined ||
-      defaultPresentingSec !== undefined ||
-      defaultQuestionsSec !== undefined;
+      topPitchSec !== undefined ||
+      defaultPitchSec !== undefined;
 
     const eventUpdate = prisma.event.update({
       where: { id: params.eventId },
@@ -505,14 +511,9 @@ export async function PATCH(
       : null;
 
     if (timingConfigChanged && pitchSession) {
-      const nextTopPresentingSec =
-        topPresentingSec ?? pitchSession.topPresentingSec;
-      const nextTopQuestionsSec =
-        topQuestionsSec ?? pitchSession.topQuestionsSec;
-      const nextDefaultPresentingSec =
-        defaultPresentingSec ?? pitchSession.defaultPresentingSec;
-      const nextDefaultQuestionsSec =
-        defaultQuestionsSec ?? pitchSession.defaultQuestionsSec;
+      const nextTopPitchSec = topPitchSec ?? pitchSession.topPitchSec;
+      const nextDefaultPitchSec =
+        defaultPitchSec ?? pitchSession.defaultPitchSec;
 
       const pitchSessionUpdate = prisma.pitchSession.update({
         where: { id: pitchSession.id },
@@ -521,10 +522,8 @@ export async function PATCH(
             votingEndTime: parsedVotingEndTime,
           }),
           ...(topProjectCount !== undefined && { topProjectCount }),
-          ...(topPresentingSec !== undefined && { topPresentingSec }),
-          ...(topQuestionsSec !== undefined && { topQuestionsSec }),
-          ...(defaultPresentingSec !== undefined && { defaultPresentingSec }),
-          ...(defaultQuestionsSec !== undefined && { defaultQuestionsSec }),
+          ...(topPitchSec !== undefined && { topPitchSec }),
+          ...(defaultPitchSec !== undefined && { defaultPitchSec }),
         },
       });
 
@@ -539,8 +538,7 @@ export async function PATCH(
               status: { in: ['CURRENT', 'APPROVED'] },
             },
             data: {
-              allottedPresentingSec: nextTopPresentingSec,
-              allottedQuestionsSec: nextTopQuestionsSec,
+              allottedSec: nextTopPitchSec,
             },
           }),
           prisma.pitchProject.updateMany({
@@ -550,8 +548,7 @@ export async function PATCH(
               status: { in: ['CURRENT', 'APPROVED'] },
             },
             data: {
-              allottedPresentingSec: nextDefaultPresentingSec,
-              allottedQuestionsSec: nextDefaultQuestionsSec,
+              allottedSec: nextDefaultPitchSec,
             },
           }),
         ]);

@@ -61,7 +61,7 @@ export type PitchProjectStatus =
 
 export type PitchProjectVoteValue = 'LIKE' | 'DISLIKE';
 
-export type PitchPhase = 'WAITING' | 'PRESENTING' | 'QUESTIONS' | 'COMPLETED';
+export type PitchTimerPhase = 'WAITING' | 'RUNNING' | 'COMPLETED';
 
 interface EventManagementHackerSummary {
   id: EntityId;

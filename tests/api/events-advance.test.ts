@@ -64,7 +64,7 @@ describe('/api/events/[eventId]/advance', () => {
       });
 
     prisma.pitchProject.findMany.mockResolvedValue([
-      { id: 'ep1', position: 1, status: 'QUEUED', pitchPhase: 'WAITING' },
+      { id: 'ep1', position: 1, status: 'QUEUED', timerPhase: 'WAITING' },
     ]);
     prisma.pitchProject.update.mockResolvedValue({});
 
@@ -90,7 +90,7 @@ describe('/api/events/[eventId]/advance', () => {
       });
 
     prisma.pitchProject.findMany.mockResolvedValue([
-      { id: 'ep1', position: 1, status: 'QUEUED', pitchPhase: 'WAITING' },
+      { id: 'ep1', position: 1, status: 'QUEUED', timerPhase: 'WAITING' },
     ]);
     prisma.pitchProject.update.mockResolvedValue({});
 
@@ -116,7 +116,7 @@ describe('/api/events/[eventId]/advance', () => {
       });
 
     prisma.pitchProject.findMany.mockResolvedValue([
-      { id: 'ep1', position: 1, status: 'QUEUED', pitchPhase: 'WAITING' },
+      { id: 'ep1', position: 1, status: 'QUEUED', timerPhase: 'WAITING' },
     ]);
     prisma.pitchProject.update.mockResolvedValue({});
 
@@ -144,7 +144,7 @@ describe('/api/events/[eventId]/advance', () => {
       });
 
     prisma.pitchProject.findMany.mockResolvedValue([
-      { id: 'ep1', position: 1, status: 'CURRENT', pitchPhase: 'COMPLETED' },
+      { id: 'ep1', position: 1, status: 'CURRENT', timerPhase: 'COMPLETED' },
     ]);
     prisma.pitchProject.update.mockResolvedValue({});
     prisma.pitchSession.update.mockResolvedValue({});
@@ -158,7 +158,7 @@ describe('/api/events/[eventId]/advance', () => {
     });
   });
 
-  it('auto-completes timer when advancing from PRESENTING', async () => {
+  it('auto-completes a running timer when advancing', async () => {
     mockAuth.mockReturnValue({ userId: 'clerk-admin' });
     prisma.hacker.findUnique.mockResolvedValue({ id: 'h-admin', role: 'SITE_ADMIN' });
     prisma.event.findUnique
@@ -175,8 +175,8 @@ describe('/api/events/[eventId]/advance', () => {
       });
 
     prisma.pitchProject.findMany.mockResolvedValue([
-      { id: 'ep1', position: 1, status: 'CURRENT', pitchPhase: 'PRESENTING', presentingStartedAt: new Date() },
-      { id: 'ep2', position: 2, status: 'QUEUED', pitchPhase: 'WAITING' },
+      { id: 'ep1', position: 1, status: 'CURRENT', timerPhase: 'RUNNING', timerStartedAt: new Date() },
+      { id: 'ep2', position: 2, status: 'QUEUED', timerPhase: 'WAITING' },
     ]);
     prisma.pitchProject.update.mockResolvedValue({});
 
@@ -184,50 +184,14 @@ describe('/api/events/[eventId]/advance', () => {
     const res = await POST_ADVANCE(request as any, { params: { eventId: 'e1' } } as any);
     expect(res.status).toBe(200);
 
-    // Current project should be marked DONE with COMPLETED pitchPhase
+    // Current project should be marked DONE with a completed timer.
     const doneCall = prisma.pitchProject.update.mock.calls[0];
     expect(doneCall[0].data.status).toBe('DONE');
-    expect(doneCall[0].data.pitchPhase).toBe('COMPLETED');
+    expect(doneCall[0].data.timerPhase).toBe('COMPLETED');
     expect(doneCall[0].data.completedAt).toBeDefined();
-    expect(doneCall[0].data.questionsStartedAt).toBeDefined();
-
-    // Next project should be set to CURRENT with WAITING pitchPhase
+    // Next project should be set to CURRENT with a waiting timer.
     const nextCall = prisma.pitchProject.update.mock.calls[1];
     expect(nextCall[0].data.status).toBe('CURRENT');
-    expect(nextCall[0].data.pitchPhase).toBe('WAITING');
-  });
-
-  it('auto-completes timer when advancing from QUESTIONS', async () => {
-    mockAuth.mockReturnValue({ userId: 'clerk-admin' });
-    prisma.hacker.findUnique.mockResolvedValue({ id: 'h-admin', role: 'SITE_ADMIN' });
-    prisma.event.findUnique
-      .mockResolvedValueOnce({
-        id: 'e1',
-        phase: 'PITCHING',
-        staff: [],
-        projects: [],
-      })
-      .mockResolvedValueOnce({
-        id: 'e1',
-        phase: 'PITCHING',
-        projects: [],
-      });
-
-    prisma.pitchProject.findMany.mockResolvedValue([
-      { id: 'ep1', position: 1, status: 'CURRENT', pitchPhase: 'QUESTIONS', questionsStartedAt: new Date() },
-      { id: 'ep2', position: 2, status: 'QUEUED', pitchPhase: 'WAITING' },
-    ]);
-    prisma.pitchProject.update.mockResolvedValue({});
-
-    const request = new NextRequest('http://localhost:3000/api/events/e1/pitch/advance', { method: 'POST' });
-    const res = await POST_ADVANCE(request as any, { params: { eventId: 'e1' } } as any);
-    expect(res.status).toBe(200);
-
-    const doneCall = prisma.pitchProject.update.mock.calls[0];
-    expect(doneCall[0].data.status).toBe('DONE');
-    expect(doneCall[0].data.pitchPhase).toBe('COMPLETED');
-    expect(doneCall[0].data.completedAt).toBeDefined();
-    // Should NOT set questionsStartedAt since already in QUESTIONS phase
-    expect(doneCall[0].data.questionsStartedAt).toBeUndefined();
+    expect(nextCall[0].data.timerPhase).toBe('WAITING');
   });
 });
