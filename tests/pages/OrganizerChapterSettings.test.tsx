@@ -414,6 +414,42 @@ describe('/organizer/chapters/[chapterSlug]/settings', () => {
     });
   });
 
+  it('keeps profile saving available after a chapter image upload', async () => {
+    mockChapterAdmin();
+    renderSettingsPage();
+
+    const imageInput = await screen.findByLabelText(/chapter image/i);
+    const image = new File(['image-bytes'], 'boston-new.jpg', {
+      type: 'image/jpeg',
+    });
+
+    fireEvent.change(imageInput, { target: { files: [image] } });
+
+    await screen.findByText(/chapter image uploaded/i);
+
+    const description = screen.getByLabelText(/chapter description/i);
+    fireEvent.change(description, {
+      target: { value: 'Updated after the image upload' },
+    });
+
+    const saveButton = screen.getByRole('button', { name: /save profile/i });
+    expect(saveButton).toBeEnabled();
+    fireEvent.click(saveButton);
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        `/api/chapters/${chapter.id}`,
+        expect.objectContaining({
+          method: 'PATCH',
+          body: JSON.stringify({
+            description: 'Updated after the image upload',
+            timezone: chapter.timezone,
+          }),
+        })
+      );
+    });
+  });
+
   it('creates a ban flag from the selected hacker search result', async () => {
     mockChapterAdmin();
     const createdFlag = {

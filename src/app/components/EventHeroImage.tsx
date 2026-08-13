@@ -3,7 +3,6 @@
 import Image from 'next/image';
 import type { ReactNode } from 'react';
 import type { PublicEventDetail } from '@/types/event-management';
-import EventMarkdown from './EventMarkdown';
 import { useManagementClasses } from './ManagementSurface';
 
 function formatEventDate(
@@ -36,9 +35,11 @@ function formatEventDate(
 export function PublicEventHero({
   event,
   actions,
+  chapterActions,
 }: {
   event: PublicEventDetail;
   actions?: ReactNode;
+  chapterActions?: ReactNode;
 }) {
   const classes = useManagementClasses();
   const placeholderLogo = classes.isDarkMode
@@ -48,9 +49,7 @@ export function PublicEventHero({
 
   return (
     <article className={`${classes.panel} overflow-hidden`}>
-      <div
-        className={`${classes.subtlePanel} relative aspect-[3/2] w-full overflow-hidden rounded-none border-0 border-b !bg-black`}
-      >
+      <div className="relative aspect-video w-full overflow-hidden bg-black">
         <Image
           alt={event.image?.alt || `${event.title} event`}
           className={
@@ -58,7 +57,7 @@ export function PublicEventHero({
           }
           fill
           priority
-          sizes="(min-width: 1280px) 1152px, 100vw"
+          sizes="(min-width: 1024px) 384px, 100vw"
           src={event.image?.url || placeholderLogo}
           unoptimized={Boolean(event.image?.url)}
         />
@@ -67,26 +66,33 @@ export function PublicEventHero({
         )}
       </div>
 
-      <div className="p-5 sm:p-7 lg:p-8">
-        <p
-          className={`text-xs font-bold uppercase tracking-[0.18em] ${classes.mutedText}`}
-        >
-          {event.chapterName}
-        </p>
-        <h1 className="mt-3 max-w-4xl text-balance text-3xl font-bold leading-tight sm:text-5xl">
+      <div className="p-5 sm:p-6">
+        <div className="flex flex-wrap items-center gap-2">
+          <p
+            className={`text-xs font-bold uppercase tracking-[0.18em] ${classes.mutedText}`}
+          >
+            {event.chapterName}
+          </p>
+          {chapterActions && (
+            <div className="flex flex-wrap items-center gap-1.5 [&>span]:min-h-5 [&>span]:px-2 [&>span]:py-0.5 [&>span]:text-[10px]">
+              {chapterActions}
+            </div>
+          )}
+        </div>
+        <h1 className="mt-3 text-balance text-3xl font-bold leading-tight sm:text-4xl">
           {event.title}
         </h1>
-        {event.description && (
-          <EventMarkdown
-            className={`prose mt-4 max-w-3xl text-base leading-7 prose-headings:mb-2 prose-headings:mt-4 prose-p:my-2 prose-a:text-current prose-li:my-0 ${
-              classes.isDarkMode ? 'prose-invert' : 'prose-gray'
-            } ${classes.mutedText}`}
-            markdown={event.description}
-          />
+
+        {actions && (
+          <div
+            className={`mt-5 grid gap-2 border-t pt-5 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 ${classes.isDarkMode ? 'border-gray-800' : 'border-gray-200'}`}
+          >
+            {actions}
+          </div>
         )}
 
         <dl
-          className={`mt-6 grid gap-4 border-t pt-5 ${classes.isDarkMode ? 'border-gray-800' : 'border-gray-200'} sm:grid-cols-2`}
+          className={`mt-6 grid gap-4 border-t pt-5 ${classes.isDarkMode ? 'border-gray-800' : 'border-gray-200'}`}
         >
           <div className="flex gap-3">
             <svg
@@ -150,14 +156,6 @@ export function PublicEventHero({
             </div>
           </div>
         </dl>
-
-        {actions && (
-          <div
-            className={`mt-5 flex flex-wrap items-center gap-2 border-t pt-5 ${classes.isDarkMode ? 'border-gray-800' : 'border-gray-200'}`}
-          >
-            {actions}
-          </div>
-        )}
       </div>
     </article>
   );

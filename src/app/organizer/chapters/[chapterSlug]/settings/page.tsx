@@ -272,7 +272,8 @@ export default function OrganizerChapterSettingsPage({
     event: React.ChangeEvent<HTMLInputElement>
   ) {
     if (!chapter) return;
-    const file = event.currentTarget.files?.[0];
+    const input = event.currentTarget;
+    const file = input.files?.[0];
     if (!file) return;
 
     setIsUploadingImage(true);
@@ -303,7 +304,7 @@ export default function OrganizerChapterSettingsPage({
           : 'Unable to upload chapter image.'
       );
     } finally {
-      event.currentTarget.value = '';
+      input.value = '';
       setIsUploadingImage(false);
     }
   }

@@ -212,7 +212,7 @@ describe('/api/events organizer chapter-admin behavior', () => {
           waitlistMessage:
             'You are on the waitlist. We will let you know if a spot opens up.',
           declineMessage:
-            'Thank you for your interest. Unfortunately, we are unable to offer you a spot at this event.',
+            'Thank you for your interest. Unfortunately, we are unable to offer you a spot at this event. Please apply for the next one.',
         }),
       })
     );

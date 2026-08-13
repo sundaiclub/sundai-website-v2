@@ -526,7 +526,7 @@ describe('chapter public directory and landing pages', () => {
   });
 
   describe('/chapters', () => {
-    it('renders active chapter cards with city, timezone, and next event links', async () => {
+    it('renders active chapter cards with descriptions and next event links', async () => {
       mockDirectoryFetch(activeChapterDirectory);
 
       renderDirectoryPage();
@@ -538,16 +538,22 @@ describe('chapter public directory and landing pages', () => {
         bostonCardLink.closest('article') ??
         bostonCardLink.closest('li') ??
         bostonCardLink;
-      expect(within(bostonCard).getByText(/^Boston$/i)).toBeInTheDocument();
-      expect(bostonCard).toHaveTextContent(/America\/New_York|Eastern/i);
+      expect(bostonCard).toHaveTextContent(
+        'Public builds and demos for Boston hackers.'
+      );
+      expect(within(bostonCard).queryByText(/^Boston$/i)).not.toBeInTheDocument();
+      expect(bostonCard).not.toHaveTextContent(/America\/New_York|Eastern/i);
 
       const sfCardLink = await screen.findByRole('link', {
         name: /sundai san francisco/i,
       });
       const sfCard =
         sfCardLink.closest('article') ?? sfCardLink.closest('li') ?? sfCardLink;
-      expect(within(sfCard).getByText(/^San Francisco$/i)).toBeInTheDocument();
-      expect(sfCard).toHaveTextContent(/America\/Los_Angeles|Pacific/i);
+      expect(sfCard).toHaveTextContent('West Coast builders and demos.');
+      expect(
+        within(sfCard).queryByText(/^San Francisco$/i)
+      ).not.toBeInTheDocument();
+      expect(sfCard).not.toHaveTextContent(/America\/Los_Angeles|Pacific/i);
 
       expect(
         await screen.findByRole('link', { name: /boston demo night/i })

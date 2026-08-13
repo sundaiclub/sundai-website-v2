@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { sanitizeApprovedDetailsJson } from '@/lib/approvedEventDetails';
 import type {
   AddToCalendarPayload,
@@ -11,6 +12,7 @@ import type {
 import { ManagementSection, useManagementClasses } from './ManagementSurface';
 import { EventApplicationForm } from './EventApplicationForm';
 import { ViewerRegistrationStatusBadge } from './PublicEventCard';
+import EventMarkdown from './EventMarkdown';
 
 function encodeCalendarDate(value: string | Date) {
   return new Date(value)
@@ -67,8 +69,7 @@ function ApprovedOnlyDetails({
 
   return (
     <div>
-      <h3 className="text-base font-bold">Event-specific details</h3>
-      <dl className="mt-4 grid gap-4">
+      <dl className="grid gap-4">
         {entries.map(([key, value]) => (
           <div key={key}>
             {key.replace(/[^a-z0-9]/gi, '').toLowerCase() !== 'details' && (
@@ -87,6 +88,48 @@ function ApprovedOnlyDetails({
         ))}
       </dl>
     </div>
+  );
+}
+
+function EventApprovedDetailsSection({ event }: { event: PublicEventDetail }) {
+  const entries = event.approvedDetailsJson
+    ? detailEntries(event.approvedDetailsJson)
+    : [];
+
+  if (!event.approvedDetailsVisible || entries.length === 0) return null;
+
+  return (
+    <ManagementSection title="Event-specific details" size="large">
+      <ApprovedOnlyDetails event={event} />
+    </ManagementSection>
+  );
+}
+
+function EventApprovalStatusSection({ event }: { event: PublicEventDetail }) {
+  const classes = useManagementClasses();
+  const registration = event.viewerRegistration;
+  const registrationStatus =
+    registration?.status ?? event.viewerRegistrationStatus;
+
+  if (registrationStatus !== 'APPROVED') return null;
+
+  return (
+    <ManagementSection
+      actions={<ViewerRegistrationStatusBadge status="APPROVED" />}
+      description={
+        registration?.publicSafeMessage ||
+        event.applicationControls.publicMessage ||
+        'Your place at this event is confirmed.'
+      }
+      size="large"
+      title="You have been approved"
+    >
+      {registration?.canCancel && (
+        <button type="button" className={classes.secondaryButton}>
+          Cancel registration
+        </button>
+      )}
+    </ManagementSection>
   );
 }
 
@@ -111,6 +154,156 @@ export function AddToCalendarAction({
     <a className={classes.primaryButton} href={googleCalendarHref(payload)}>
       Add to calendar
     </a>
+  );
+}
+
+export function EventRegistrationAction({
+  event,
+  viewerProfile,
+}: {
+  event: PublicEventDetail;
+  viewerProfile?: ProfilePrefillSource | null;
+}) {
+  const classes = useManagementClasses();
+  const [isOpen, setIsOpen] = useState(false);
+  const canRegister =
+    event.applicationControls.canSubmit &&
+    !event.viewerRegistration &&
+    event.applicationQuestionSet.composedFields.length > 0;
+
+  useEffect(() => {
+    if (!isOpen) return;
+    function closeOnEscape(keyEvent: KeyboardEvent) {
+      if (keyEvent.key === 'Escape') setIsOpen(false);
+    }
+    document.addEventListener('keydown', closeOnEscape);
+    return () => document.removeEventListener('keydown', closeOnEscape);
+  }, [isOpen]);
+
+  if (!canRegister) return null;
+
+  return (
+    <>
+      <button
+        aria-haspopup="dialog"
+        className={classes.primaryButton}
+        onClick={() => setIsOpen(true)}
+        type="button"
+      >
+        Register
+      </button>
+      {isOpen && (
+        <div
+          aria-labelledby="registration-dialog-title"
+          aria-modal="true"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+          onMouseDown={event => {
+            if (event.currentTarget === event.target) setIsOpen(false);
+          }}
+          role="dialog"
+        >
+          <div
+            className={`${classes.panel} max-h-[90vh] w-full max-w-2xl overflow-y-auto p-5 sm:p-7`}
+          >
+            <div className="mb-6 flex items-start justify-between gap-4">
+              <div>
+                <p
+                  className={`text-xs font-bold uppercase ${classes.mutedText}`}
+                >
+                  {event.title}
+                </p>
+                <h2
+                  className="mt-1 text-2xl font-bold"
+                  id="registration-dialog-title"
+                >
+                  Register for this event
+                </h2>
+              </div>
+              <button
+                aria-label="Close registration"
+                className={classes.ghostButton}
+                onClick={() => setIsOpen(false)}
+                type="button"
+              >
+                <span aria-hidden="true">✕</span>
+              </button>
+            </div>
+            <EventApplicationForm
+              embedded
+              event={event}
+              hideStartButton
+              initialEditing
+              viewerProfile={viewerProfile}
+            />
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+function EventDescriptionSection({ event }: { event: PublicEventDetail }) {
+  const classes = useManagementClasses();
+
+  if (!event.description) return null;
+
+  return (
+    <ManagementSection title="About this event" size="large">
+      <EventMarkdown
+        className={`prose max-w-none text-base leading-7 prose-headings:mb-2 prose-headings:mt-4 prose-p:my-2 prose-a:text-current prose-li:my-0 ${
+          classes.isDarkMode ? 'prose-invert' : 'prose-gray'
+        } ${classes.mutedText}`}
+        markdown={event.description}
+      />
+    </ManagementSection>
+  );
+}
+
+export function EventNarrativeColumn({ event }: { event: PublicEventDetail }) {
+  const midpoint = event.endTime
+    ? (new Date(event.startTime).getTime() +
+        new Date(event.endTime).getTime()) /
+      2
+    : Number.POSITIVE_INFINITY;
+  const [pitchFirst, setPitchFirst] = useState(false);
+
+  useEffect(() => {
+    let timeout: number | undefined;
+
+    function updateAndSchedule() {
+      const isPastMidpoint = Date.now() >= midpoint;
+      setPitchFirst(isPastMidpoint);
+      if (!Number.isFinite(midpoint) || isPastMidpoint) return;
+      timeout = window.setTimeout(
+        updateAndSchedule,
+        Math.min(midpoint - Date.now(), 2_147_000_000)
+      );
+    }
+
+    updateAndSchedule();
+    return () => {
+      if (timeout !== undefined) window.clearTimeout(timeout);
+    };
+  }, [midpoint]);
+
+  const pitch = (
+    <EventPitchSection
+      eventId={event.pitchSession ? event.id : null}
+      phase={event.pitchSession?.phase}
+    />
+  );
+  const description = <EventDescriptionSection event={event} />;
+  const approvalStatus = <EventApprovalStatusSection event={event} />;
+  const approvedDetails = <EventApprovedDetailsSection event={event} />;
+
+  return (
+    <div className="grid content-start gap-5">
+      {pitchFirst && pitch}
+      {approvalStatus}
+      {approvedDetails}
+      {description}
+      {!pitchFirst && pitch}
+    </div>
   );
 }
 
@@ -170,27 +363,17 @@ export function EventDetailSections({
   const showStatus = Boolean(
     registrationStatus || event.applicationControls.publicMessage
   );
-  const showApplication = Boolean(
-    registration?.canEditAnswers ||
-      (event.applicationQuestionSet.composedFields.length > 0 &&
-        event.applicationControls.canSubmit)
-  );
-  const approvedEntries = event.approvedDetailsJson
-    ? detailEntries(event.approvedDetailsJson)
-    : [];
-  const showApproved =
-    event.approvedDetailsVisible && approvedEntries.length > 0;
+  const showApplication = Boolean(registration?.canEditAnswers);
 
-  if (!showStatus && !showApplication && !showApproved) return null;
+  if (registrationStatus === 'APPROVED') return null;
+  if (!showStatus && !showApplication) return null;
 
   return (
     <ManagementSection
       title={registrationHeading(registrationStatus)}
       description={
         event.applicationControls.publicMessage ||
-        (registrationStatus === 'APPROVED'
-          ? 'Your place at this event is confirmed.'
-          : 'Apply to take part in this event.')
+        'Apply to take part in this event.'
       }
       actions={
         registrationStatus ? (
@@ -200,9 +383,8 @@ export function EventDetailSections({
       size="large"
     >
       <div className={`grid gap-6 divide-y ${classes.divider}`}>
-        {showApproved && <ApprovedOnlyDetails event={event} />}
         {showApplication && (
-          <div className={showApproved ? 'pt-6' : ''}>
+          <div>
             <h3 className="mb-4 text-lg font-bold">Application</h3>
             <EventApplicationForm
               embedded
@@ -212,7 +394,7 @@ export function EventDetailSections({
           </div>
         )}
         {registration?.canCancel && (
-          <div className={showApproved || showApplication ? 'pt-6' : ''}>
+          <div className={showApplication ? 'pt-6' : ''}>
             <button type="button" className={classes.secondaryButton}>
               Cancel registration
             </button>
@@ -239,8 +421,11 @@ export function EventPitchSection({
       title="Pitch session"
       description="At the end of the event, use the pitch session to present projects to the group."
       actions={
-        <a className={classes.primaryButton} href={`/pitch/${eventId}`}>
-          Open pitch event
+        <a
+          className={`${classes.primaryButton} whitespace-nowrap !px-3`}
+          href={`/pitch/${eventId}`}
+        >
+          Go to pitch
           <span aria-hidden="true">→</span>
         </a>
       }

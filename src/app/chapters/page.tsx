@@ -99,12 +99,11 @@ export default function ChaptersPage() {
                 <div className="block truncate text-lg font-bold group-hover:underline">
                   {chapter.name}
                 </div>
-                <div className={`mt-1 text-sm ${classes.mutedText}`}>
-                  {chapter.city}
-                </div>
-                <div className={`mt-1 text-xs ${classes.mutedText}`}>
-                  {chapter.timezone}
-                </div>
+                {chapter.description && (
+                  <div className={`mt-1 text-sm ${classes.mutedText}`}>
+                    {chapter.description}
+                  </div>
+                )}
               </div>
               <ManagementBadge>{chapter.accessMode}</ManagementBadge>
             </div>
