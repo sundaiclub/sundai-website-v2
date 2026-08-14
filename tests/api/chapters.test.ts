@@ -722,6 +722,36 @@ describe('/api/chapters', () => {
     );
   });
 
+  it('lets a chapter admin update chapter decision message defaults', async () => {
+    const { chapter, hacker, membership } = buildChapterAdminFixture();
+    const updateBody = {
+      defaultApprovalMessage: 'Welcome to the Boston event.',
+      defaultWaitlistMessage: 'You are on the Boston waitlist.',
+      defaultRejectionMessage: 'Boston cannot offer you a spot this time.',
+    };
+
+    mockActor(hacker);
+    mockMembershipLookup(membership);
+    prisma.chapter.findUnique.mockResolvedValue(chapter);
+    prisma.chapter.update.mockResolvedValue({ ...chapter, ...updateBody });
+
+    const response = await PATCH_CHAPTER(
+      createJsonRequest(`/api/chapters/${chapter.id}`, {
+        method: 'PATCH',
+        body: updateBody,
+      }) as any,
+      createRouteContext({ chapterId: chapter.id }) as any
+    );
+
+    expect(response.status).toBe(200);
+    expect(prisma.chapter.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: chapter.id },
+        data: updateBody,
+      })
+    );
+  });
+
   it('rejects an unsupported chapter timezone', async () => {
     const siteAdmin = buildSiteAdmin();
     const chapter = buildChapter({ id: 'chapter-boston' });

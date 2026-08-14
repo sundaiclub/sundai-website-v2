@@ -43,18 +43,12 @@ export async function POST(
     }
 
     if (currentIdx !== -1) {
-      // If still presenting/questions, mark as completed with timestamp
+      // If the timer is running, stop it before advancing.
       const current = ordered[currentIdx];
       const completedData: Prisma.PitchProjectUpdateInput = { status: 'DONE' };
-      if (
-        current.pitchPhase === 'PRESENTING' ||
-        current.pitchPhase === 'QUESTIONS'
-      ) {
-        completedData.pitchPhase = 'COMPLETED';
+      if (current.timerPhase === 'RUNNING') {
+        completedData.timerPhase = 'COMPLETED';
         completedData.completedAt = new Date();
-        if (current.pitchPhase === 'PRESENTING') {
-          completedData.questionsStartedAt = new Date();
-        }
       }
       await prisma.pitchProject.update({
         where: { id: current.id },
@@ -64,7 +58,7 @@ export async function POST(
     if (nextIdx !== -1) {
       await prisma.pitchProject.update({
         where: { id: ordered[nextIdx].id },
-        data: { status: 'CURRENT', approved: true, pitchPhase: 'WAITING' },
+        data: { status: 'CURRENT', approved: true, timerPhase: 'WAITING' },
       });
     } else {
       await prisma.pitchSession.update({

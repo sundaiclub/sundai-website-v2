@@ -479,30 +479,28 @@ model EventProject {
 }
 
 model PitchSession {
-  id                   String            @id @default(uuid())
-  event                Event?            @relation(fields: [eventId], references: [id])
-  eventId              String?
-  chapter              Chapter           @relation(fields: [chapterId], references: [id])
-  chapterId            String
-  legacyBackfill       Boolean           @default(false)
-  title                String
-  description          String?
-  startTime            DateTime
-  meetingUrl           String?
-  location             String?
-  audienceCanReorder   Boolean           @default(true)
-  votingEndTime        DateTime?
-  phase                PitchSessionPhase @default(VOTING)
-  topProjectCount      Int               @default(5)
-  topPresentingSec     Int               @default(120)
-  topQuestionsSec      Int               @default(180)
-  defaultPresentingSec Int               @default(60)
-  defaultQuestionsSec  Int               @default(120)
-  projects             PitchProject[]
-  createdBy            Hacker            @relation(fields: [createdById], references: [id])
-  createdById          String
-  createdAt            DateTime          @default(now())
-  updatedAt            DateTime          @updatedAt
+  id                 String            @id @default(uuid())
+  event              Event?            @relation(fields: [eventId], references: [id])
+  eventId            String?
+  chapter            Chapter           @relation(fields: [chapterId], references: [id])
+  chapterId          String
+  legacyBackfill     Boolean           @default(false)
+  title              String
+  description        String?
+  startTime          DateTime
+  meetingUrl         String?
+  location           String?
+  audienceCanReorder Boolean           @default(true)
+  votingEndTime      DateTime?
+  phase              PitchSessionPhase @default(VOTING)
+  topProjectCount    Int               @default(5)
+  topPitchSec        Int               @default(300)
+  defaultPitchSec    Int               @default(180)
+  projects           PitchProject[]
+  createdBy          Hacker            @relation(fields: [createdById], references: [id])
+  createdById        String
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
 
   @@index([eventId])
   @@index([chapterId, startTime])
@@ -510,27 +508,30 @@ model PitchSession {
 }
 
 model Chapter {
-  id                    String                @id @default(uuid())
-  name                  String
-  slug                  String                @unique
-  city                  String
-  region                String?
-  country               String
-  timezone              String
-  description           String?
-  heroImage             Image?                @relation("ChapterHeroImage", fields: [heroImageId], references: [id])
-  heroImageId           String?               @unique
-  status                ChapterStatus         @default(ACTIVE)
-  accessMode            ChapterAccessMode     @default(PUBLIC)
-  mailingListName       String?
-  mailingListExternalId String?
-  createdAt             DateTime              @default(now())
-  updatedAt             DateTime              @updatedAt
-  memberships           ChapterMembership[]
-  events                Event[]
-  pitchSessions         PitchSession[]
-  applicationTemplates  ApplicationTemplate[]
-  banFlags              UserBanFlag[]
+  id                      String                @id @default(uuid())
+  name                    String
+  slug                    String                @unique
+  city                    String
+  region                  String?
+  country                 String
+  timezone                String
+  description             String?
+  heroImage               Image?                @relation("ChapterHeroImage", fields: [heroImageId], references: [id])
+  heroImageId             String?               @unique
+  status                  ChapterStatus         @default(ACTIVE)
+  accessMode              ChapterAccessMode     @default(PUBLIC)
+  mailingListName         String?
+  mailingListExternalId   String?
+  defaultApprovalMessage  String?
+  defaultWaitlistMessage  String?
+  defaultRejectionMessage String?
+  createdAt               DateTime              @default(now())
+  updatedAt               DateTime              @updatedAt
+  memberships             ChapterMembership[]
+  events                  Event[]
+  pitchSessions           PitchSession[]
+  applicationTemplates    ApplicationTemplate[]
+  banFlags                UserBanFlag[]
 
   @@index([status, accessMode])
   @@index([slug])
@@ -862,14 +863,11 @@ model PitchProject {
   updatedAt      DateTime           @updatedAt
 
   // Timer fields
-  pitchPhase            PitchPhase         @default(WAITING)
-  presentingStartedAt   DateTime?
-  questionsStartedAt    DateTime?
-  completedAt           DateTime?
-  pausedAt              DateTime?
-  allottedPresentingSec Int?
-  allottedQuestionsSec  Int?
-  pitchVotes            PitchProjectVote[]
+  timerPhase     PitchTimerPhase    @default(WAITING)
+  timerStartedAt DateTime?
+  completedAt    DateTime?
+  allottedSec    Int?
+  pitchVotes     PitchProjectVote[]
 
   @@unique([pitchSessionId, projectId])
   @@index([pitchSessionId, position])
@@ -904,9 +902,8 @@ enum PitchProjectStatus {
   SKIPPED
 }
 
-enum PitchPhase {
+enum PitchTimerPhase {
   WAITING
-  PRESENTING
-  QUESTIONS
+  RUNNING
   COMPLETED
 }

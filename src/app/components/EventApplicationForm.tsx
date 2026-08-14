@@ -193,17 +193,21 @@ export function EventApplicationForm({
   viewerProfile,
   onRegistrationChange,
   embedded = false,
+  initialEditing = false,
+  hideStartButton = false,
 }: {
   event: PublicEventDetail;
   viewerProfile?: ProfilePrefillSource | null;
   onRegistrationChange?: (registration: PublicRegistrationResponse) => void;
   embedded?: boolean;
+  initialEditing?: boolean;
+  hideStartButton?: boolean;
 }) {
   const classes = useManagementClasses();
   const fields = event.applicationQuestionSet.composedFields;
   const registration = event.viewerRegistration;
   const controls: ApplicationControlsState = event.applicationControls;
-  const [isEditing, setIsEditing] = useState(false);
+  const [isEditing, setIsEditing] = useState(initialEditing);
   const [answers, setAnswers] = useState<JsonObject>(() =>
     initialAnswers({
       fields,
@@ -242,12 +246,13 @@ export function EventApplicationForm({
     );
     setEmailNotificationsEnabled(savedEmailPreference);
     setSmsConsentGranted(savedSmsPreference);
-    setIsEditing(false);
+    setIsEditing(initialEditing);
   }, [
     controls.canSubmit,
     event.reusableAnswersJson,
     fields,
     registration,
+    initialEditing,
     savedEmailPreference,
     savedSmsPreference,
     viewerProfile,
@@ -258,7 +263,8 @@ export function EventApplicationForm({
     controls.canSubmit &&
     !registration &&
     !isEditing &&
-    !actionMessage;
+    !actionMessage &&
+    !hideStartButton;
   const canShowForm = fields.length > 0 && isEditing;
   const submitLabel = registration ? 'Save changes' : 'Submit application';
 

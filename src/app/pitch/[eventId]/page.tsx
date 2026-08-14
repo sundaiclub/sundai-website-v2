@@ -1,5 +1,6 @@
 'use client';
 import Image from 'next/image';
+import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { useUser, SignInButton } from '@clerk/nextjs';
@@ -10,7 +11,6 @@ import { ProjectCard } from '../../components/Project';
 import type { Project } from '@/types/project';
 import { motion, AnimatePresence, PanInfo } from 'framer-motion';
 import ProjectMarkdown from '../../components/ProjectMarkdown';
-import EventMarkdown from '../../components/EventMarkdown';
 import {
   formatDateTimeLocalValue,
   serializeDateTimeLocalValue,
@@ -21,7 +21,7 @@ import type {
   PitchProjectStatus,
   PitchProjectVoteValue,
   EventStaffRole,
-  PitchPhase,
+  PitchTimerPhase,
 } from '@/types/event-management';
 
 type PitchProjectEntry = {
@@ -32,13 +32,10 @@ type PitchProjectEntry = {
   isTopProject: boolean;
   addedById: string;
   project: Project;
-  pitchPhase: PitchPhase;
-  presentingStartedAt: string | null;
-  questionsStartedAt: string | null;
+  timerPhase: PitchTimerPhase;
+  timerStartedAt: string | null;
   completedAt: string | null;
-  pausedAt: string | null;
-  allottedPresentingSec: number | null;
-  allottedQuestionsSec: number | null;
+  allottedSec: number | null;
   pitchVotes: Array<{
     hackerId: string;
     value: PitchProjectVoteValue;
@@ -48,21 +45,19 @@ type PitchProjectEntry = {
 
 type EventDetail = {
   id: string;
+  slug: string;
   title: string;
-  description?: string | null;
   startTime: string;
   endTime?: string | null;
   timezone: string;
-  chapter: { timezone: string };
+  chapter: { slug: string; timezone: string };
   meetingUrl?: string | null;
   audienceCanReorder: boolean;
   votingEndTime?: string | null;
   phase: PitchSessionPhase;
   topProjectCount: number;
-  topPresentingSec: number;
-  topQuestionsSec: number;
-  defaultPresentingSec: number;
-  defaultQuestionsSec: number;
+  topPitchSec: number;
+  defaultPitchSec: number;
   staff: Array<{
     id: string;
     role: EventStaffRole;
@@ -77,10 +72,8 @@ type EventPitchResponse = Omit<
   | 'votingEndTime'
   | 'phase'
   | 'topProjectCount'
-  | 'topPresentingSec'
-  | 'topQuestionsSec'
-  | 'defaultPresentingSec'
-  | 'defaultQuestionsSec'
+  | 'topPitchSec'
+  | 'defaultPitchSec'
   | 'projects'
 > & {
   pitchSessions?: Array<
@@ -90,10 +83,8 @@ type EventPitchResponse = Omit<
       | 'votingEndTime'
       | 'phase'
       | 'topProjectCount'
-      | 'topPresentingSec'
-      | 'topQuestionsSec'
-      | 'defaultPresentingSec'
-      | 'defaultQuestionsSec'
+      | 'topPitchSec'
+      | 'defaultPitchSec'
       | 'projects'
     >
   >;
@@ -111,10 +102,8 @@ function toEventDetail(data: EventPitchResponse): EventDetail {
     votingEndTime: pitchSession.votingEndTime,
     phase: pitchSession.phase,
     topProjectCount: pitchSession.topProjectCount,
-    topPresentingSec: pitchSession.topPresentingSec,
-    topQuestionsSec: pitchSession.topQuestionsSec,
-    defaultPresentingSec: pitchSession.defaultPresentingSec,
-    defaultQuestionsSec: pitchSession.defaultQuestionsSec,
+    topPitchSec: pitchSession.topPitchSec,
+    defaultPitchSec: pitchSession.defaultPitchSec,
     projects: pitchSession.projects,
   };
 }
@@ -295,7 +284,7 @@ function SwipeCard({
       <div
         className={`${isDarkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl p-6 shadow-lg max-h-[70vh] overflow-y-auto`}
       >
-        <div className="relative mb-4 aspect-video max-h-[30vh] w-full overflow-hidden rounded-lg">
+        <div className="relative mb-4 aspect-[3/2] w-full overflow-hidden rounded-lg bg-black">
           <Image
             src={
               project.thumbnail?.url ||
@@ -304,7 +293,7 @@ function SwipeCard({
                 : '/images/default_project_thumbnail_light.svg')
             }
             alt={project.title}
-            className="object-cover"
+            className="object-contain"
             draggable={false}
             fill
             sizes="(min-width: 768px) 560px, 100vw"
@@ -916,41 +905,32 @@ function TimerDisplay({
   allottedSec,
   isDarkMode,
   label,
-  pausedAt,
 }: {
   startedAt: string;
   allottedSec: number;
   isDarkMode: boolean;
   label: string;
-  pausedAt?: string | null;
 }) {
   const [elapsed, setElapsed] = useState(0);
 
   useEffect(() => {
     const start = new Date(startedAt).getTime();
-    if (pausedAt) {
-      setElapsed((new Date(pausedAt).getTime() - start) / 1000);
-      return;
-    }
     const tick = () => setElapsed((Date.now() - start) / 1000);
     tick();
     const id = setInterval(tick, 100);
     return () => clearInterval(id);
-  }, [startedAt, pausedAt]);
+  }, [startedAt]);
 
   const overtime = Math.max(0, elapsed - allottedSec);
   const isOver = overtime > 0;
   const remaining = Math.max(0, allottedSec - elapsed);
-  const isPaused = !!pausedAt;
-
   return (
     <div className="flex flex-col items-center gap-1">
       <span className="text-xs uppercase tracking-wider opacity-70">
         {label}
-        {isPaused && ' · Paused'}
       </span>
       <div
-        className={`text-4xl font-mono font-bold tabular-nums ${isPaused ? 'opacity-60' : ''} ${isOver ? 'text-red-500' : isDarkMode ? 'text-white' : 'text-gray-900'}`}
+        className={`text-4xl font-mono font-bold tabular-nums ${isOver ? 'text-red-500' : isDarkMode ? 'text-white' : 'text-gray-900'}`}
       >
         {isOver ? formatTime(elapsed) : formatTime(remaining)}
       </div>
@@ -973,32 +953,20 @@ function CompletedTimerSummary({
   ep: PitchProjectEntry;
   isDarkMode: boolean;
 }) {
-  if (!ep.presentingStartedAt) return null;
+  if (!ep.timerStartedAt) return null;
 
-  const presStart = new Date(ep.presentingStartedAt).getTime();
-  const qStart = ep.questionsStartedAt
-    ? new Date(ep.questionsStartedAt).getTime()
-    : null;
+  const start = new Date(ep.timerStartedAt).getTime();
   const end = ep.completedAt ? new Date(ep.completedAt).getTime() : null;
-
-  const presDuration = qStart ? (qStart - presStart) / 1000 : null;
-  const qDuration = qStart && end ? (end - qStart) / 1000 : null;
-
-  const presAllotted = ep.allottedPresentingSec ?? 0;
-  const qAllotted = ep.allottedQuestionsSec ?? 0;
+  const duration = end ? (end - start) / 1000 : null;
+  const allotted = ep.allottedSec ?? 0;
 
   return (
     <div
       className={`flex gap-4 text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}
     >
-      {presDuration != null && (
-        <span className={presDuration > presAllotted ? 'text-red-400' : ''}>
-          Pitch: {formatTime(presDuration)}/{formatTime(presAllotted)}
-        </span>
-      )}
-      {qDuration != null && (
-        <span className={qDuration > qAllotted ? 'text-red-400' : ''}>
-          Q&A: {formatTime(qDuration)}/{formatTime(qAllotted)}
+      {duration != null && (
+        <span className={duration > allotted ? 'text-red-400' : ''}>
+          Total: {formatTime(duration)}/{formatTime(allotted)}
         </span>
       )}
     </div>
@@ -1029,7 +997,7 @@ function PitchTimer({
         body: JSON.stringify({ action, pitchProjectId: currentItem.id }),
       });
       if (res.ok) {
-        if (action === 'finish') {
+        if (action === 'stop') {
           await fetch(`/api/events/${eventId}/pitch/advance`, {
             method: 'POST',
           });
@@ -1041,9 +1009,7 @@ function PitchTimer({
     }
   };
 
-  const phase = currentItem.pitchPhase;
-  const isPaused = !!currentItem.pausedAt;
-
+  const phase = currentItem.timerPhase;
   return (
     <div
       className={`rounded-xl p-5 shadow ${isDarkMode ? 'bg-gray-800' : 'bg-white'}`}
@@ -1052,26 +1018,18 @@ function PitchTimer({
         <h3 className="font-semibold">Timer</h3>
         <span
           className={`text-xs uppercase tracking-wider px-2 py-1 rounded-full font-semibold ${
-            isPaused
-              ? 'bg-amber-100 text-amber-700'
-              : phase === 'WAITING'
-                ? 'bg-gray-200 text-gray-600'
-                : phase === 'PRESENTING'
-                  ? 'bg-indigo-100 text-indigo-700'
-                  : phase === 'QUESTIONS'
-                    ? 'bg-purple-100 text-purple-700'
-                    : 'bg-gray-200 text-gray-600'
+            phase === 'WAITING'
+              ? 'bg-gray-200 text-gray-600'
+              : phase === 'RUNNING'
+                ? 'bg-indigo-100 text-indigo-700'
+                : 'bg-gray-200 text-gray-600'
           }`}
         >
-          {isPaused
-            ? 'Paused'
-            : phase === 'WAITING'
-              ? 'Ready'
-              : phase === 'PRESENTING'
-                ? 'Presenting'
-                : phase === 'QUESTIONS'
-                  ? 'Q&A'
-                  : 'Done'}
+          {phase === 'WAITING'
+            ? 'Ready'
+            : phase === 'RUNNING'
+              ? 'Running'
+              : 'Done'}
         </span>
       </div>
 
@@ -1089,86 +1047,36 @@ function PitchTimer({
                 isController ? 'text-base' : 'text-center opacity-70 text-sm'
               }
             >
-              Allotted: {formatTime(currentItem.allottedPresentingSec ?? 0)}{' '}
-              presenting, {formatTime(currentItem.allottedQuestionsSec ?? 0)}{' '}
-              Q&A
+              Total time: {formatTime(currentItem.allottedSec ?? 0)}
             </div>
             {isController && (
               <button
                 disabled={acting}
-                onClick={() => timerAction('start_presenting')}
+                onClick={() => timerAction('start')}
                 className={`px-4 py-2 rounded text-white text-sm font-semibold transition duration-300 shrink-0 ${acting ? 'bg-gray-400' : 'bg-indigo-600 hover:bg-indigo-700'}`}
               >
-                {acting ? 'Starting...' : 'Presentation Started'}
+                {acting ? 'Starting...' : 'Start'}
               </button>
             )}
           </>
         )}
 
-        {phase === 'PRESENTING' && currentItem.presentingStartedAt && (
+        {phase === 'RUNNING' && currentItem.timerStartedAt && (
           <>
             <TimerDisplay
-              startedAt={currentItem.presentingStartedAt}
-              allottedSec={currentItem.allottedPresentingSec ?? 120}
+              startedAt={currentItem.timerStartedAt}
+              allottedSec={currentItem.allottedSec ?? 180}
               isDarkMode={isDarkMode}
-              label="Presenting"
-              pausedAt={currentItem.pausedAt}
+              label="Pitch"
             />
             {isController && (
               <div className="flex gap-2 shrink-0">
                 <button
                   disabled={acting}
-                  onClick={() => timerAction(isPaused ? 'resume' : 'pause')}
-                  title={
-                    isPaused
-                      ? 'Resume the timer'
-                      : 'Pause the timer (e.g. for AV issues)'
-                  }
-                  className={`px-4 py-2 rounded text-white text-sm font-semibold transition duration-300 ${acting ? 'bg-gray-400' : isPaused ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-amber-600 hover:bg-amber-700'}`}
+                  onClick={() => timerAction('stop')}
+                  className={`px-4 py-2 rounded text-white text-sm font-semibold transition duration-300 ${acting ? 'bg-gray-400' : 'bg-indigo-600 hover:bg-indigo-700'}`}
                 >
-                  {isPaused ? 'Resume' : 'Pause'}
-                </button>
-                <button
-                  disabled={acting || isPaused}
-                  onClick={() => timerAction('start_questions')}
-                  className={`px-4 py-2 rounded text-white text-sm font-semibold transition duration-300 ${acting || isPaused ? 'bg-gray-400' : 'bg-indigo-600 hover:bg-indigo-700'}`}
-                >
-                  {acting ? 'Starting...' : 'Q&A Started'}
-                </button>
-              </div>
-            )}
-          </>
-        )}
-
-        {phase === 'QUESTIONS' && currentItem.questionsStartedAt && (
-          <>
-            <TimerDisplay
-              startedAt={currentItem.questionsStartedAt}
-              allottedSec={currentItem.allottedQuestionsSec ?? 180}
-              isDarkMode={isDarkMode}
-              label="Q&A"
-              pausedAt={currentItem.pausedAt}
-            />
-            {isController && (
-              <div className="flex gap-2 shrink-0">
-                <button
-                  disabled={acting}
-                  onClick={() => timerAction(isPaused ? 'resume' : 'pause')}
-                  title={
-                    isPaused
-                      ? 'Resume the timer'
-                      : 'Pause the timer (e.g. for AV issues)'
-                  }
-                  className={`px-4 py-2 rounded text-white text-sm font-semibold transition duration-300 ${acting ? 'bg-gray-400' : isPaused ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-amber-600 hover:bg-amber-700'}`}
-                >
-                  {isPaused ? 'Resume' : 'Pause'}
-                </button>
-                <button
-                  disabled={acting || isPaused}
-                  onClick={() => timerAction('finish')}
-                  className={`px-4 py-2 rounded text-white text-sm font-semibold transition duration-300 ${acting || isPaused ? 'bg-gray-400' : 'bg-indigo-600 hover:bg-indigo-700'}`}
-                >
-                  {acting ? 'Finishing...' : 'Finished'}
+                  {acting ? 'Stopping...' : 'Stop'}
                 </button>
               </div>
             )}
@@ -1754,10 +1662,8 @@ export default function PitchEventPage() {
   const [phaseTransitioning, setPhaseTransitioning] =
     useState<PitchSessionPhase | null>(null);
   const [editTopProjectCount, setEditTopProjectCount] = useState(5);
-  const [editTopPresentingSec, setEditTopPresentingSec] = useState(120);
-  const [editTopQuestionsSec, setEditTopQuestionsSec] = useState(180);
-  const [editDefaultPresentingSec, setEditDefaultPresentingSec] = useState(60);
-  const [editDefaultQuestionsSec, setEditDefaultQuestionsSec] = useState(120);
+  const [editTopPitchSec, setEditTopPitchSec] = useState(300);
+  const [editDefaultPitchSec, setEditDefaultPitchSec] = useState(180);
 
   const [showJoin, setShowJoin] = useState(false);
   const [myProjects, setMyProjects] = useState<Project[]>([]);
@@ -1850,10 +1756,8 @@ export default function PitchEventPage() {
       (event.staff || []).filter(m => m.role === 'MC').map(m => m.hacker.id)
     );
     setEditTopProjectCount(event.topProjectCount);
-    setEditTopPresentingSec(event.topPresentingSec);
-    setEditTopQuestionsSec(event.topQuestionsSec);
-    setEditDefaultPresentingSec(event.defaultPresentingSec);
-    setEditDefaultQuestionsSec(event.defaultQuestionsSec);
+    setEditTopPitchSec(event.topPitchSec);
+    setEditDefaultPitchSec(event.defaultPitchSec);
     setMcSearch('');
     try {
       const res = await fetch('/api/hackers');
@@ -1877,10 +1781,8 @@ export default function PitchEventPage() {
           votingEndTime: serializeDateTimeLocalValue(editVotingEndTime),
           mcIds: editMcIds,
           topProjectCount: editTopProjectCount,
-          topPresentingSec: editTopPresentingSec,
-          topQuestionsSec: editTopQuestionsSec,
-          defaultPresentingSec: editDefaultPresentingSec,
-          defaultQuestionsSec: editDefaultQuestionsSec,
+          topPitchSec: editTopPitchSec,
+          defaultPitchSec: editDefaultPitchSec,
         }),
       });
       if (res.ok) {
@@ -1984,7 +1886,14 @@ export default function PitchEventPage() {
         <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 py-16">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold">{event.title}</h1>
+              <h1 className="text-2xl font-bold">
+                <Link
+                  href={`/events/${event.chapter.slug}/${event.slug}`}
+                  className="rounded-sm hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500"
+                >
+                  {event.title}
+                </Link>
+              </h1>
               <StageBadge phase={event.phase} />
             </div>
             <div className="flex items-center gap-2">
@@ -2007,15 +1916,6 @@ export default function PitchEventPage() {
               )}
             </div>
           </div>
-
-          {event.description && (
-            <EventMarkdown
-              markdown={event.description}
-              className={`prose prose-sm mb-4 max-w-none opacity-80 prose-a:text-current ${
-                isDarkMode ? 'prose-invert' : 'prose-gray'
-              }`}
-            />
-          )}
 
           {event.phase === 'VOTING' ? (
             <VotingPhase
@@ -2044,7 +1944,7 @@ export default function PitchEventPage() {
       {showEdit && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div
-            className={`${isDarkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl w-full max-w-lg p-6 shadow-xl max-h-[90vh] overflow-y-auto`}
+            className={`${isDarkMode ? 'bg-gray-800 text-white' : 'bg-white text-gray-900'} rounded-xl w-full max-w-lg p-6 shadow-xl max-h-[90vh] overflow-y-auto`}
           >
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-semibold">Edit Event</h2>
@@ -2096,7 +1996,7 @@ export default function PitchEventPage() {
               className={`rounded-lg p-4 mb-4 ${isDarkMode ? 'bg-gray-700/50' : 'bg-gray-50'}`}
             >
               <h3 className="text-sm font-semibold mb-3">
-                Presentation Timing
+                Pitch Timing
               </h3>
 
               <label className="block text-xs font-medium mb-1">
@@ -2114,55 +2014,18 @@ export default function PitchEventPage() {
                 className={`w-full px-3 py-2 rounded-md mb-3 ${isDarkMode ? 'bg-gray-900 text-gray-100' : 'bg-gray-100 text-gray-900'}`}
               />
 
-              <div className="grid grid-cols-2 gap-3 mb-3">
-                <div>
-                  <label className="block text-xs font-medium mb-1">
-                    Top Presenting (sec)
-                  </label>
-                  <input
-                    type="number"
-                    min={0}
-                    step={10}
-                    value={editTopPresentingSec}
-                    onChange={e =>
-                      setEditTopPresentingSec(
-                        Math.max(0, parseInt(e.target.value) || 0)
-                      )
-                    }
-                    className={`w-full px-3 py-2 rounded-md ${isDarkMode ? 'bg-gray-900 text-gray-100' : 'bg-gray-100 text-gray-900'}`}
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium mb-1">
-                    Top Q&A (sec)
-                  </label>
-                  <input
-                    type="number"
-                    min={0}
-                    step={10}
-                    value={editTopQuestionsSec}
-                    onChange={e =>
-                      setEditTopQuestionsSec(
-                        Math.max(0, parseInt(e.target.value) || 0)
-                      )
-                    }
-                    className={`w-full px-3 py-2 rounded-md ${isDarkMode ? 'bg-gray-900 text-gray-100' : 'bg-gray-100 text-gray-900'}`}
-                  />
-                </div>
-              </div>
-
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium mb-1">
-                    Regular Presenting (sec)
+                    Top Project Total Time (sec)
                   </label>
                   <input
                     type="number"
                     min={0}
                     step={10}
-                    value={editDefaultPresentingSec}
+                    value={editTopPitchSec}
                     onChange={e =>
-                      setEditDefaultPresentingSec(
+                      setEditTopPitchSec(
                         Math.max(0, parseInt(e.target.value) || 0)
                       )
                     }
@@ -2171,15 +2034,15 @@ export default function PitchEventPage() {
                 </div>
                 <div>
                   <label className="block text-xs font-medium mb-1">
-                    Regular Q&A (sec)
+                    Regular Project Total Time (sec)
                   </label>
                   <input
                     type="number"
                     min={0}
                     step={10}
-                    value={editDefaultQuestionsSec}
+                    value={editDefaultPitchSec}
                     onChange={e =>
-                      setEditDefaultQuestionsSec(
+                      setEditDefaultPitchSec(
                         Math.max(0, parseInt(e.target.value) || 0)
                       )
                     }
@@ -2290,7 +2153,7 @@ export default function PitchEventPage() {
       {showJoin && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div
-            className={`${isDarkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl w-full max-w-lg p-6 shadow-xl`}
+            className={`${isDarkMode ? 'bg-gray-800 text-white' : 'bg-white text-gray-900'} rounded-xl w-full max-w-lg p-6 shadow-xl`}
           >
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-semibold">Choose your project</h2>

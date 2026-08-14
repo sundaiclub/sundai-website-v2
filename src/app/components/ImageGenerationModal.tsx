@@ -186,12 +186,12 @@ export default function ImageGenerationModal({
                       }`}
                       onClick={() => handleImageSelect(index)}
                     >
-                      <div className="aspect-video relative">
+                      <div className="relative aspect-[3/2] bg-black">
                         <Image
                           src={image.url}
                           alt={`Generated image ${index + 1}`}
                           fill
-                          className="object-cover"
+                          className="object-contain"
                         />
                       </div>
                       {selectedImageIndex === index && (

@@ -2,7 +2,13 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useEffect, useState, type ReactNode } from 'react';
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  type ReactNode,
+} from 'react';
 import {
   ManagementAlert,
   ManagementBadge,
@@ -19,6 +25,16 @@ type EffectiveWorkspaceRole = 'SITE_ADMIN' | 'CHAPTER_ADMIN' | 'MC' | 'CO_MC';
 export type EventWorkspacePayload = EventWorkspaceOverview & {
   effectiveRole?: EffectiveWorkspaceRole;
 };
+
+const EventWorkspaceContext = createContext<EventWorkspacePayload | null>(null);
+
+export function useEventWorkspace() {
+  const workspace = useContext(EventWorkspaceContext);
+  if (!workspace) {
+    throw new Error('useEventWorkspace must be used inside WorkspaceShell.');
+  }
+  return workspace;
+}
 
 type WorkspaceShellProps = {
   eventId: string;
@@ -136,6 +152,7 @@ function WorkspaceContent({
   const pathname = usePathname();
   const classes = useManagementClasses();
   const event = workspace.event;
+  const hasPublicEvent = event.status !== 'DRAFT';
   const availableSections = new Set(
     workspace.availableSections?.length
       ? workspace.availableSections
@@ -144,12 +161,14 @@ function WorkspaceContent({
 
   return (
     <ManagementPage maxWidth="max-w-7xl">
-      <div className="mb-4">
-        <Link className={classes.ghostButton} href={event.publicUrl}>
-          <span aria-hidden="true">&larr;</span>
-          <span>Back to event</span>
-        </Link>
-      </div>
+      {hasPublicEvent && (
+        <div className="mb-4">
+          <Link className={classes.ghostButton} href={event.publicUrl}>
+            <span aria-hidden="true">&larr;</span>
+            <span>Back to event</span>
+          </Link>
+        </div>
+      )}
       <header className={`${classes.panel} mb-5 p-5 sm:p-6`}>
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
@@ -172,13 +191,15 @@ function WorkspaceContent({
               </ManagementBadge>
             </div>
           </div>
-          <Link
-            className={classes.secondaryButton}
-            href={event.publicUrl}
-            target="_blank"
-          >
-            View event
-          </Link>
+          {hasPublicEvent && (
+            <Link
+              className={classes.secondaryButton}
+              href={event.publicUrl}
+              target="_blank"
+            >
+              View event
+            </Link>
+          )}
         </div>
 
         <nav aria-label="Event workspace" className="mt-5 overflow-x-auto">
@@ -210,7 +231,9 @@ function WorkspaceContent({
           </ul>
         </nav>
       </header>
-      {children}
+      <EventWorkspaceContext.Provider value={workspace}>
+        {children}
+      </EventWorkspaceContext.Provider>
     </ManagementPage>
   );
 }

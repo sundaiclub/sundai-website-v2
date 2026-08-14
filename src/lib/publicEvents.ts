@@ -222,6 +222,7 @@ export type PublicEventViewer = {
 
 export type ListPublicEventsOptions = {
   chapterSlug?: string | null;
+  period?: 'upcoming' | 'previous';
   viewer?: PublicEventViewer | null;
   now?: Date;
   take?: number;
@@ -244,6 +245,7 @@ export type RedactPublicEventOptions = {
   viewerProfile?: ProfilePrefillSource | null;
   viewerNotificationPreferences?: PublicEventDetail['viewerNotificationPreferences'];
   viewerRegistration?: PublicViewerRegistrationState | null;
+  viewerEventStaffRole?: EventStaffRole | null;
   viewerCanManageRegistrations?: boolean;
   viewerCanViewApprovedDetails?: boolean;
   viewerCanEditEvent?: boolean;
@@ -342,8 +344,17 @@ function publicEventVisibilityWhere(
 
 function publicEventListingWhere(
   now: Date,
-  chapterSlug?: string | null
+  chapterSlug?: string | null,
+  period: 'upcoming' | 'previous' = 'upcoming'
 ): Prisma.EventWhereInput {
+  if (period === 'previous') {
+    return {
+      ...publicEventVisibilityWhere(chapterSlug),
+      startTime: { lt: now },
+      OR: [{ endTime: null }, { endTime: { lte: now } }],
+    };
+  }
+
   return {
     ...publicEventVisibilityWhere(chapterSlug),
     OR: [
@@ -365,10 +376,14 @@ export async function listPublicEvents(
 ): Promise<PublicEventCard[]> {
   const client = options.prismaClient ?? defaultPrisma;
   const now = options.now ?? new Date();
+  const period = options.period ?? 'upcoming';
   const events = await client.event.findMany({
-    where: publicEventListingWhere(now, options.chapterSlug),
+    where: publicEventListingWhere(now, options.chapterSlug, period),
     include: publicEventInclude(),
-    orderBy: [{ startTime: 'asc' }, { title: 'asc' }],
+    orderBy:
+      period === 'previous'
+        ? [{ startTime: 'desc' }, { title: 'asc' }]
+        : [{ startTime: 'asc' }, { title: 'asc' }],
     take: options.take,
     skip: options.skip,
   });
@@ -472,6 +487,7 @@ export async function getPublicEventBySlug(
           }
         : null,
     viewerRegistration,
+    viewerEventStaffRole: readPermissionContext.staff?.role ?? null,
     viewerCanManageRegistrations,
     viewerCanViewApprovedDetails,
     viewerCanEditEvent,
@@ -506,8 +522,16 @@ export function redactPublicEventForViewer(
   options: RedactPublicEventOptions = {}
 ): PublicEventDetail {
   const now = options.now ?? new Date();
+  const viewerRegistration = options.viewerRegistration
+    ? {
+        ...options.viewerRegistration,
+        canCancel: options.viewerEventStaffRole
+          ? false
+          : options.viewerRegistration.canCancel,
+      }
+    : null;
   const approvedDetailsVisible = canViewApprovedDetails({
-    viewerRegistration: options.viewerRegistration,
+    viewerRegistration,
     viewerCanViewApprovedDetails: options.viewerCanViewApprovedDetails,
     viewerCanManageRegistrations: options.viewerCanManageRegistrations,
   });
@@ -516,9 +540,9 @@ export function redactPublicEventForViewer(
     : null;
   const applicationControls = buildApplicationControls({
     event,
-    viewerRegistration: options.viewerRegistration ?? null,
+    viewerRegistration,
     viewerIsSignedIn:
-      options.viewerIsSignedIn === true || Boolean(options.viewerRegistration),
+      options.viewerIsSignedIn === true || Boolean(viewerRegistration),
     approvedCount: options.approvedCount,
     now,
   });
@@ -543,7 +567,8 @@ export function redactPublicEventForViewer(
     viewerProfile: options.viewerProfile ?? null,
     viewerNotificationPreferences:
       options.viewerNotificationPreferences ?? null,
-    viewerRegistration: options.viewerRegistration ?? null,
+    viewerRegistration,
+    viewerEventStaffRole: options.viewerEventStaffRole ?? null,
     viewerCanManageRegistrations: options.viewerCanManageRegistrations === true,
     viewerCanEditEvent: options.viewerCanEditEvent === true,
     viewerCanManageEvent: options.viewerCanManageEvent === true,

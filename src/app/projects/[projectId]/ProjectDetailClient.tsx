@@ -285,8 +285,7 @@ export default function ProjectDetailClient() {
     >
       <div className="max-w-7xl mx-auto relative">
         <div className={`shadow-lg overflow-hidden`}>
-          {/* Project Header - Now with larger height on desktop */}
-          <div className="relative h-64 md:h-96 w-full">
+          <div className="relative aspect-[3/2] w-full bg-black">
           <NextImage
               src={
                 project.thumbnail?.url ||
@@ -296,7 +295,7 @@ export default function ProjectDetailClient() {
               }
               alt={project.title}
               fill
-              className="object-cover"
+              className="object-contain"
               priority
             />
             {allowedEdit && (

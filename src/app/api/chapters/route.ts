@@ -24,6 +24,9 @@ const chapterSelect = {
   accessMode: true,
   mailingListName: true,
   mailingListExternalId: true,
+  defaultApprovalMessage: true,
+  defaultWaitlistMessage: true,
+  defaultRejectionMessage: true,
   createdAt: true,
   updatedAt: true,
 } as const;

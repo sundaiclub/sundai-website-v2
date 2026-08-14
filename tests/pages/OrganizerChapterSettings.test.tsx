@@ -414,6 +414,123 @@ describe('/organizer/chapters/[chapterSlug]/settings', () => {
     });
   });
 
+  it('updates chapter decision message defaults under Admins', async () => {
+    mockChapterAdmin();
+    const chapterWithDefaults = {
+      ...chapter,
+      defaultApprovalMessage: 'Boston approval default.',
+      defaultWaitlistMessage: 'Boston waitlist default.',
+      defaultRejectionMessage: 'Boston rejection default.',
+    };
+
+    global.fetch = jest.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = requestUrl(input);
+      if (url.includes('/members')) return jsonResponse(members);
+      if (url.includes('/ban-flags')) return jsonResponse(banFlags);
+      if (isApplicationTemplateListRequest(url)) return jsonResponse(templates);
+      if (init?.method === 'PATCH') {
+        return jsonResponse({
+          ...chapterWithDefaults,
+          defaultApprovalMessage: 'Updated Boston approval.',
+          defaultWaitlistMessage: 'Updated Boston waitlist.',
+          defaultRejectionMessage: 'Updated Boston rejection.',
+        });
+      }
+      if (/\/api\/chapters\/[^/?]+/.test(url)) {
+        return jsonResponse(chapterWithDefaults);
+      }
+      return jsonResponse({});
+    }) as jest.Mock;
+
+    renderSettingsPage();
+
+    const approvalMessage = await screen.findByLabelText(
+      /default approval message/i
+    );
+    const rejectionMessage = screen.getByLabelText(
+      /default rejection message/i
+    );
+    const waitlistMessage = screen.getByLabelText(/default waitlist message/i);
+    expect(approvalMessage).toHaveValue('Boston approval default.');
+    expect(waitlistMessage).toHaveValue('Boston waitlist default.');
+    expect(rejectionMessage).toHaveValue('Boston rejection default.');
+
+    fireEvent.change(approvalMessage, {
+      target: { value: 'Updated Boston approval.' },
+    });
+    fireEvent.change(rejectionMessage, {
+      target: { value: 'Updated Boston rejection.' },
+    });
+    fireEvent.change(waitlistMessage, {
+      target: { value: 'Updated Boston waitlist.' },
+    });
+    fireEvent.click(
+      screen.getByRole('button', { name: /save decision messages/i })
+    );
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        `/api/chapters/${chapter.id}`,
+        expect.objectContaining({
+          method: 'PATCH',
+          body: JSON.stringify({
+            defaultApprovalMessage: 'Updated Boston approval.',
+            defaultWaitlistMessage: 'Updated Boston waitlist.',
+            defaultRejectionMessage: 'Updated Boston rejection.',
+          }),
+        })
+      );
+    });
+
+    const adminHeading = screen.getByText('Admins');
+    const banFlagsHeading = screen.getByText('Ban flags');
+    const membersHeading = screen.getByText('Members');
+    expect(
+      adminHeading.compareDocumentPosition(approvalMessage) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+    expect(
+      banFlagsHeading.compareDocumentPosition(membersHeading) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+  });
+
+  it('keeps profile saving available after a chapter image upload', async () => {
+    mockChapterAdmin();
+    renderSettingsPage();
+
+    const imageInput = await screen.findByLabelText(/chapter image/i);
+    const image = new File(['image-bytes'], 'boston-new.jpg', {
+      type: 'image/jpeg',
+    });
+
+    fireEvent.change(imageInput, { target: { files: [image] } });
+
+    await screen.findByText(/chapter image uploaded/i);
+
+    const description = screen.getByLabelText(/chapter description/i);
+    fireEvent.change(description, {
+      target: { value: 'Updated after the image upload' },
+    });
+
+    const saveButton = screen.getByRole('button', { name: /save profile/i });
+    expect(saveButton).toBeEnabled();
+    fireEvent.click(saveButton);
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        `/api/chapters/${chapter.id}`,
+        expect.objectContaining({
+          method: 'PATCH',
+          body: JSON.stringify({
+            description: 'Updated after the image upload',
+            timezone: chapter.timezone,
+          }),
+        })
+      );
+    });
+  });
+
   it('creates a ban flag from the selected hacker search result', async () => {
     mockChapterAdmin();
     const createdFlag = {

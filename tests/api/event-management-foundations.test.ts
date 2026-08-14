@@ -184,6 +184,7 @@ describe('/api/events event-management foundations', () => {
 
     mockActor(siteAdmin);
     mockMembershipLookup();
+    prisma.chapter.findUnique.mockResolvedValue(chapter);
     prisma.event.create.mockResolvedValue(createdEvent);
 
     const response = await POST_EVENTS(

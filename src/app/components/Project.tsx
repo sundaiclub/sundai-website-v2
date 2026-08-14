@@ -95,7 +95,6 @@ export function ProjectCard({ project, userInfo, handleLike, isDarkMode, show_st
   const maxVisible = (variant === "compact" || variant === "trending") ? 5 : 6;
   const visibleMembers = teamMembers.slice(0, maxVisible);
   const remainingMembers = Math.max(0, teamMembers.length - visibleMembers.length);
-  const imageHeightClass = (variant === "compact" || variant === "trending") ? "h-32" : "h-40 sm:h-48";
   const cardPaddingClass = variant === "compact" ? "p-3" : "p-4 sm:p-6";
   const titleClass =
     variant === "trending"
@@ -122,7 +121,7 @@ export function ProjectCard({ project, userInfo, handleLike, isDarkMode, show_st
           : "bg-white hover:shadow-xl"
       } rounded-xl shadow-lg overflow-hidden transition-shadow transition-transform duration-200 hover:-translate-y-1 relative flex flex-col h-full`}
     >
-      <div className={`relative ${imageHeightClass}`}>
+      <div className="relative aspect-[3/2] w-full bg-black">
         {(showTrendingBadge || imageBadge) && (
           <div className="absolute top-3 left-3 z-10">
             <div className={`px-2 py-1 rounded-full text-xs font-semibold ${
@@ -178,7 +177,7 @@ export function ProjectCard({ project, userInfo, handleLike, isDarkMode, show_st
             }
             alt={project.title}
             fill
-            className="object-cover"
+            className="object-contain"
             unoptimized
           />
         </Link>

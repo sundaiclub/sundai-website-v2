@@ -52,7 +52,7 @@ function pitchEntry(overrides: Record<string, unknown> = {}) {
     cardStatus: 'NEEDS_INFO',
     approved: true,
     isTopProject: false,
-    pitchPhase: 'WAITING',
+    timerPhase: 'WAITING',
     completedAt: null,
     pitchSession: {
       id: 'pitch-session-boston',
@@ -212,7 +212,7 @@ describe('/api/events/[eventId]/projects', () => {
         data: expect.objectContaining({
           status: expect.anything(),
           approved: expect.anything(),
-          pitchPhase: expect.anything(),
+          timerPhase: expect.anything(),
         }),
       })
     );
@@ -270,7 +270,7 @@ describe('/api/events/[eventId]/projects', () => {
       cardStatus: 'APPROVED',
       position: 1,
       status: 'DONE',
-      pitchPhase: 'COMPLETED',
+      timerPhase: 'COMPLETED',
       completedAt: new Date('2026-07-03T20:00:00.000Z'),
       pitchSession: {
         id: 'pitch-session-cambridge',

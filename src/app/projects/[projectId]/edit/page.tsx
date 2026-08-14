@@ -810,12 +810,12 @@ export default function ProjectEditPage() {
             </label>
             <div className="mt-1 flex items-center space-x-4">
               {thumbnailPreview && (
-                <div className="relative w-32 aspect-video">
+                <div className="relative aspect-[3/2] w-32 bg-black">
                   <Image
                     src={thumbnailPreview}
                     alt="Thumbnail preview"
                     fill
-                    className="object-cover rounded-lg"
+                    className="rounded-lg object-contain"
                   />
                   <button
                     type="button"
@@ -848,7 +848,7 @@ export default function ProjectEditPage() {
               </div>
             </div>
             <p className={`mt-2 text-sm ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
-              Recommended: 1280x720px or larger, 16:9 ratio
+              Recommended: 1200x800px or larger, 3:2 ratio
             </p>
           </div>
           <div>
