@@ -12,6 +12,7 @@ import { Providers } from './components/Providers';
 import ExternalLinkBehavior from './components/ExternalLinkBehavior';
 import { Space_Mono, Fira_Code } from 'next/font/google'
 import Script from 'next/script';
+import { DEFAULT_SOCIAL_IMAGE_URL, PUBLIC_APP_URL } from '@/lib/siteUrl';
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -29,7 +30,7 @@ const firaCode = Fira_Code({
 export const metadata: Metadata = {
   title: "Sundai Club",
   description: "Building & Launching AI Prototypes Every Sunday",
-  metadataBase: new URL("https://www.sundai.club"),
+  metadataBase: new URL(PUBLIC_APP_URL),
   openGraph: {
     type: "website",
     siteName: "Sundai Club",
@@ -37,18 +38,18 @@ export const metadata: Metadata = {
     description: "Building & Launching AI Prototypes Every Sunday",
     images: [
       {
-        url: "/images/icon-512x512.png",
-        width: 512,
-        height: 512,
+        url: DEFAULT_SOCIAL_IMAGE_URL,
+        width: 1200,
+        height: 630,
         alt: "Sundai Club Logo",
       },
     ],
   },
   twitter: {
-    card: "summary",
+    card: "summary_large_image",
     title: "Sundai Club",
     description: "Building & Launching AI Prototypes Every Sunday",
-    images: ["/images/icon-512x512.png"],
+    images: [DEFAULT_SOCIAL_IMAGE_URL],
   },
 };
 

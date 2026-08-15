@@ -14,7 +14,7 @@ describe('middleware', () => {
     const { createRouteMatcher } = require('@clerk/nextjs/server');
 
     expect(createRouteMatcher).toHaveBeenCalledWith(
-      expect.arrayContaining(['/api/projects(.*)'])
+      expect.arrayContaining(['/projects(.*)', '/api/projects(.*)'])
     );
   });
 
