@@ -10,6 +10,7 @@ import { publicCalendarPayloadFixture } from '../utils/event-rsvp-fixtures';
 import { getPublicEventBySlug } from '@/lib/publicEvents';
 import { listVisibleEventMaterials } from '@/lib/eventMaterials';
 import { listPublicEventProjects } from '@/lib/publicEventProjects';
+import { DEFAULT_SOCIAL_IMAGE_URL } from '@/lib/siteUrl';
 import { mockProject } from '../utils/test-utils';
 
 const mockUseTheme = jest.fn();
@@ -485,6 +486,55 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
     mockUseTheme.mockReturnValue({ isDarkMode: false });
     mockListPublicEventProjects.mockResolvedValue([]);
     mockSignedOut();
+  });
+
+  it('uses the event image in link preview metadata', async () => {
+    const event = buildEventDetail({
+      image: {
+        id: 'event-image',
+        url: 'https://cdn.example.com/ai-build-night.webp',
+        alt: 'AI Build Night artwork',
+      },
+    });
+    mockGetPublicEventBySlug.mockResolvedValue(event);
+    const {
+      generateMetadata,
+    } = require('../../src/app/events/[chapterSlug]/[eventSlug]/page');
+
+    const metadata = await generateMetadata({ params: routeParams });
+
+    expect(mockGetPublicEventBySlug).toHaveBeenCalledWith({
+      ...routeParams,
+      viewer: null,
+    });
+    expect(metadata.openGraph?.images).toEqual([
+      {
+        url: event.image?.url,
+        alt: event.image?.alt,
+      },
+    ]);
+    expect(metadata.twitter?.images).toEqual([event.image?.url]);
+  });
+
+  it('uses the black-background Sundai image for event link previews without artwork', async () => {
+    mockGetPublicEventBySlug.mockResolvedValue(buildEventDetail());
+    const {
+      generateMetadata,
+    } = require('../../src/app/events/[chapterSlug]/[eventSlug]/page');
+
+    const metadata = await generateMetadata({ params: routeParams });
+
+    expect(metadata.openGraph?.images).toEqual([
+      {
+        url: DEFAULT_SOCIAL_IMAGE_URL,
+        width: 1200,
+        height: 630,
+        alt: 'Sundai Club Logo',
+      },
+    ]);
+    expect(metadata.twitter?.images).toEqual([
+      DEFAULT_SOCIAL_IMAGE_URL,
+    ]);
   });
 
   it('renders published public event fields for anonymous visitors', async () => {
