@@ -1,6 +1,6 @@
 import { Metadata } from "next";
 import prisma from "@/lib/prisma";
-import { DEFAULT_SOCIAL_IMAGE_URL } from "@/lib/siteUrl";
+import { DEFAULT_SOCIAL_IMAGE_URL, publicUrl } from "@/lib/siteUrl";
 import ProjectDetailClient from "./ProjectDetailClient";
 
 type Props = {
@@ -28,6 +28,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
           url: DEFAULT_SOCIAL_IMAGE_URL,
           width: 1200,
           height: 630,
+          type: "image/png",
           alt: "Sundai Club Logo",
         },
       ];
@@ -35,8 +36,16 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return {
     title,
     description,
+    alternates: {
+      canonical: publicUrl(
+        `/projects/${encodeURIComponent(params.projectId)}`
+      ),
+    },
     openGraph: {
       type: "article",
+      url: publicUrl(
+        `/projects/${encodeURIComponent(params.projectId)}`
+      ),
       title,
       description,
       siteName: "Sundai Club",
