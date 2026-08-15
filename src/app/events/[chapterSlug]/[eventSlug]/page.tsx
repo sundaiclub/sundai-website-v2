@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { auth } from '@clerk/nextjs/server';
 import {
@@ -20,6 +21,56 @@ import {
 import { listVisibleEventMaterials } from '@/lib/eventMaterials';
 import { listPublicEventProjects } from '@/lib/publicEventProjects';
 import { getPublicEventBySlug } from '@/lib/publicEvents';
+
+const DEFAULT_SOCIAL_IMAGE = {
+  url: '/images/sundai-social-card.png',
+  width: 1200,
+  height: 630,
+  alt: 'Sundai Club Logo',
+};
+
+type EventPageProps = {
+  params: { chapterSlug: string; eventSlug: string };
+};
+
+export async function generateMetadata({
+  params,
+}: EventPageProps): Promise<Metadata> {
+  const event = await getPublicEventBySlug({
+    chapterSlug: params.chapterSlug,
+    eventSlug: params.eventSlug,
+    viewer: null,
+  });
+
+  if (!event) {
+    return { title: 'Event Not Found | Sundai Club' };
+  }
+
+  const title = `${event.title} | Sundai Club`;
+  const description =
+    event.description || `Join ${event.chapterName} for ${event.title}.`;
+  const image = event.image?.url
+    ? { url: event.image.url, alt: event.image.alt || event.title }
+    : DEFAULT_SOCIAL_IMAGE;
+
+  return {
+    title,
+    description,
+    openGraph: {
+      type: 'website',
+      siteName: 'Sundai Club',
+      title,
+      description,
+      images: [image],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description,
+      images: [image.url],
+    },
+  };
+}
 
 type PublicMaterial = {
   id: string;
@@ -77,9 +128,7 @@ function approvedAddress(event: {
 
 export default async function PublicEventDetailPage({
   params,
-}: {
-  params: { chapterSlug: string; eventSlug: string };
-}) {
+}: EventPageProps) {
   const { userId } = auth();
   const event = await getPublicEventBySlug({
     chapterSlug: params.chapterSlug,

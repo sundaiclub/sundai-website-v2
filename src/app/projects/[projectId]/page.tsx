@@ -22,7 +22,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const description = project.preview || "A project built at Sundai Club";
   const images = project.thumbnail?.url
     ? [{ url: project.thumbnail.url, alt: project.title }]
-    : [{ url: "/images/icon-512x512.png", width: 512, height: 512, alt: "Sundai Club Logo" }];
+    : [
+        {
+          url: "/images/sundai-social-card.png",
+          width: 1200,
+          height: 630,
+          alt: "Sundai Club Logo",
+        },
+      ];
 
   return {
     title,
@@ -35,7 +42,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       images,
     },
     twitter: {
-      card: project.thumbnail?.url ? "summary_large_image" : "summary",
+      card: "summary_large_image",
       title,
       description,
       images: images.map((img) => img.url),

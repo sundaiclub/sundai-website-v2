@@ -37,18 +37,18 @@ export const metadata: Metadata = {
     description: "Building & Launching AI Prototypes Every Sunday",
     images: [
       {
-        url: "/images/icon-512x512.png",
-        width: 512,
-        height: 512,
+        url: "/images/sundai-social-card.png",
+        width: 1200,
+        height: 630,
         alt: "Sundai Club Logo",
       },
     ],
   },
   twitter: {
-    card: "summary",
+    card: "summary_large_image",
     title: "Sundai Club",
     description: "Building & Launching AI Prototypes Every Sunday",
-    images: ["/images/icon-512x512.png"],
+    images: ["/images/sundai-social-card.png"],
   },
 };
 

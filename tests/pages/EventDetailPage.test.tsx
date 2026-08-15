@@ -487,6 +487,55 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
     mockSignedOut();
   });
 
+  it('uses the event image in link preview metadata', async () => {
+    const event = buildEventDetail({
+      image: {
+        id: 'event-image',
+        url: 'https://cdn.example.com/ai-build-night.webp',
+        alt: 'AI Build Night artwork',
+      },
+    });
+    mockGetPublicEventBySlug.mockResolvedValue(event);
+    const {
+      generateMetadata,
+    } = require('../../src/app/events/[chapterSlug]/[eventSlug]/page');
+
+    const metadata = await generateMetadata({ params: routeParams });
+
+    expect(mockGetPublicEventBySlug).toHaveBeenCalledWith({
+      ...routeParams,
+      viewer: null,
+    });
+    expect(metadata.openGraph?.images).toEqual([
+      {
+        url: event.image?.url,
+        alt: event.image?.alt,
+      },
+    ]);
+    expect(metadata.twitter?.images).toEqual([event.image?.url]);
+  });
+
+  it('uses the black-background Sundai image for event link previews without artwork', async () => {
+    mockGetPublicEventBySlug.mockResolvedValue(buildEventDetail());
+    const {
+      generateMetadata,
+    } = require('../../src/app/events/[chapterSlug]/[eventSlug]/page');
+
+    const metadata = await generateMetadata({ params: routeParams });
+
+    expect(metadata.openGraph?.images).toEqual([
+      {
+        url: '/images/sundai-social-card.png',
+        width: 1200,
+        height: 630,
+        alt: 'Sundai Club Logo',
+      },
+    ]);
+    expect(metadata.twitter?.images).toEqual([
+      '/images/sundai-social-card.png',
+    ]);
+  });
+
   it('renders published public event fields for anonymous visitors', async () => {
     await renderDetailPage(buildEventDetail());
 
