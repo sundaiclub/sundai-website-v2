@@ -1,11 +1,12 @@
 import type { Metadata } from 'next';
 import prisma from '@/lib/prisma';
-import { DEFAULT_SOCIAL_IMAGE_URL } from '@/lib/siteUrl';
+import { DEFAULT_SOCIAL_IMAGE_URL, publicUrl } from '@/lib/siteUrl';
 
 const DEFAULT_SOCIAL_IMAGE = {
   url: DEFAULT_SOCIAL_IMAGE_URL,
   width: 1200,
   height: 630,
+  type: 'image/png',
   alt: 'Sundai Club Logo',
 };
 
@@ -45,12 +46,17 @@ export async function generateMetadata({
         alt: chapter.heroImage.alt || `${chapter.name} chapter`,
       }
     : DEFAULT_SOCIAL_IMAGE;
+  const pageUrl = publicUrl(
+    `/chapters/${encodeURIComponent(params.chapterSlug)}`
+  );
 
   return {
     title,
     description,
+    alternates: { canonical: pageUrl },
     openGraph: {
       type: 'website',
+      url: pageUrl,
       siteName: 'Sundai Club',
       title,
       description,

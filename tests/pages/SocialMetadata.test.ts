@@ -15,7 +15,7 @@ import { generateMetadata as generateChapterMetadata } from '../../src/app/chapt
 import { generateMetadata as generateProjectMetadata } from '../../src/app/projects/[projectId]/page';
 import { metadata as rootMetadata } from '../../src/app/layout';
 import prisma from '@/lib/prisma';
-import { DEFAULT_SOCIAL_IMAGE_URL } from '@/lib/siteUrl';
+import { DEFAULT_SOCIAL_IMAGE_URL, publicUrl } from '@/lib/siteUrl';
 
 const mockChapterFindFirst = prisma.chapter.findFirst as jest.Mock;
 const mockProjectFindUnique = prisma.project.findUnique as jest.Mock;
@@ -39,6 +39,10 @@ describe('chapter and project link preview metadata', () => {
       params: { chapterSlug: 'boston' },
     });
 
+    expect(metadata.openGraph?.url).toBe(publicUrl('/chapters/boston'));
+    expect(metadata.alternates?.canonical).toBe(
+      publicUrl('/chapters/boston')
+    );
     expect(metadata.openGraph?.images).toEqual([
       {
         url: 'https://cdn.example.com/boston-chapter.webp',
@@ -66,6 +70,7 @@ describe('chapter and project link preview metadata', () => {
         url: DEFAULT_SOCIAL_IMAGE_URL,
         width: 1200,
         height: 630,
+        type: 'image/png',
         alt: 'Sundai Club Logo',
       },
     ]);
@@ -98,14 +103,19 @@ describe('chapter and project link preview metadata', () => {
 
 describe('root link preview metadata', () => {
   it('uses the configured public app URL for social images', () => {
-    expect(rootMetadata.metadataBase).toEqual(
-      new URL(process.env.NEXT_PUBLIC_APP_URL ?? 'https://www.sundai.club')
+    const expectedBase = new URL(
+      process.env.NEXT_PUBLIC_APP_URL ?? 'https://www.sundai.club'
     );
+
+    expect(rootMetadata.metadataBase).toEqual(expectedBase);
+    expect(rootMetadata.alternates?.canonical).toBe(expectedBase.toString());
+    expect(rootMetadata.openGraph?.url).toBe(expectedBase.toString());
     expect(rootMetadata.openGraph?.images).toEqual([
       {
         url: DEFAULT_SOCIAL_IMAGE_URL,
         width: 1200,
         height: 630,
+        type: 'image/png',
         alt: 'Sundai Club Logo',
       },
     ]);

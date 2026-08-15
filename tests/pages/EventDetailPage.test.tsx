@@ -10,7 +10,7 @@ import { publicCalendarPayloadFixture } from '../utils/event-rsvp-fixtures';
 import { getPublicEventBySlug } from '@/lib/publicEvents';
 import { listVisibleEventMaterials } from '@/lib/eventMaterials';
 import { listPublicEventProjects } from '@/lib/publicEventProjects';
-import { DEFAULT_SOCIAL_IMAGE_URL } from '@/lib/siteUrl';
+import { DEFAULT_SOCIAL_IMAGE_URL, publicUrl } from '@/lib/siteUrl';
 import { mockProject } from '../utils/test-utils';
 
 const mockUseTheme = jest.fn();
@@ -507,6 +507,12 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
       ...routeParams,
       viewer: null,
     });
+    expect(metadata.openGraph?.url).toBe(
+      publicUrl('/events/boston/ai-build-night')
+    );
+    expect(metadata.alternates?.canonical).toBe(
+      publicUrl('/events/boston/ai-build-night')
+    );
     expect(metadata.openGraph?.images).toEqual([
       {
         url: event.image?.url,
@@ -529,6 +535,7 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
         url: DEFAULT_SOCIAL_IMAGE_URL,
         width: 1200,
         height: 630,
+        type: 'image/png',
         alt: 'Sundai Club Logo',
       },
     ]);

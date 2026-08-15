@@ -12,7 +12,11 @@ import { Providers } from './components/Providers';
 import ExternalLinkBehavior from './components/ExternalLinkBehavior';
 import { Space_Mono, Fira_Code } from 'next/font/google'
 import Script from 'next/script';
-import { DEFAULT_SOCIAL_IMAGE_URL, PUBLIC_APP_URL } from '@/lib/siteUrl';
+import {
+  DEFAULT_SOCIAL_IMAGE_URL,
+  PUBLIC_APP_URL,
+  publicUrl,
+} from '@/lib/siteUrl';
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -31,8 +35,10 @@ export const metadata: Metadata = {
   title: "Sundai Club",
   description: "Building & Launching AI Prototypes Every Sunday",
   metadataBase: new URL(PUBLIC_APP_URL),
+  alternates: { canonical: publicUrl('/') },
   openGraph: {
     type: "website",
+    url: publicUrl('/'),
     siteName: "Sundai Club",
     title: "Sundai Club",
     description: "Building & Launching AI Prototypes Every Sunday",
@@ -41,6 +47,7 @@ export const metadata: Metadata = {
         url: DEFAULT_SOCIAL_IMAGE_URL,
         width: 1200,
         height: 630,
+        type: "image/png",
         alt: "Sundai Club Logo",
       },
     ],
