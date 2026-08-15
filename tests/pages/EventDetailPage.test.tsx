@@ -10,6 +10,7 @@ import { publicCalendarPayloadFixture } from '../utils/event-rsvp-fixtures';
 import { getPublicEventBySlug } from '@/lib/publicEvents';
 import { listVisibleEventMaterials } from '@/lib/eventMaterials';
 import { listPublicEventProjects } from '@/lib/publicEventProjects';
+import { DEFAULT_SOCIAL_IMAGE_URL } from '@/lib/siteUrl';
 import { mockProject } from '../utils/test-utils';
 
 const mockUseTheme = jest.fn();
@@ -525,14 +526,14 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
 
     expect(metadata.openGraph?.images).toEqual([
       {
-        url: '/images/sundai-social-card.png',
+        url: DEFAULT_SOCIAL_IMAGE_URL,
         width: 1200,
         height: 630,
         alt: 'Sundai Club Logo',
       },
     ]);
     expect(metadata.twitter?.images).toEqual([
-      '/images/sundai-social-card.png',
+      DEFAULT_SOCIAL_IMAGE_URL,
     ]);
   });
 

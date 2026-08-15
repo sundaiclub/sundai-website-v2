@@ -21,9 +21,10 @@ import {
 import { listVisibleEventMaterials } from '@/lib/eventMaterials';
 import { listPublicEventProjects } from '@/lib/publicEventProjects';
 import { getPublicEventBySlug } from '@/lib/publicEvents';
+import { DEFAULT_SOCIAL_IMAGE_URL } from '@/lib/siteUrl';
 
 const DEFAULT_SOCIAL_IMAGE = {
-  url: '/images/sundai-social-card.png',
+  url: DEFAULT_SOCIAL_IMAGE_URL,
   width: 1200,
   height: 630,
   alt: 'Sundai Club Logo',

@@ -1,5 +1,6 @@
 import { Metadata } from "next";
 import prisma from "@/lib/prisma";
+import { DEFAULT_SOCIAL_IMAGE_URL } from "@/lib/siteUrl";
 import ProjectDetailClient from "./ProjectDetailClient";
 
 type Props = {
@@ -24,7 +25,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     ? [{ url: project.thumbnail.url, alt: project.title }]
     : [
         {
-          url: "/images/sundai-social-card.png",
+          url: DEFAULT_SOCIAL_IMAGE_URL,
           width: 1200,
           height: 630,
           alt: "Sundai Club Logo",

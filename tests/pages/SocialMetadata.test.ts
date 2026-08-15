@@ -15,6 +15,7 @@ import { generateMetadata as generateChapterMetadata } from '../../src/app/chapt
 import { generateMetadata as generateProjectMetadata } from '../../src/app/projects/[projectId]/page';
 import { metadata as rootMetadata } from '../../src/app/layout';
 import prisma from '@/lib/prisma';
+import { DEFAULT_SOCIAL_IMAGE_URL } from '@/lib/siteUrl';
 
 const mockChapterFindFirst = prisma.chapter.findFirst as jest.Mock;
 const mockProjectFindUnique = prisma.project.findUnique as jest.Mock;
@@ -62,7 +63,7 @@ describe('chapter and project link preview metadata', () => {
 
     expect(metadata.openGraph?.images).toEqual([
       {
-        url: '/images/sundai-social-card.png',
+        url: DEFAULT_SOCIAL_IMAGE_URL,
         width: 1200,
         height: 630,
         alt: 'Sundai Club Logo',
@@ -96,9 +97,20 @@ describe('chapter and project link preview metadata', () => {
 });
 
 describe('root link preview metadata', () => {
-  it('uses the configured public app URL for relative social images', () => {
+  it('uses the configured public app URL for social images', () => {
     expect(rootMetadata.metadataBase).toEqual(
       new URL(process.env.NEXT_PUBLIC_APP_URL ?? 'https://www.sundai.club')
     );
+    expect(rootMetadata.openGraph?.images).toEqual([
+      {
+        url: DEFAULT_SOCIAL_IMAGE_URL,
+        width: 1200,
+        height: 630,
+        alt: 'Sundai Club Logo',
+      },
+    ]);
+    expect(rootMetadata.twitter?.images).toEqual([
+      DEFAULT_SOCIAL_IMAGE_URL,
+    ]);
   });
 });
