@@ -29,7 +29,9 @@ const firaCode = Fira_Code({
 export const metadata: Metadata = {
   title: "Sundai Club",
   description: "Building & Launching AI Prototypes Every Sunday",
-  metadataBase: new URL("https://www.sundai.club"),
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_APP_URL ?? "https://www.sundai.club"
+  ),
   openGraph: {
     type: "website",
     siteName: "Sundai Club",
