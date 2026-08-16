@@ -336,6 +336,31 @@ describe('/organizer/events/new', () => {
     ).toBeInTheDocument();
   });
 
+  it('shows the size limit when an event image upload returns 413', async () => {
+    await renderNewEventPage();
+    fillRequiredEventFields();
+    const defaultFetch = (global.fetch as jest.Mock).getMockImplementation()!;
+    (global.fetch as jest.Mock).mockImplementation(
+      (input: RequestInfo | URL, init?: RequestInit) =>
+        requestUrl(input).includes('/api/events/event-created/image')
+          ? jsonResponse({}, 413)
+          : defaultFetch(input, init)
+    );
+
+    fireEvent.change(screen.getByLabelText(/event image/i), {
+      target: {
+        files: [new File(['image'], 'event.webp', { type: 'image/webp' })],
+      },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /save draft/i }));
+
+    expect(
+      await screen.findByText(
+        /file too large\. image files must be smaller than 15 mb\. the event was saved\./i
+      )
+    ).toBeInTheDocument();
+  });
+
   it('generates, selects, and uploads an AI event image', async () => {
     await renderNewEventPage();
     fillRequiredEventFields();

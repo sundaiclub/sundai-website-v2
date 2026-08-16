@@ -301,6 +301,13 @@ export async function PATCH(
       return badRequest('timezone must be a supported IANA timezone');
     }
 
+    if (body?.name !== undefined) {
+      if (typeof body.name !== 'string' || !body.name.trim()) {
+        return badRequest('name is required');
+      }
+      body.name = body.name.trim();
+    }
+
     for (const key of allowedKeys) {
       if (body?.[key] !== undefined) data[key] = body[key] || null;
     }

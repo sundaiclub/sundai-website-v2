@@ -34,6 +34,10 @@ import type {
 import { DEFAULT_EVENT_MESSAGES } from '@/lib/eventMessageDefaults';
 import { parseTemplateFieldsJson } from '@/lib/applicationTemplates';
 import { CHAPTER_TIMEZONE_GROUPS } from '@/lib/chapterTimezones';
+import {
+  getImageUploadError,
+  validateImageUploadSize,
+} from '@/lib/imageUploads';
 
 type ChapterListPayload = ManageableChapterListItem[] | null;
 type StaffListPayload =
@@ -567,6 +571,15 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
   }
 
   function selectEventImage(file: File | null) {
+    if (file) {
+      const sizeError = validateImageUploadSize(file);
+      if (sizeError) {
+        setEventImageFile(null);
+        setEventImagePrompt(null);
+        setMessage(sizeError);
+        return;
+      }
+    }
     setEventImageFile(file);
     setEventImagePrompt(null);
     if (file) setEventImagePreview(URL.createObjectURL(file));
@@ -584,11 +597,12 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
       if (!response.ok) throw new Error('Unable to download generated image');
 
       const blob = await response.blob();
-      setEventImageFile(
-        new File([blob], 'ai-generated-event-image.webp', {
-          type: 'image/webp',
-        })
-      );
+      const generatedFile = new File([blob], 'ai-generated-event-image.webp', {
+        type: 'image/webp',
+      });
+      const sizeError = validateImageUploadSize(generatedFile);
+      if (sizeError) throw new Error(sizeError);
+      setEventImageFile(generatedFile);
       setEventImagePrompt(prompt);
       setEventImagePreview(url);
       setMessage('AI-generated event image selected.');
@@ -811,7 +825,11 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
         );
         if (!imageResponse.ok) {
           setSavedEventId(savedEvent.id);
-          setMessage('Unable to upload the event image. The event was saved.');
+          const uploadError = await getImageUploadError(
+            imageResponse,
+            'Unable to upload the event image.'
+          );
+          setMessage(`${uploadError} The event was saved.`);
           return;
         }
         const image = await imageResponse.json();
@@ -1078,7 +1096,7 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
                 </div>
                 <div className="grid gap-3">
                   <span className={`text-sm ${classes.mutedText}`}>
-                    JPEG, PNG, WebP, or GIF. Maximum 10 MB.
+                    JPEG, PNG, WebP, or GIF.
                   </span>
                   <label className="grid gap-2">
                     <span className="sr-only">Upload event image</span>

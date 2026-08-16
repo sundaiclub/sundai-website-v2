@@ -97,4 +97,19 @@ describe('/api/events/[eventId]/image', () => {
     expect(uploadToGCS).not.toHaveBeenCalled();
     expect(prisma.image.create).not.toHaveBeenCalled();
   });
+
+  it('returns 413 when the image is too large', async () => {
+    const file = new File(['image'], 'large.webp', { type: 'image/webp' });
+    Object.defineProperty(file, 'size', { value: 15 * 1024 * 1024 });
+
+    const response = await POST(imageRequest(file), {
+      params: { eventId: 'event-1' },
+    });
+
+    expect(response.status).toBe(413);
+    expect(await response.json()).toEqual({
+      message: 'File too large. Image files must be smaller than 15 MB.',
+    });
+    expect(uploadToGCS).not.toHaveBeenCalled();
+  });
 });

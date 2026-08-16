@@ -621,6 +621,7 @@ export async function PATCH(
     const event = await prisma.event.findUnique({
       where: { id: params.eventId },
       include: {
+        chapter: true,
         image: true,
         staff: { include: { hacker: { include: { avatar: true } } } },
         pitchSessions: {

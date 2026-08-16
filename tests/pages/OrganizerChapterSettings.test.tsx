@@ -531,6 +531,32 @@ describe('/organizer/chapters/[chapterSlug]/settings', () => {
     });
   });
 
+  it('shows the size limit when a chapter image upload returns 413', async () => {
+    mockChapterAdmin();
+    renderSettingsPage();
+
+    const imageInput = await screen.findByLabelText(/chapter image/i);
+    const defaultFetch = (global.fetch as jest.Mock).getMockImplementation()!;
+    (global.fetch as jest.Mock).mockImplementation(
+      (input: RequestInfo | URL, init?: RequestInit) =>
+        requestUrl(input).includes(`/api/chapters/${chapter.id}/image`)
+          ? jsonResponse({}, 413)
+          : defaultFetch(input, init)
+    );
+
+    fireEvent.change(imageInput, {
+      target: {
+        files: [new File(['image'], 'chapter.jpg', { type: 'image/jpeg' })],
+      },
+    });
+
+    expect(
+      await screen.findByText(
+        /file too large\. image files must be smaller than 15 mb\./i
+      )
+    ).toBeInTheDocument();
+  });
+
   it('creates a ban flag from the selected hacker search result', async () => {
     mockChapterAdmin();
     const createdFlag = {

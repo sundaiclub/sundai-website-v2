@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { uploadToGCS } from '@/lib/gcp-storage';
+import {
+  IMAGE_UPLOAD_SIZE_ERROR,
+  validateImageUploadSize,
+} from '@/lib/imageUploads';
 
 export async function POST(request: Request) {
   try {
@@ -21,6 +25,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Invalid file type' }, { status: 400 });
     }
 
+    if (validateImageUploadSize(file)) {
+      return NextResponse.json(
+        { error: IMAGE_UPLOAD_SIZE_ERROR },
+        { status: 413 }
+      );
+    }
+
     // Upload to GCS
     const { url } = await uploadToGCS(file, 'projects');
 
@@ -32,4 +43,4 @@ export async function POST(request: Request) {
       { status: 500 }
     );
   }
-} 
+}
