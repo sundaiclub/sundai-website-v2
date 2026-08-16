@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, use } from 'react';
 import {
   ManagementAlert,
   ManagementBadge,
@@ -32,11 +32,10 @@ function MetricList({ metrics }: { metrics: Record<string, number> }) {
   );
 }
 
-export default function OrganizerEventReportingPage({
-  params,
-}: {
-  params: { eventId: string };
+export default function OrganizerEventReportingPage(props: {
+  params: Promise<{ eventId: string }>;
 }) {
+  const params = use(props.params);
   const classes = useManagementClasses();
   const [preview, setPreview] = useState<EventReportingPreview | null>(null);
   const [state, setState] = useState<

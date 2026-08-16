@@ -1,190 +1,235 @@
 // @ts-nocheck
-import React from 'react'
-import { render, screen, waitFor, fireEvent } from '@testing-library/react'
+import React from 'react';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 
 jest.mock('../../src/app/contexts/UserContext', () => ({
   useUserContext: jest.fn(),
-}))
+}));
 
 jest.mock('../../src/app/contexts/ThemeContext', () => ({
   useTheme: jest.fn(),
-}))
+}));
 
 describe('/news page', () => {
   beforeEach(() => {
-    jest.clearAllMocks()
-  })
+    jest.clearAllMocks();
+  });
 
   it('generates email on demand and shows preview', async () => {
     const projectsResp = {
       ok: true,
-      json: () => Promise.resolve([
-        {
-          id: 'p1',
-          title: 'Top 1',
-          preview: 'Preview 1',
-          createdAt: new Date().toISOString(),
-          thumbnail: null,
-          launchLead: { id: 'h1', name: 'Alice' },
-          participants: [],
-          likes: [{ hackerId: 'u1', createdAt: new Date().toISOString() }],
-          techTags: [],
-          domainTags: [],
-        },
-      ])
-    }
-    ;(global.fetch as any) = jest.fn().mockImplementation((url: string) => {
-      if (url.includes('/api/projects')) return Promise.resolve(projectsResp)
-      if (url.includes('vectorlab.dev/api/tldr')) return Promise.resolve({ ok: true, text: () => Promise.resolve('- A TLDR item') })
-      if (url.includes('/api/news/generate')) return Promise.resolve({ ok: true, json: () => Promise.resolve({ htmlBody: '<section id="outline">Modified</section>' }), headers: { get: () => 'application/json' } })
-      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) })
-    })
+      json: () =>
+        Promise.resolve([
+          {
+            id: 'p1',
+            title: 'Top 1',
+            preview: 'Preview 1',
+            createdAt: new Date().toISOString(),
+            thumbnail: null,
+            launchLead: { id: 'h1', name: 'Alice' },
+            participants: [],
+            likes: [{ hackerId: 'u1', createdAt: new Date().toISOString() }],
+            techTags: [],
+            domainTags: [],
+          },
+        ]),
+    };
+    (global.fetch as any) = jest.fn().mockImplementation((url: string) => {
+      if (url.includes('/api/projects')) return Promise.resolve(projectsResp);
+      if (url.includes('vectorlab.dev/api/tldr'))
+        return Promise.resolve({
+          ok: true,
+          text: () => Promise.resolve('- A TLDR item'),
+        });
+      if (url.includes('/api/news/generate'))
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              htmlBody: '<section id="outline">Modified</section>',
+            }),
+          headers: { get: () => 'application/json' },
+        });
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+    });
 
-    const userCtx = require('../../src/app/contexts/UserContext')
-    userCtx.useUserContext.mockReturnValue({ isAdmin: true })
-    const themeCtx = require('../../src/app/contexts/ThemeContext')
-    themeCtx.useTheme.mockReturnValue({ isDarkMode: false })
-    const Comp = require('../../src/app/news/NewsClient').default
+    const userCtx = require('../../src/app/contexts/UserContext');
+    userCtx.useUserContext.mockReturnValue({ isAdmin: true });
+    const themeCtx = require('../../src/app/contexts/ThemeContext');
+    themeCtx.useTheme.mockReturnValue({ isDarkMode: false });
+    const Comp = require('../../src/app/news/NewsClient').default;
 
-    render(<Comp />)
-    expect(screen.getByText('Weekly News')).toBeInTheDocument()
+    render(<Comp />);
+    expect(screen.getByText('Weekly News')).toBeInTheDocument();
 
-    const generateBtn = screen.getByRole('button', { name: 'Generate' })
-    fireEvent.click(generateBtn)
+    const generateBtn = screen.getByRole('button', { name: 'Generate' });
+    fireEvent.click(generateBtn);
 
-    await waitFor(() => expect(screen.getByText('Email HTML')).toBeInTheDocument())
+    await waitFor(() =>
+      expect(screen.getByText('Email HTML')).toBeInTheDocument()
+    );
     // Ensures TLDR endpoint was queried
-    const calls = (global.fetch as jest.Mock).mock.calls
-    expect(calls.some((args: any[]) => String(args[0]).includes('vectorlab.dev/api/tldr'))).toBe(true)
-    const previewHeading = screen.getByText('Preview')
-    expect(previewHeading).toBeInTheDocument()
+    const calls = (global.fetch as jest.Mock).mock.calls;
+    expect(
+      calls.some((args: any[]) =>
+        String(args[0]).includes('vectorlab.dev/api/tldr')
+      )
+    ).toBe(true);
+    const previewHeading = screen.getByText('Preview');
+    expect(previewHeading).toBeInTheDocument();
 
     // Validate updated sections exist in generated HTML and removed ones are absent
-    const textareas = screen.getAllByRole('textbox') as HTMLTextAreaElement[]
-    const htmlArea = textareas.find(t => t.readOnly) as HTMLTextAreaElement
-    expect(htmlArea).toBeTruthy()
-    const html = htmlArea.value
-    expect(html).toContain('id="tools-club"')
-    expect(html).toContain('AI Tools Club, Tuesdays @ 5pm')
-    expect(html).toContain('id="community"')
-    expect(html).not.toContain('Hacker Combinator')
+    const textareas = screen.getAllByRole('textbox') as HTMLTextAreaElement[];
+    const htmlArea = textareas.find(t => t.readOnly) as HTMLTextAreaElement;
+    expect(htmlArea).toBeTruthy();
+    const html = htmlArea.value;
+    expect(html).toContain('id="tools-club"');
+    expect(html).toContain('AI Tools Club, Tuesdays @ 5pm');
+    expect(html).toContain('id="community"');
+    expect(html).not.toContain('Hacker Combinator');
 
     // Tools Club button should be black, square (no curve)
-    const ctaHref = 'https://www.sundai.club/events'
-    const ctaIdx = html.indexOf(ctaHref)
-    expect(ctaIdx).toBeGreaterThan(-1)
-    const ctaSlice = html.slice(ctaIdx - 200, ctaIdx + 200)
-    expect(ctaSlice).toContain('background:#111827')
-    expect(ctaSlice).toContain('border-radius:0')
-    expect(ctaSlice).not.toContain('#f87171')
-    expect(html).not.toContain('partiful.com/e/xZtVjYqjTCVZQ2wlAjCg')
-    expect(html).not.toContain('partiful.com/e/C3mnrNSv8YGnZefXcL0D')
-  })
+    const ctaHref = 'https://www.sundai.club/events';
+    const ctaIdx = html.indexOf(ctaHref);
+    expect(ctaIdx).toBeGreaterThan(-1);
+    const ctaSlice = html.slice(ctaIdx - 200, ctaIdx + 200);
+    expect(ctaSlice).toContain('background:#111827');
+    expect(ctaSlice).toContain('border-radius:0');
+    expect(ctaSlice).not.toContain('#f87171');
+    expect(html).not.toContain('partiful.com/e/xZtVjYqjTCVZQ2wlAjCg');
+    expect(html).not.toContain('partiful.com/e/C3mnrNSv8YGnZefXcL0D');
+  });
 
   it('streams generated content progressively', async () => {
     const projectsResp = {
       ok: true,
-      json: () => Promise.resolve([
-        {
-          id: 'p1',
-          title: 'Top 1',
-          preview: 'Preview 1',
-          createdAt: new Date().toISOString(),
-          thumbnail: null,
-          launchLead: { id: 'h1', name: 'Alice' },
-          participants: [],
-          likes: [{ hackerId: 'u1', createdAt: new Date().toISOString() }],
-          techTags: [],
-          domainTags: [],
-        },
-      ])
-    }
+      json: () =>
+        Promise.resolve([
+          {
+            id: 'p1',
+            title: 'Top 1',
+            preview: 'Preview 1',
+            createdAt: new Date().toISOString(),
+            thumbnail: null,
+            launchLead: { id: 'h1', name: 'Alice' },
+            participants: [],
+            likes: [{ hackerId: 'u1', createdAt: new Date().toISOString() }],
+            techTags: [],
+            domainTags: [],
+          },
+        ]),
+    };
 
-    const headers = { get: (key: string) => key.toLowerCase() === 'content-type' ? 'text/plain; charset=utf-8' : null } as any
+    const headers = {
+      get: (key: string) =>
+        key.toLowerCase() === 'content-type'
+          ? 'text/plain; charset=utf-8'
+          : null,
+    } as any;
 
-    let step = 0
+    let step = 0;
     const reader = {
       read: jest.fn().mockImplementation(async () => {
-        step++
-        if (step === 1) return { value: new TextEncoder().encode('Hello '), done: false }
-        if (step === 2) return { value: new TextEncoder().encode('World'), done: false }
-        return { value: undefined, done: true }
-      })
-    }
-    const streamLike = { getReader: () => reader } as any
+        step++;
+        if (step === 1)
+          return { value: new TextEncoder().encode('Hello '), done: false };
+        if (step === 2)
+          return { value: new TextEncoder().encode('World'), done: false };
+        return { value: undefined, done: true };
+      }),
+    };
+    const streamLike = { getReader: () => reader } as any;
 
-    ;(global.fetch as any) = jest.fn().mockImplementation((url: string) => {
-      if (url.includes('/api/projects')) return Promise.resolve(projectsResp)
-      if (url.includes('vectorlab.dev/api/tldr')) return Promise.resolve({ ok: true, text: () => Promise.resolve('- Streamed TLDR item') })
-      if (url.includes('/api/news/generate')) return Promise.resolve({ ok: true, headers, body: streamLike })
-      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) })
-    })
+    (global.fetch as any) = jest.fn().mockImplementation((url: string) => {
+      if (url.includes('/api/projects')) return Promise.resolve(projectsResp);
+      if (url.includes('vectorlab.dev/api/tldr'))
+        return Promise.resolve({
+          ok: true,
+          text: () => Promise.resolve('- Streamed TLDR item'),
+        });
+      if (url.includes('/api/news/generate'))
+        return Promise.resolve({ ok: true, headers, body: streamLike });
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+    });
 
-    const userCtx = require('../../src/app/contexts/UserContext')
-    userCtx.useUserContext.mockReturnValue({ isAdmin: true })
-    const themeCtx = require('../../src/app/contexts/ThemeContext')
-    themeCtx.useTheme.mockReturnValue({ isDarkMode: false })
-    const Comp = require('../../src/app/news/NewsClient').default
+    const userCtx = require('../../src/app/contexts/UserContext');
+    userCtx.useUserContext.mockReturnValue({ isAdmin: true });
+    const themeCtx = require('../../src/app/contexts/ThemeContext');
+    themeCtx.useTheme.mockReturnValue({ isDarkMode: false });
+    const Comp = require('../../src/app/news/NewsClient').default;
 
-    render(<Comp />)
-    const generateBtn = screen.getByRole('button', { name: 'Generate' })
+    render(<Comp />);
+    const generateBtn = screen.getByRole('button', { name: 'Generate' });
     // Type an instruction to trigger LLM call and streaming
-    const instr = screen.getByLabelText('Optional instruction to modify the email')
-    fireEvent.change(instr, { target: { value: 'make concise' } })
-    fireEvent.click(generateBtn)
+    const instr = screen.getByLabelText(
+      'Optional instruction to modify the email'
+    );
+    fireEvent.change(instr, { target: { value: 'make concise' } });
+    fireEvent.click(generateBtn);
 
     await waitFor(() => {
-      const calls = (global.fetch as jest.Mock).mock.calls
-      const generateCall = calls.find((args: any[]) => String(args[0]).includes('/api/news/generate'))
-      expect(generateCall).toBeDefined()
-      expect(generateCall[1].headers['Accept']).toBe('text/plain')
-    })
+      const calls = (global.fetch as jest.Mock).mock.calls;
+      const generateCall = calls.find((args: any[]) =>
+        String(args[0]).includes('/api/news/generate')
+      );
+      expect(generateCall).toBeDefined();
+      expect(generateCall[1].headers['Accept']).toBe('text/plain');
+    });
     // TLDR endpoint should also be fetched
-    const calls2 = (global.fetch as jest.Mock).mock.calls
-    expect(calls2.some((args: any[]) => String(args[0]).includes('vectorlab.dev/api/tldr'))).toBe(true)
-  })
+    const calls2 = (global.fetch as jest.Mock).mock.calls;
+    expect(
+      calls2.some((args: any[]) =>
+        String(args[0]).includes('vectorlab.dev/api/tldr')
+      )
+    ).toBe(true);
+  });
 
   it('does not generate an email when the current news feed is empty', async () => {
-    ;(global.fetch as any) = jest.fn().mockImplementation((url: string) => {
+    (global.fetch as any) = jest.fn().mockImplementation((url: string) => {
       if (url.includes('/api/projects')) {
-        return Promise.resolve({ ok: true, json: () => Promise.resolve([]) })
+        return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
       }
       if (url.includes('vectorlab.dev/api/tldr')) {
-        return Promise.resolve({ ok: true, text: () => Promise.resolve('   ') })
+        return Promise.resolve({
+          ok: true,
+          text: () => Promise.resolve('   '),
+        });
       }
-      return Promise.resolve({ ok: true })
-    })
+      return Promise.resolve({ ok: true });
+    });
 
-    const userCtx = require('../../src/app/contexts/UserContext')
-    userCtx.useUserContext.mockReturnValue({ isAdmin: true })
-    const themeCtx = require('../../src/app/contexts/ThemeContext')
-    themeCtx.useTheme.mockReturnValue({ isDarkMode: false })
-    const Comp = require('../../src/app/news/NewsClient').default
+    const userCtx = require('../../src/app/contexts/UserContext');
+    userCtx.useUserContext.mockReturnValue({ isAdmin: true });
+    const themeCtx = require('../../src/app/contexts/ThemeContext');
+    themeCtx.useTheme.mockReturnValue({ isDarkMode: false });
+    const Comp = require('../../src/app/news/NewsClient').default;
 
-    render(<Comp />)
-    fireEvent.click(screen.getByRole('button', { name: 'Generate' }))
+    render(<Comp />);
+    fireEvent.click(screen.getByRole('button', { name: 'Generate' }));
 
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith(
         'https://vectorlab.dev/api/tldr',
         { cache: 'no-store' }
-      )
-    })
+      );
+    });
     await waitFor(() =>
       expect(screen.getByRole('button', { name: 'Generate' })).toBeEnabled()
-    )
-    expect(screen.queryByText('Email HTML')).not.toBeInTheDocument()
-  })
+    );
+    expect(screen.queryByText('Email HTML')).not.toBeInTheDocument();
+  });
 
   it('is publicly visible (no admin gate)', async () => {
-    const userCtx = require('../../src/app/contexts/UserContext')
-    userCtx.useUserContext.mockReturnValue({ isAdmin: false })
-    const themeCtx = require('../../src/app/contexts/ThemeContext')
-    themeCtx.useTheme.mockReturnValue({ isDarkMode: false })
-    global.fetch = jest.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve([]) }) as any
-    const Comp = require('../../src/app/news/NewsClient').default
+    const userCtx = require('../../src/app/contexts/UserContext');
+    userCtx.useUserContext.mockReturnValue({ isAdmin: false });
+    const themeCtx = require('../../src/app/contexts/ThemeContext');
+    themeCtx.useTheme.mockReturnValue({ isDarkMode: false });
+    global.fetch = jest
+      .fn()
+      .mockResolvedValue({ ok: true, json: () => Promise.resolve([]) }) as any;
+    const Comp = require('../../src/app/news/NewsClient').default;
 
-    render(<Comp />)
-    expect(screen.getByText('Weekly News')).toBeInTheDocument()
-  })
-})
+    render(<Comp />);
+    expect(screen.getByText('Weekly News')).toBeInTheDocument();
+  });
+});

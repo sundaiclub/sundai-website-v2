@@ -1,4 +1,5 @@
 import React from 'react';
+import { resolvedParams } from '../utils/next';
 import {
   fireEvent,
   render,
@@ -125,7 +126,9 @@ function mockSignedOut() {
 }
 
 function renderChapterPage() {
-  render(<ChapterLandingPage params={{ chapterSlug: 'boston' }} />);
+  render(
+    <ChapterLandingPage params={resolvedParams({ chapterSlug: 'boston' })} />
+  );
 }
 
 describe('/chapters/[chapterSlug] public chapter page', () => {

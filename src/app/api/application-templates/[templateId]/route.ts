@@ -46,8 +46,9 @@ function activeTemplateScopeFilter(
 
 export async function PATCH(
   req: Request,
-  { params }: { params: { templateId: string } }
+  props: { params: Promise<{ templateId: string }> }
 ) {
+  const params = await props.params;
   try {
     const hacker = await getCurrentHacker();
     if (!hacker) return new NextResponse('Unauthorized', { status: 401 });
@@ -118,8 +119,9 @@ export async function PATCH(
 
 export async function DELETE(
   _req: Request,
-  { params }: { params: { templateId: string } }
+  props: { params: Promise<{ templateId: string }> }
 ) {
+  const params = await props.params;
   try {
     const hacker = await getCurrentHacker();
     if (!hacker) return new NextResponse('Unauthorized', { status: 401 });

@@ -7,8 +7,9 @@ import {
 
 export async function POST(
   req: Request,
-  { params }: { params: { chapterId: string } }
+  props: { params: Promise<{ chapterId: string }> }
 ) {
+  const params = await props.params;
   try {
     const { hacker, response } = await requireChapterMemberManager(
       params.chapterId

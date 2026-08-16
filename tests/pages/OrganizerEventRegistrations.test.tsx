@@ -1,4 +1,5 @@
 import React from 'react';
+import { resolvedParams } from '../utils/next';
 import {
   cleanup,
   fireEvent,
@@ -39,10 +40,12 @@ jest.mock('next/navigation', () => ({
   }),
 }));
 
-type PageComponent = React.ComponentType<{ params: { eventId: string } }>;
+type PageComponent = React.ComponentType<{
+  params: Promise<{ eventId: string }>;
+}>;
 type WorkspaceLayoutComponent = React.ComponentType<{
   children: React.ReactNode;
-  params: { eventId: string };
+  params: Promise<{ eventId: string }>;
 }>;
 
 const eventId = 'event-ai-build-night';
@@ -452,10 +455,12 @@ function renderRegistrationsPage() {
     '../../src/app/organizer/events/[eventId]/registrations/page'
   );
 
-  render(<OrganizerEventRegistrationsPage params={{ eventId }} />);
+  render(
+    <OrganizerEventRegistrationsPage params={resolvedParams({ eventId })} />
+  );
 }
 
-function renderWorkspaceRegistrations() {
+async function renderWorkspaceRegistrations() {
   const OrganizerEventLayout = loadPage(
     '/organizer/events/[eventId] layout',
     '../../src/app/organizer/events/[eventId]/layout'
@@ -466,9 +471,17 @@ function renderWorkspaceRegistrations() {
   );
 
   render(
-    <OrganizerEventLayout params={{ eventId }}>
-      <OrganizerEventRegistrationsPage params={{ eventId }} />
-    </OrganizerEventLayout>
+    await (
+      OrganizerEventLayout as unknown as (props: {
+        children: React.ReactNode;
+        params: Promise<{ eventId: string }>;
+      }) => Promise<React.ReactElement>
+    )({
+      params: resolvedParams({ eventId }),
+      children: (
+        <OrganizerEventRegistrationsPage params={resolvedParams({ eventId })} />
+      ),
+    })
   );
 }
 
@@ -506,7 +519,7 @@ describe('/organizer/events/[eventId]/registrations', () => {
   });
 
   it('opens the existing registration review inside the event workspace shell', async () => {
-    renderWorkspaceRegistrations();
+    await renderWorkspaceRegistrations();
 
     expect(await screen.findByText(/signed in applicant/i)).toBeInTheDocument();
     expect(
@@ -537,7 +550,7 @@ describe('/organizer/events/[eventId]/registrations', () => {
       },
     });
 
-    renderWorkspaceRegistrations();
+    await renderWorkspaceRegistrations();
 
     expect(await screen.findByText(/signed in applicant/i)).toBeInTheDocument();
     expect(

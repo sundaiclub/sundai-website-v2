@@ -32,12 +32,13 @@ const DEFAULT_SOCIAL_IMAGE = {
 };
 
 type EventPageProps = {
-  params: { chapterSlug: string; eventSlug: string };
+  params: Promise<{ chapterSlug: string; eventSlug: string }>;
 };
 
-export async function generateMetadata({
-  params,
-}: EventPageProps): Promise<Metadata> {
+export async function generateMetadata(
+  props: EventPageProps
+): Promise<Metadata> {
+  const params = await props.params;
   const event = await getPublicEventBySlug({
     chapterSlug: params.chapterSlug,
     eventSlug: params.eventSlug,
@@ -133,10 +134,9 @@ function approvedAddress(event: {
   return typeof address === 'string' ? address.trim() : null;
 }
 
-export default async function PublicEventDetailPage({
-  params,
-}: EventPageProps) {
-  const { userId } = auth();
+export default async function PublicEventDetailPage(props: EventPageProps) {
+  const params = await props.params;
+  const { userId } = await auth();
   const event = await getPublicEventBySlug({
     chapterSlug: params.chapterSlug,
     eventSlug: params.eventSlug,

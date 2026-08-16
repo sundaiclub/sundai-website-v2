@@ -28,17 +28,14 @@ const chapterImageSelect = {
 } as const;
 
 function isUploadFile(value: FormDataEntryValue | null): value is File {
-  return (
-    value !== null &&
-    typeof value === 'object' &&
-    'type' in value
-  );
+  return value !== null && typeof value === 'object' && 'type' in value;
 }
 
 export async function POST(
   request: Request,
-  { params }: { params: { chapterId: string } }
+  props: { params: Promise<{ chapterId: string }> }
 ) {
+  const params = await props.params;
   try {
     const chapterId = await resolveChapterId(params.chapterId);
     if (!chapterId) return new NextResponse('Not Found', { status: 404 });

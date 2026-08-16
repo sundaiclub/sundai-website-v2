@@ -1,16 +1,17 @@
-import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
-import prisma from "@/lib/prisma";
-import { uploadToGCS } from "@/lib/gcp-storage";
+import { NextResponse } from 'next/server';
+import { auth } from '@clerk/nextjs/server';
+import prisma from '@/lib/prisma';
+import { uploadToGCS } from '@/lib/gcp-storage';
 
 export async function POST(
   request: Request,
-  { params }: { params: { hackerId: string } }
+  props: { params: Promise<{ hackerId: string }> }
 ) {
+  const params = await props.params;
   try {
-    const { userId } = auth();
+    const { userId } = await auth();
     if (!userId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const requestingHacker = await prisma.hacker.findUnique({
@@ -18,21 +19,21 @@ export async function POST(
     });
 
     if (!requestingHacker || requestingHacker.id !== params.hackerId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const formData = await request.formData();
-    const file = formData.get("file") as File | null;
+    const file = formData.get('file') as File | null;
 
     if (!file || !(file instanceof File)) {
-      return NextResponse.json({ error: "No file provided" }, { status: 400 });
+      return NextResponse.json({ error: 'No file provided' }, { status: 400 });
     }
 
-    if (!file.type.startsWith("image/")) {
-      return NextResponse.json({ error: "Invalid file type" }, { status: 400 });
+    if (!file.type.startsWith('image/')) {
+      return NextResponse.json({ error: 'Invalid file type' }, { status: 400 });
     }
 
-    const uploadResult = await uploadToGCS(file, "avatars");
+    const uploadResult = await uploadToGCS(file, 'avatars');
 
     const newImage = await prisma.image.create({
       data: {
@@ -40,7 +41,7 @@ export async function POST(
         bucket: process.env.GOOGLE_CLOUD_BUCKET!,
         url: uploadResult.url,
         filename: file.name,
-        mimeType: file.type || "application/octet-stream",
+        mimeType: file.type || 'application/octet-stream',
         size: file.size,
         alt: `${requestingHacker.name} avatar`,
       },
@@ -60,16 +61,21 @@ export async function POST(
     });
 
     if (existing?.avatarId) {
-      await prisma.image.delete({ where: { id: existing.avatarId } }).catch(error => {
-        console.error("Failed to clean up the previous avatar record:", error);
-      });
+      await prisma.image
+        .delete({ where: { id: existing.avatarId } })
+        .catch(error => {
+          console.error(
+            'Failed to clean up the previous avatar record:',
+            error
+          );
+        });
     }
 
     return NextResponse.json(updated);
   } catch (error) {
-    console.error("Error uploading avatar:", error);
+    console.error('Error uploading avatar:', error);
     return NextResponse.json(
-      { error: "Failed to upload avatar" },
+      { error: 'Failed to upload avatar' },
       { status: 500 }
     );
   }

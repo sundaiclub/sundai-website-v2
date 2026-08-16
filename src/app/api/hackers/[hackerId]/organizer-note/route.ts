@@ -72,8 +72,9 @@ async function canAccessChapterTarget(
 
 export async function GET(
   request: Request,
-  { params }: { params: { hackerId: string } }
+  props: { params: Promise<{ hackerId: string }> }
 ) {
+  const params = await props.params;
   try {
     const hacker = await getCurrentHacker();
     if (!hacker) return unauthorized();
@@ -123,8 +124,9 @@ export async function GET(
 
 export async function PUT(
   request: Request,
-  { params }: { params: { hackerId: string } }
+  props: { params: Promise<{ hackerId: string }> }
 ) {
+  const params = await props.params;
   try {
     const hacker = await getCurrentHacker();
     if (!hacker) return unauthorized();

@@ -40,9 +40,7 @@ describe('chapter and project link preview metadata', () => {
     });
 
     expect(metadata.openGraph?.url).toBe(publicUrl('/chapters/boston'));
-    expect(metadata.alternates?.canonical).toBe(
-      publicUrl('/chapters/boston')
-    );
+    expect(metadata.alternates?.canonical).toBe(publicUrl('/chapters/boston'));
     expect(metadata.openGraph?.images).toEqual([
       {
         url: 'https://cdn.example.com/boston-chapter.webp',
@@ -119,8 +117,6 @@ describe('root link preview metadata', () => {
         alt: 'Sundai Club Logo',
       },
     ]);
-    expect(rootMetadata.twitter?.images).toEqual([
-      DEFAULT_SOCIAL_IMAGE_URL,
-    ]);
+    expect(rootMetadata.twitter?.images).toEqual([DEFAULT_SOCIAL_IMAGE_URL]);
   });
 });

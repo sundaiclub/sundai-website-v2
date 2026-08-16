@@ -20,7 +20,7 @@ Cut over organizer event operations to `/organizer/events/[eventId]`, providing 
 
 ## Technical Context
 
-**Language/Version**: TypeScript 5.6, React 18, Next.js 14.2 App Router, Prisma 5.21, Node.js runtime.
+**Language/Version**: TypeScript 5.6, React 19.2, Next.js 16.3 App Router, Prisma 5.21, Node.js 26 runtime.
 
 **Primary Dependencies**: Next.js, React, Prisma Client, PostgreSQL, Clerk (`@clerk/nextjs`), Google Cloud Storage (`@google-cloud/storage`), AWS SES SDK, Twilio, Jest, React Testing Library, Tailwind CSS.
 

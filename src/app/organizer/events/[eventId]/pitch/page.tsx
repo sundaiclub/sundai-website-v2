@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, use } from 'react';
 import {
   ManagementAlert,
   ManagementEmptyState,
@@ -30,11 +30,10 @@ function readable(value: string) {
     .join(' ');
 }
 
-export default function OrganizerEventPitchPage({
-  params,
-}: {
-  params: { eventId: string };
+export default function OrganizerEventPitchPage(props: {
+  params: Promise<{ eventId: string }>;
 }) {
+  const params = use(props.params);
   const classes = useManagementClasses();
   const workspace = useEventWorkspace();
   const [projects, setProjects] = useState<PitchProject[]>([]);

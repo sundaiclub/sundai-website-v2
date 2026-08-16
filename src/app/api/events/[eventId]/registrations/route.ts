@@ -123,8 +123,9 @@ function reviewRow(
 
 export async function GET(
   req: Request,
-  { params }: { params: { eventId: string } }
+  props: { params: Promise<{ eventId: string }> }
 ) {
+  const params = await props.params;
   try {
     const hacker = await getCurrentHacker();
     if (!hacker) return unauthorized();
@@ -191,8 +192,9 @@ export async function GET(
 
 export async function POST(
   req: Request,
-  { params }: { params: { eventId: string } }
+  props: { params: Promise<{ eventId: string }> }
 ) {
+  const params = await props.params;
   try {
     const hacker = await getCurrentHacker();
     if (!hacker) return unauthorized();

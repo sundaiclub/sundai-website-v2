@@ -12,12 +12,13 @@ const DEFAULT_SOCIAL_IMAGE = {
 
 type ChapterLayoutProps = {
   children: React.ReactNode;
-  params: { chapterSlug: string };
+  params: Promise<{ chapterSlug: string }>;
 };
 
-export async function generateMetadata({
-  params,
-}: Pick<ChapterLayoutProps, 'params'>): Promise<Metadata> {
+export async function generateMetadata(
+  props: Pick<ChapterLayoutProps, 'params'>
+): Promise<Metadata> {
+  const params = await props.params;
   const chapter = await prisma.chapter.findFirst({
     where: {
       slug: params.chapterSlug,

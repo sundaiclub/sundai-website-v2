@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, use } from 'react';
 import {
   AuthStatusAlert,
   authStatusFromResponse,
@@ -96,11 +96,10 @@ function replaceTemplate(
         : template
   );
 }
-export default function OrganizerChapterSettingsPage({
-  params,
-}: {
-  params: { chapterSlug: string };
+export default function OrganizerChapterSettingsPage(props: {
+  params: Promise<{ chapterSlug: string }>;
 }) {
+  const params = use(props.params);
   const classes = useManagementClasses();
   const { loading } = useUserContext();
   const [chapter, setChapter] = useState<OrganizerChapterSettings | null>(null);
@@ -322,10 +321,7 @@ export default function OrganizerChapterSettingsPage({
 
       if (!response.ok) {
         throw new Error(
-          await getImageUploadError(
-            response,
-            'Unable to upload chapter image.'
-          )
+          await getImageUploadError(response, 'Unable to upload chapter image.')
         );
       }
 

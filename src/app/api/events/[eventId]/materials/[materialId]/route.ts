@@ -1,10 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { requireEventMaterialsManager } from '@/lib/eventManagementApi';
-import {
-  deleteEventMaterial,
-  updateEventMaterial,
-} from '@/lib/eventMaterials';
+import { deleteEventMaterial, updateEventMaterial } from '@/lib/eventMaterials';
 
 const MUTABLE_FIELDS = [
   'title',
@@ -78,12 +75,11 @@ function isValidationError(error: unknown) {
 
 export async function PATCH(
   request: Request,
-  {
-    params,
-  }: {
-    params: { eventId: string; materialId: string };
+  props: {
+    params: Promise<{ eventId: string; materialId: string }>;
   }
 ) {
+  const params = await props.params;
   try {
     const access = await requireEventMaterialsManager(params.eventId);
     if (access.response) return access.response;
@@ -117,12 +113,11 @@ export async function PATCH(
 
 export async function DELETE(
   _request: Request,
-  {
-    params,
-  }: {
-    params: { eventId: string; materialId: string };
+  props: {
+    params: Promise<{ eventId: string; materialId: string }>;
   }
 ) {
+  const params = await props.params;
   try {
     const access = await requireEventMaterialsManager(params.eventId);
     if (access.response) return access.response;

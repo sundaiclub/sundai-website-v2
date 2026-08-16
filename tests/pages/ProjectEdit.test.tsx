@@ -10,7 +10,12 @@ import { ThemeProvider } from '../../src/app/contexts/ThemeContext';
 jest.mock('../../src/app/contexts/UserContext', () => ({
   useUserContext: () => ({
     isAdmin: true,
-    userInfo: { id: 'current-user-id', name: 'Current User', email: 'current@example.com', role: 'SITE_ADMIN' },
+    userInfo: {
+      id: 'current-user-id',
+      name: 'Current User',
+      email: 'current@example.com',
+      role: 'SITE_ADMIN',
+    },
     loading: false,
   }),
 }));
@@ -63,11 +68,11 @@ describe('ProjectEdit', () => {
     techTags: [
       { id: 'tech1', name: 'React' },
       { id: 'tech2', name: 'TypeScript' },
-      { id: 'tech3', name: 'Node.js' }
+      { id: 'tech3', name: 'Node.js' },
     ],
     domainTags: [
       { id: 'dom1', name: 'Web Development' },
-      { id: 'dom2', name: 'AI' }
+      { id: 'dom2', name: 'AI' },
     ],
     launchLead: {
       id: 'launch-lead-id',
@@ -97,7 +102,7 @@ describe('ProjectEdit', () => {
         emailAddresses: [{ emailAddress: 'current@example.com' }],
       },
     } as any);
-    
+
     // Mock fetch for APIs
     (global.fetch as jest.Mock).mockResolvedValue({
       ok: true,
@@ -120,7 +125,10 @@ describe('ProjectEdit', () => {
 
   it('should render project edit form when loaded', async () => {
     (global.fetch as jest.Mock)
-      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(mockProject) }) // project
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockProject),
+      }) // project
       .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve([]) }) // tech tags
       .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve([]) }) // domain tags
       .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve([]) }); // hackers
@@ -143,7 +151,10 @@ describe('ProjectEdit', () => {
 
   it('should render form fields', async () => {
     (global.fetch as jest.Mock)
-      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(mockProject) })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockProject),
+      })
       .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve([]) })
       .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve([]) })
       .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve([]) });
@@ -166,9 +177,18 @@ describe('ProjectEdit', () => {
 
   it('should render tech tags selector', async () => {
     (global.fetch as jest.Mock)
-      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(mockProject) })
-      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(mockProject.techTags) })
-      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(mockProject.domainTags) })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockProject),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockProject.techTags),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockProject.domainTags),
+      })
       .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve([]) });
 
     render(
@@ -184,9 +204,18 @@ describe('ProjectEdit', () => {
 
   it('should render domain tags selector', async () => {
     (global.fetch as jest.Mock)
-      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(mockProject) })
-      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(mockProject.techTags) })
-      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(mockProject.domainTags) })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockProject),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockProject.techTags),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockProject.domainTags),
+      })
       .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve([]) });
 
     render(
@@ -202,7 +231,10 @@ describe('ProjectEdit', () => {
 
   it('should render team management section', async () => {
     (global.fetch as jest.Mock)
-      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(mockProject) })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockProject),
+      })
       .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve([]) })
       .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve([]) })
       .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve([]) });
@@ -223,11 +255,17 @@ describe('ProjectEdit', () => {
 
   it('should handle form submission', async () => {
     (global.fetch as jest.Mock)
-      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(mockProject) }) // project
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockProject),
+      }) // project
       .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve([]) }) // tech
       .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve([]) }) // domain
       .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve([]) }) // hackers
-      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(mockProject) }); // PATCH
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockProject),
+      }); // PATCH
 
     render(
       <ThemeProvider>
@@ -239,18 +277,26 @@ describe('ProjectEdit', () => {
       expect(screen.getByText('Title')).toBeInTheDocument();
     });
 
-    const submitButton = screen.getAllByRole('button', { name: /save changes/i })[0];
+    const submitButton = screen.getAllByRole('button', {
+      name: /save changes/i,
+    })[0];
     fireEvent.click(submitButton);
 
     await waitFor(() => {
       const calls = (global.fetch as jest.Mock).mock.calls as any[];
-      const hasPatch = calls.some(([url, init]) => /\/api\/projects\/.*\/edit/.test(url) && init?.method === 'PATCH');
+      const hasPatch = calls.some(
+        ([url, init]) =>
+          /\/api\/projects\/.*\/edit/.test(url) && init?.method === 'PATCH'
+      );
       expect(hasPatch).toBe(true);
     });
   });
 
   it('should handle error state', async () => {
-    (global.fetch as jest.Mock).mockResolvedValueOnce({ ok: false, text: () => Promise.resolve('error') });
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: false,
+      text: () => Promise.resolve('error'),
+    });
 
     render(
       <ThemeProvider>
@@ -262,9 +308,6 @@ describe('ProjectEdit', () => {
       expect(mockPush).toHaveBeenCalledWith('/projects');
     });
   });
-
-
-  
 
   it('should handle missing optional fields gracefully', async () => {
     const projectWithMissingFields = {
@@ -279,7 +322,10 @@ describe('ProjectEdit', () => {
     };
 
     (global.fetch as jest.Mock)
-      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(projectWithMissingFields) })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(projectWithMissingFields),
+      })
       .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve([]) })
       .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve([]) })
       .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve([]) });

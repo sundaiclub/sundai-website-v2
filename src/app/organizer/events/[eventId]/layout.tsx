@@ -1,12 +1,13 @@
 import type { ReactNode } from 'react';
 import WorkspaceShell from './WorkspaceShell';
 
-export default function OrganizerEventLayout({
-  children,
-  params,
-}: {
+export default async function OrganizerEventLayout(props: {
   children: ReactNode;
-  params: { eventId: string };
+  params: Promise<{ eventId: string }>;
 }) {
+  const params = await props.params;
+
+  const { children } = props;
+
   return <WorkspaceShell eventId={params.eventId}>{children}</WorkspaceShell>;
 }

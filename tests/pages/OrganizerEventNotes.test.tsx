@@ -1,4 +1,5 @@
 import React from 'react';
+import { resolvedParams } from '../utils/next';
 import {
   cleanup,
   fireEvent,
@@ -15,7 +16,11 @@ jest.mock('../../src/app/contexts/ThemeContext', () => ({
 
 jest.mock('next/navigation', () => ({
   usePathname: () => '/organizer/events/event-ai-build-night/notes',
-  useRouter: () => ({ push: jest.fn(), replace: jest.fn(), refresh: jest.fn() }),
+  useRouter: () => ({
+    push: jest.fn(),
+    replace: jest.fn(),
+    refresh: jest.fn(),
+  }),
 }));
 
 const eventId = 'event-ai-build-night';
@@ -58,7 +63,7 @@ function mockNotesFetch({
   rows = [noteRow],
   canViewRevisions = true,
 }: {
-  rows?: typeof noteRow[];
+  rows?: (typeof noteRow)[];
   canViewRevisions?: boolean;
 } = {}) {
   global.fetch = jest.fn((input: RequestInfo | URL, init?: RequestInit) => {
@@ -92,10 +97,7 @@ function mockNotesFetch({
         },
       });
     }
-    if (
-      url.pathname ===
-      `/api/events/${eventId}/notes/${hackerId}/revisions`
-    ) {
+    if (url.pathname === `/api/events/${eventId}/notes/${hackerId}/revisions`) {
       return jsonResponse({
         items: [
           {
@@ -111,7 +113,9 @@ function mockNotesFetch({
   }) as jest.Mock;
 }
 
-function loadPage(): React.ComponentType<{ params: { eventId: string } }> {
+function loadPage(): React.ComponentType<{
+  params: Promise<{ eventId: string }>;
+}> {
   try {
     return require('../../src/app/organizer/events/[eventId]/notes/page')
       .default;
@@ -122,7 +126,7 @@ function loadPage(): React.ComponentType<{ params: { eventId: string } }> {
 
 function renderPage() {
   const Page = loadPage();
-  return render(<Page params={{ eventId }} />);
+  return render(<Page params={resolvedParams({ eventId })} />);
 }
 
 describe('/organizer/events/[eventId]/notes', () => {
@@ -155,7 +159,9 @@ describe('/organizer/events/[eventId]/notes', () => {
 
   it('opens and updates the shared current organizer note in event scope', async () => {
     renderPage();
-    fireEvent.click(await screen.findByRole('button', { name: /ada builder/i }));
+    fireEvent.click(
+      await screen.findByRole('button', { name: /ada builder/i })
+    );
 
     const editor = await screen.findByLabelText(/organizer note/i);
     expect(editor).toHaveValue('Prefers a quiet demo setup.');
@@ -191,9 +197,13 @@ describe('/organizer/events/[eventId]/notes', () => {
 
   it('shows revision history only when the current role has history capability', async () => {
     renderPage();
-    fireEvent.click(await screen.findByRole('button', { name: /ada builder/i }));
     fireEvent.click(
-      await screen.findByRole('button', { name: /view.*history|revision history/i })
+      await screen.findByRole('button', { name: /ada builder/i })
+    );
+    fireEvent.click(
+      await screen.findByRole('button', {
+        name: /view.*history|revision history/i,
+      })
     );
     expect(await screen.findByText('Chapter Admin')).toBeInTheDocument();
     expect(screen.getByText('Needs a quiet setup.')).toBeInTheDocument();
@@ -201,7 +211,9 @@ describe('/organizer/events/[eventId]/notes', () => {
     cleanup();
     mockNotesFetch({ canViewRevisions: false });
     renderPage();
-    fireEvent.click(await screen.findByRole('button', { name: /ada builder/i }));
+    fireEvent.click(
+      await screen.findByRole('button', { name: /ada builder/i })
+    );
     expect(
       screen.queryByRole('button', { name: /view.*history|revision history/i })
     ).not.toBeInTheDocument();
@@ -210,13 +222,19 @@ describe('/organizer/events/[eventId]/notes', () => {
   it('renders empty and load-error states without stale note content', async () => {
     mockNotesFetch({ rows: [] });
     renderPage();
-    expect(await screen.findByText(/no relevant hackers|no notes/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/no relevant hackers|no notes/i)
+    ).toBeInTheDocument();
 
     cleanup();
     global.fetch = jest.fn(() => jsonResponse({ error: 'Unavailable' }, 503));
     renderPage();
     const alert = await screen.findByRole('alert');
-    expect(alert).toHaveTextContent(/notes.*unavailable|unable to load.*notes/i);
-    expect(screen.queryByText('Prefers a quiet demo setup.')).not.toBeInTheDocument();
+    expect(alert).toHaveTextContent(
+      /notes.*unavailable|unable to load.*notes/i
+    );
+    expect(
+      screen.queryByText('Prefers a quiet demo setup.')
+    ).not.toBeInTheDocument();
   });
 });

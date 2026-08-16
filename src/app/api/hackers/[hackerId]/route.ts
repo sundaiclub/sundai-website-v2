@@ -1,20 +1,20 @@
-import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
-import type { Prisma } from "@prisma/client";
-import prisma from "@/lib/prisma";
-import { phoneNumberForStorage } from "@/lib/phoneNumbers";
+import { NextResponse } from 'next/server';
+import { auth } from '@clerk/nextjs/server';
+import type { Prisma } from '@prisma/client';
+import prisma from '@/lib/prisma';
+import { phoneNumberForStorage } from '@/lib/phoneNumbers';
 
-const REQUIRED_HACKER_UPDATE_FIELDS = ["name"] as const;
+const REQUIRED_HACKER_UPDATE_FIELDS = ['name'] as const;
 
 const NULLABLE_HACKER_UPDATE_FIELDS = [
-  "bio",
-  "githubUrl",
-  "phoneNumber",
-  "linkedinUrl",
-  "twitterUrl",
-  "username",
-  "discordName",
-  "websiteUrl",
+  'bio',
+  'githubUrl',
+  'phoneNumber',
+  'linkedinUrl',
+  'twitterUrl',
+  'username',
+  'discordName',
+  'websiteUrl',
 ] as const;
 
 const ALLOWED_HACKER_UPDATE_FIELDS = [
@@ -23,13 +23,14 @@ const ALLOWED_HACKER_UPDATE_FIELDS = [
 ] as const;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === "object";
+  return value !== null && typeof value === 'object';
 }
 
 export async function GET(
   request: Request,
-  { params }: { params: { hackerId: string } }
+  props: { params: Promise<{ hackerId: string }> }
 ) {
+  const params = await props.params;
   try {
     const hacker = await prisma.hacker.findUnique({
       where: { id: params.hackerId },
@@ -41,7 +42,7 @@ export async function GET(
             likes: true,
           },
           orderBy: {
-            createdAt: "desc",
+            createdAt: 'desc',
           },
         },
         projects: {
@@ -54,7 +55,7 @@ export async function GET(
             },
           },
           orderBy: {
-            createdAt: "desc",
+            createdAt: 'desc',
           },
         },
         likes: {
@@ -72,20 +73,20 @@ export async function GET(
             },
           },
           orderBy: {
-            createdAt: "desc",
+            createdAt: 'desc',
           },
         },
       },
     });
 
     if (!hacker) {
-      return NextResponse.json({ error: "Builder not found" }, { status: 404 });
+      return NextResponse.json({ error: 'Builder not found' }, { status: 404 });
     }
 
     const { likes, ...hackerWithoutLikes } = hacker;
     const transformedHacker = {
       ...hackerWithoutLikes,
-      likedProjects: likes.map((like) => ({
+      likedProjects: likes.map(like => ({
         createdAt: like.createdAt,
         project: like.project,
       })),
@@ -93,9 +94,9 @@ export async function GET(
 
     return NextResponse.json(transformedHacker);
   } catch (error) {
-    console.error("Error fetching hacker:", error);
+    console.error('Error fetching hacker:', error);
     return NextResponse.json(
-      { error: "Error fetching hacker" },
+      { error: 'Error fetching hacker' },
       { status: 500 }
     );
   }
@@ -103,12 +104,13 @@ export async function GET(
 
 export async function PATCH(
   request: Request,
-  { params }: { params: { hackerId: string } }
+  props: { params: Promise<{ hackerId: string }> }
 ) {
+  const params = await props.params;
   try {
-    const { userId } = auth();
+    const { userId } = await auth();
     if (!userId) {
-      return NextResponse.json("Unauthorized", { status: 401 });
+      return NextResponse.json('Unauthorized', { status: 401 });
     }
 
     const requestingHacker = await prisma.hacker.findUnique({
@@ -116,11 +118,11 @@ export async function PATCH(
     });
 
     if (!requestingHacker) {
-      return NextResponse.json({ error: "Builder not found" }, { status: 404 });
+      return NextResponse.json({ error: 'Builder not found' }, { status: 404 });
     }
 
     if (requestingHacker.id !== params.hackerId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const data: unknown = await request.json();
@@ -128,15 +130,15 @@ export async function PATCH(
     const sanitizedData: Prisma.HackerUpdateInput = {};
 
     if (isRecord(data)) {
-      if (typeof data.name === "string") {
+      if (typeof data.name === 'string') {
         sanitizedData.name = data.name;
       }
 
       for (const key of NULLABLE_HACKER_UPDATE_FIELDS) {
         const value = data[key];
-        if (typeof value === "string" || value === null) {
+        if (typeof value === 'string' || value === null) {
           sanitizedData[key] =
-            key === "phoneNumber" && typeof value === "string"
+            key === 'phoneNumber' && typeof value === 'string'
               ? phoneNumberForStorage(value)
               : value;
         }
@@ -153,7 +155,7 @@ export async function PATCH(
             thumbnail: true,
           },
           orderBy: {
-            createdAt: "desc",
+            createdAt: 'desc',
           },
         },
         projects: {
@@ -166,7 +168,7 @@ export async function PATCH(
             },
           },
           orderBy: {
-            createdAt: "desc",
+            createdAt: 'desc',
           },
         },
         likes: {
@@ -183,7 +185,7 @@ export async function PATCH(
             },
           },
           orderBy: {
-            createdAt: "desc",
+            createdAt: 'desc',
           },
         },
       },
@@ -191,9 +193,9 @@ export async function PATCH(
 
     return NextResponse.json(updatedHacker);
   } catch (error) {
-    console.error("Error updating builder:", error);
+    console.error('Error updating builder:', error);
     return NextResponse.json(
-      { error: "Error updating builder" },
+      { error: 'Error updating builder' },
       { status: 500 }
     );
   }

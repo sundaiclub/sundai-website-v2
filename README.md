@@ -31,7 +31,7 @@ Reach out to @godeva or @arteml0178 on discord with any quesions.
 
 Before starting, ensure you have:
 
-- **Node.js 18+** and npm installed
+- **Node.js 26** and npm installed
 - **Docker Desktop** installed AND running (not just installed!)
 - **Git** for version control
 - **Clerk Account** - Sign up at [clerk.com](https://clerk.com) for authentication
@@ -66,6 +66,7 @@ docker info
 #### Required Third-Party Services:
 
 **Clerk Authentication** (Required):
+
 1. Sign up at [clerk.com](https://clerk.com)
 2. Create a new application
 3. Get your publishable key and secret key from the dashboard
@@ -97,8 +98,8 @@ npm run db:reset
 
 **Now your profile should work!** Visit `/me` or click on your profile to see your hacker profile page.
 
-
 **Google Cloud Storage** (Optional for local development):
+
 1. Create Google Cloud Project
 2. Enable Cloud Storage API
 3. Create a storage bucket
@@ -233,13 +234,14 @@ npm run setup-husky
 ### Test Coverage
 
 - **Components**: All React components are tested
-- **Pages**: All page components are tested  
+- **Pages**: All page components are tested
 - **API Routes**: All API endpoints are tested
 - **Utilities**: All utility functions are tested
 
 ### Pre-commit Hooks
 
 Before each commit, the following runs automatically:
+
 1. **ESLint** - Code linting and fixing
 2. **Jest** - Related tests only
 3. **Prettier** - Code formatting
@@ -248,6 +250,7 @@ Before each commit, the following runs automatically:
 ### GitHub Actions
 
 All pull requests automatically run:
+
 - Linting and type checking
 - Full test suite
 - Build verification
@@ -268,7 +271,8 @@ graph TD
 ```
 
 **Tech Stack:**
-- **Frontend**: Next.js 14 with TypeScript, Tailwind CSS, Framer Motion
+
+- **Frontend**: Next.js 16 with TypeScript, Tailwind CSS, Framer Motion
 - **Backend**: Next.js API routes with Prisma ORM
 - **Database**: PostgreSQL with Docker for local development
 - **Authentication**: Clerk for user management
@@ -280,6 +284,7 @@ graph TD
 ### Common First-Time Setup Issues:
 
 #### "Docker daemon not running"
+
 ```bash
 # Solution: Start Docker Desktop first
 open -a Docker  # macOS
@@ -287,12 +292,14 @@ open -a Docker  # macOS
 ```
 
 #### "Environment variable not found: DATABASE_URL"
+
 ```bash
 # Solution: Ensure .env.local file exists with correct variables
 cat .env.local  # Check if file exists and has DATABASE_URL
 ```
 
 #### "Database connection failed"
+
 ```bash
 # Solution: Ensure PostgreSQL container is running
 docker compose ps
@@ -301,6 +308,7 @@ npm run db:up
 ```
 
 #### "Clerk authentication errors"
+
 ```bash
 # Solution: Get real API keys from Clerk dashboard
 # 1. Go to https://clerk.com
@@ -309,6 +317,7 @@ npm run db:up
 ```
 
 #### "Missing CLERK_ENCRYPTION_KEY" warning
+
 ```bash
 # This is a deprecation warning, app will still work
 # Add to .env.local if you want to remove the warning:
@@ -485,6 +494,7 @@ their short expiry or when current access is removed.
 ## 🔑 Required External Services Setup
 
 ### Clerk Authentication Setup:
+
 1. Sign up at [clerk.com](https://clerk.com)
 2. Create a new application
 3. Copy your publishable key and secret key to `.env.local`
@@ -492,6 +502,7 @@ their short expiry or when current access is removed.
 5. Configure sign-in/sign-up flows in Clerk dashboard
 
 ### Google Cloud Storage Setup (Optional):
+
 1. Create Google Cloud Project
 2. Enable Cloud Storage API
 3. Create a storage bucket
@@ -499,6 +510,7 @@ their short expiry or when current access is removed.
 5. Download service account key JSON file and add to project
 
 ### AI Image Generation Setup (Optional):
+
 1. **Gemini API**: Get your API key from [Google AI Studio](https://makersuite.google.com/app/apikey)
 2. **Replicate API**: Sign up at [replicate.com](https://replicate.com) and get your API token
 3. Add both keys to your `.env.local` file

@@ -539,9 +539,7 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
         alt: 'Sundai Club Logo',
       },
     ]);
-    expect(metadata.twitter?.images).toEqual([
-      DEFAULT_SOCIAL_IMAGE_URL,
-    ]);
+    expect(metadata.twitter?.images).toEqual([DEFAULT_SOCIAL_IMAGE_URL]);
   });
 
   it('renders published public event fields for anonymous visitors', async () => {

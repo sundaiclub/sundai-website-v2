@@ -4,8 +4,9 @@ import { resolveBanFlag } from '@/lib/moderation';
 
 export async function PATCH(
   req: Request,
-  { params }: { params: { flagId: string } }
+  props: { params: Promise<{ flagId: string }> }
 ) {
+  const params = await props.params;
   try {
     const { hacker, response } = await requireSiteAdmin();
     if (response) return response;

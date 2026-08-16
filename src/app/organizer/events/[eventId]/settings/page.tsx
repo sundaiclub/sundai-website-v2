@@ -1,15 +1,14 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, use } from 'react';
 import { ManagementAlert } from '../../../../components/ManagementSurface';
 import { OrganizerEventForm } from '../../EventForm';
 import type { EventWorkspacePayload } from '../WorkspaceShell';
 
-export default function OrganizerEventSettingsPage({
-  params,
-}: {
-  params: { eventId: string };
+export default function OrganizerEventSettingsPage(props: {
+  params: Promise<{ eventId: string }>;
 }) {
+  const params = use(props.params);
   const [access, setAccess] = useState<
     'loading' | 'allowed' | 'denied' | 'unavailable'
   >('loading');

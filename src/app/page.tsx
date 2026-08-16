@@ -209,6 +209,7 @@ export default function Home() {
                     style={{ filter: 'brightness(1.2)' }}
                     className="w-16 h-16 sm:w-24 sm:h-24 opacity-90"
                     alt="Logo MIT"
+                    priority
                     width={96}
                     height={96}
                   />

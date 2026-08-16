@@ -1,8 +1,9 @@
 "use client";
 import React, { KeyboardEvent, useState } from "react";
 import Image from "next/image";
-import gifPath2 from "../../../public/assets/pip-ai_workflow.gif"; // Your first GIF
-import gifPath1 from "../../../public/assets/standard_workflow.gif"; // Your second GIF (replace with actual path)
+
+const gifPath1 = "/assets/standard_workflow.gif";
+const gifPath2 = "/assets/pip-ai_workflow.gif";
 
 type GifDisplayProps = {
   altText?: string;

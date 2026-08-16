@@ -1,24 +1,19 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  agentRules: false,
+  allowedDevOrigins: ['192.168.0.119'],
   typescript: {
     ignoreBuildErrors: true,
   },
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
   images: {
-    // unoptimized: true,
-    domains: [
-      "img.clerk.com",
-      "images.clerk.dev",
-      "www.gravatar.com",
-      "storage.googleapis.com",
-      "replicate.delivery",
+    remotePatterns: [
+      { protocol: 'https', hostname: 'img.clerk.com' },
+      { protocol: 'https', hostname: 'images.clerk.dev' },
+      { protocol: 'https', hostname: 'www.gravatar.com' },
+      { protocol: 'https', hostname: 'storage.googleapis.com' },
+      { protocol: 'https', hostname: 'replicate.delivery' },
     ],
   },
-  experimental: {
-    esmExternals: 'loose'
-  }
 };
 
 export default nextConfig;

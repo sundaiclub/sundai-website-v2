@@ -4,8 +4,9 @@ import { joinOrReactivatePublicMembership } from '@/lib/chapters';
 
 export async function POST(
   _req: Request,
-  { params }: { params: { chapterId: string } }
+  props: { params: Promise<{ chapterId: string }> }
 ) {
+  const params = await props.params;
   try {
     const hacker = await getCurrentHacker();
     if (!hacker) return new NextResponse('Unauthorized', { status: 401 });

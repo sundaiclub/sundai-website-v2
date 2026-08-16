@@ -332,8 +332,14 @@ describe('event-management site-admin pages', () => {
               ? input.url
               : input.toString();
 
-        if (url === '/api/chapters/chapter-boston' && init?.method === 'PATCH') {
-          return jsonResponse({ ...chapters[0], name: 'Sundai Greater Boston' });
+        if (
+          url === '/api/chapters/chapter-boston' &&
+          init?.method === 'PATCH'
+        ) {
+          return jsonResponse({
+            ...chapters[0],
+            name: 'Sundai Greater Boston',
+          });
         }
         if (url === '/api/chapters') {
           return jsonResponse({ chapters, items: chapters });
@@ -352,7 +358,9 @@ describe('event-management site-admin pages', () => {
       });
       fireEvent.click(editButton);
       fireEvent.change(
-        screen.getByRole('textbox', { name: /chapter name for sundai boston/i }),
+        screen.getByRole('textbox', {
+          name: /chapter name for sundai boston/i,
+        }),
         { target: { value: 'Sundai Greater Boston' } }
       );
       fireEvent.click(screen.getByRole('button', { name: /save name/i }));

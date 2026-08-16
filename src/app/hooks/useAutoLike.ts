@@ -1,10 +1,13 @@
-"use client";
-import { useEffect } from "react";
-import { useUser } from "@clerk/nextjs";
-import { useRouter, useSearchParams } from "next/navigation";
+'use client';
+import { useEffect } from 'react';
+import { useUser } from '@clerk/nextjs';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 type AutoLikeUser = ReturnType<typeof useUser> & {
-  openSignIn?: (options: { redirectUrl: string }) => unknown | Promise<unknown>;
+  openSignIn?: (options: {
+    fallbackRedirectUrl: string;
+    signUpFallbackRedirectUrl: string;
+  }) => unknown | Promise<unknown>;
 };
 
 export function useAutoLike(projectId: string | null) {
@@ -15,7 +18,7 @@ export function useAutoLike(projectId: string | null) {
   useEffect(() => {
     if (!projectId) return;
 
-    const shouldLike = searchParams?.get("like") === "1";
+    const shouldLike = searchParams?.get('like') === '1';
     if (!shouldLike) return;
 
     const likeOnceKey = `liked_${projectId}`;
@@ -25,27 +28,32 @@ export function useAutoLike(projectId: string | null) {
       if (!isLoaded) return;
       if (!isSignedIn) {
         try {
-          if (typeof openSignIn === "function") {
+          if (typeof openSignIn === 'function') {
             await openSignIn({
-              redirectUrl: `/projects/${projectId}?like=1`,
+              fallbackRedirectUrl: `/projects/${projectId}?like=1`,
+              signUpFallbackRedirectUrl: `/projects/${projectId}?like=1`,
             });
           }
         } catch (error) {
-          console.error("Unable to open sign-in for automatic like:", error);
+          console.error('Unable to open sign-in for automatic like:', error);
         }
         return;
       }
 
       try {
-        const res = await fetch(`/api/projects/${projectId}/like`, { method: "POST" });
+        const res = await fetch(`/api/projects/${projectId}/like`, {
+          method: 'POST',
+        });
         if (res.ok) {
-          sessionStorage.setItem(likeOnceKey, "1");
-          const params = new URLSearchParams(Array.from(searchParams?.entries() || []));
-          params.delete("like");
+          sessionStorage.setItem(likeOnceKey, '1');
+          const params = new URLSearchParams(
+            Array.from(searchParams?.entries() || [])
+          );
+          params.delete('like');
           router.replace(`?${params.toString()}`);
         }
       } catch (error) {
-        console.error("Unable to apply automatic project like:", error);
+        console.error('Unable to apply automatic project like:', error);
       }
     };
 

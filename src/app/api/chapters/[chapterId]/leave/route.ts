@@ -4,13 +4,17 @@ import { leaveChapterWithAdminGuard } from '@/lib/chapters';
 
 export async function POST(
   _req: Request,
-  { params }: { params: { chapterId: string } }
+  props: { params: Promise<{ chapterId: string }> }
 ) {
+  const params = await props.params;
   try {
     const hacker = await getCurrentHacker();
     if (!hacker) return new NextResponse('Unauthorized', { status: 401 });
 
-    const membership = await leaveChapterWithAdminGuard(params.chapterId, hacker.id);
+    const membership = await leaveChapterWithAdminGuard(
+      params.chapterId,
+      hacker.id
+    );
     return NextResponse.json(membership);
   } catch (error: unknown) {
     if (error instanceof Error) {

@@ -1,15 +1,16 @@
-import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
-import prisma from "@/lib/prisma";
+import { NextResponse } from 'next/server';
+import { auth } from '@clerk/nextjs/server';
+import prisma from '@/lib/prisma';
 
 export async function PATCH(
   req: Request,
-  { params }: { params: { projectId: string } }
+  props: { params: Promise<{ projectId: string }> }
 ) {
+  const params = await props.params;
   try {
-    const { userId } = auth();
+    const { userId } = await auth();
     if (!userId) {
-      return new NextResponse("Unauthorized", { status: 401 });
+      return new NextResponse('Unauthorized', { status: 401 });
     }
 
     const body = await req.json();
@@ -20,7 +21,7 @@ export async function PATCH(
     });
 
     if (!currentUser) {
-      return new NextResponse("User not found", { status: 404 });
+      return new NextResponse('User not found', { status: 404 });
     }
 
     const project = await prisma.project.findUnique({
@@ -33,15 +34,17 @@ export async function PATCH(
     });
 
     if (!project) {
-      return new NextResponse("Project not found", { status: 404 });
+      return new NextResponse('Project not found', { status: 404 });
     }
 
-    const isAdmin = currentUser.role === "SITE_ADMIN";
+    const isAdmin = currentUser.role === 'SITE_ADMIN';
     const isLaunchLead = project.launchLeadId === currentUser.id;
-    const isTeamMember = project.participants.some(p => p.hackerId === currentUser.id);
+    const isTeamMember = project.participants.some(
+      p => p.hackerId === currentUser.id
+    );
 
     if (!isAdmin && !isLaunchLead && !isTeamMember) {
-      return new NextResponse("Unauthorized", { status: 401 });
+      return new NextResponse('Unauthorized', { status: 401 });
     }
 
     const updatedProject = await prisma.project.update({
@@ -51,7 +54,7 @@ export async function PATCH(
 
     return NextResponse.json(updatedProject);
   } catch (error) {
-    console.error("[PROJECT_STATUS_UPDATE]", error);
-    return new NextResponse("Internal Error", { status: 500 });
+    console.error('[PROJECT_STATUS_UPDATE]', error);
+    return new NextResponse('Internal Error', { status: 500 });
   }
 }

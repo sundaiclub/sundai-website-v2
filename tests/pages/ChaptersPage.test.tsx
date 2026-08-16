@@ -1,4 +1,5 @@
 import React from 'react';
+import { resolvedParams } from '../utils/next';
 import {
   fireEvent,
   render,
@@ -513,7 +514,7 @@ function renderLandingPage(chapterSlug: string) {
     '/chapters/[chapterSlug]',
     '../../src/app/chapters/[chapterSlug]/page'
   );
-  render(<ChapterLandingPage params={{ chapterSlug }} />);
+  render(<ChapterLandingPage params={resolvedParams({ chapterSlug })} />);
 }
 
 describe('chapter public directory and landing pages', () => {
@@ -541,7 +542,9 @@ describe('chapter public directory and landing pages', () => {
       expect(bostonCard).toHaveTextContent(
         'Public builds and demos for Boston hackers.'
       );
-      expect(within(bostonCard).queryByText(/^Boston$/i)).not.toBeInTheDocument();
+      expect(
+        within(bostonCard).queryByText(/^Boston$/i)
+      ).not.toBeInTheDocument();
       expect(bostonCard).not.toHaveTextContent(/America\/New_York|Eastern/i);
 
       const sfCardLink = await screen.findByRole('link', {

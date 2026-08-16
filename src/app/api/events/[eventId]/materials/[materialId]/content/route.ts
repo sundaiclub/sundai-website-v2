@@ -15,23 +15,18 @@ function notFound() {
 
 export async function GET(
   _request: Request,
-  {
-    params,
-  }: {
-    params: { eventId: string; materialId: string };
+  props: {
+    params: Promise<{ eventId: string; materialId: string }>;
   }
 ) {
+  const params = await props.params;
   try {
     const material = await prisma.eventMaterial.findUnique({
       where: { id: params.materialId, eventId: params.eventId },
     });
     if (!material || material.kind !== 'FILE') return notFound();
     if (!isEventMaterialAvailable(material)) return notFound();
-    if (
-      !material.objectKey ||
-      !material.bucket ||
-      !material.originalFilename
-    ) {
+    if (!material.objectKey || !material.bucket || !material.originalFilename) {
       return notFound();
     }
 
