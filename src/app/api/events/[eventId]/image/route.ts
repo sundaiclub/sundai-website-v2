@@ -2,8 +2,11 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { requireEventSettingsManager } from '@/lib/eventManagementApi';
 import { uploadToGCS } from '@/lib/gcp-storage';
+import {
+  IMAGE_UPLOAD_SIZE_ERROR,
+  validateImageUploadSize,
+} from '@/lib/imageUploads';
 
-const MAX_EVENT_IMAGE_BYTES = 10 * 1024 * 1024;
 const ALLOWED_EVENT_IMAGE_TYPES = new Set([
   'image/jpeg',
   'image/png',
@@ -44,10 +47,10 @@ export async function POST(
         { status: 400 }
       );
     }
-    if (file.size > MAX_EVENT_IMAGE_BYTES) {
+    if (validateImageUploadSize(file)) {
       return NextResponse.json(
-        { message: 'Event images must be 10 MB or smaller.' },
-        { status: 400 }
+        { message: IMAGE_UPLOAD_SIZE_ERROR },
+        { status: 413 }
       );
     }
 

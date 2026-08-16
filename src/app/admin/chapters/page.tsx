@@ -35,6 +35,10 @@ export default function AdminChaptersPage() {
   const { isAdmin, loading, userInfo } = useUserContext();
   const [chapters, setChapters] = useState<SiteAdminChapterListItem[]>([]);
   const [loadError, setLoadError] = useState('');
+  const [editingChapterId, setEditingChapterId] = useState<string | null>(null);
+  const [chapterNameDraft, setChapterNameDraft] = useState('');
+  const [chapterNameError, setChapterNameError] = useState('');
+  const [isSavingChapterName, setIsSavingChapterName] = useState(false);
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
   const [city, setCity] = useState('');
@@ -88,6 +92,61 @@ export default function AdminChaptersPage() {
       setAccessMode('PUBLIC');
       setStatus('ACTIVE');
       setDescription('');
+    }
+  }
+
+  function startEditingChapterName(chapter: SiteAdminChapterListItem) {
+    setEditingChapterId(chapter.id);
+    setChapterNameDraft(chapter.name);
+    setChapterNameError('');
+  }
+
+  function cancelEditingChapterName() {
+    setEditingChapterId(null);
+    setChapterNameDraft('');
+    setChapterNameError('');
+  }
+
+  async function saveChapterName(
+    event: React.FormEvent,
+    chapter: SiteAdminChapterListItem
+  ) {
+    event.preventDefault();
+    const nextName = chapterNameDraft.trim();
+    if (!nextName) {
+      setChapterNameError('Chapter name is required.');
+      return;
+    }
+
+    setIsSavingChapterName(true);
+    setChapterNameError('');
+
+    try {
+      const response = await fetch(`/api/chapters/${chapter.id}`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ name: nextName }),
+      });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        throw new Error(payload?.message || 'Unable to save chapter name.');
+      }
+
+      const updated = (await response.json()) as { name?: string };
+      setChapters(current =>
+        current.map(item =>
+          item.id === chapter.id
+            ? { ...item, name: updated.name ?? nextName }
+            : item
+        )
+      );
+      cancelEditingChapterName();
+    } catch (error) {
+      setChapterNameError(
+        error instanceof Error ? error.message : 'Unable to save chapter name.'
+      );
+    } finally {
+      setIsSavingChapterName(false);
     }
   }
 
@@ -218,15 +277,70 @@ export default function AdminChaptersPage() {
                     key={chapter.id}
                     className="grid gap-3 py-4 lg:grid-cols-[minmax(0,1fr)_auto_auto] lg:items-center"
                   >
-                    <Link
-                      className="block min-w-0 rounded-md py-1 underline-offset-4 hover:underline"
-                      href={`/chapters/${chapter.slug}`}
-                    >
-                      <div className="font-semibold">{chapter.name}</div>
-                      <div className={`text-sm ${classes.mutedText}`}>
-                        {chapter.city}
+                    {editingChapterId === chapter.id ? (
+                      <form
+                        className="grid min-w-0 gap-2"
+                        onSubmit={event => saveChapterName(event, chapter)}
+                      >
+                        <label className="grid gap-1 text-sm font-semibold">
+                          Chapter name
+                          <input
+                            aria-label={`Chapter name for ${chapter.name}`}
+                            autoFocus
+                            className={classes.input}
+                            disabled={isSavingChapterName}
+                            onChange={event =>
+                              setChapterNameDraft(event.target.value)
+                            }
+                            value={chapterNameDraft}
+                          />
+                        </label>
+                        {chapterNameError && (
+                          <ManagementAlert tone="danger">
+                            {chapterNameError}
+                          </ManagementAlert>
+                        )}
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            className={classes.primaryButton}
+                            disabled={
+                              isSavingChapterName || !chapterNameDraft.trim()
+                            }
+                            type="submit"
+                          >
+                            {isSavingChapterName ? 'Saving...' : 'Save name'}
+                          </button>
+                          <button
+                            className={classes.secondaryButton}
+                            disabled={isSavingChapterName}
+                            onClick={cancelEditingChapterName}
+                            type="button"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </form>
+                    ) : (
+                      <div className="flex min-w-0 items-start gap-2">
+                        <Link
+                          className="block min-w-0 rounded-md py-1 underline-offset-4 hover:underline"
+                          href={`/chapters/${chapter.slug}`}
+                        >
+                          <div className="font-semibold">{chapter.name}</div>
+                          <div className={`text-sm ${classes.mutedText}`}>
+                            {chapter.city}
+                          </div>
+                        </Link>
+                        <button
+                          aria-label={`Edit ${chapter.name} name`}
+                          className={classes.ghostButton}
+                          onClick={() => startEditingChapterName(chapter)}
+                          type="button"
+                        >
+                          Edit name
+                        </button>
                       </div>
-                    </Link>
+                    )}
                     <div className="flex flex-wrap gap-2">
                       <ManagementBadge
                         tone={

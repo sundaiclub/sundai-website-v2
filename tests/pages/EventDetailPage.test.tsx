@@ -860,6 +860,24 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('hides the event-specific details section when no details are set', async () => {
+    await renderDetailPage(
+      buildEventDetail({
+        approvedDetailsVisible: true,
+        approvedDetailsJson: {
+          address: '42 Private Lane',
+          details: '   ',
+        },
+        viewerRegistrationStatus: 'APPROVED',
+        viewerRegistration: registrationState('APPROVED'),
+      })
+    );
+
+    expect(
+      screen.queryByRole('heading', { name: /event-specific details/i })
+    ).not.toBeInTheDocument();
+  });
+
   it('renders only public material links for anonymous and non-approved viewers', async () => {
     await renderDetailPage(
       buildEventDetail({

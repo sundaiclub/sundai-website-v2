@@ -365,6 +365,44 @@ describe('/api/projects/[projectId]/edit', () => {
       expect(mockUploadToGCS).toHaveBeenCalled();
     });
 
+    it('should return 413 when the thumbnail is too large', async () => {
+      const { auth } = require('@clerk/nextjs/server');
+      auth.mockReturnValue({ userId: mockUserId });
+      mockPrisma.project.findUnique.mockResolvedValue({
+        id: mockProjectId,
+        launchLeadId: mockHackerId,
+        participants: [],
+        status: 'DRAFT',
+      } as any);
+      mockPrisma.hacker.findUnique.mockResolvedValue({
+        id: mockHackerId,
+        clerkId: mockUserId,
+        role: 'HACKER',
+      } as any);
+
+      const formData = new FormData();
+      formData.append(
+        'thumbnail',
+        new File([new Uint8Array(15 * 1024 * 1024)], 'large.jpg', {
+          type: 'image/jpeg',
+        })
+      );
+      const request = new NextRequest(
+        `http://localhost:3000/api/projects/${mockProjectId}/edit`,
+        { method: 'PATCH', body: formData }
+      );
+
+      const response = await PATCH(request, {
+        params: { projectId: mockProjectId },
+      });
+
+      expect(response.status).toBe(413);
+      expect(await response.json()).toEqual({
+        error: 'File too large. Image files must be smaller than 15 MB.',
+      });
+      expect(mockUploadToGCS).not.toHaveBeenCalled();
+    });
+
     it('should handle thumbnail deletion', async () => {
       const { auth } = require('@clerk/nextjs/server');
       auth.mockReturnValue({ userId: mockUserId });
