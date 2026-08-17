@@ -31,7 +31,7 @@ Reach out to @godeva or @arteml0178 on discord with any quesions.
 
 Before starting, ensure you have:
 
-- **Node.js 26** and npm installed
+- **Node.js 24** and npm installed
 - **Docker Desktop** installed AND running (not just installed!)
 - **Git** for version control
 - **Clerk Account** - Sign up at [clerk.com](https://clerk.com) for authentication

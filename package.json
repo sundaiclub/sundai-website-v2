@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "engines": {
-    "node": ">=26.0.0 <27"
+    "node": ">=24.0.0 <25"
   },
   "scripts": {
     "dev": "node --no-deprecation node_modules/.bin/next dev -p 3001",
@@ -63,7 +63,7 @@
     "@testing-library/react": "16.3.0",
     "@testing-library/user-event": "14.6.1",
     "@types/jest": "^29.5.8",
-    "@types/node": "26.2.0",
+    "@types/node": "24.13.3",
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.4",
     "eslint": "9.39.5",
