@@ -30,6 +30,10 @@ import type {
 } from '@/types/event-management';
 import { CHAPTER_TIMEZONE_GROUPS } from '@/lib/chapterTimezones';
 import { DEFAULT_EVENT_MESSAGES } from '@/lib/eventMessageDefaults';
+import {
+  getImageUploadError,
+  validateImageUploadSize,
+} from '@/lib/imageUploads';
 
 function firstChapter(payload: unknown): OrganizerChapterSettings | null {
   if (payload && typeof payload === 'object' && 'id' in payload) {
@@ -305,6 +309,9 @@ export default function OrganizerChapterSettingsPage({
     setSettingsError('');
 
     try {
+      const sizeError = validateImageUploadSize(file);
+      if (sizeError) throw new Error(sizeError);
+
       const formData = new FormData();
       formData.append('file', file);
 
@@ -314,8 +321,12 @@ export default function OrganizerChapterSettingsPage({
       });
 
       if (!response.ok) {
-        const payload = await response.json().catch(() => null);
-        throw new Error(payload?.error || 'Unable to upload chapter image.');
+        throw new Error(
+          await getImageUploadError(
+            response,
+            'Unable to upload chapter image.'
+          )
+        );
       }
 
       const updatedChapter = firstChapter(await response.json());

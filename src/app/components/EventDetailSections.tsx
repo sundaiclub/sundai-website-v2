@@ -52,7 +52,9 @@ function humanizeKey(key: string) {
 function detailEntries(details: JsonObject) {
   return Object.entries(sanitizeApprovedDetailsJson(details)).filter(
     (entry): entry is [string, string | number | boolean] =>
-      ['string', 'number', 'boolean'].includes(typeof entry[1]) &&
+      ((typeof entry[1] === 'string' && entry[1].trim().length > 0) ||
+        typeof entry[1] === 'number' ||
+        typeof entry[1] === 'boolean') &&
       entry[0].replace(/[^a-z0-9]/gi, '').toLowerCase() !== 'address'
   );
 }

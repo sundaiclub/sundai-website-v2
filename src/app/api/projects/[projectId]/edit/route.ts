@@ -2,6 +2,10 @@ import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import type { Prisma, ProjectStatus } from "@prisma/client";
 import prisma from "@/lib/prisma";
+import {
+  IMAGE_UPLOAD_SIZE_ERROR,
+  validateImageUploadSize,
+} from "@/lib/imageUploads";
 
 const PROJECT_STATUSES = ["DRAFT", "PENDING", "APPROVED"] as const satisfies readonly ProjectStatus[];
 
@@ -133,6 +137,13 @@ export async function PATCH(
     const deleteThumbnail = formData.get('deleteThumbnail') === 'true';
     const thumbnail = formData.get('thumbnail') as File | null;
     const thumbnailPrompt = formData.get('thumbnailPrompt')?.toString() || null;
+
+    if (thumbnail instanceof File && validateImageUploadSize(thumbnail)) {
+      return NextResponse.json(
+        { error: IMAGE_UPLOAD_SIZE_ERROR },
+        { status: 413 }
+      );
+    }
 
     if (deleteThumbnail) {
       updateData.thumbnail = {

@@ -436,6 +436,11 @@ describe('/api/events/[eventId]', () => {
       .mockResolvedValueOnce({
         id: 'evt-1',
         title: 'Updated Event',
+        chapter: {
+          id: 'chapter-boston',
+          slug: 'boston',
+          timezone: 'America/New_York',
+        },
         pitchSessions: [
           {
             id: 'pitch-1',
@@ -509,8 +514,14 @@ describe('/api/events/[eventId]', () => {
     });
 
     const body = await res.json();
+    expect(body.chapter.slug).toBe('boston');
     expect(body.pitchSessions[0].projects[0].allottedSec).toBe(330);
     expect(body.pitchSessions[0].projects[1].allottedSec).toBe(195);
+    expect(prisma.event.findUnique).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        include: expect.objectContaining({ chapter: true }),
+      })
+    );
   });
 
   it.each([

@@ -317,6 +317,54 @@ describe('event-management site-admin pages', () => {
       expect(
         screen.queryByRole('link', { name: /^events$/i })
       ).not.toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: /edit sundai boston name/i })
+      ).toBeInTheDocument();
+    });
+
+    it('edits a chapter name from the chapter list', async () => {
+      mockSiteAdmin();
+      global.fetch = jest.fn((input: RequestInfo | URL, init?: RequestInit) => {
+        const url =
+          typeof input === 'string'
+            ? input
+            : 'url' in input
+              ? input.url
+              : input.toString();
+
+        if (url === '/api/chapters/chapter-boston' && init?.method === 'PATCH') {
+          return jsonResponse({ ...chapters[0], name: 'Sundai Greater Boston' });
+        }
+        if (url === '/api/chapters') {
+          return jsonResponse({ chapters, items: chapters });
+        }
+        return jsonResponse({});
+      }) as jest.Mock;
+      const ChaptersPage = loadPage(
+        '/admin/chapters',
+        '../../src/app/admin/chapters/page'
+      );
+
+      render(<ChaptersPage />);
+
+      const editButton = await screen.findByRole('button', {
+        name: /edit sundai boston name/i,
+      });
+      fireEvent.click(editButton);
+      fireEvent.change(
+        screen.getByRole('textbox', { name: /chapter name for sundai boston/i }),
+        { target: { value: 'Sundai Greater Boston' } }
+      );
+      fireEvent.click(screen.getByRole('button', { name: /save name/i }));
+
+      await expectSomeText(/sundai greater boston/i);
+      expect(global.fetch).toHaveBeenCalledWith(
+        '/api/chapters/chapter-boston',
+        expect.objectContaining({
+          method: 'PATCH',
+          body: JSON.stringify({ name: 'Sundai Greater Boston' }),
+        })
+      );
     });
 
     it('denies chapter management to non-site-admin users', async () => {

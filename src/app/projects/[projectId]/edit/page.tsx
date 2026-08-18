@@ -24,6 +24,10 @@ import type { HackerSelectionOption } from '@/types/hacker';
 import { swapFirstLetters } from "../../../utils/nameUtils";
 import ImageGenerationModal from "../../../components/ImageGenerationModal";
 import ProjectMarkdown from "../../../components/ProjectMarkdown";
+import {
+  getImageUploadError,
+  validateImageUploadSize,
+} from "@/lib/imageUploads";
 
 const MAX_TITLE_LENGTH = 32;
 const MAX_PREVIEW_LENGTH = 100;
@@ -39,21 +43,29 @@ type UploadImageResponse = {
 };
 
 const uploadImage = async (file: File): Promise<string> => {
+  const sizeError = validateImageUploadSize(file);
+  if (sizeError) throw new Error(sizeError);
+
   const loadingToast = toast.loading("Uploading image...");
   const formData = new FormData();
   formData.append("file", file);
   formData.append("filename", file.name);
 
-  const response = await fetch("/api/uploads/image", {
-    method: "POST",
-    body: formData,
-  });
-  toast.dismiss(loadingToast);
-  if (!response.ok) {
-    throw new Error("Failed to upload image");
+  try {
+    const response = await fetch("/api/uploads/image", {
+      method: "POST",
+      body: formData,
+    });
+    if (!response.ok) {
+      throw new Error(
+        await getImageUploadError(response, "Failed to upload image")
+      );
+    }
+    const data = (await response.json()) as UploadImageResponse;
+    return data.url;
+  } finally {
+    toast.dismiss(loadingToast);
   }
-  const data = (await response.json()) as UploadImageResponse;
-  return data.url;
 };
 
 function ButtonPanel({ params, router, isDarkMode, handleSave, handlePublish, saving, publishing, isDraft }:
@@ -230,6 +242,12 @@ export default function ProjectEditPage() {
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      const sizeError = validateImageUploadSize(file);
+      if (sizeError) {
+        e.target.value = "";
+        toast.error(sizeError);
+        return;
+      }
       setThumbnail(file);
       setThumbnailPrompt(null);
       const reader = new FileReader();
@@ -260,6 +278,8 @@ export default function ProjectEditPage() {
       const response = await fetch(url);
       const blob = await response.blob();
       const file = new File([blob], 'ai-generated-thumbnail.webp', { type: 'image/webp' });
+      const sizeError = validateImageUploadSize(file);
+      if (sizeError) throw new Error(sizeError);
       
       setThumbnail(file);
       setThumbnailPreview(url);
@@ -267,7 +287,7 @@ export default function ProjectEditPage() {
       toast.success("AI-generated image selected!");
     } catch (error) {
       console.error("Error processing AI-generated image:", error);
-      toast.error("Failed to process AI-generated image");
+      toast.error(error instanceof Error ? error.message : "Failed to process AI-generated image");
     }
   };
 
@@ -313,7 +333,9 @@ export default function ProjectEditPage() {
       });
 
       if (!response.ok) {
-        throw new Error("Failed to update project");
+        throw new Error(
+          await getImageUploadError(response, "Failed to update project")
+        );
       }
 
       const updatedProject = await response.json();
@@ -322,7 +344,7 @@ export default function ProjectEditPage() {
       router.push(`/projects/${params?.projectId}`);
     } catch (error) {
       console.error("Error updating project:", error);
-      toast.error("Failed to save changes");
+      toast.error(error instanceof Error ? error.message : "Failed to save changes");
     } finally {
       setSaving(false);
     }
@@ -368,7 +390,9 @@ export default function ProjectEditPage() {
       });
 
       if (!saveResponse.ok) {
-        throw new Error("Failed to save project");
+        throw new Error(
+          await getImageUploadError(saveResponse, "Failed to save project")
+        );
       }
 
       const publishResponse = await fetch(`/api/projects/${params?.projectId}/submit`, {
@@ -385,7 +409,7 @@ export default function ProjectEditPage() {
       router.push(`/projects/${params?.projectId}`);
     } catch (error) {
       console.error("Error publishing project:", error);
-      toast.error("Failed to publish project");
+      toast.error(error instanceof Error ? error.message : "Failed to publish project");
     } finally {
       setPublishing(false);
     }
@@ -1022,7 +1046,7 @@ export default function ProjectEditPage() {
                           }, 0);
                         } catch (error) {
                           console.error("Error uploading image:", error);
-                          toast.error("Failed to upload image");
+                          toast.error(error instanceof Error ? error.message : "Failed to upload image");
                         }
                       }
                     }}
@@ -1115,7 +1139,7 @@ export default function ProjectEditPage() {
                       }, 0);
                     } catch (error) {
                       console.error("Error uploading image:", error);
-                      toast.error("Failed to upload image");
+                      toast.error(error instanceof Error ? error.message : "Failed to upload image");
                     }
                   }
                 }
@@ -1137,26 +1161,12 @@ export default function ProjectEditPage() {
                 const file = e.dataTransfer.files[0];
                 if (file && file.type.startsWith('image/')) {
                   try {
-                    const loadingToast = toast.loading('Uploading image...');
-                    const formData = new FormData();
-                    formData.append('file', file);
-
-                    const response = await fetch('/api/uploads/image', {
-                      method: 'POST',
-                      body: formData,
-                    });
-
-                    if (!response.ok) {
-                      throw new Error('Failed to upload image');
-                    }
-
-                    const data = await response.json();
-                    toast.dismiss(loadingToast);
+                    const imageUrl = await uploadImage(file);
                     toast.success('Image uploaded successfully');
 
                     const start = textarea.selectionStart || textarea.value.length;
                     const text = textarea.value;
-                    const imageMarkdown = `![${file.name}](${data.url})`;
+                    const imageMarkdown = `![${file.name}](${imageUrl})`;
                     setEditableDescription(
                       text.substring(0, start) + imageMarkdown + text.substring(start)
                     );
@@ -1167,7 +1177,7 @@ export default function ProjectEditPage() {
                     return;
                   } catch (error) {
                     console.error('Error uploading image:', error);
-                    toast.error('Failed to upload image');
+                    toast.error(error instanceof Error ? error.message : 'Failed to upload image');
                     return;
                   }
                 }
