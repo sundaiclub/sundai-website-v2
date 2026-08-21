@@ -155,22 +155,21 @@ npm run db:reset
 
 ### Vercel + Amazon RDS
 
-Use the limited application login for Vercel runtime traffic. Keep the database-owner login outside Vercel and use it only for controlled Prisma migration commands:
+Use the limited application login for Vercel runtime traffic. Use the database-owner login only for the automatic migration step during a Vercel build:
 
 ```bash
 # Runtime queries from Vercel / Prisma Client. Use the environment-specific app user.
 DATABASE_URL="postgresql://APP_USER:PASSWORD@RDS_HOST:5432/DB_NAME?sslmode=require&connection_limit=1&pool_timeout=10"
 
-# Local migration commands only. Use the environment-specific owner user.
+# Automatic Vercel migration command. Use the environment-specific owner user.
 DIRECT_URL="postgresql://OWNER_USER:PASSWORD@RDS_HOST:5432/DB_NAME?sslmode=require"
 ```
 
 Notes:
 
 - Both URLs use the RDS PostgreSQL port `5432` and require TLS.
-- Vercel must receive only `DATABASE_URL`. Do not add `DIRECT_URL` or an RDS administrator secret to Vercel.
-- Vercel builds do not run database migrations.
-- Before you deploy code with a migration, export the matching owner `DIRECT_URL` in a controlled operator session and run `npm run db:migrate:deploy`.
+- Vercel must receive the limited application connection as `DATABASE_URL` and the matching owner connection as the sensitive `DIRECT_URL`.
+- `vercel-build` uses `DIRECT_URL` only for `prisma migrate deploy`. The application build and runtime continue to use `DATABASE_URL`.
 - Keep `connection_limit=1` for the current low-volume Vercel deployment. Review this limit and add a managed pooler if concurrency increases.
 
 ### 5. Start Development Server
