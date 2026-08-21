@@ -153,25 +153,25 @@ npm run db:migrate
 npm run db:reset
 ```
 
-### Vercel + Cloud SQL managed connection pooling
+### Vercel + Amazon RDS
 
-If you enable Google Cloud SQL Managed Connection Pooling, point runtime traffic at the pooler and keep Prisma CLI commands on a direct connection:
+Use the limited application login for Vercel runtime traffic. Keep the database-owner login outside Vercel and use it only for controlled Prisma migration commands:
 
 ```bash
-# Runtime queries from Vercel / Prisma Client
-DATABASE_URL="postgresql://USER:PASSWORD@DB_HOST:6432/DB_NAME?sslmode=require"
+# Runtime queries from Vercel / Prisma Client. Use the environment-specific app user.
+DATABASE_URL="postgresql://APP_USER:PASSWORD@RDS_HOST:5432/DB_NAME?sslmode=require&connection_limit=1&pool_timeout=10"
 
-# Migrations / Prisma CLI
-DIRECT_URL="postgresql://USER:PASSWORD@DB_HOST:5432/DB_NAME?sslmode=require"
+# Local migration commands only. Use the environment-specific owner user.
+DIRECT_URL="postgresql://OWNER_USER:PASSWORD@RDS_HOST:5432/DB_NAME?sslmode=require"
 ```
 
 Notes:
 
-- `DATABASE_URL` should use port `6432`, which is Cloud SQL's managed pooler port.
-- `DIRECT_URL` should use port `5432`, which is the direct Postgres port.
-- This project keeps app runtime traffic on `DATABASE_URL`, and `npm run vercel-build` now prefers `DIRECT_URL` for `prisma migrate deploy` when it is set.
-- In Cloud SQL Managed Connection Pooling, keep `pool_mode=transaction` unless you have a specific reason not to, and set `max_prepared_statements` above `0` so Prisma prepared statements are supported.
-- If your Cloud SQL instance is private-only, Vercel won't be able to reach it directly. In that case you need a public path or network bridge rather than only changing env vars.
+- Both URLs use the RDS PostgreSQL port `5432` and require TLS.
+- Vercel must receive only `DATABASE_URL`. Do not add `DIRECT_URL` or an RDS administrator secret to Vercel.
+- Vercel builds do not run database migrations.
+- Before you deploy code with a migration, export the matching owner `DIRECT_URL` in a controlled operator session and run `npm run db:migrate:deploy`.
+- Keep `connection_limit=1` for the current low-volume Vercel deployment. Review this limit and add a managed pooler if concurrency increases.
 
 ### 5. Start Development Server
 
