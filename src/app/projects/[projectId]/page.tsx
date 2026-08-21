@@ -1,13 +1,14 @@
-import { Metadata } from "next";
-import prisma from "@/lib/prisma";
-import { DEFAULT_SOCIAL_IMAGE_URL, publicUrl } from "@/lib/siteUrl";
-import ProjectDetailClient from "./ProjectDetailClient";
+import { Metadata } from 'next';
+import prisma from '@/lib/prisma';
+import { DEFAULT_SOCIAL_IMAGE_URL, publicUrl } from '@/lib/siteUrl';
+import ProjectDetailClient from './ProjectDetailClient';
 
 type Props = {
-  params: { projectId: string };
+  params: Promise<{ projectId: string }>;
 };
 
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
+export async function generateMetadata(props: Props): Promise<Metadata> {
+  const params = await props.params;
   const project = await prisma.project.findUnique({
     where: { id: params.projectId },
     include: { thumbnail: true },
@@ -15,12 +16,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   if (!project) {
     return {
-      title: "Project Not Found | Sundai Club",
+      title: 'Project Not Found | Sundai Club',
     };
   }
 
   const title = `${project.title} | Sundai Club`;
-  const description = project.preview || "A project built at Sundai Club";
+  const description = project.preview || 'A project built at Sundai Club';
   const images = project.thumbnail?.url
     ? [{ url: project.thumbnail.url, alt: project.title }]
     : [
@@ -28,8 +29,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
           url: DEFAULT_SOCIAL_IMAGE_URL,
           width: 1200,
           height: 630,
-          type: "image/png",
-          alt: "Sundai Club Logo",
+          type: 'image/png',
+          alt: 'Sundai Club Logo',
         },
       ];
 
@@ -37,25 +38,21 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     title,
     description,
     alternates: {
-      canonical: publicUrl(
-        `/projects/${encodeURIComponent(params.projectId)}`
-      ),
+      canonical: publicUrl(`/projects/${encodeURIComponent(params.projectId)}`),
     },
     openGraph: {
-      type: "article",
-      url: publicUrl(
-        `/projects/${encodeURIComponent(params.projectId)}`
-      ),
+      type: 'article',
+      url: publicUrl(`/projects/${encodeURIComponent(params.projectId)}`),
       title,
       description,
-      siteName: "Sundai Club",
+      siteName: 'Sundai Club',
       images,
     },
     twitter: {
-      card: "summary_large_image",
+      card: 'summary_large_image',
       title,
       description,
-      images: images.map((img) => img.url),
+      images: images.map(img => img.url),
     },
   };
 }

@@ -16,8 +16,9 @@ const ALLOWED_EVENT_IMAGE_TYPES = new Set([
 
 export async function POST(
   request: Request,
-  { params }: { params: { eventId: string } }
+  props: { params: Promise<{ eventId: string }> }
 ) {
+  const params = await props.params;
   try {
     const access = await requireEventSettingsManager(params.eventId);
     if (access.response) return access.response;
@@ -74,9 +75,11 @@ export async function POST(
     });
 
     if (event.imageId) {
-      await prisma.image.delete({ where: { id: event.imageId } }).catch(error => {
-        console.error('[EVENT_IMAGE_CLEANUP]', error);
-      });
+      await prisma.image
+        .delete({ where: { id: event.imageId } })
+        .catch(error => {
+          console.error('[EVENT_IMAGE_CLEANUP]', error);
+        });
     }
 
     return NextResponse.json(updatedEvent.image);

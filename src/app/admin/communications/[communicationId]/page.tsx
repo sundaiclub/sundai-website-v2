@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, use } from 'react';
 import type { AdminCommunicationDetail } from '@/types/admin-communications';
 import AdminAuthGate from '../../AdminAuthGate';
 import {
@@ -15,11 +15,10 @@ import {
 } from '../../../components/ManagementSurface';
 import { useUserContext } from '../../../contexts/UserContext';
 
-export default function AdminCommunicationDetailPage({
-  params,
-}: {
-  params: { communicationId: string };
+export default function AdminCommunicationDetailPage(props: {
+  params: Promise<{ communicationId: string }>;
 }) {
+  const params = use(props.params);
   const classes = useManagementClasses();
   const { isAdmin, loading, userInfo } = useUserContext();
   const [item, setItem] = useState<AdminCommunicationDetail | null>(null);
@@ -107,7 +106,9 @@ export default function AdminCommunicationDetailPage({
                         <div className="font-semibold">
                           {recipient.displayName}
                         </div>
-                        <div className="break-all">{recipient.contactValue}</div>
+                        <div className="break-all">
+                          {recipient.contactValue}
+                        </div>
                         <ManagementBadge
                           tone={
                             ['FAILED', 'UNDELIVERED'].includes(recipient.status)

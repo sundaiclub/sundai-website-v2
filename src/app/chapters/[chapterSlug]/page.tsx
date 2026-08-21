@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, use } from 'react';
 import EventSummaryCard from '../../components/EventSummaryCard';
 import { SignInAction } from '../../components/SignInAction';
 import {
@@ -33,11 +33,10 @@ function firstMembership(
   return chapter?.viewerMembership ?? null;
 }
 
-export default function ChapterLandingPage({
-  params,
-}: {
-  params: { chapterSlug: string };
+export default function ChapterLandingPage(props: {
+  params: Promise<{ chapterSlug: string }>;
 }) {
+  const params = use(props.params);
   const classes = useManagementClasses();
   const { isAdmin, userInfo } = useUserContext();
   const [chapter, setChapter] = useState<ChapterLanding | null>(null);
@@ -373,6 +372,7 @@ export default function ChapterLandingPage({
                   : 'object-contain p-10'
               }
               fill
+              priority
               src={chapter.heroImage?.url || placeholderLogo}
               sizes="(min-width: 768px) 50vw, 100vw"
               unoptimized={Boolean(chapter.heroImage?.url)}
@@ -409,8 +409,7 @@ export default function ChapterLandingPage({
                 <ManagementAlert tone={actionError ? 'danger' : 'success'}>
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <span>{actionError || actionMessage}</span>
-                    {actionError ===
-                      'Please sign in to join this chapter.' && (
+                    {actionError === 'Please sign in to join this chapter.' && (
                       <SignInAction label="Sign in to join" />
                     )}
                   </div>

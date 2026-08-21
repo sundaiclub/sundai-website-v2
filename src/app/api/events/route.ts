@@ -52,7 +52,7 @@ export async function GET(req: Request) {
     const organizerOnly =
       searchParams.get('organizer') === 'true' ||
       searchParams.get('manageable') === 'true';
-    const { userId } = auth();
+    const { userId } = await auth();
 
     if (!organizerOnly) {
       const viewer = userId
@@ -155,7 +155,7 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const { userId } = auth();
+    const { userId } = await auth();
     if (!userId) return new NextResponse('Unauthorized', { status: 401 });
 
     const user = await prisma.hacker.findUnique({

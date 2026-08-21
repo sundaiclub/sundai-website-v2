@@ -1,4 +1,5 @@
 'use client';
+import { use } from 'react';
 import {
   ManagementLinkButton,
   ManagementSection,
@@ -105,11 +106,10 @@ function Counts({ workspace }: { workspace: EventWorkspacePayload }) {
   );
 }
 
-export default function OrganizerEventOverviewPage({
-  params,
-}: {
-  params: { eventId: string };
+export default function OrganizerEventOverviewPage(props: {
+  params: Promise<{ eventId: string }>;
 }) {
+  const params = use(props.params);
   const classes = useManagementClasses();
   const workspace = useEventWorkspace();
 

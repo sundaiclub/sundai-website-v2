@@ -5,8 +5,9 @@ import { canManageChapterSettings } from '@/lib/eventManagementAuth';
 
 export async function DELETE(
   _req: Request,
-  { params }: { params: { eventId: string; staffId: string } }
+  props: { params: Promise<{ eventId: string; staffId: string }> }
 ) {
+  const params = await props.params;
   try {
     const hacker = await getCurrentHacker();
     if (!hacker) return new NextResponse('Unauthorized', { status: 401 });

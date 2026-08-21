@@ -6,14 +6,15 @@ import {
 } from '@/lib/organizerNotes';
 
 type RouteContext = {
-  params: { eventId: string; hackerId: string };
+  params: Promise<{ eventId: string; hackerId: string }>;
 };
 
 function notFound() {
   return NextResponse.json({ error: 'Not Found' }, { status: 404 });
 }
 
-export async function GET(_request: Request, { params }: RouteContext) {
+export async function GET(_request: Request, props: RouteContext) {
+  const params = await props.params;
   try {
     const access = await requireEventNotesManager(params.eventId);
     if (access.response) return access.response;
@@ -35,7 +36,8 @@ export async function GET(_request: Request, { params }: RouteContext) {
   }
 }
 
-export async function PUT(request: Request, { params }: RouteContext) {
+export async function PUT(request: Request, props: RouteContext) {
+  const params = await props.params;
   try {
     const access = await requireEventNotesManager(params.eventId);
     if (access.response) return access.response;

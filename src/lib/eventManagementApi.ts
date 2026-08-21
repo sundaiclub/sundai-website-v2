@@ -50,7 +50,7 @@ type EventPitchManagerPitchSession = Prisma.PitchSessionGetPayload<{
 }>;
 
 export async function getCurrentHacker() {
-  const { userId } = auth();
+  const { userId } = await auth();
   if (!userId) return null;
 
   return prisma.hacker.findUnique({
@@ -208,7 +208,7 @@ export function requireEventPitchAccess(eventId: string) {
 }
 
 export async function requireEventPitchManager(eventId: string) {
-  const { userId } = auth();
+  const { userId } = await auth();
   if (!userId) {
     return { hacker: null, event: null, response: unauthorized() };
   }

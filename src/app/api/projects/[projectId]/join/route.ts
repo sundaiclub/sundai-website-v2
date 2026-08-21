@@ -1,15 +1,16 @@
-import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
-import prisma from "@/lib/prisma";
+import { NextResponse } from 'next/server';
+import { auth } from '@clerk/nextjs/server';
+import prisma from '@/lib/prisma';
 
 export async function POST(
   request: Request,
-  { params }: { params: { projectId: string } }
+  props: { params: Promise<{ projectId: string }> }
 ) {
+  const params = await props.params;
   try {
-    const { userId } = auth();
+    const { userId } = await auth();
     if (!userId) {
-      return new NextResponse("Unauthorized", { status: 401 });
+      return new NextResponse('Unauthorized', { status: 401 });
     }
 
     const hacker = await prisma.hacker.findUnique({
@@ -17,7 +18,7 @@ export async function POST(
     });
 
     if (!hacker) {
-      return new NextResponse("Builder not found", { status: 404 });
+      return new NextResponse('Builder not found', { status: 404 });
     }
 
     const { role } = await request.json();
@@ -33,7 +34,7 @@ export async function POST(
 
     if (existingParticipant) {
       return NextResponse.json(
-        { error: "Already a participant" },
+        { error: 'Already a participant' },
         { status: 400 }
       );
     }
@@ -55,9 +56,9 @@ export async function POST(
 
     return NextResponse.json(participant);
   } catch (error) {
-    console.error("[PROJECT_JOIN]", error);
+    console.error('[PROJECT_JOIN]', error);
     return NextResponse.json(
-      { error: "Error joining project" },
+      { error: 'Error joining project' },
       { status: 500 }
     );
   }
@@ -65,12 +66,13 @@ export async function POST(
 
 export async function DELETE(
   request: Request,
-  { params }: { params: { projectId: string } }
+  props: { params: Promise<{ projectId: string }> }
 ) {
+  const params = await props.params;
   try {
-    const { userId } = auth();
+    const { userId } = await auth();
     if (!userId) {
-      return new NextResponse("Unauthorized", { status: 401 });
+      return new NextResponse('Unauthorized', { status: 401 });
     }
 
     const hacker = await prisma.hacker.findUnique({
@@ -78,7 +80,7 @@ export async function DELETE(
     });
 
     if (!hacker) {
-      return new NextResponse("Hacker not found", { status: 404 });
+      return new NextResponse('Hacker not found', { status: 404 });
     }
 
     await prisma.projectToParticipant.delete({
@@ -92,9 +94,9 @@ export async function DELETE(
 
     return new NextResponse(null, { status: 204 });
   } catch (error) {
-    console.error("[PROJECT_LEAVE]", error);
+    console.error('[PROJECT_LEAVE]', error);
     return NextResponse.json(
-      { error: "Error leaving project" },
+      { error: 'Error leaving project' },
       { status: 500 }
     );
   }

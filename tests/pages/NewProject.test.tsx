@@ -29,7 +29,9 @@ jest.mock('react-hot-toast', () => ({
 
 const mockUseUser = useUser as jest.MockedFunction<typeof useUser>;
 const mockUseRouter = useRouter as jest.MockedFunction<typeof useRouter>;
-const mockCreateProject = api.createProject as jest.MockedFunction<typeof api.createProject>;
+const mockCreateProject = api.createProject as jest.MockedFunction<
+  typeof api.createProject
+>;
 const mockToast = toast as jest.Mocked<typeof toast>;
 
 const defaultProps = {
@@ -52,11 +54,7 @@ const defaultRouter = {
 };
 
 const renderWithTheme = (component: React.ReactElement) => {
-  return render(
-    <ThemeProvider>
-      {component}
-    </ThemeProvider>
-  );
+  return render(<ThemeProvider>{component}</ThemeProvider>);
 };
 
 describe('NewProject', () => {
@@ -64,23 +62,27 @@ describe('NewProject', () => {
     jest.clearAllMocks();
     mockUseUser.mockReturnValue(defaultProps);
     mockUseRouter.mockReturnValue(defaultRouter);
-    mockCreateProject.mockResolvedValue({ id: 'new-project-id', title: 'New Project' });
-    
+    mockCreateProject.mockResolvedValue({
+      id: 'new-project-id',
+      title: 'New Project',
+    });
+
     global.fetch = jest.fn().mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve([
-        { id: 'hacker-1', name: 'John Doe', email: 'john@example.com' },
-        { id: 'hacker-2', name: 'Jane Smith', email: 'jane@example.com' },
-      ]),
+      json: () =>
+        Promise.resolve([
+          { id: 'hacker-1', name: 'John Doe', email: 'john@example.com' },
+          { id: 'hacker-2', name: 'Jane Smith', email: 'jane@example.com' },
+        ]),
     });
-    
+
     mockToast.success.mockClear();
     mockToast.error.mockClear();
   });
 
   it('should render new project form', () => {
     renderWithTheme(<NewProject />);
-    
+
     expect(screen.getByText('Initialize New Project')).toBeInTheDocument();
     expect(screen.getByText('Launch Lead *')).toBeInTheDocument();
     expect(screen.getByText('Project Title *')).toBeInTheDocument();
@@ -91,7 +93,7 @@ describe('NewProject', () => {
 
   it('should render all form fields', () => {
     renderWithTheme(<NewProject />);
-    
+
     expect(screen.getByLabelText('Project Title *')).toBeInTheDocument();
     expect(screen.getByLabelText('Brief Description *')).toBeInTheDocument();
     expect(screen.getByText('+ Add Team Members')).toBeInTheDocument();
@@ -99,45 +101,49 @@ describe('NewProject', () => {
 
   it('should render team management section', () => {
     renderWithTheme(<NewProject />);
-    
+
     expect(screen.getByText('Team Members')).toBeInTheDocument();
     expect(screen.getByText('+ Add Team Members')).toBeInTheDocument();
   });
 
   it('should handle form submission', async () => {
     renderWithTheme(<NewProject />);
-    
+
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith('/api/hackers');
     });
-    
+
     fireEvent.change(screen.getByLabelText('Project Title *'), {
       target: { value: 'New Project' },
     });
     fireEvent.change(screen.getByLabelText('Brief Description *'), {
       target: { value: 'New project description' },
     });
-    
+
     const submitButton = screen.getByText('Create Project');
     fireEvent.click(submitButton);
 
     await waitFor(() => {
-      expect(mockToast.error).toHaveBeenCalledWith('Please select a launch lead');
+      expect(mockToast.error).toHaveBeenCalledWith(
+        'Please select a launch lead'
+      );
     });
   });
 
   it('should handle form validation', async () => {
     renderWithTheme(<NewProject />);
-    
+
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith('/api/hackers');
     });
-    
+
     const submitButton = screen.getByText('Create Project');
     fireEvent.click(submitButton);
 
     await waitFor(() => {
-      expect(mockToast.error).toHaveBeenCalledWith('Please select a launch lead');
+      expect(mockToast.error).toHaveBeenCalledWith(
+        'Please select a launch lead'
+      );
     });
   });
 
@@ -148,21 +154,22 @@ describe('NewProject', () => {
     });
 
     renderWithTheme(<NewProject />);
-    
+
     expect(screen.getByText('Initialize New Project')).toBeInTheDocument();
   });
 
   it('should update form state when inputs change', () => {
     renderWithTheme(<NewProject />);
-    
+
     const titleInput = screen.getByLabelText('Project Title *');
     const descriptionInput = screen.getByLabelText('Brief Description *');
-    
+
     fireEvent.change(titleInput, { target: { value: 'Test Project' } });
-    fireEvent.change(descriptionInput, { target: { value: 'Test Description' } });
-    
+    fireEvent.change(descriptionInput, {
+      target: { value: 'Test Description' },
+    });
+
     expect(titleInput).toHaveValue('Test Project');
     expect(descriptionInput).toHaveValue('Test Description');
   });
-
 });

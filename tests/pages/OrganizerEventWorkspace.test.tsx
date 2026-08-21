@@ -1,4 +1,5 @@
 import React from 'react';
+import { resolvedParams } from '../utils/next';
 import { cleanup, render, screen } from '@testing-library/react';
 
 const mockUseTheme = jest.fn();
@@ -117,28 +118,38 @@ function mockWorkspaceFetch(data: unknown = workspace, status = 200) {
 
 function loadLayout(): React.ComponentType<{
   children: React.ReactNode;
-  params: { eventId: string };
+  params: Promise<{ eventId: string }>;
 }> {
   return require('../../src/app/organizer/events/[eventId]/layout').default;
 }
 
 function loadOverview(): React.ComponentType<{
-  params: { eventId: string };
+  params: Promise<{ eventId: string }>;
 }> {
   return require('../../src/app/organizer/events/[eventId]/page').default;
 }
 
 function loadPitch(): React.ComponentType<{
-  params: { eventId: string };
+  params: Promise<{ eventId: string }>;
 }> {
   return require('../../src/app/organizer/events/[eventId]/pitch/page').default;
 }
 
-function renderWorkspace(
+async function renderWorkspace(
   children: React.ReactNode = <div>Overview content</div>
 ) {
   const Layout = loadLayout();
-  return render(<Layout params={{ eventId }}>{children}</Layout>);
+  return render(
+    await (
+      Layout as unknown as (props: {
+        children: React.ReactNode;
+        params: Promise<{ eventId: string }>;
+      }) => Promise<React.ReactElement>
+    )({
+      params: resolvedParams({ eventId }),
+      children,
+    })
+  );
 }
 
 describe('/organizer/events/[eventId] workspace', () => {
@@ -161,7 +172,7 @@ describe('/organizer/events/[eventId] workspace', () => {
   afterEach(cleanup);
 
   it('renders the event-scoped shell identity and effective organizer role', async () => {
-    renderWorkspace();
+    await renderWorkspace();
 
     expect(await screen.findByText('AI Build Night')).toBeInTheDocument();
     expect(screen.getByText('Sundai Boston')).toBeInTheDocument();
@@ -175,7 +186,7 @@ describe('/organizer/events/[eventId] workspace', () => {
   });
 
   it('provides event-scoped navigation for every completed workspace section', async () => {
-    renderWorkspace();
+    await renderWorkspace();
     await screen.findByText('AI Build Night');
 
     const expectedLinks: Array<[RegExp, string]> = [
@@ -203,7 +214,7 @@ describe('/organizer/events/[eventId] workspace', () => {
       ),
     });
 
-    renderWorkspace();
+    await renderWorkspace();
     await screen.findByText('AI Build Night');
 
     expect(
@@ -226,7 +237,7 @@ describe('/organizer/events/[eventId] workspace', () => {
 
   it('renders overview settings, staff, and safe operational counts', async () => {
     const Overview = loadOverview();
-    renderWorkspace(<Overview params={{ eventId }} />);
+    await renderWorkspace(<Overview params={resolvedParams({ eventId })} />);
 
     expect(await screen.findByText(/capacity/i)).toBeInTheDocument();
     expect(screen.getByText('80')).toBeInTheDocument();
@@ -248,7 +259,7 @@ describe('/organizer/events/[eventId] workspace', () => {
       event: { ...workspace.event, status: 'DRAFT' },
     });
     const Overview = loadOverview();
-    renderWorkspace(<Overview params={{ eventId }} />);
+    await renderWorkspace(<Overview params={resolvedParams({ eventId })} />);
 
     await screen.findByText('AI Build Night');
 
@@ -269,7 +280,7 @@ describe('/organizer/events/[eventId] workspace', () => {
       event: { ...workspace.event, status: 'DRAFT' },
     });
     const Pitch = loadPitch();
-    renderWorkspace(<Pitch params={{ eventId }} />);
+    await renderWorkspace(<Pitch params={resolvedParams({ eventId })} />);
 
     await screen.findByText('Pitch summary');
 
@@ -280,7 +291,7 @@ describe('/organizer/events/[eventId] workspace', () => {
 
   it('shows permission lost without retaining event metadata after access is denied', async () => {
     mockWorkspaceFetch('Forbidden', 403);
-    renderWorkspace();
+    await renderWorkspace();
 
     expect(
       await screen.findByText(/permission.*lost|no longer have access/i)
@@ -294,7 +305,7 @@ describe('/organizer/events/[eventId] workspace', () => {
 
   it('does not expose check-in, attendance, or no-show controls', async () => {
     const Overview = loadOverview();
-    renderWorkspace(<Overview params={{ eventId }} />);
+    await renderWorkspace(<Overview params={resolvedParams({ eventId })} />);
     await screen.findByText('AI Build Night');
 
     expect(

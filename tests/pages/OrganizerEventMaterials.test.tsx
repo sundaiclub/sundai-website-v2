@@ -1,4 +1,5 @@
 import React from 'react';
+import { resolvedParams } from '../utils/next';
 import {
   cleanup,
   fireEvent,
@@ -66,8 +67,7 @@ const organizerFile: EventMaterial = {
   visibility: 'ORGANIZERS_ONLY',
   title: 'Sponsor contacts',
   originalFilename: 'sponsor-contacts.xlsx',
-  mimeType:
-    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   position: 30,
   isAvailable: false,
 };
@@ -79,7 +79,9 @@ function jsonResponse(data: unknown, status = 200) {
     json: jest.fn().mockResolvedValue(data),
     text: jest
       .fn()
-      .mockResolvedValue(typeof data === 'string' ? data : JSON.stringify(data)),
+      .mockResolvedValue(
+        typeof data === 'string' ? data : JSON.stringify(data)
+      ),
   });
 }
 
@@ -128,7 +130,10 @@ function mockMaterialsFetch(
       );
     }
     if (init?.method === 'PATCH') {
-      return jsonResponse({ ...approvedFile, ...JSON.parse(String(init.body)) });
+      return jsonResponse({
+        ...approvedFile,
+        ...JSON.parse(String(init.body)),
+      });
     }
     if (init?.method === 'DELETE') {
       return jsonResponse(null, 204);
@@ -138,7 +143,9 @@ function mockMaterialsFetch(
   }) as jest.Mock;
 }
 
-function loadPage(): React.ComponentType<{ params: { eventId: string } }> {
+function loadPage(): React.ComponentType<{
+  params: Promise<{ eventId: string }>;
+}> {
   try {
     return require('../../src/app/organizer/events/[eventId]/materials/page')
       .default;
@@ -149,15 +156,22 @@ function loadPage(): React.ComponentType<{ params: { eventId: string } }> {
   }
 }
 
-function renderPage() {
+async function renderPage() {
   const Page = loadPage();
-  return render(<Page params={{ eventId }} />);
+  return render(
+    await (
+      Page as unknown as (props: {
+        params: Promise<{ eventId: string }>;
+      }) => Promise<React.ReactElement>
+    )({
+      params: resolvedParams({ eventId }),
+    })
+  );
 }
 
 function fetchBody(path: string, method: string) {
   const call = (global.fetch as jest.Mock).mock.calls.find(
-    ([input, init]) =>
-      requestUrl(input) === path && init?.method === method
+    ([input, init]) => requestUrl(input) === path && init?.method === method
   );
   if (!call) throw new Error(`Expected ${method} ${path}`);
   return JSON.parse(String(call[1].body));
@@ -173,7 +187,7 @@ describe('/organizer/events/[eventId]/materials', () => {
   afterEach(cleanup);
 
   it('shows the upload policy before file selection and labels visibility and availability', async () => {
-    renderPage();
+    await renderPage();
 
     expect(await screen.findByText('Public schedule')).toBeInTheDocument();
     const policy = screen.getByRole('heading', {
@@ -193,7 +207,7 @@ describe('/organizer/events/[eventId]/materials', () => {
   });
 
   it('creates an https link with organizer-selected visibility and ordering', async () => {
-    renderPage();
+    await renderPage();
     await screen.findByText('Public schedule');
 
     fireEvent.click(screen.getByRole('button', { name: /add material/i }));
@@ -226,7 +240,7 @@ describe('/organizer/events/[eventId]/materials', () => {
   });
 
   it('uploads a file through an intent before finalizing the material record', async () => {
-    renderPage();
+    await renderPage();
     await screen.findByText('Public schedule');
 
     fireEvent.click(screen.getByRole('button', { name: /add material/i }));
@@ -247,10 +261,7 @@ describe('/organizer/events/[eventId]/materials', () => {
 
     await waitFor(() => {
       expect(
-        fetchBody(
-          `/api/events/${eventId}/materials/upload-intents`,
-          'POST'
-        )
+        fetchBody(`/api/events/${eventId}/materials/upload-intents`, 'POST')
       ).toMatchObject({
         filename: 'sponsor-brief.pdf',
         mimeType: 'application/pdf',
@@ -272,7 +283,7 @@ describe('/organizer/events/[eventId]/materials', () => {
   });
 
   it('supports ordering changes and persists the new position', async () => {
-    renderPage();
+    await renderPage();
     await screen.findByText('Attendee brief');
 
     fireEvent.click(
@@ -291,12 +302,12 @@ describe('/organizer/events/[eventId]/materials', () => {
 
   it('renders empty and load-error states without stale material rows', async () => {
     mockMaterialsFetch([]);
-    renderPage();
+    await renderPage();
     expect(await screen.findByText(/no materials/i)).toBeInTheDocument();
 
     cleanup();
     global.fetch = jest.fn(() => jsonResponse({ error: 'Unavailable' }, 503));
-    renderPage();
+    await renderPage();
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent(/materials.*unavailable/i);
     expect(screen.queryByText('Public schedule')).not.toBeInTheDocument();
@@ -304,7 +315,7 @@ describe('/organizer/events/[eventId]/materials', () => {
 
   it('requires confirmation and removes a material through the event-scoped API', async () => {
     const confirm = jest.spyOn(window, 'confirm').mockReturnValue(true);
-    renderPage();
+    await renderPage();
     await screen.findByText('Sponsor contacts');
 
     fireEvent.click(
@@ -320,7 +331,9 @@ describe('/organizer/events/[eventId]/materials', () => {
         expect.objectContaining({ method: 'DELETE' })
       );
     });
-    expect(screen.queryByText('Sponsor contacts')).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.queryByText('Sponsor contacts')).not.toBeInTheDocument();
+    });
     confirm.mockRestore();
   });
 });

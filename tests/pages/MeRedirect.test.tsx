@@ -29,7 +29,8 @@ jest.mock('../../src/lib/api', () => ({
 global.fetch = jest.fn();
 
 const mockUseUser = useUser as jest.MockedFunction<typeof useUser>;
-const mockGetHackerByClerkId = require('../../src/lib/api').getHackerByClerkId as jest.Mock;
+const mockGetHackerByClerkId = require('../../src/lib/api')
+  .getHackerByClerkId as jest.Mock;
 
 describe('MeRedirect', () => {
   const mockHacker = {
@@ -48,7 +49,7 @@ describe('MeRedirect', () => {
         emailAddresses: [{ emailAddress: 'current@example.com' }],
       },
     } as any);
-    
+
     // Mock fetch for APIs
     (global.fetch as jest.Mock).mockResolvedValue({
       ok: true,
@@ -94,7 +95,11 @@ describe('MeRedirect', () => {
     render(<MePage />);
 
     await waitFor(() => {
-      expect(screen.getByText('Your profile is still being created. Please refresh in a moment.')).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          'Your profile is still being created. Please refresh in a moment.'
+        )
+      ).toBeInTheDocument();
     });
 
     expect(mockPush).not.toHaveBeenCalled();
@@ -106,7 +111,11 @@ describe('MeRedirect', () => {
     render(<MePage />);
 
     await waitFor(() => {
-      expect(screen.getByText('Your profile is still being created. Please refresh in a moment.')).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          'Your profile is still being created. Please refresh in a moment.'
+        )
+      ).toBeInTheDocument();
     });
 
     expect(mockPush).not.toHaveBeenCalled();
@@ -121,7 +130,9 @@ describe('MeRedirect', () => {
 
     render(<MePage />);
 
-    expect(screen.getByText('Please sign in to view your profile')).toBeInTheDocument();
+    expect(
+      screen.getByText('Please sign in to view your profile')
+    ).toBeInTheDocument();
   });
 
   it('should handle loading state', () => {

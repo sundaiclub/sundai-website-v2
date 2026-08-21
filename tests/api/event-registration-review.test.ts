@@ -76,7 +76,9 @@ const {
 type RegistrationNotesRoute = {
   POST: (
     req: Request,
-    context: { params: { eventId: string; registrationId: string } }
+    context: {
+      params: Promise<{ eventId: string; registrationId: string }>;
+    }
   ) => Promise<Response>;
 };
 
@@ -614,10 +616,12 @@ describe('T053 organizer registration review internal notes API', () => {
             body: { internalReviewNotes },
           }
         ) as any,
-        createRouteContext({
-          eventId: fixture.publishedEvent.id,
-          registrationId: registration.id,
-        })
+        {
+          params: Promise.resolve({
+            eventId: fixture.publishedEvent.id,
+            registrationId: registration.id,
+          }),
+        }
       );
       const body = await response.json();
 

@@ -1,65 +1,59 @@
+import React from 'react';
+
+const mockProtect = jest.fn();
+const mockClerkMiddleware = jest.fn(() => 'clerk-proxy');
+
 jest.mock('@clerk/nextjs/server', () => ({
-  clerkMiddleware: jest.fn((handler: unknown) => handler),
-  createRouteMatcher: jest.fn(() => jest.fn(() => false)),
+  auth: Object.assign(jest.fn(), { protect: mockProtect }),
+  clerkMiddleware: mockClerkMiddleware,
 }));
 
-describe('middleware', () => {
+describe('Clerk proxy and page authorization', () => {
   beforeEach(() => {
     jest.resetModules();
     jest.clearAllMocks();
   });
 
-  it('keeps public project reads available for signed-out visitors', () => {
-    require('../src/middleware');
-    const { createRouteMatcher } = require('@clerk/nextjs/server');
+  it('establishes Clerk context without deprecated path authorization', () => {
+    const proxy = require('../src/proxy');
 
-    expect(createRouteMatcher).toHaveBeenCalledWith(
-      expect.arrayContaining(['/projects(.*)', '/api/projects(.*)'])
-    );
-  });
-
-  it('keeps the Clerk webhook public', () => {
-    require('../src/middleware');
-    const { createRouteMatcher } = require('@clerk/nextjs/server');
-
-    expect(createRouteMatcher).toHaveBeenCalledWith(
-      expect.arrayContaining(['/api/webhooks/clerk'])
-    );
-  });
-
-  it('keeps verified Twilio webhooks public', () => {
-    require('../src/middleware');
-    const { createRouteMatcher } = require('@clerk/nextjs/server');
-
-    expect(createRouteMatcher).toHaveBeenCalledWith(
-      expect.arrayContaining(['/api/webhooks/twilio(.*)'])
-    );
-  });
-
-  it('keeps the legal pages public', () => {
-    require('../src/middleware');
-    const { createRouteMatcher } = require('@clerk/nextjs/server');
-
-    expect(createRouteMatcher).toHaveBeenCalledWith(
-      expect.arrayContaining(['/privacy', '/terms'])
-    );
-  });
-
-  it('protects routes that are not public', async () => {
-    const middleware = require('../src/middleware').default;
-    const protect = jest.fn();
-    const auth = jest.fn(() => ({ protect }));
-
-    await middleware(auth, { nextUrl: { pathname: '/admin' } });
-
-    expect(protect).toHaveBeenCalledTimes(1);
+    expect(proxy.default).toBe('clerk-proxy');
+    expect(mockClerkMiddleware).toHaveBeenCalledWith();
   });
 
   it('has the expected matcher configuration', () => {
-    const middleware = require('../src/middleware');
+    const proxy = require('../src/proxy');
 
-    expect(middleware.config).toEqual({
+    expect(proxy.config).toEqual({
       matcher: ['/((?!.+\\.[\\w]+$|_next).*)', '/', '/(api|trpc)(.*)'],
     });
+  });
+
+  it('protects authenticated page groups in their server layout', async () => {
+    const AuthenticatedPageLayout =
+      require('../src/app/AuthenticatedPageLayout').default;
+    const child = React.createElement('div', null, 'Protected content');
+
+    const result = await AuthenticatedPageLayout({ children: child });
+
+    expect(mockProtect).toHaveBeenCalledTimes(1);
+    expect(result).toBe(child);
+  });
+
+  it.each([
+    '../src/app/admin/layout',
+    '../src/app/attendance/layout',
+    '../src/app/guide/layout',
+    '../src/app/hacker/layout',
+    '../src/app/me/layout',
+    '../src/app/news/layout',
+    '../src/app/organizer/layout',
+    '../src/app/weeks/layout',
+  ])('%s uses the authenticated page layout', layoutPath => {
+    const layout = require(layoutPath).default;
+    const AuthenticatedPageLayout =
+      require('../src/app/AuthenticatedPageLayout').default;
+
+    expect(layout).toBe(AuthenticatedPageLayout);
   });
 });

@@ -423,9 +423,11 @@ describe('/organizer/events/new', () => {
     expect(screen.getByLabelText(/^chapter$/i)).toHaveValue(
       'chapter-san-francisco'
     );
-    expect(screen.getByLabelText(/timezone/i)).toHaveValue(
-      'America/Los_Angeles'
-    );
+    await waitFor(() => {
+      expect(screen.getByLabelText(/timezone/i)).toHaveValue(
+        'America/Los_Angeles'
+      );
+    });
   });
 
   it('shows approved-only detail, staff assignment, application question, and message controls', async () => {

@@ -1,4 +1,5 @@
 import React from 'react';
+import { resolvedParams } from '../utils/next';
 import {
   cleanup,
   fireEvent,
@@ -156,22 +157,30 @@ function mockAdministrationFetch(workspace = adminWorkspace) {
 
 function loadLayout(): React.ComponentType<{
   children: React.ReactNode;
-  params: { eventId: string };
+  params: Promise<{ eventId: string }>;
 }> {
   return require('../../src/app/organizer/events/[eventId]/layout').default;
 }
 
-function loadOverview(): React.ComponentType<{ params: { eventId: string } }> {
+function loadOverview(): React.ComponentType<{
+  params: Promise<{ eventId: string }>;
+}> {
   return require('../../src/app/organizer/events/[eventId]/page').default;
 }
 
-function renderAdministration() {
+async function renderAdministration() {
   const Layout = loadLayout();
   const Overview = loadOverview();
   return render(
-    <Layout params={{ eventId }}>
-      <Overview params={{ eventId }} />
-    </Layout>
+    await (
+      Layout as unknown as (props: {
+        children: React.ReactNode;
+        params: Promise<{ eventId: string }>;
+      }) => Promise<React.ReactElement>
+    )({
+      params: resolvedParams({ eventId }),
+      children: <Overview params={resolvedParams({ eventId })} />,
+    })
   );
 }
 
@@ -190,7 +199,7 @@ describe('/organizer/events/[eventId] administration', () => {
   afterEach(cleanup);
 
   it('lets MCs edit settings while keeping lifecycle and staff controls admin-only', async () => {
-    renderAdministration();
+    await renderAdministration();
     expect(
       await screen.findByRole('link', { name: /edit event details/i })
     ).toHaveAttribute('href', `/organizer/events/${eventId}/settings`);
@@ -216,7 +225,7 @@ describe('/organizer/events/[eventId] administration', () => {
         viewNoteHistory: false,
       },
     });
-    renderAdministration();
+    await renderAdministration();
     await screen.findByText('AI Build Night');
     expect(
       screen.queryByRole('button', { name: /add|assign staff/i })
@@ -240,7 +249,7 @@ describe('/organizer/events/[eventId] administration', () => {
         viewNoteHistory: false,
       },
     });
-    renderAdministration();
+    await renderAdministration();
     await screen.findByText('AI Build Night');
     expect(
       screen.queryByRole('link', { name: /edit event details/i })
@@ -248,7 +257,7 @@ describe('/organizer/events/[eventId] administration', () => {
   });
 
   it('assigns an MC or co-MC through the event-scoped staff endpoint', async () => {
-    renderAdministration();
+    await renderAdministration();
     fireEvent.click(
       await screen.findByRole('button', { name: /add|assign staff/i })
     );
@@ -284,7 +293,7 @@ describe('/organizer/events/[eventId] administration', () => {
 
   it('confirms staff removal and refreshes the visible assignment list', async () => {
     const confirm = jest.spyOn(window, 'confirm').mockReturnValue(true);
-    renderAdministration();
+    await renderAdministration();
     fireEvent.click(
       await screen.findByRole('button', { name: /remove morgan mc/i })
     );
@@ -300,7 +309,7 @@ describe('/organizer/events/[eventId] administration', () => {
   });
 
   it('shows immutable staff audit history with actor, action, role, and time', async () => {
-    renderAdministration();
+    await renderAdministration();
     fireEvent.click(
       await screen.findByRole('button', { name: /staff audit|view history/i })
     );

@@ -42,19 +42,15 @@ describe('PostHogProvider', () => {
 
   it('should render children', () => {
     const testChildren = <div data-testid="test-children">Test Content</div>;
-    
-    render(
-      <PostHogProvider>
-        {testChildren}
-      </PostHogProvider>
-    );
+
+    render(<PostHogProvider>{testChildren}</PostHogProvider>);
 
     expect(screen.getByTestId('test-children')).toBeInTheDocument();
   });
 
   it('should initialize PostHog on mount', () => {
     const posthog = require('posthog-js');
-    
+
     render(
       <PostHogProvider>
         <div>Test</div>
@@ -72,7 +68,7 @@ describe('PostHogProvider', () => {
   it('should use default PostHog host when not provided', () => {
     process.env.NEXT_PUBLIC_POSTHOG_HOST = undefined;
     const posthog = require('posthog-js');
-    
+
     render(
       <PostHogProvider>
         <div>Test</div>

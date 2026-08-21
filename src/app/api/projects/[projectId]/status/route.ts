@@ -1,15 +1,16 @@
-import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
-import prisma from "@/lib/prisma";
+import { NextResponse } from 'next/server';
+import { auth } from '@clerk/nextjs/server';
+import prisma from '@/lib/prisma';
 
 export async function PATCH(
   req: Request,
-  { params }: { params: { projectId: string } }
+  props: { params: Promise<{ projectId: string }> }
 ) {
+  const params = await props.params;
   try {
-    const { userId } = auth();
+    const { userId } = await auth();
     if (!userId) {
-      return new NextResponse("Unauthorized", { status: 401 });
+      return new NextResponse('Unauthorized', { status: 401 });
     }
 
     const user = await prisma.hacker.findUnique({
@@ -17,8 +18,8 @@ export async function PATCH(
       select: { role: true },
     });
 
-    if (user?.role !== "SITE_ADMIN") {
-      return new NextResponse("Unauthorized", { status: 401 });
+    if (user?.role !== 'SITE_ADMIN') {
+      return new NextResponse('Unauthorized', { status: 401 });
     }
 
     const { status } = await req.json();
@@ -30,7 +31,7 @@ export async function PATCH(
 
     return NextResponse.json(updatedProject);
   } catch (error) {
-    console.error("[PROJECT_STATUS_UPDATE]", error);
-    return new NextResponse("Internal Error", { status: 500 });
+    console.error('[PROJECT_STATUS_UPDATE]', error);
+    return new NextResponse('Internal Error', { status: 500 });
   }
 }

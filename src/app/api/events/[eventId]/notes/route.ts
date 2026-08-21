@@ -10,8 +10,9 @@ const MAX_SEARCH_LENGTH = 100;
 
 export async function GET(
   request: Request,
-  { params }: { params: { eventId: string } }
+  props: { params: Promise<{ eventId: string }> }
 ) {
+  const params = await props.params;
   try {
     const access = await requireEventNotesManager(params.eventId);
     if (access.response) return access.response;

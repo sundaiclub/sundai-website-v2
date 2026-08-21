@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, use } from 'react';
 import {
   ManagementAlert,
   ManagementBadge,
@@ -39,11 +39,10 @@ function rowName(row: NoteRow) {
   return row.hacker?.name ?? row.name ?? 'Unknown hacker';
 }
 
-export default function OrganizerEventNotesPage({
-  params,
-}: {
-  params: { eventId: string };
+export default function OrganizerEventNotesPage(props: {
+  params: Promise<{ eventId: string }>;
 }) {
+  const params = use(props.params);
   const classes = useManagementClasses();
   const [rows, setRows] = useState<NoteRow[]>([]);
   const [search, setSearch] = useState('');

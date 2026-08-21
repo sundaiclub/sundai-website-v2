@@ -1,11 +1,12 @@
-import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
-import prisma from "@/lib/prisma";
+import { NextResponse } from 'next/server';
+import { auth } from '@clerk/nextjs/server';
+import prisma from '@/lib/prisma';
 
 export async function GET(
   req: Request,
-  { params }: { params: { projectId: string } }
+  props: { params: Promise<{ projectId: string }> }
 ) {
+  const params = await props.params;
   try {
     const project = await prisma.project.findUnique({
       where: { id: params.projectId },
@@ -37,30 +38,31 @@ export async function GET(
     });
 
     if (!project) {
-      return new NextResponse("Project not found", { status: 404 });
+      return new NextResponse('Project not found', { status: 404 });
     }
 
     return NextResponse.json({
       ...project,
-      likes: project.likes.map((like) => ({
+      likes: project.likes.map(like => ({
         hackerId: like.hackerId,
         createdAt: like.createdAt,
       })),
     });
   } catch (error) {
-    console.error("[PROJECT_GET]", error);
-    return new NextResponse("Internal Error", { status: 500 });
+    console.error('[PROJECT_GET]', error);
+    return new NextResponse('Internal Error', { status: 500 });
   }
 }
 
 export async function DELETE(
   req: Request,
-  { params }: { params: { projectId: string } }
+  props: { params: Promise<{ projectId: string }> }
 ) {
+  const params = await props.params;
   try {
-    const { userId } = auth();
+    const { userId } = await auth();
     if (!userId) {
-      return new NextResponse("Unauthorized", { status: 401 });
+      return new NextResponse('Unauthorized', { status: 401 });
     }
 
     const hacker = await prisma.hacker.findUnique({
@@ -68,7 +70,7 @@ export async function DELETE(
     });
 
     if (!hacker) {
-      return new NextResponse("Builder not found", { status: 404 });
+      return new NextResponse('Builder not found', { status: 404 });
     }
 
     const project = await prisma.project.findUnique({
@@ -80,14 +82,14 @@ export async function DELETE(
     });
 
     if (!project) {
-      return new NextResponse("Project not found", { status: 404 });
+      return new NextResponse('Project not found', { status: 404 });
     }
 
-    const isAdmin = hacker.role === "SITE_ADMIN";
+    const isAdmin = hacker.role === 'SITE_ADMIN';
     const isLaunchLead = project.launchLeadId === hacker.id;
 
     if (!isAdmin && !isLaunchLead) {
-      return new NextResponse("Unauthorized", { status: 401 });
+      return new NextResponse('Unauthorized', { status: 401 });
     }
 
     const pitchEntries = await prisma.pitchProject.findMany({
@@ -119,7 +121,7 @@ export async function DELETE(
 
     return new NextResponse(null, { status: 204 });
   } catch (error) {
-    console.error("[PROJECT_DELETE]", error);
-    return new NextResponse("Internal Error", { status: 500 });
+    console.error('[PROJECT_DELETE]', error);
+    return new NextResponse('Internal Error', { status: 500 });
   }
 }

@@ -1,4 +1,5 @@
 import React from 'react';
+import { resolvedParams } from '../utils/next';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 const mockUseTheme = jest.fn();
@@ -338,7 +339,11 @@ function renderSettingsPage() {
     '../../src/app/organizer/chapters/[chapterSlug]/settings/page'
   );
 
-  render(<OrganizerChapterSettingsPage params={{ chapterSlug: 'boston' }} />);
+  render(
+    <OrganizerChapterSettingsPage
+      params={resolvedParams({ chapterSlug: 'boston' })}
+    />
+  );
 }
 
 describe('/organizer/chapters/[chapterSlug]/settings', () => {

@@ -1,4 +1,5 @@
 import React from 'react';
+import { resolvedParams } from '../utils/next';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 const mockUseTheme = jest.fn();
@@ -22,7 +23,9 @@ jest.mock('next/navigation', () => ({
   }),
 }));
 
-type PageComponent = React.ComponentType<{ params: { eventId: string } }>;
+type PageComponent = React.ComponentType<{
+  params: Promise<{ eventId: string }>;
+}>;
 
 const eventSettings = {
   id: 'event-ai-build-night',
@@ -165,7 +168,7 @@ function renderSettingsPage(eventId = eventSettings.id) {
     '../../src/app/organizer/events/[eventId]/settings/page'
   );
 
-  render(<OrganizerEventSettingsPage params={{ eventId }} />);
+  render(<OrganizerEventSettingsPage params={resolvedParams({ eventId })} />);
 }
 
 function patchBodyForEvent(eventId = eventSettings.id) {

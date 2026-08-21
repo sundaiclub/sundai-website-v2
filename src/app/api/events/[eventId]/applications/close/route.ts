@@ -38,8 +38,9 @@ async function readCloseApplicationsBody(
 
 export async function POST(
   req: Request,
-  { params }: { params: { eventId: string } }
+  props: { params: Promise<{ eventId: string }> }
 ) {
+  const params = await props.params;
   try {
     const { hacker, response } = await requireEventAdministrator(
       params.eventId

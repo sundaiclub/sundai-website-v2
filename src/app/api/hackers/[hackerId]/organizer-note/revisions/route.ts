@@ -14,8 +14,9 @@ import {
 
 export async function GET(
   request: Request,
-  { params }: { params: { hackerId: string } }
+  props: { params: Promise<{ hackerId: string }> }
 ) {
+  const params = await props.params;
   try {
     const hacker = await getCurrentHacker();
     if (!hacker) return unauthorized();

@@ -10,9 +10,10 @@ import { canEditRegistrationNotes } from '@/lib/eventManagementAuth';
 
 async function updateNotes(
   req: Request,
-  { params }: { params: { eventId: string; registrationId: string } }
+  props: { params: Promise<{ eventId: string; registrationId: string }> }
 ) {
   try {
+    const params = await props.params;
     const hacker = await getCurrentHacker();
     if (!hacker) return unauthorized();
 

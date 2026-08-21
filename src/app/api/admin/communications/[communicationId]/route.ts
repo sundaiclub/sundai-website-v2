@@ -7,8 +7,9 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(
   _request: Request,
-  { params }: { params: { communicationId: string } }
+  props: { params: Promise<{ communicationId: string }> }
 ) {
+  const params = await props.params;
   try {
     const { response } = await requireSiteAdmin();
     if (response) return response;

@@ -1,17 +1,18 @@
-import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
-import prisma from "@/lib/prisma";
+import { NextResponse } from 'next/server';
+import { auth } from '@clerk/nextjs/server';
+import prisma from '@/lib/prisma';
 
 const MAX_FEATURED = 3;
 
 export async function PUT(
   request: Request,
-  { params }: { params: { hackerId: string } }
+  props: { params: Promise<{ hackerId: string }> }
 ) {
+  const params = await props.params;
   try {
-    const { userId } = auth();
+    const { userId } = await auth();
     if (!userId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const requestingHacker = await prisma.hacker.findUnique({
@@ -20,23 +21,23 @@ export async function PUT(
     });
 
     if (!requestingHacker || requestingHacker.id !== params.hackerId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const body = await request.json();
     const ids: unknown = body?.featuredProjectIds;
 
-    if (
-      !Array.isArray(ids) ||
-      !ids.every((v) => typeof v === "string")
-    ) {
+    if (!Array.isArray(ids) || !ids.every(v => typeof v === 'string')) {
       return NextResponse.json(
-        { error: "featuredProjectIds must be a string array" },
+        { error: 'featuredProjectIds must be a string array' },
         { status: 400 }
       );
     }
 
-    const uniqueIds = Array.from(new Set(ids as string[])).slice(0, MAX_FEATURED);
+    const uniqueIds = Array.from(new Set(ids as string[])).slice(
+      0,
+      MAX_FEATURED
+    );
 
     if (uniqueIds.length > 0) {
       const owned = await prisma.project.findMany({
@@ -49,10 +50,10 @@ export async function PUT(
         },
         select: { id: true },
       });
-      const ownedSet = new Set(owned.map((p) => p.id));
-      if (uniqueIds.some((id) => !ownedSet.has(id))) {
+      const ownedSet = new Set(owned.map(p => p.id));
+      if (uniqueIds.some(id => !ownedSet.has(id))) {
         return NextResponse.json(
-          { error: "Cannot feature a project you are not part of" },
+          { error: 'Cannot feature a project you are not part of' },
           { status: 400 }
         );
       }
@@ -66,9 +67,9 @@ export async function PUT(
 
     return NextResponse.json(updated);
   } catch (error) {
-    console.error("Error updating featured projects:", error);
+    console.error('Error updating featured projects:', error);
     return NextResponse.json(
-      { error: "Failed to update featured projects" },
+      { error: 'Failed to update featured projects' },
       { status: 500 }
     );
   }

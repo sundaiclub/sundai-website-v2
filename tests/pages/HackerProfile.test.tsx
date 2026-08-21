@@ -57,14 +57,20 @@ describe('HackerProfile', () => {
         emailAddresses: [{ emailAddress: 'current@example.com' }],
       },
     } as any);
-    
+
     // Mock fetch for APIs
     (global.fetch as jest.Mock).mockImplementation((url: string) => {
       if (url.includes('/api/hackers?clerkId=')) {
-        return Promise.resolve({ ok: true, json: () => Promise.resolve({ id: 'current-user-hacker-id' }) });
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ id: 'current-user-hacker-id' }),
+        });
       }
       if (url.includes('/api/hackers/test-hacker-id')) {
-        return Promise.resolve({ ok: true, json: () => Promise.resolve(mockHacker) });
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve(mockHacker),
+        });
       }
       return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
     });
@@ -103,10 +109,16 @@ describe('HackerProfile', () => {
 
     (global.fetch as jest.Mock).mockImplementation((url: string) => {
       if (url.includes('/api/hackers?clerkId=')) {
-        return Promise.resolve({ ok: true, json: () => Promise.resolve({ id: 'current-user-hacker-id' }) });
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ id: 'current-user-hacker-id' }),
+        });
       }
       if (url.includes('/api/hackers/test-hacker-id')) {
-        return Promise.resolve({ ok: true, json: () => Promise.resolve(hackerWithAvatar) });
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve(hackerWithAvatar),
+        });
       }
       return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
     });
@@ -120,16 +132,24 @@ describe('HackerProfile', () => {
     const img = await screen.findByAltText('Test Hacker');
     fireEvent.error(img);
     await waitFor(() => {
-      expect((img as HTMLImageElement).src).toContain('/images/default_avatar.png');
+      expect((img as HTMLImageElement).src).toContain(
+        '/images/default_avatar.png'
+      );
     });
   });
 
   it('should handle error state', async () => {
     (global.fetch as jest.Mock).mockImplementation((url: string) => {
       if (url.includes('/api/hackers/test-hacker-id')) {
-        return Promise.resolve({ ok: false, text: () => Promise.resolve('Failed to fetch') });
+        return Promise.resolve({
+          ok: false,
+          text: () => Promise.resolve('Failed to fetch'),
+        });
       }
-      return Promise.resolve({ ok: true, json: () => Promise.resolve({ id: 'current-user-hacker-id' }) });
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ id: 'current-user-hacker-id' }),
+      });
     });
 
     render(
@@ -154,10 +174,16 @@ describe('HackerProfile', () => {
     } as any);
     (global.fetch as jest.Mock).mockImplementation((url: string) => {
       if (url.includes('/api/hackers?clerkId=')) {
-        return Promise.resolve({ ok: true, json: () => Promise.resolve({ id: 'test-hacker-id' }) });
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ id: 'test-hacker-id' }),
+        });
       }
       if (url.includes('/api/hackers/test-hacker-id')) {
-        return Promise.resolve({ ok: true, json: () => Promise.resolve(mockHacker) });
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve(mockHacker),
+        });
       }
       return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
     });
@@ -185,10 +211,16 @@ describe('HackerProfile', () => {
     } as any);
     (global.fetch as jest.Mock).mockImplementation((url: string) => {
       if (url.includes('/api/hackers?clerkId=')) {
-        return Promise.resolve({ ok: true, json: () => Promise.resolve({ id: 'another-hacker-id' }) });
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ id: 'another-hacker-id' }),
+        });
       }
       if (url.includes('/api/hackers/test-hacker-id')) {
-        return Promise.resolve({ ok: true, json: () => Promise.resolve(mockHacker) });
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve(mockHacker),
+        });
       }
       return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
     });
@@ -216,10 +248,16 @@ describe('HackerProfile', () => {
     };
     (global.fetch as jest.Mock).mockImplementation((url: string) => {
       if (url.includes('/api/hackers?clerkId=')) {
-        return Promise.resolve({ ok: true, json: () => Promise.resolve({ id: 'another-hacker-id' }) });
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ id: 'another-hacker-id' }),
+        });
       }
       if (url.includes('/api/hackers/test-hacker-id')) {
-        return Promise.resolve({ ok: true, json: () => Promise.resolve(hackerWithMissingFields) });
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve(hackerWithMissingFields),
+        });
       }
       return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
     });

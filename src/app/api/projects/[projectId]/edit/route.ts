@@ -1,13 +1,17 @@
-import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
-import type { Prisma, ProjectStatus } from "@prisma/client";
-import prisma from "@/lib/prisma";
+import { NextResponse } from 'next/server';
+import { auth } from '@clerk/nextjs/server';
+import type { Prisma, ProjectStatus } from '@prisma/client';
+import prisma from '@/lib/prisma';
 import {
   IMAGE_UPLOAD_SIZE_ERROR,
   validateImageUploadSize,
-} from "@/lib/imageUploads";
+} from '@/lib/imageUploads';
 
-const PROJECT_STATUSES = ["DRAFT", "PENDING", "APPROVED"] as const satisfies readonly ProjectStatus[];
+const PROJECT_STATUSES = [
+  'DRAFT',
+  'PENDING',
+  'APPROVED',
+] as const satisfies readonly ProjectStatus[];
 
 type SubmittedParticipant = {
   role?: string | null;
@@ -17,46 +21,50 @@ type SubmittedParticipant = {
 };
 
 function isProjectStatus(value: FormDataEntryValue): value is ProjectStatus {
-  return typeof value === "string" && PROJECT_STATUSES.some(status => status === value);
+  return (
+    typeof value === 'string' &&
+    PROJECT_STATUSES.some(status => status === value)
+  );
 }
 function isSubmittedParticipant(value: unknown): value is SubmittedParticipant {
   return (
     value !== null &&
-    typeof value === "object" &&
-    "hacker" in value &&
+    typeof value === 'object' &&
+    'hacker' in value &&
     value.hacker !== null &&
-    typeof value.hacker === "object" &&
-    "id" in value.hacker &&
-    typeof value.hacker.id === "string" &&
-    (!("role" in value) ||
+    typeof value.hacker === 'object' &&
+    'id' in value.hacker &&
+    typeof value.hacker.id === 'string' &&
+    (!('role' in value) ||
       value.role === null ||
       value.role === undefined ||
-      typeof value.role === "string")
+      typeof value.role === 'string')
   );
 }
 
 export async function PATCH(
   req: Request,
-  { params }: { params: { projectId: string } }
+  props: { params: Promise<{ projectId: string }> }
 ) {
+  const params = await props.params;
   try {
-    const { userId } = auth();
+    const { userId } = await auth();
     if (!userId) {
-      return new NextResponse("Unauthorized", { status: 401 });
+      return new NextResponse('Unauthorized', { status: 401 });
     }
 
     const project = await prisma.project.findUnique({
       where: { id: params.projectId },
       include: {
         participants: {
-          include: { hacker: true }
+          include: { hacker: true },
         },
         launchLead: true,
-      }
+      },
     });
 
     if (!project) {
-      return new NextResponse("Project not found", { status: 404 });
+      return new NextResponse('Project not found', { status: 404 });
     }
 
     const user = await prisma.hacker.findUnique({
@@ -64,14 +72,14 @@ export async function PATCH(
       select: { id: true, role: true },
     });
 
-    const isAdmin = user?.role === "SITE_ADMIN";
-    const canEdit = 
+    const isAdmin = user?.role === 'SITE_ADMIN';
+    const canEdit =
       isAdmin ||
       project.launchLeadId === user?.id ||
       project.participants.some(p => p.hacker.id === user?.id);
 
     if (!canEdit) {
-      return new NextResponse("Unauthorized", { status: 401 });
+      return new NextResponse('Unauthorized', { status: 401 });
     }
 
     const formData = await req.formData();
@@ -80,16 +88,21 @@ export async function PATCH(
     const newStatus = formData.get('status');
     if (newStatus) {
       if (!isProjectStatus(newStatus)) {
-        return new NextResponse("Invalid project status", { status: 400 });
+        return new NextResponse('Invalid project status', { status: 400 });
       }
       const currentStatus = project.status;
-      
-      if (newStatus === "APPROVED" && !isAdmin) {
-        return new NextResponse("Only admins can approve projects", { status: 403 });
+
+      if (newStatus === 'APPROVED' && !isAdmin) {
+        return new NextResponse('Only admins can approve projects', {
+          status: 403,
+        });
       }
-      
-      if (!isAdmin && currentStatus === "PENDING" && newStatus !== "PENDING") {
-        return new NextResponse("Only admins can change status of pending projects", { status: 403 });
+
+      if (!isAdmin && currentStatus === 'PENDING' && newStatus !== 'PENDING') {
+        return new NextResponse(
+          'Only admins can change status of pending projects',
+          { status: 403 }
+        );
       }
 
       updateData.status = newStatus;
@@ -97,41 +110,43 @@ export async function PATCH(
 
     const isStarred = formData.get('is_starred');
     if (isStarred !== null && !isAdmin) {
-      return new NextResponse("Only admins can change starred status", { status: 403 });
+      return new NextResponse('Only admins can change starred status', {
+        status: 403,
+      });
     } else if (isStarred !== null) {
       updateData.is_starred = isStarred === 'true';
     }
 
     const title = formData.get('title');
     if (title) updateData.title = title.toString();
-    
+
     const preview = formData.get('preview');
     if (preview) updateData.preview = preview.toString();
-    
+
     const description = formData.get('description');
     if (description) updateData.description = description.toString();
-    
+
     const startDate = formData.get('startDate');
     if (startDate) updateData.startDate = new Date(startDate.toString());
-    
+
     const endDate = formData.get('endDate');
     if (endDate) updateData.endDate = new Date(endDate.toString());
 
     updateData.githubUrl = formData.get('githubUrl')?.toString() || null;
     updateData.demoUrl = formData.get('demoUrl')?.toString() || null;
     updateData.blogUrl = formData.get('blogUrl')?.toString() || null;
-    
+
     const isBroken = formData.get('is_broken');
     if (isBroken !== null) updateData.is_broken = isBroken === 'true';
 
     const techTags = formData.getAll('techTags[]');
     updateData.techTags = {
-      set: techTags.map((id) => ({ id: id.toString() }))
+      set: techTags.map(id => ({ id: id.toString() })),
     };
 
     const domainTags = formData.getAll('domainTags[]');
     updateData.domainTags = {
-      set: domainTags.map((id) => ({ id: id.toString() }))
+      set: domainTags.map(id => ({ id: id.toString() })),
     };
 
     const deleteThumbnail = formData.get('deleteThumbnail') === 'true';
@@ -147,20 +162,20 @@ export async function PATCH(
 
     if (deleteThumbnail) {
       updateData.thumbnail = {
-        disconnect: true
+        disconnect: true,
       };
     } else if (thumbnail && thumbnail instanceof File) {
       try {
-        const { uploadToGCS } = await import("@/lib/gcp-storage");
+        const { uploadToGCS } = await import('@/lib/gcp-storage');
         const uploadResult = await uploadToGCS(thumbnail);
-        
+
         const newImage = await prisma.image.create({
           data: {
             key: uploadResult.filename,
             bucket: process.env.GOOGLE_CLOUD_BUCKET!,
             url: uploadResult.url,
             filename: thumbnail.name,
-            mimeType: thumbnail.type || "application/octet-stream",
+            mimeType: thumbnail.type || 'application/octet-stream',
             size: thumbnail.size,
             width: undefined,
             height: undefined,
@@ -170,43 +185,46 @@ export async function PATCH(
         });
 
         updateData.thumbnail = {
-          connect: { id: newImage.id }
+          connect: { id: newImage.id },
         };
       } catch (error) {
-        console.error("Error uploading thumbnail:", error);
-        return new NextResponse("Error uploading thumbnail", { status: 500 });
+        console.error('Error uploading thumbnail:', error);
+        return new NextResponse('Error uploading thumbnail', { status: 500 });
       }
     }
 
-    const canManageTeam = user?.role === "SITE_ADMIN" || project.launchLeadId === user?.id;
-    
+    const canManageTeam =
+      user?.role === 'SITE_ADMIN' || project.launchLeadId === user?.id;
+
     if (canManageTeam) {
       const participantsJson = formData.get('participants');
       const launchLeadId = formData.get('launchLead');
 
       if (launchLeadId) {
         updateData.launchLead = {
-          connect: { id: launchLeadId.toString() }
+          connect: { id: launchLeadId.toString() },
         };
       }
 
       if (participantsJson) {
-        const parsedParticipants: unknown = JSON.parse(participantsJson.toString());
+        const parsedParticipants: unknown = JSON.parse(
+          participantsJson.toString()
+        );
         const participants = Array.isArray(parsedParticipants)
           ? parsedParticipants.filter(isSubmittedParticipant)
           : [];
-        
+
         await prisma.projectToParticipant.deleteMany({
-          where: { projectId: params.projectId }
+          where: { projectId: params.projectId },
         });
 
         updateData.participants = {
           create: participants
-            .filter((p) => p.hacker.id !== launchLeadId)
-            .map((p) => ({
+            .filter(p => p.hacker.id !== launchLeadId)
+            .map(p => ({
               hackerId: p.hacker.id,
-              role: p.role
-            }))
+              role: p.role,
+            })),
         };
       }
     }
@@ -237,7 +255,7 @@ export async function PATCH(
 
     return NextResponse.json(updatedProject);
   } catch (error) {
-    console.error("[PROJECT_UPDATE]", error);
-    return new NextResponse("Internal Error", { status: 500 });
+    console.error('[PROJECT_UPDATE]', error);
+    return new NextResponse('Internal Error', { status: 500 });
   }
 }

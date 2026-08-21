@@ -33,8 +33,9 @@ import {
 
 export async function GET(
   req: Request,
-  { params }: { params: { eventId: string } }
+  props: { params: Promise<{ eventId: string }> }
 ) {
+  const params = await props.params;
   try {
     const searchParams = new URL(req.url).searchParams;
     const managementRead =
@@ -162,7 +163,7 @@ export async function GET(
 
     if (!event) return new NextResponse('Not Found', { status: 404 });
 
-    const { userId } = auth();
+    const { userId } = await auth();
     const viewer = userId
       ? await prisma.hacker.findUnique({
           where: { clerkId: userId },
@@ -284,8 +285,9 @@ export async function GET(
 
 export async function PATCH(
   req: Request,
-  { params }: { params: { eventId: string } }
+  props: { params: Promise<{ eventId: string }> }
 ) {
+  const params = await props.params;
   try {
     const access = await requireEventSettingsManager(params.eventId);
     if (access.response) return access.response;
@@ -669,10 +671,11 @@ export async function PATCH(
 
 export async function DELETE(
   _req: Request,
-  { params }: { params: { eventId: string } }
+  props: { params: Promise<{ eventId: string }> }
 ) {
+  const params = await props.params;
   try {
-    const { userId } = auth();
+    const { userId } = await auth();
     if (!userId) return new NextResponse('Unauthorized', { status: 401 });
 
     const user = await prisma.hacker.findUnique({

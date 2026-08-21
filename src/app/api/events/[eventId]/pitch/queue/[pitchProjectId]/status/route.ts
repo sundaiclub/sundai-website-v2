@@ -4,8 +4,9 @@ import { requireEventPitchAccess } from '@/lib/eventManagementApi';
 
 export async function PATCH(
   req: Request,
-  { params }: { params: { eventId: string; pitchProjectId: string } }
+  props: { params: Promise<{ eventId: string; pitchProjectId: string }> }
 ) {
+  const params = await props.params;
   try {
     const access = await requireEventPitchAccess(params.eventId);
     if (access.response) return access.response;

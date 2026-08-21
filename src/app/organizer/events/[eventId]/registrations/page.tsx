@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, use } from 'react';
 import {
   ManagementAlert,
   ManagementSection,
@@ -52,11 +52,10 @@ function normalizeReviewState(
   };
 }
 
-export default function OrganizerEventRegistrationsPage({
-  params,
-}: {
-  params: { eventId: string };
+export default function OrganizerEventRegistrationsPage(props: {
+  params: Promise<{ eventId: string }>;
 }) {
+  const params = use(props.params);
   const { isAdmin } = useUserContext();
   const [workspace, setWorkspace] = useState<EventWorkspacePayload | null>(
     null
