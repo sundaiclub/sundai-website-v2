@@ -21,6 +21,7 @@ const mockUseAuth = jest.fn();
 const mockServerAuth = jest.fn();
 const mockCurrentUser = jest.fn();
 const mockNotFound = jest.fn();
+const mockRouterRefresh = jest.fn();
 
 jest.mock('../../src/app/contexts/ThemeContext', () => ({
   useTheme: () => mockUseTheme(),
@@ -40,7 +41,7 @@ jest.mock('next/navigation', () => ({
     prefetch: jest.fn(),
     back: jest.fn(),
     forward: jest.fn(),
-    refresh: jest.fn(),
+    refresh: mockRouterRefresh,
   }),
   notFound: () => mockNotFound(),
 }));
@@ -486,6 +487,10 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
     mockUseTheme.mockReturnValue({ isDarkMode: false });
     mockListPublicEventProjects.mockResolvedValue([]);
     mockSignedOut();
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   it('uses the event image in link preview metadata', async () => {
@@ -1168,6 +1173,41 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
       })
     ).toBeInTheDocument();
     expect(screen.queryByText(/42 private lane/i)).not.toBeInTheDocument();
+  });
+
+  it('cancels the current user registration and refreshes the event detail', async () => {
+    mockSignedIn();
+    jest.spyOn(window, 'confirm').mockReturnValue(true);
+    const event = buildEventDetail({
+      viewerRegistrationStatus: 'APPROVED',
+      viewerRegistration: registrationState('APPROVED', {
+        canEditAnswers: false,
+        canCancel: true,
+      }),
+      applicationControls: {
+        ...buildEventDetail().applicationControls,
+        canSubmit: false,
+        canEditAnswers: false,
+        canCancelRegistration: true,
+      },
+    });
+
+    await renderDetailPage(event);
+    fireEvent.click(
+      screen.getByRole('button', { name: /cancel registration/i })
+    );
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        `/api/events/${event.id}/registrations/me/cancel`,
+        { method: 'POST' }
+      );
+    });
+    expect(await screen.findByText(/registration cancelled/i)).toHaveAttribute(
+      'role',
+      'status'
+    );
+    expect(mockRouterRefresh).toHaveBeenCalledTimes(1);
   });
 
   it('provides an add-to-calendar action using the public calendar payload', async () => {

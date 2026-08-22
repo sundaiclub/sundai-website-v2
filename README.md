@@ -120,7 +120,8 @@ WEBHOOK_SECRET="whsec_your_webhook_secret_here"
 GOOGLE_CLOUD_BUCKET="your-bucket-name"
 
 # AI Image Generation (optional for local development)
-GEMINI_API_KEY="your_gemini_api_key_here"
+AWS_REGION="us-east-2"
+AWS_BEARER_TOKEN_BEDROCK="your_bedrock_api_key_here"
 REPLICATE_API_TOKEN="your_replicate_api_token_here"
 
 # PostHog Analytics (optional for local development)
@@ -498,10 +499,12 @@ their short expiry or when current access is removed.
 5. Download service account key JSON file and add to project
 
 ### AI Image Generation Setup (Optional):
-1. **Gemini API**: Get your API key from [Google AI Studio](https://makersuite.google.com/app/apikey)
-2. **Replicate API**: Sign up at [replicate.com](https://replicate.com) and get your API token
-3. Add both keys to your `.env.local` file
-4. The AI image generation feature will be available in project editing for creating pixel-art thumbnails
+1. In Amazon Bedrock, enable access to `openai.gpt-5.6-luna` in a supported region.
+2. Create a Bedrock API key for the application.
+3. Set `AWS_REGION` and `AWS_BEARER_TOKEN_BEDROCK` in `.env.local`.
+4. **Replicate API**: Sign up at [replicate.com](https://replicate.com) and get your API token.
+5. Set `REPLICATE_API_TOKEN` in `.env.local`.
+6. The AI image generation feature will be available in project editing for creating pixel-art thumbnails.
 
 ## 🚀 Learn More
 

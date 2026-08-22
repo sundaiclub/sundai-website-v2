@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { sanitizeApprovedDetailsJson } from '@/lib/approvedEventDetails';
 import type {
   AddToCalendarPayload,
@@ -165,12 +166,80 @@ function EventTopRegistrationStatusSection({
           />
         )}
         {!isEventStaff && registration?.canCancel && (
-          <button type="button" className={classes.secondaryButton}>
-            Cancel registration
-          </button>
+          <CancelRegistrationAction eventId={event.id} />
         )}
       </div>
     </ManagementSection>
+  );
+}
+
+function CancelRegistrationAction({ eventId }: { eventId: string }) {
+  const classes = useManagementClasses();
+  const router = useRouter();
+  const [isCancelling, setIsCancelling] = useState(false);
+  const [isCancelled, setIsCancelled] = useState(false);
+  const [error, setError] = useState('');
+
+  async function cancelRegistration() {
+    if (
+      !window.confirm(
+        'Cancel your registration for this event? This action cannot be undone.'
+      )
+    ) {
+      return;
+    }
+
+    setIsCancelling(true);
+    setError('');
+
+    try {
+      const response = await fetch(
+        `/api/events/${encodeURIComponent(eventId)}/registrations/me/cancel`,
+        { method: 'POST' }
+      );
+      const payload = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        throw new Error(payload?.message || 'Unable to cancel registration.');
+      }
+
+      setIsCancelled(true);
+      router.refresh();
+    } catch (cancelError) {
+      setError(
+        cancelError instanceof Error
+          ? cancelError.message
+          : 'Unable to cancel registration.'
+      );
+    } finally {
+      setIsCancelling(false);
+    }
+  }
+
+  if (isCancelled) {
+    return (
+      <span aria-live="polite" className="text-sm" role="status">
+        Registration cancelled.
+      </span>
+    );
+  }
+
+  return (
+    <div>
+      <button
+        className={classes.secondaryButton}
+        disabled={isCancelling}
+        onClick={cancelRegistration}
+        type="button"
+      >
+        {isCancelling ? 'Cancelling…' : 'Cancel registration'}
+      </button>
+      {error && (
+        <p aria-live="assertive" className="mt-2 text-sm text-red-600" role="alert">
+          {error}
+        </p>
+      )}
+    </div>
   );
 }
 

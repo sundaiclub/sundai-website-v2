@@ -1,7 +1,7 @@
-import { GoogleGenAI } from '@google/genai';
+import { BedrockOpenAI } from 'openai';
 import Replicate from 'replicate';
 
-const PROMPT_MODEL = 'gemini-3-flash-preview';
+export const PROMPT_MODEL = 'openai.gpt-5.6-luna';
 const IMAGE_MODEL = 'black-forest-labs/flux-2-klein-9b';
 
 export type GeneratedImage = {
@@ -44,18 +44,24 @@ export async function generatePixelArtImages(
     throw new Error('REPLICATE_API_TOKEN is not configured');
   }
 
-  const googleApiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
-  if (!googleApiKey) {
-    throw new Error('GEMINI_API_KEY or GOOGLE_API_KEY is not configured');
+  const bedrockApiKey = process.env.AWS_BEARER_TOKEN_BEDROCK;
+  if (!bedrockApiKey) {
+    throw new Error('AWS_BEARER_TOKEN_BEDROCK is not configured');
+  }
+
+  const awsRegion = process.env.AWS_REGION;
+  if (!awsRegion) {
+    throw new Error('AWS_REGION is not configured');
   }
 
   const replicate = new Replicate({ auth: replicateToken });
-  const ai = new GoogleGenAI({ apiKey: googleApiKey });
+  const ai = new BedrockOpenAI({ apiKey: bedrockApiKey, awsRegion });
   const promptVariations = await Promise.all(
     Array.from({ length: 4 }, async (_, index) => {
-      const response = await ai.models.generateContent({
+      const response = await ai.responses.create({
         model: PROMPT_MODEL,
-        contents: `Create a different variation of this image generation prompt. Make it unique but keep the same core concept and style:
+        reasoning: { effort: 'none' },
+        input: `Create a different variation of this image generation prompt. Make it unique but keep the same core concept and style:
 
 Subject Context:
 ${subjectContext}
@@ -71,7 +77,7 @@ Requirements for variation ${index + 1}:
 
 Generate only the new prompt text, with no explanations.`,
       });
-      const generatedVariation = response.text?.trim();
+      const generatedVariation = response.output_text.trim();
 
       if (!generatedVariation) {
         throw new Error('No prompt variation was generated');
