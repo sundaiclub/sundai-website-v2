@@ -119,7 +119,7 @@ WEBHOOK_SECRET="whsec_your_webhook_secret_here"
 # Google Cloud Storage (optional for local development)
 GOOGLE_CLOUD_BUCKET="your-bucket-name"
 
-# AI Image Generation (optional for local development)
+# Amazon Bedrock text generation and AI image generation
 AWS_REGION="us-east-2"
 AWS_BEARER_TOKEN_BEDROCK="your_bedrock_api_key_here"
 REPLICATE_API_TOKEN="your_replicate_api_token_here"
@@ -505,6 +505,8 @@ their short expiry or when current access is removed.
 4. **Replicate API**: Sign up at [replicate.com](https://replicate.com) and get your API token.
 5. Set `REPLICATE_API_TOKEN` in `.env.local`.
 6. The AI image generation feature will be available in project editing for creating pixel-art thumbnails.
+
+The same Bedrock configuration generates project share posts and rewrites news email content.
 
 ## 🚀 Learn More
 

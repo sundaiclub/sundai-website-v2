@@ -7,9 +7,9 @@ import prisma from '@/lib/prisma';
 import {
   buildShareContentPrompt,
   generateShareContent,
-  SHARE_CONTENT_MODEL,
   type SharePlatform,
 } from '@/lib/shareContent';
+import { isBedrockTextConfigured, streamBedrockText } from '@/lib/bedrockText';
 import type { Project } from '@/types/project';
 
 type ShareRequestBody = {
@@ -172,9 +172,8 @@ export async function POST(
       acceptHeader.includes('text/plain');
 
     if (wantsStream) {
-      const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
-      if (!apiKey) {
-        return new NextResponse('Gemini API key not configured', {
+      if (!isBedrockTextConfigured()) {
+        return new NextResponse('Amazon Bedrock is not configured', {
           status: 500,
         });
       }
@@ -185,19 +184,12 @@ export async function POST(
         isTeamMember,
       });
 
-      const { GoogleGenAI } = await import('@google/genai');
-      const ai = new GoogleGenAI({ apiKey });
       const encoder = new TextEncoder();
       const stream = new ReadableStream({
         async start(controller) {
           try {
-            const response = await ai.models.generateContentStream({
-              model: SHARE_CONTENT_MODEL,
-              contents: prompt,
-            });
-            for await (const chunk of response) {
-              const text = chunk.text || '';
-              if (text) controller.enqueue(encoder.encode(text));
+            for await (const text of streamBedrockText(prompt)) {
+              controller.enqueue(encoder.encode(text));
             }
             controller.close();
           } catch (error) {

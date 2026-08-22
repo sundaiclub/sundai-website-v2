@@ -1,10 +1,8 @@
-const responsesCreateMock = jest.fn();
 const replicateRunMock = jest.fn();
 
-jest.mock('openai', () => ({
-  BedrockOpenAI: jest.fn().mockImplementation(() => ({
-    responses: { create: responsesCreateMock },
-  })),
+jest.mock('../../src/lib/bedrockText', () => ({
+  BEDROCK_TEXT_MODEL: 'openai.gpt-5.6-luna',
+  generateBedrockText: jest.fn(),
 }));
 
 jest.mock('replicate', () => ({
@@ -12,29 +10,29 @@ jest.mock('replicate', () => ({
   default: jest.fn().mockImplementation(() => ({ run: replicateRunMock })),
 }));
 
-import { BedrockOpenAI } from 'openai';
 import Replicate from 'replicate';
+import { generateBedrockText } from '../../src/lib/bedrockText';
 import {
   generatePixelArtImages,
   PROMPT_MODEL,
 } from '../../src/lib/aiImageGeneration';
 
+const generateBedrockTextMock = generateBedrockText as jest.MockedFunction<
+  typeof generateBedrockText
+>;
+
 describe('generatePixelArtImages', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    process.env.AWS_BEARER_TOKEN_BEDROCK = 'test-bedrock-key';
-    process.env.AWS_REGION = 'us-east-2';
     process.env.REPLICATE_API_TOKEN = 'test-replicate-key';
 
-    responsesCreateMock.mockImplementation(({ input }) =>
-      Promise.resolve({ output_text: `Generated: ${input}` })
+    generateBedrockTextMock.mockImplementation(input =>
+      Promise.resolve(`Generated: ${input}`)
     );
     replicateRunMock.mockResolvedValue(['https://example.com/image.webp']);
   });
 
   afterEach(() => {
-    delete process.env.AWS_BEARER_TOKEN_BEDROCK;
-    delete process.env.AWS_REGION;
     delete process.env.REPLICATE_API_TOKEN;
   });
 
@@ -42,36 +40,20 @@ describe('generatePixelArtImages', () => {
     const images = await generatePixelArtImages('A friendly robot');
 
     expect(PROMPT_MODEL).toBe('openai.gpt-5.6-luna');
-    expect(BedrockOpenAI).toHaveBeenCalledWith({
-      apiKey: 'test-bedrock-key',
-      awsRegion: 'us-east-2',
-    });
-    expect(responsesCreateMock).toHaveBeenCalledTimes(4);
-    expect(responsesCreateMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        model: 'openai.gpt-5.6-luna',
-        reasoning: { effort: 'none' },
-        input: expect.stringContaining('A friendly robot'),
-      })
+    expect(generateBedrockTextMock).toHaveBeenCalledTimes(4);
+    expect(generateBedrockTextMock).toHaveBeenCalledWith(
+      expect.stringContaining('A friendly robot')
     );
     expect(Replicate).toHaveBeenCalledWith({ auth: 'test-replicate-key' });
     expect(replicateRunMock).toHaveBeenCalledTimes(4);
     expect(images).toHaveLength(4);
   });
 
-  it('requires a Bedrock API key', async () => {
-    delete process.env.AWS_BEARER_TOKEN_BEDROCK;
+  it('propagates Bedrock failures', async () => {
+    generateBedrockTextMock.mockRejectedValueOnce(new Error('Bedrock failed'));
 
     await expect(generatePixelArtImages('A robot')).rejects.toThrow(
-      'AWS_BEARER_TOKEN_BEDROCK is not configured'
-    );
-  });
-
-  it('requires an AWS region', async () => {
-    delete process.env.AWS_REGION;
-
-    await expect(generatePixelArtImages('A robot')).rejects.toThrow(
-      'AWS_REGION is not configured'
+      'Bedrock failed'
     );
   });
 });
