@@ -1396,7 +1396,7 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
       ).toBeChecked();
     });
 
-    it('prefills only prior answers enabled for reuse', async () => {
+    it('prefills the prior site name and answers enabled for reuse', async () => {
       const event = buildApplicationEvent();
       const composedFields = event.applicationQuestionSet.composedFields.map(
         field => ({
@@ -1408,6 +1408,7 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
       await renderDetailPage({
         ...event,
         reusableAnswersJson: {
+          name: 'Name from my previous application',
           project: 'Answer from my previous application',
           chapterGoals: 'This answer should not be reused',
         },
@@ -1419,6 +1420,9 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
 
       await openRegistrationForm();
 
+      expect(screen.getByLabelText(/full name/i)).toHaveValue(
+        'Name from my previous application'
+      );
       expect(screen.getByLabelText(/project idea/i)).toHaveValue(
         'Answer from my previous application'
       );

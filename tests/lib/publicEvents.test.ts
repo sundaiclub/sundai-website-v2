@@ -520,7 +520,7 @@ describe('public event helpers', () => {
     ).toEqual(['name', 'email', 'phoneNumber']);
   });
 
-  it('returns the latest prior answer only for questions configured for reuse', async () => {
+  it('returns the latest site name and answers configured for reuse', async () => {
     const event = buildPublicEvent({
       applicationQuestionsJson: [
         {
@@ -551,11 +551,16 @@ describe('public event helpers', () => {
     prisma.eventRegistration.findMany.mockResolvedValue([
       buildRegistration({
         eventId: 'event-prior-newer',
-        answersJson: { project: '   ', 'private-note': 'Do not reuse this' },
+        answersJson: {
+          name: 'Latest Applicant Name',
+          project: '   ',
+          'private-note': 'Do not reuse this',
+        },
       }),
       buildRegistration({
         eventId: 'event-prior-older',
         answersJson: {
+          name: 'Older Applicant Name',
           project: 'Reusable project answer',
           'private-note': 'Still do not reuse this',
         },
@@ -585,6 +590,7 @@ describe('public event helpers', () => {
       take: 50,
     });
     expect(detail?.reusableAnswersJson).toEqual({
+      name: 'Latest Applicant Name',
       project: 'Reusable project answer',
     });
   });

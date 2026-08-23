@@ -11,6 +11,7 @@ import {
   buildApplicationControlsState,
   getApplicationPublicStatus,
   parseTemplateFieldsJson,
+  shouldReusePreviousApplicationAnswer,
 } from '@/lib/applicationTemplates';
 import { fetchMergedApplicationTemplate } from '@/lib/applicationTemplateQueries';
 import type {
@@ -589,7 +590,7 @@ async function getReusableAnswersForViewer(input: {
   viewerHackerId?: EntityId | null;
 }): Promise<JsonObject> {
   const reusableFieldIds = input.fields
-    .filter(field => field.reusePreviousAnswer === true)
+    .filter(shouldReusePreviousApplicationAnswer)
     .map(field => field.id);
 
   if (!input.viewerHackerId || reusableFieldIds.length === 0) return {};

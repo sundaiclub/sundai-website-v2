@@ -530,6 +530,15 @@ export function applyProfilePrefillToAnswers(
   };
 }
 
+export function shouldReusePreviousApplicationAnswer(
+  field: TemplateFieldDefinition
+): boolean {
+  return (
+    field.reusePreviousAnswer === true ||
+    (field.id === 'name' && field.siteRequired === true)
+  );
+}
+
 function getPublicSafeApplicationStatusMessage(
   input: PublicSafeStatusMessageInput
 ): string | null {
