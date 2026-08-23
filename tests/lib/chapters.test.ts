@@ -117,7 +117,10 @@ describe('chapter helper indexed query shapes', () => {
 
     expect(prismaClient.chapter.findMany).toHaveBeenCalledWith({
       where: visibleChapterWhere(hacker),
-      orderBy: { name: 'asc' },
+      orderBy: [
+        { events: { _count: 'desc' } },
+        { name: 'asc' },
+      ],
       include: {
         heroImage: {
           select: { id: true, url: true, alt: true, filename: true },

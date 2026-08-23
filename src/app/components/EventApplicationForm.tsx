@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import {
   applyProfilePrefillToAnswers,
+  shouldReusePreviousApplicationAnswer,
   validateRequiredApplicationAnswers,
 } from '@/lib/applicationTemplates';
 import type {
@@ -62,7 +63,7 @@ function initialAnswers(input: {
   const existingAnswers = jsonObject(input.registration?.answersJson);
   const answers = input.fields.reduce<JsonObject>((result, field) => {
     if (
-      field.reusePreviousAnswer === true &&
+      shouldReusePreviousApplicationAnswer(field) &&
       reusableAnswers[field.id] !== undefined
     ) {
       result[field.id] = reusableAnswers[field.id];

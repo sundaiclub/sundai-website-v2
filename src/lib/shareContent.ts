@@ -1,5 +1,5 @@
 import type { Project } from '@/types/project';
-import { GoogleGenAI } from '@google/genai';
+import { BEDROCK_TEXT_MODEL, generateBedrockText } from '@/lib/bedrockText';
 
 export type SharePlatform = 'twitter' | 'linkedin' | 'reddit';
 
@@ -40,7 +40,7 @@ const PLATFORM_STYLES: Record<SharePlatform, string> = {
     'informative, community-focused, with technical details that would interest developers',
 };
 
-export const SHARE_CONTENT_MODEL = 'gemini-2.5-flash';
+export const SHARE_CONTENT_MODEL = BEDROCK_TEXT_MODEL;
 
 function formatTeamNames(
   teamMembers: ShareTeamMember[],
@@ -140,16 +140,9 @@ export async function generateShareContent({
 }: ShareContentRequest): Promise<ShareContentResponse> {
   const prompt = buildShareContentPrompt({ project, platform, isTeamMember });
 
-  const ai = new GoogleGenAI({
-    apiKey: process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY,
-  });
-  const response = await ai.models.generateContent({
-    model: SHARE_CONTENT_MODEL,
-    contents: prompt,
-  });
-  const generatedContent = response.text;
+  const generatedContent = await generateBedrockText(prompt);
   if (!generatedContent) {
-    throw new Error('Gemini returned no share content.');
+    throw new Error('No share content was generated.');
   }
 
   const hashtagMatches = generatedContent.match(/#[\w]+/g) ?? [];

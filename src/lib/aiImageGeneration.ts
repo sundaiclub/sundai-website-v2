@@ -1,7 +1,7 @@
-import { GoogleGenAI } from '@google/genai';
 import Replicate from 'replicate';
+import { BEDROCK_TEXT_MODEL, generateBedrockText } from '@/lib/bedrockText';
 
-const PROMPT_MODEL = 'gemini-3-flash-preview';
+export const PROMPT_MODEL = BEDROCK_TEXT_MODEL;
 const IMAGE_MODEL = 'black-forest-labs/flux-2-klein-9b';
 
 export type GeneratedImage = {
@@ -44,18 +44,12 @@ export async function generatePixelArtImages(
     throw new Error('REPLICATE_API_TOKEN is not configured');
   }
 
-  const googleApiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
-  if (!googleApiKey) {
-    throw new Error('GEMINI_API_KEY or GOOGLE_API_KEY is not configured');
-  }
-
   const replicate = new Replicate({ auth: replicateToken });
-  const ai = new GoogleGenAI({ apiKey: googleApiKey });
   const promptVariations = await Promise.all(
     Array.from({ length: 4 }, async (_, index) => {
-      const response = await ai.models.generateContent({
-        model: PROMPT_MODEL,
-        contents: `Create a different variation of this image generation prompt. Make it unique but keep the same core concept and style:
+      const generatedVariation = (
+        await generateBedrockText(
+          `Create a different variation of this image generation prompt. Make it unique but keep the same core concept and style:
 
 Subject Context:
 ${subjectContext}
@@ -69,9 +63,9 @@ Requirements for variation ${index + 1}:
 - Avoid text or logos
 - Focus on visual metaphor rather than literal representation
 
-Generate only the new prompt text, with no explanations.`,
-      });
-      const generatedVariation = response.text?.trim();
+Generate only the new prompt text, with no explanations.`
+        )
+      ).trim();
 
       if (!generatedVariation) {
         throw new Error('No prompt variation was generated');

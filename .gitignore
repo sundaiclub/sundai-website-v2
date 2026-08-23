@@ -50,3 +50,6 @@ test_screenshots
 .playwright-mcp
 
 docs/code-quality
+
+# Local Git worktrees
+/worktrees/

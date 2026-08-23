@@ -10,6 +10,7 @@ import { publicCalendarPayloadFixture } from '../utils/event-rsvp-fixtures';
 import { getPublicEventBySlug } from '@/lib/publicEvents';
 import { listVisibleEventMaterials } from '@/lib/eventMaterials';
 import { listPublicEventProjects } from '@/lib/publicEventProjects';
+import { getPublicEventSocialMetadata } from '@/lib/eventSocialMetadata';
 import { DEFAULT_SOCIAL_IMAGE_URL, publicUrl } from '@/lib/siteUrl';
 import { mockProject } from '../utils/test-utils';
 
@@ -21,6 +22,7 @@ const mockUseAuth = jest.fn();
 const mockServerAuth = jest.fn();
 const mockCurrentUser = jest.fn();
 const mockNotFound = jest.fn();
+const mockRouterRefresh = jest.fn();
 
 jest.mock('../../src/app/contexts/ThemeContext', () => ({
   useTheme: () => mockUseTheme(),
@@ -40,7 +42,7 @@ jest.mock('next/navigation', () => ({
     prefetch: jest.fn(),
     back: jest.fn(),
     forward: jest.fn(),
-    refresh: jest.fn(),
+    refresh: mockRouterRefresh,
   }),
   notFound: () => mockNotFound(),
 }));
@@ -63,6 +65,10 @@ jest.mock('@/lib/publicEvents', () => ({
   getPublicEventBySlug: jest.fn(),
 }));
 
+jest.mock('@/lib/eventSocialMetadata', () => ({
+  getPublicEventSocialMetadata: jest.fn(),
+}));
+
 jest.mock('@/lib/eventMaterials', () => ({
   listVisibleEventMaterials: jest.fn(),
 }));
@@ -76,6 +82,8 @@ type PageComponent = React.ComponentType<{
 }>;
 
 const mockGetPublicEventBySlug = getPublicEventBySlug as jest.Mock;
+const mockGetPublicEventSocialMetadata =
+  getPublicEventSocialMetadata as jest.Mock;
 const mockListVisibleEventMaterials = listVisibleEventMaterials as jest.Mock;
 const mockListPublicEventProjects = listPublicEventProjects as jest.Mock;
 const routeParams = { chapterSlug: 'boston', eventSlug: 'ai-build-night' };
@@ -488,6 +496,10 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
     mockSignedOut();
   });
 
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
   it('uses the event image in link preview metadata', async () => {
     const event = buildEventDetail({
       image: {
@@ -496,16 +508,15 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
         alt: 'AI Build Night artwork',
       },
     });
-    mockGetPublicEventBySlug.mockResolvedValue(event);
+    mockGetPublicEventSocialMetadata.mockResolvedValue(event);
     const {
       generateMetadata,
     } = require('../../src/app/events/[chapterSlug]/[eventSlug]/page');
 
     const metadata = await generateMetadata({ params: routeParams });
 
-    expect(mockGetPublicEventBySlug).toHaveBeenCalledWith({
+    expect(mockGetPublicEventSocialMetadata).toHaveBeenCalledWith({
       ...routeParams,
-      viewer: null,
     });
     expect(metadata.openGraph?.url).toBe(
       publicUrl('/events/boston/ai-build-night')
@@ -523,7 +534,7 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
   });
 
   it('uses the black-background Sundai image for event link previews without artwork', async () => {
-    mockGetPublicEventBySlug.mockResolvedValue(buildEventDetail());
+    mockGetPublicEventSocialMetadata.mockResolvedValue(buildEventDetail());
     const {
       generateMetadata,
     } = require('../../src/app/events/[chapterSlug]/[eventSlug]/page');
@@ -1170,6 +1181,41 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
     expect(screen.queryByText(/42 private lane/i)).not.toBeInTheDocument();
   });
 
+  it('cancels the current user registration and refreshes the event detail', async () => {
+    mockSignedIn();
+    jest.spyOn(window, 'confirm').mockReturnValue(true);
+    const event = buildEventDetail({
+      viewerRegistrationStatus: 'APPROVED',
+      viewerRegistration: registrationState('APPROVED', {
+        canEditAnswers: false,
+        canCancel: true,
+      }),
+      applicationControls: {
+        ...buildEventDetail().applicationControls,
+        canSubmit: false,
+        canEditAnswers: false,
+        canCancelRegistration: true,
+      },
+    });
+
+    await renderDetailPage(event);
+    fireEvent.click(
+      screen.getByRole('button', { name: /cancel registration/i })
+    );
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        `/api/events/${event.id}/registrations/me/cancel`,
+        { method: 'POST' }
+      );
+    });
+    expect(await screen.findByText(/registration cancelled/i)).toHaveAttribute(
+      'role',
+      'status'
+    );
+    expect(mockRouterRefresh).toHaveBeenCalledTimes(1);
+  });
+
   it('provides an add-to-calendar action using the public calendar payload', async () => {
     await renderDetailPage(
       buildEventDetail({ viewerRegistrationStatus: 'APPROVED' })
@@ -1350,7 +1396,7 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
       ).toBeChecked();
     });
 
-    it('prefills only prior answers enabled for reuse', async () => {
+    it('prefills the prior site name and answers enabled for reuse', async () => {
       const event = buildApplicationEvent();
       const composedFields = event.applicationQuestionSet.composedFields.map(
         field => ({
@@ -1362,6 +1408,7 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
       await renderDetailPage({
         ...event,
         reusableAnswersJson: {
+          name: 'Name from my previous application',
           project: 'Answer from my previous application',
           chapterGoals: 'This answer should not be reused',
         },
@@ -1373,6 +1420,9 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
 
       await openRegistrationForm();
 
+      expect(screen.getByLabelText(/full name/i)).toHaveValue(
+        'Name from my previous application'
+      );
       expect(screen.getByLabelText(/project idea/i)).toHaveValue(
         'Answer from my previous application'
       );
