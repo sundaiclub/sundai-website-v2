@@ -21,6 +21,7 @@ import {
 import { listVisibleEventMaterials } from '@/lib/eventMaterials';
 import { listPublicEventProjects } from '@/lib/publicEventProjects';
 import { getPublicEventBySlug } from '@/lib/publicEvents';
+import { getPublicEventSocialMetadata } from '@/lib/eventSocialMetadata';
 import { DEFAULT_SOCIAL_IMAGE_URL, publicUrl } from '@/lib/siteUrl';
 
 const DEFAULT_SOCIAL_IMAGE = {
@@ -38,10 +39,9 @@ type EventPageProps = {
 export async function generateMetadata({
   params,
 }: EventPageProps): Promise<Metadata> {
-  const event = await getPublicEventBySlug({
+  const event = await getPublicEventSocialMetadata({
     chapterSlug: params.chapterSlug,
     eventSlug: params.eventSlug,
-    viewer: null,
   });
 
   if (!event) {

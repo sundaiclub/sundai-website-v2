@@ -1,8 +1,12 @@
-export const runtime = 'nodejs'
+export const runtime = 'nodejs';
 export const maxDuration = 300;
 
-import { NextResponse } from "next/server";
-import { GoogleGenAI } from "@google/genai";
+import { NextResponse } from 'next/server';
+import {
+  generateBedrockText,
+  isBedrockTextConfigured,
+  streamBedrockText,
+} from '@/lib/bedrockText';
 
 type GenerateRequest = {
   htmlBody: string; // only the <body> innerHTML, no head/styles
@@ -21,15 +25,15 @@ function extractBody(html: string): string {
 
 function sanitizeReturn(bodyInnerHtml: string): string {
   // Basic safeguard to ensure we only return body inner HTML
-  if (!bodyInnerHtml) return "";
+  if (!bodyInnerHtml) return '';
   return bodyInnerHtml
-    .replace(/<\/?html[^>]*>/gi, "")
-    .replace(/<\/?head[^>]*>[\s\S]*?<\/head>/gi, "")
-    .replace(/<\/?body[^>]*>/gi, "");
+    .replace(/<\/?html[^>]*>/gi, '')
+    .replace(/<\/?head[^>]*>[\s\S]*?<\/head>/gi, '')
+    .replace(/<\/?body[^>]*>/gi, '');
 }
 
 function stripModelOutput(output: string): string {
-  if (!output) return "";
+  if (!output) return '';
   let s = String(output).trim();
 
   // Strip outer triple-backtick fences, optionally labeled (e.g., ```html)
@@ -38,11 +42,13 @@ function stripModelOutput(output: string): string {
     s = fencedBlock[1].trim();
   } else {
     // Best-effort if only leading/ending fences present
-    s = s.replace(/^```[a-zA-Z0-9_-]*\s*/i, "").replace(/\s*```$/i, "");
+    s = s.replace(/^```[a-zA-Z0-9_-]*\s*/i, '').replace(/\s*```$/i, '');
   }
 
   // Strip <pre><code> ... </code></pre> wrapper if present
-  const preCode = s.match(/^\s*<pre[^>]*>\s*<code[^>]*>([\s\S]*?)<\/code>\s*<\/pre>\s*$/i);
+  const preCode = s.match(
+    /^\s*<pre[^>]*>\s*<code[^>]*>([\s\S]*?)<\/code>\s*<\/pre>\s*$/i
+  );
   if (preCode) {
     s = preCode[1].trim();
   } else {
@@ -58,14 +64,19 @@ export async function POST(req: Request) {
   try {
     const { htmlBody, instruction }: GenerateRequest = await req.json();
 
-    if (typeof htmlBody !== "string") {
-      return NextResponse.json({ error: "htmlBody is required" }, { status: 400 });
+    if (typeof htmlBody !== 'string') {
+      return NextResponse.json(
+        { error: 'htmlBody is required' },
+        { status: 400 }
+      );
     }
 
     const bodyOnly = extractBody(htmlBody);
 
     const acceptHeader = req.headers.get('accept') || '';
-    const wantsStream = acceptHeader.includes('text/event-stream') || acceptHeader.includes('text/plain');
+    const wantsStream =
+      acceptHeader.includes('text/event-stream') ||
+      acceptHeader.includes('text/plain');
 
     if (!instruction || instruction.trim().length === 0) {
       // No LLM modification requested
@@ -79,13 +90,13 @@ export async function POST(req: Request) {
             } catch (e) {
               controller.error(e);
             }
-          }
+          },
         });
         return new Response(stream, {
           headers: {
             'Content-Type': 'text/plain; charset=utf-8',
             'Cache-Control': 'no-cache',
-          }
+          },
         });
       }
       return NextResponse.json({ htmlBody: sanitizeReturn(bodyOnly) });
@@ -98,65 +109,60 @@ Instruction: ${instruction}
 Current body inner HTML:
 ${bodyOnly}`;
 
-    const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
-    if (!apiKey) {
+    if (!isBedrockTextConfigured()) {
       // If no API key, return original body unchanged
       return NextResponse.json({ htmlBody: sanitizeReturn(bodyOnly) });
     }
-
-    const ai = new GoogleGenAI({ apiKey });
 
     if (wantsStream) {
       const encoder = new TextEncoder();
       const stream = new ReadableStream({
         async start(controller) {
           try {
-            const response = await ai.models.generateContentStream({
-              model: "gemini-2.5-flash",
-              contents: prompt,
-            });
-
             // Buffer chunks to sanitize wrappers (```html, <pre>/<code>) correctly
-            let buffer = "";
-            for await (const chunk of response) {
-              const text = chunk.text || '';
-              if (text) buffer += text;
+            let buffer = '';
+            for await (const text of streamBedrockText(prompt)) {
+              buffer += text;
             }
 
             const stripped = stripModelOutput(buffer);
-            const finalBody = stripped ? sanitizeReturn(stripped) : sanitizeReturn(bodyOnly);
+            const finalBody = stripped
+              ? sanitizeReturn(stripped)
+              : sanitizeReturn(bodyOnly);
             controller.enqueue(encoder.encode(finalBody));
             controller.close();
           } catch (e: unknown) {
-            console.error('[NEWS_GENERATE_STREAM]', e instanceof Error ? e.message : e);
+            console.error(
+              '[NEWS_GENERATE_STREAM]',
+              e instanceof Error ? e.message : e
+            );
             try {
               controller.enqueue(encoder.encode(sanitizeReturn(bodyOnly)));
             } finally {
               controller.close();
             }
           }
-        }
+        },
       });
 
       return new Response(stream, {
         headers: {
           'Content-Type': 'text/plain; charset=utf-8',
           'Cache-Control': 'no-cache',
-        }
+        },
       });
     }
 
     // Fallback to non-streaming JSON response
-    let generated = "";
+    let generated = '';
     try {
-      const resp = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
-        contents: prompt,
-      });
-      generated = resp.text || "";
+      generated = await generateBedrockText(prompt);
     } catch (e: unknown) {
       console.error('[NEWS_GENERATE]', e instanceof Error ? e.message : e);
-      return NextResponse.json({ htmlBody: sanitizeReturn(bodyOnly), error: `LLM error` }, { status: 200 });
+      return NextResponse.json(
+        { htmlBody: sanitizeReturn(bodyOnly), error: `LLM error` },
+        { status: 200 }
+      );
     }
     const stripped = stripModelOutput(generated);
     const trimmed = stripped.trim();
@@ -168,4 +174,3 @@ ${bodyOnly}`;
     return new NextResponse('Internal Error', { status: 500 });
   }
 }
-

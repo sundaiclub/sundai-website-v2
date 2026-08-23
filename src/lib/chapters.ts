@@ -194,7 +194,10 @@ export async function listVisibleChapters(options: ListVisibleChaptersOptions = 
 
   const chapters = await client.chapter.findMany({
     where,
-    orderBy: options.orderBy ?? { name: "asc" },
+    orderBy: options.orderBy ?? [
+      { events: { _count: "desc" } },
+      { name: "asc" },
+    ],
     include: {
       heroImage: {
         select: { id: true, url: true, alt: true, filename: true },
