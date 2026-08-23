@@ -357,7 +357,7 @@ export default function ProjectDetailClient() {
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:items-stretch">
         <article className={`${managementClasses.panel} overflow-hidden`}>
-          <div className="relative aspect-video w-full overflow-hidden bg-black">
+          <div className="relative aspect-[3/2] w-full overflow-hidden bg-black">
             <NextImage
               src={
                 project.thumbnail?.url ||
