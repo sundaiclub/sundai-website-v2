@@ -10,6 +10,7 @@ import { publicCalendarPayloadFixture } from '../utils/event-rsvp-fixtures';
 import { getPublicEventBySlug } from '@/lib/publicEvents';
 import { listVisibleEventMaterials } from '@/lib/eventMaterials';
 import { listPublicEventProjects } from '@/lib/publicEventProjects';
+import { getPublicEventSocialMetadata } from '@/lib/eventSocialMetadata';
 import { DEFAULT_SOCIAL_IMAGE_URL, publicUrl } from '@/lib/siteUrl';
 import { mockProject } from '../utils/test-utils';
 
@@ -64,6 +65,10 @@ jest.mock('@/lib/publicEvents', () => ({
   getPublicEventBySlug: jest.fn(),
 }));
 
+jest.mock('@/lib/eventSocialMetadata', () => ({
+  getPublicEventSocialMetadata: jest.fn(),
+}));
+
 jest.mock('@/lib/eventMaterials', () => ({
   listVisibleEventMaterials: jest.fn(),
 }));
@@ -77,6 +82,8 @@ type PageComponent = React.ComponentType<{
 }>;
 
 const mockGetPublicEventBySlug = getPublicEventBySlug as jest.Mock;
+const mockGetPublicEventSocialMetadata =
+  getPublicEventSocialMetadata as jest.Mock;
 const mockListVisibleEventMaterials = listVisibleEventMaterials as jest.Mock;
 const mockListPublicEventProjects = listPublicEventProjects as jest.Mock;
 const routeParams = { chapterSlug: 'boston', eventSlug: 'ai-build-night' };
@@ -501,16 +508,15 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
         alt: 'AI Build Night artwork',
       },
     });
-    mockGetPublicEventBySlug.mockResolvedValue(event);
+    mockGetPublicEventSocialMetadata.mockResolvedValue(event);
     const {
       generateMetadata,
     } = require('../../src/app/events/[chapterSlug]/[eventSlug]/page');
 
     const metadata = await generateMetadata({ params: routeParams });
 
-    expect(mockGetPublicEventBySlug).toHaveBeenCalledWith({
+    expect(mockGetPublicEventSocialMetadata).toHaveBeenCalledWith({
       ...routeParams,
-      viewer: null,
     });
     expect(metadata.openGraph?.url).toBe(
       publicUrl('/events/boston/ai-build-night')
@@ -528,7 +534,7 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
   });
 
   it('uses the black-background Sundai image for event link previews without artwork', async () => {
-    mockGetPublicEventBySlug.mockResolvedValue(buildEventDetail());
+    mockGetPublicEventSocialMetadata.mockResolvedValue(buildEventDetail());
     const {
       generateMetadata,
     } = require('../../src/app/events/[chapterSlug]/[eventSlug]/page');
