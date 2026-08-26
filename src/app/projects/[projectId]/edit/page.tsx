@@ -671,21 +671,24 @@ export default function ProjectEditPage() {
             </label>
             <form ref={formRef} onSubmit={(e) => { e.preventDefault(); handleSave(); }} className="space-y-4 mt-2">
               <input
-                type="url"
+                type="text"
+                inputMode="url"
                 placeholder="GitHub URL"
                 value={editableGithubUrl}
                 onChange={(e) => setEditableGithubUrl(e.target.value)}
                 className={`block w-3/4 border ${isDarkMode ? "border-gray-600 bg-gray-800 text-gray-100" : "border-gray-300 bg-white text-gray-900"} rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 p-2`}
               />
               <input
-                type="url"
+                type="text"
+                inputMode="url"
                 placeholder="Demo URL"
                 value={editableDemoUrl}
                 onChange={(e) => setEditableDemoUrl(e.target.value)}
                 className={`block w-3/4 border ${isDarkMode ? "border-gray-600 bg-gray-800 text-gray-100" : "border-gray-300 bg-white text-gray-900"} rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 p-2`}
               />
               <input
-                type="url"
+                type="text"
+                inputMode="url"
                 placeholder="Blog URL"
                 value={editableBlogUrl}
                 onChange={(e) => setEditableBlogUrl(e.target.value)}

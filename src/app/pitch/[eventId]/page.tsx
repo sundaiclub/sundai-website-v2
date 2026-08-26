@@ -1646,12 +1646,16 @@ export default function PitchEventPage() {
   const params = useParams();
   const eventId = params?.eventId as string;
   const [event, setEvent] = useState<EventDetail | null>(null);
+  const [eventPreview, setEventPreview] = useState<EventPitchResponse | null>(
+    null
+  );
   const [loading, setLoading] = useState(true);
 
   const [showEdit, setShowEdit] = useState(false);
   const [editTitle, setEditTitle] = useState('');
   const [editStartTime, setEditStartTime] = useState('');
   const [editMeetingUrl, setEditMeetingUrl] = useState('');
+  const [editError, setEditError] = useState('');
   const [editVotingEndTime, setEditVotingEndTime] = useState('');
   const [editMcIds, setEditMcIds] = useState<string[]>([]);
   const [allHackers, setAllHackers] = useState<
@@ -1675,7 +1679,15 @@ export default function PitchEventPage() {
     async function load() {
       try {
         const res = await fetch(`/api/events/${eventId}`);
-        setEvent(toEventDetail((await res.json()) as EventPitchResponse));
+        if (!res.ok) {
+          setEvent(null);
+          setEventPreview(null);
+          return;
+        }
+
+        const data = (await res.json()) as EventPitchResponse;
+        setEventPreview(data);
+        setEvent(data.pitchSessions?.[0] ? toEventDetail(data) : null);
       } finally {
         setLoading(false);
       }
@@ -1741,6 +1753,7 @@ export default function PitchEventPage() {
 
   const openEdit = async () => {
     if (!event) return;
+    setEditError('');
     setEditTitle(event.title);
     setEditStartTime(formatDateTimeLocalValue(event.startTime, event.timezone));
     setEditMeetingUrl(event.meetingUrl || '');
@@ -1769,6 +1782,7 @@ export default function PitchEventPage() {
   const saveEdit = async () => {
     if (!event) return;
     setSaving(true);
+    setEditError('');
     try {
       const res = await fetch(`/api/events/${event.id}`, {
         method: 'PATCH',
@@ -1785,10 +1799,13 @@ export default function PitchEventPage() {
           defaultPitchSec: editDefaultPitchSec,
         }),
       });
-      if (res.ok) {
-        setEvent(toEventDetail((await res.json()) as EventPitchResponse));
-        setShowEdit(false);
+      if (!res.ok) {
+        const payload = await res.json().catch(() => null);
+        setEditError(payload?.message || 'Unable to save event settings.');
+        return;
       }
+      setEvent(toEventDetail((await res.json()) as EventPitchResponse));
+      setShowEdit(false);
     } finally {
       setSaving(false);
     }
@@ -1857,8 +1874,19 @@ export default function PitchEventPage() {
       >
         <div className="text-center">
           <h1 className="text-2xl font-bold mb-4">
-            You need to be logged in to view this page
+            {eventPreview?.title ?? 'Pitch event'}
           </h1>
+          {eventPreview?.meetingUrl && (
+            <a
+              href={eventPreview.meetingUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-block px-6 py-3 mb-4 rounded-full bg-indigo-600 text-white hover:bg-indigo-700 transition duration-300 text-lg"
+            >
+              Join meeting
+            </a>
+          )}
+          <p className="mb-4">Log in to use the pitch controls.</p>
           <SignInButton mode="modal">
             <button className="px-6 py-3 rounded-full bg-indigo-600 text-white hover:bg-indigo-700 transition duration-300 text-lg">
               Log In / Sign Up
@@ -1874,7 +1902,21 @@ export default function PitchEventPage() {
       <div
         className={`min-h-screen font-space-mono flex items-center justify-center ${isDarkMode ? 'bg-gradient-to-b from-gray-900 to-black text-gray-100' : 'bg-gradient-to-b from-[#E5E5E5] to-[#F0F0F0] text-gray-900'}`}
       >
-        Event not found
+        <div className="text-center">
+          <h1 className="text-2xl font-bold mb-4">
+            {eventPreview?.title ?? 'Event not found'}
+          </h1>
+          {eventPreview?.meetingUrl && (
+            <a
+              href={eventPreview.meetingUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-block px-6 py-3 rounded-full bg-indigo-600 text-white hover:bg-indigo-700 transition duration-300 text-lg"
+            >
+              Join meeting
+            </a>
+          )}
+        </div>
       </div>
     );
 
@@ -1956,6 +1998,12 @@ export default function PitchEventPage() {
               </button>
             </div>
 
+            {editError && (
+              <p className="mb-4 text-sm text-red-600" role="alert">
+                {editError}
+              </p>
+            )}
+
             <label className="block text-sm font-medium mb-1">Title</label>
             <input
               value={editTitle}
@@ -1978,7 +2026,8 @@ export default function PitchEventPage() {
             <input
               value={editMeetingUrl}
               onChange={e => setEditMeetingUrl(e.target.value)}
-              placeholder="https://zoom.us/j/..."
+              inputMode="url"
+              placeholder="zoom.us/j/..."
               className={`w-full px-3 py-2 rounded-md mb-4 ${isDarkMode ? 'bg-gray-900 text-gray-100' : 'bg-gray-100 text-gray-900'}`}
             />
 

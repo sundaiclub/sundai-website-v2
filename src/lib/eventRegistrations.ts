@@ -5,6 +5,7 @@ import { BLOCKED_REGISTRATION_MESSAGE } from '@/lib/moderation';
 import { notifyEventDecision } from '@/lib/eventDecisionNotifications';
 import { phoneNumberForStorage } from '@/lib/phoneNumbers';
 import { SMS_CONSENT_CONFIGURED, SMS_CONSENT_VERSION } from '@/lib/smsConsent';
+import { normalizeHttpsUrl } from '@/lib/httpsUrls';
 import type {
   EntityId,
   EventApplicationMode,
@@ -32,7 +33,6 @@ const PUBLIC_REGISTRATION_DUPLICATE_STATUSES = [
   'WAITLISTED',
   'DECLINED',
   'BLOCKED',
-  'CANCELLED',
 ] as const satisfies readonly RegistrationStatus[];
 
 const PUBLIC_REGISTRATION_CANCELABLE_STATUSES = [
@@ -381,7 +381,9 @@ export function isApplicantDecisionStatus(
 function isDuplicatePublicRegistrationStatus(
   status: RegistrationStatus
 ): boolean {
-  return PUBLIC_REGISTRATION_DUPLICATE_STATUSES.includes(status);
+  return PUBLIC_REGISTRATION_DUPLICATE_STATUSES.includes(
+    status as (typeof PUBLIC_REGISTRATION_DUPLICATE_STATUSES)[number]
+  );
 }
 
 function canEditPublicRegistrationAnswers(status: RegistrationStatus): boolean {
@@ -680,7 +682,10 @@ export async function submitPublicEventRegistration(
       };
     }
 
-    const answers = normalizeRegistrationAnswers(input.answersJson);
+    const answers = normalizeRegistrationAnswers(
+      input.answersJson,
+      template.fields
+    );
     await updateHackerApplicationProfile(
       input.hackerId,
       answers,
@@ -698,35 +703,52 @@ export async function submitPublicEventRegistration(
       tx
     );
     const toStatus = getInitialPublicRegistrationStatus(event.applicationMode);
-    const registration = await tx.eventRegistration.create({
-      data: {
-        eventId: input.eventId,
-        hackerId: input.hackerId,
-        status: toStatus,
-        source: 'WEBSITE',
-        answersJson: toNullableJsonInput(answers),
-        templateSnapshotJson: toNullableJsonInput(
-          cloneTemplateSnapshot(template.fields)
-        ),
-        publicSafeMessage: null,
-        internalReviewNotes: null,
-        decidedById: isApplicantDecisionStatus(toStatus)
-          ? input.hackerId
-          : null,
-        decidedAt: isApplicantDecisionStatus(toStatus) ? new Date() : null,
-        waitlistedAt: toStatus === 'WAITLISTED' ? new Date() : null,
-      },
-    });
+    const submittedAt = new Date();
+    const registrationData = {
+      status: toStatus,
+      source: 'WEBSITE' as const,
+      answersJson: toNullableJsonInput(answers),
+      templateSnapshotJson: toNullableJsonInput(
+        cloneTemplateSnapshot(template.fields)
+      ),
+      publicSafeMessage: null,
+      decidedById: isApplicantDecisionStatus(toStatus)
+        ? input.hackerId
+        : null,
+      decidedAt: isApplicantDecisionStatus(toStatus) ? submittedAt : null,
+      waitlistedAt: toStatus === 'WAITLISTED' ? submittedAt : null,
+    };
+    const isReapplication = existingRegistration?.status === 'CANCELLED';
+    const registration = isReapplication
+      ? await tx.eventRegistration.update({
+          where: { id: existingRegistration.id },
+          data: {
+            ...registrationData,
+            submittedAt,
+            cancelledAt: null,
+            cancelledById: null,
+          },
+        })
+      : await tx.eventRegistration.create({
+          data: {
+            eventId: input.eventId,
+            hackerId: input.hackerId,
+            ...registrationData,
+            internalReviewNotes: null,
+          },
+        });
 
     await writeEventRegistrationAudit(
       {
         registrationId: registration.id,
         eventId: input.eventId,
         actorId: input.hackerId,
-        fromStatus: null,
+        fromStatus: isReapplication ? 'CANCELLED' : null,
         toStatus,
         changeJson: {
-          action: 'SUBMIT_PUBLIC_REGISTRATION',
+          action: isReapplication
+            ? 'REAPPLY_PUBLIC_REGISTRATION'
+            : 'SUBMIT_PUBLIC_REGISTRATION',
           source: 'WEBSITE',
           applicationMode: event.applicationMode,
         },
@@ -782,7 +804,10 @@ export async function updatePendingPublicEventRegistration(
       };
     }
 
-    const answers = normalizeRegistrationAnswers(input.answersJson);
+    const answers = normalizeRegistrationAnswers(
+      input.answersJson,
+      template.fields
+    );
     await updateHackerApplicationProfile(
       input.hackerId,
       answers,
@@ -1379,8 +1404,22 @@ function toTime(value: Date | string | null | undefined): number | null {
   return Number.isFinite(time) ? time : null;
 }
 
-function normalizeRegistrationAnswers(answersJson: unknown): JsonObject {
-  return isJsonObject(answersJson) ? answersJson : {};
+function normalizeRegistrationAnswers(
+  answersJson: unknown,
+  fields: readonly TemplateFieldDefinition[]
+): JsonObject {
+  if (!isJsonObject(answersJson)) return {};
+
+  const answers = { ...answersJson };
+  for (const field of fields) {
+    const value = answers[field.id];
+    if (field.type !== 'URL' || typeof value !== 'string' || !value.trim()) {
+      continue;
+    }
+    const result = normalizeHttpsUrl(value);
+    if (result.valid) answers[field.id] = result.normalizedUrl;
+  }
+  return answers;
 }
 
 async function updateHackerApplicationProfile(
@@ -1520,12 +1559,15 @@ function validateRegistrationAnswerForField(
     });
   }
 
-  if (field.type === 'URL' && stringValue && !isUrlLike(stringValue)) {
-    issues.push({
-      code: 'INVALID_FIELD_TYPE',
-      message: `${field.label} must be a valid URL.`,
-      fieldId: field.id,
-    });
+  if (field.type === 'URL' && stringValue) {
+    const url = normalizeHttpsUrl(stringValue);
+    if (!url.valid) {
+      issues.push({
+        code: 'INVALID_FIELD_TYPE',
+        message: `${field.label}: ${url.error}`,
+        fieldId: field.id,
+      });
+    }
   }
 
   if (
@@ -1656,15 +1698,6 @@ function isEmptyAnswer(value: JsonValue | undefined): boolean {
 
 function isEmailLike(value: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
-}
-
-function isUrlLike(value: string): boolean {
-  try {
-    const url = new URL(value);
-    return url.protocol === 'http:' || url.protocol === 'https:';
-  } catch {
-    return false;
-  }
 }
 
 function isJsonObject(value: unknown): value is JsonObject {

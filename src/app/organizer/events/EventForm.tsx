@@ -805,8 +805,12 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
       }
 
       if (!response.ok) {
+        const payload = await response.json().catch(() => null);
         setMessage(
-          isEditing ? 'Unable to save event settings' : 'Unable to save event'
+          payload?.message ||
+            (isEditing
+              ? 'Unable to save event settings'
+              : 'Unable to save event')
         );
         return;
       }

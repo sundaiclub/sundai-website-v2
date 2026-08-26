@@ -8,6 +8,7 @@ type EventMaterialsModule = {
   validateEventMaterialLink: (url: string) => {
     valid: boolean;
     error?: string;
+    normalizedUrl?: string;
   };
   isEventMaterialAvailable: (material: Material, now?: Date) => boolean;
   filterVisibleEventMaterials: (
@@ -137,12 +138,17 @@ describe('event material policy', () => {
     }
   });
 
-  it('accepts HTTPS links and rejects HTTP, relative, malformed, and non-web URLs', () => {
+  it('accepts HTTPS and scheme-free links and rejects unsafe or invalid URLs', () => {
     const { validateEventMaterialLink } = loadEventMaterials();
 
-    expect(validateEventMaterialLink('https://example.com/board').valid).toBe(
-      true
-    );
+    expect(validateEventMaterialLink('https://example.com/board')).toEqual({
+      valid: true,
+      normalizedUrl: 'https://example.com/board',
+    });
+    expect(validateEventMaterialLink(' example.com/board ')).toEqual({
+      valid: true,
+      normalizedUrl: 'https://example.com/board',
+    });
     for (const url of [
       'http://example.com/board',
       '/private/board',

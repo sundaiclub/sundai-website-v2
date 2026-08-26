@@ -136,6 +136,8 @@ describe('/api/projects/[projectId]/edit', () => {
       const formData = new FormData();
       formData.append('title', 'Updated Title');
       formData.append('status', 'PENDING');
+      formData.append('githubUrl', 'github.com/sundai-club/example');
+      formData.append('demoUrl', 'example.com/demo');
 
       const request = new NextRequest(`http://localhost:3000/api/projects/${mockProjectId}/edit`, {
         method: 'PATCH',
@@ -147,6 +149,14 @@ describe('/api/projects/[projectId]/edit', () => {
 
       expect(response.status).toBe(200);
       expect(data).toEqual(mockUpdatedProject);
+      expect(mockPrisma.project.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            githubUrl: 'https://github.com/sundai-club/example',
+            demoUrl: 'https://example.com/demo',
+          }),
+        })
+      );
     });
 
     it('should allow launch lead to edit project', async () => {

@@ -1369,6 +1369,25 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
       );
     });
 
+    it('refreshes the event page after an application is submitted', async () => {
+      await renderDetailPage(buildApplicationEvent());
+
+      await openRegistrationForm();
+      fireEvent.change(await screen.findByLabelText(/full name/i), {
+        target: { value: 'Signed In Applicant' },
+      });
+      fireEvent.change(screen.getByLabelText(/project idea/i), {
+        target: { value: 'Build an event scheduler' },
+      });
+      fireEvent.click(
+        screen.getByRole('button', { name: /submit application/i })
+      );
+
+      await waitFor(() => {
+        expect(mockRouterRefresh).toHaveBeenCalledTimes(1);
+      });
+    });
+
     it('uses saved chapter preferences as the application defaults', async () => {
       await renderDetailPage(
         buildApplicationEvent({

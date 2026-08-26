@@ -167,7 +167,7 @@ const pendingRow: OrganizerRegistrationReviewRow = {
     name: 'Signed In Applicant',
     email: 'applicant@example.com',
     why_this_event: 'I want to build with the Boston AI community.',
-    project_url: 'https://example.com/applicant-project',
+    project_url: 'example.com/applicant-project',
   },
   templateSnapshotJson: [
     {
@@ -591,17 +591,17 @@ describe('/organizer/events/[eventId]/registrations', () => {
     expect(screen.getByText(/project url/i)).toBeInTheDocument();
     expect(
       screen.getByRole('link', {
-        name: 'https://example.com/applicant-project',
+        name: 'example.com/applicant-project',
       })
     ).toHaveAttribute('href', 'https://example.com/applicant-project');
     expect(
       screen.getByRole('link', {
-        name: 'https://example.com/applicant-project',
+        name: 'example.com/applicant-project',
       })
     ).toHaveAttribute('target', '_blank');
     expect(
       screen.getByRole('link', {
-        name: 'https://example.com/applicant-project',
+        name: 'example.com/applicant-project',
       })
     ).toHaveAttribute('rel', 'noopener noreferrer');
     expect(

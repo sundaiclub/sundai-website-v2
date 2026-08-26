@@ -139,7 +139,7 @@ describe('/api/hackers/[hackerId]', () => {
         body: JSON.stringify({
           name: 'Updated Name',
           bio: 'Updated bio',
-          githubUrl: 'https://github.com/updated',
+          githubUrl: 'github.com/updated',
           phoneNumber: '5086485700',
         }),
       });
@@ -152,7 +152,10 @@ describe('/api/hackers/[hackerId]', () => {
       expect(mockPrisma.hacker.update).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { id: 'hacker-1' },
-          data: expect.objectContaining({ phoneNumber: '+15086485700' }),
+          data: expect.objectContaining({
+            githubUrl: 'https://github.com/updated',
+            phoneNumber: '+15086485700',
+          }),
         })
       );
     });
