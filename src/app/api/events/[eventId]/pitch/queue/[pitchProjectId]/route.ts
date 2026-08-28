@@ -34,7 +34,12 @@ export async function DELETE(
       if (pitchAccess.response) return pitchAccess.response;
     }
 
-    await prisma.pitchProject.delete({ where: { id: params.pitchProjectId } });
+    await prisma.$transaction([
+      prisma.pitchProjectVote.deleteMany({
+        where: { pitchProjectId: params.pitchProjectId },
+      }),
+      prisma.pitchProject.delete({ where: { id: params.pitchProjectId } }),
+    ]);
     return new NextResponse(null, { status: 204 });
   } catch (error) {
     console.error('[QUEUE_ITEM_DELETE]', error);

@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { POST as POST_JOIN, PATCH as PATCH_REORDER } from '../../src/app/api/events/[eventId]/pitch/queue/route';
 import { PATCH as PATCH_STATUS } from '../../src/app/api/events/[eventId]/pitch/queue/[pitchProjectId]/status/route';
+import { DELETE as DELETE_QUEUE_ITEM } from '../../src/app/api/events/[eventId]/pitch/queue/[pitchProjectId]/route';
 
 jest.mock('../../src/lib/prisma', () => ({
   __esModule: true,
@@ -19,7 +20,9 @@ jest.mock('../../src/lib/prisma', () => ({
       findMany: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
+      delete: jest.fn(),
     },
+    pitchProjectVote: { deleteMany: jest.fn() },
     $transaction: jest.fn((operations: Promise<unknown>[]) => Promise.all(operations)),
   },
 }));
@@ -147,6 +150,47 @@ describe('queue endpoints', () => {
     const res = await PATCH_STATUS(request as any, { params: { eventId: 'e1', pitchProjectId: 'ep1' } } as any);
     expect(res.status).toBe(200);
   });
+
+  it.each([
+    ['site admin', { role: 'SITE_ADMIN' }, null],
+    ['chapter admin', { role: 'HACKER' }, { role: 'ADMIN', status: 'ACTIVE' }],
+  ])(
+    'allows a %s to remove a queue item and its votes',
+    async (_label, hacker, chapterMembership) => {
+      mockAuth.mockReturnValue({ userId: 'clerk-admin' });
+      prisma.hacker.findUnique.mockResolvedValue({ id: 'h-admin', ...hacker });
+      prisma.pitchProject.findUnique.mockResolvedValue({
+        id: 'ep1',
+        addedById: 'someone-else',
+        status: 'QUEUED',
+        pitchSession: { eventId: 'e1' },
+      });
+      prisma.event.findUnique.mockResolvedValue({
+        id: 'e1',
+        chapterId: 'chapter-boston',
+        staff: [],
+      });
+      prisma.chapterMembership.findFirst.mockResolvedValue(chapterMembership);
+      prisma.pitchProjectVote.deleteMany.mockResolvedValue({ count: 2 });
+      prisma.pitchProject.delete.mockResolvedValue({ id: 'ep1' });
+
+      const response = await DELETE_QUEUE_ITEM(
+        new NextRequest('http://localhost:3000/api/events/e1/pitch/queue/ep1', {
+          method: 'DELETE',
+        }) as any,
+        { params: { eventId: 'e1', pitchProjectId: 'ep1' } } as any
+      );
+
+      expect(response.status).toBe(204);
+      expect(prisma.pitchProjectVote.deleteMany).toHaveBeenCalledWith({
+        where: { pitchProjectId: 'ep1' },
+      });
+      expect(prisma.pitchProject.delete).toHaveBeenCalledWith({
+        where: { id: 'ep1' },
+      });
+      expect(prisma.$transaction).toHaveBeenCalled();
+    }
+  );
 
   it('reorder rejects when audience disabled and not admin', async () => {
     mockAuth.mockReturnValue({ userId: 'u1' });

@@ -76,6 +76,7 @@ type EventPitchResponse = Omit<
   | 'defaultPitchSec'
   | 'projects'
 > & {
+  canManagePitch?: boolean;
   pitchSessions?: Array<
     Pick<
       EventDetail,
@@ -1700,9 +1701,8 @@ export default function PitchEventPage() {
   }, [eventId]);
 
   const isController = useMemo(
-    () =>
-      isAdmin || (event?.staff || []).some(m => m.hacker.id === userInfo?.id),
-    [isAdmin, event?.staff, userInfo?.id]
+    () => Boolean(eventPreview?.canManagePitch),
+    [eventPreview?.canManagePitch]
   );
 
   const transitionEvent = async (targetPhase: PitchSessionPhase) => {
@@ -2044,9 +2044,7 @@ export default function PitchEventPage() {
             <div
               className={`rounded-lg p-4 mb-4 ${isDarkMode ? 'bg-gray-700/50' : 'bg-gray-50'}`}
             >
-              <h3 className="text-sm font-semibold mb-3">
-                Pitch Timing
-              </h3>
+              <h3 className="text-sm font-semibold mb-3">Pitch Timing</h3>
 
               <label className="block text-xs font-medium mb-1">
                 Number of Top Projects

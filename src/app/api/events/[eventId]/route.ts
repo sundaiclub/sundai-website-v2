@@ -8,6 +8,7 @@ import {
 import { sanitizeApprovedDetailsJson } from '@/lib/approvedEventDetails';
 import {
   canDecideRegistrationsWithContext,
+  canManageEventPitchWithContext,
   canManageChapterSettings,
   canViewApprovedOnlyEventDetailsWithContext,
 } from '@/lib/eventManagementAuth';
@@ -209,6 +210,11 @@ export async function GET(
       chapterMembership,
       staff,
     });
+    const viewerCanManagePitch = canManageEventPitchWithContext({
+      actor: viewer,
+      chapterMembership,
+      staff,
+    });
     const publicEvent = redactPublicEventForViewer(event, {
       viewerRegistration,
       viewerCanManageRegistrations,
@@ -268,6 +274,7 @@ export async function GET(
     return NextResponse.json({
       ...publicEvent,
       ...(event.meetingUrl ? { meetingUrl: event.meetingUrl } : {}),
+      canManagePitch: viewerCanManagePitch,
       staff: pitchEvent?.staff ?? [],
       pitchSessions: pitchEvent?.pitchSessions ?? [],
     });
