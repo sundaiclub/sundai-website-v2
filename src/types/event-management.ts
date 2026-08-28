@@ -473,6 +473,21 @@ export interface PublicEventCard {
   viewerRegistrationStatus?: RegistrationStatus | null;
 }
 
+export type CurrentUserEvent = Pick<
+  PublicEventCard,
+  | 'id'
+  | 'slug'
+  | 'chapterSlug'
+  | 'chapterName'
+  | 'chapter'
+  | 'title'
+  | 'timezone'
+  | 'publicLocation'
+  | 'startTime'
+> & {
+  endTime: ISODateTimeString | Date;
+};
+
 export interface AddToCalendarPayload {
   title: string;
   description?: string | null;
