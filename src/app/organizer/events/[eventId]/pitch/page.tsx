@@ -119,7 +119,7 @@ export default function OrganizerEventPitchPage({
       actions={
         workspace.event.status !== 'DRAFT' ? (
           <ManagementLinkButton
-            href={`/pitch/${params.eventId}`}
+            href={`${workspace.event.publicUrl}?tab=pitch`}
             variant="primary"
           >
             Open pitch controller

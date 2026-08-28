@@ -1,4 +1,4 @@
-import { GET } from '../../src/app/api/events/current/route';
+import { GET } from '../../src/app/api/events/mine/route';
 import {
   mockAuthenticatedClerk,
   mockSignedOutClerk,
@@ -12,30 +12,24 @@ jest.mock('@clerk/nextjs/server', () =>
 jest.mock('../../src/lib/prisma', () => ({
   __esModule: true,
   default: {
-    hacker: {
-      findUnique: jest.fn(),
-    },
-    event: {
-      findMany: jest.fn(),
-    },
+    hacker: { findUnique: jest.fn() },
+    event: { findMany: jest.fn() },
   },
 }));
 
 const prisma = require('../../src/lib/prisma').default;
 const now = new Date('2026-08-28T17:00:00.000Z');
 
-describe('GET /api/events/current', () => {
+describe('GET /api/events/mine', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     resetClerkMocks();
     jest.useFakeTimers().setSystemTime(now);
   });
 
-  afterEach(() => {
-    jest.useRealTimers();
-  });
+  afterEach(() => jest.useRealTimers());
 
-  it('returns the published events happening now that the user is approved for', async () => {
+  it('returns future and live published events that the user is approved for', async () => {
     mockAuthenticatedClerk({ userId: 'clerk-user' });
     prisma.hacker.findUnique.mockResolvedValue({
       id: 'hacker-user',
@@ -45,13 +39,18 @@ describe('GET /api/events/current', () => {
     });
     prisma.event.findMany.mockResolvedValue([
       {
-        id: 'event-live',
-        slug: 'live-build',
-        title: 'Live Build',
+        id: 'event-future',
+        slug: 'future-build',
+        title: 'Future Build',
         timezone: 'America/New_York',
         publicLocation: 'Cambridge, MA',
-        startTime: new Date('2026-08-28T16:00:00.000Z'),
-        endTime: new Date('2026-08-28T20:00:00.000Z'),
+        startTime: new Date('2026-09-18T16:00:00.000Z'),
+        endTime: new Date('2026-09-18T20:00:00.000Z'),
+        image: {
+          id: 'image-future',
+          url: 'https://example.com/future-build.png',
+          alt: 'Builders at a Sundai event',
+        },
         chapter: {
           id: 'chapter-boston',
           slug: 'boston',
@@ -69,8 +68,7 @@ describe('GET /api/events/current', () => {
       expect.objectContaining({
         where: {
           status: 'PUBLISHED',
-          startTime: { lte: now },
-          endTime: { gte: now },
+          OR: [{ startTime: { gte: now } }, { endTime: { gte: now } }],
           registrations: {
             some: {
               hackerId: 'hacker-user',
@@ -81,13 +79,14 @@ describe('GET /api/events/current', () => {
         },
       })
     );
-    expect(body).toEqual([
+    expect(body[0]).toEqual(
       expect.objectContaining({
-        id: 'event-live',
+        id: 'event-future',
         chapterSlug: 'boston',
         chapterName: 'Sundai Boston',
-      }),
-    ]);
+        image: expect.objectContaining({ id: 'image-future' }),
+      })
+    );
   });
 
   it('requires a signed-in user', async () => {

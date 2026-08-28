@@ -13,8 +13,7 @@ export async function GET() {
     const events = await prisma.event.findMany({
       where: {
         status: 'PUBLISHED',
-        startTime: { lte: now },
-        endTime: { gte: now },
+        OR: [{ startTime: { gte: now } }, { endTime: { gte: now } }],
         registrations: {
           some: {
             hackerId: hacker.id,
@@ -23,7 +22,7 @@ export async function GET() {
           },
         },
       },
-      orderBy: [{ endTime: 'asc' }, { title: 'asc' }],
+      orderBy: [{ startTime: 'asc' }, { title: 'asc' }],
       select: {
         id: true,
         slug: true,
@@ -32,6 +31,13 @@ export async function GET() {
         publicLocation: true,
         startTime: true,
         endTime: true,
+        image: {
+          select: {
+            id: true,
+            url: true,
+            alt: true,
+          },
+        },
         chapter: {
           select: {
             id: true,
@@ -51,7 +57,7 @@ export async function GET() {
       }))
     );
   } catch (error) {
-    console.error('[CURRENT_EVENTS_GET]', error);
+    console.error('[MY_EVENTS_GET]', error);
     return new NextResponse('Internal Error', { status: 500 });
   }
 }

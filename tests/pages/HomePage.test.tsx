@@ -61,7 +61,7 @@ describe('Home Page', () => {
         json: jest
           .fn()
           .mockResolvedValue(
-            input === '/api/events/current'
+            input === '/api/events/mine'
               ? [currentEvent]
               : input === '/api/events'
                 ? []
@@ -102,6 +102,10 @@ describe('Home Page', () => {
       expect(
         screen.getByText('Sundai Boston · Cambridge, MA')
       ).toBeInTheDocument();
+      expect(screen.getByAltText('Live Build event')).toHaveAttribute(
+        'src',
+        '/images/logos/sundai_logo_light_horizontal.svg'
+      );
     });
   });
 
@@ -182,7 +186,7 @@ describe('Home Page', () => {
         '/api/projects?status=APPROVED'
       );
       expect(global.fetch).toHaveBeenCalledWith('/api/events');
-      expect(global.fetch).toHaveBeenCalledWith('/api/events/current');
+      expect(global.fetch).toHaveBeenCalledWith('/api/events/mine');
     });
   });
 

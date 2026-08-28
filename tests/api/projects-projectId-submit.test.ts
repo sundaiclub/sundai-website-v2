@@ -11,6 +11,12 @@ jest.mock('../../src/lib/prisma', () => ({
     findUnique: jest.fn(),
     update: jest.fn(),
   },
+  event: { findMany: jest.fn() },
+  eventProject: { upsert: jest.fn() },
+  pitchProject: { findFirst: jest.fn(), create: jest.fn() },
+  $transaction: jest.fn((operations: Promise<unknown>[]) =>
+    Promise.all(operations)
+  ),
 }));
 
 jest.mock('@clerk/nextjs/server', () => ({
@@ -29,19 +35,25 @@ describe('/api/projects/[projectId]/submit', () => {
     jest.clearAllMocks();
     // Set up default auth mock
     mockAuth.mockReturnValue({ userId: mockUserId });
+    (mockPrisma.event.findMany as jest.Mock).mockResolvedValue([]);
   });
 
   describe('PATCH', () => {
     it('should return 401 if user is not authenticated', async () => {
       mockAuth.mockReturnValue({ userId: null });
 
-      const request = new NextRequest(`http://localhost:3000/api/projects/${mockProjectId}/submit`, {
-        method: 'PATCH',
-        body: JSON.stringify({ status: 'PENDING' }),
-        headers: { 'Content-Type': 'application/json' },
-      });
+      const request = new NextRequest(
+        `http://localhost:3000/api/projects/${mockProjectId}/submit`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify({ status: 'PENDING' }),
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
 
-      const response = await PATCH(request, { params: { projectId: mockProjectId } });
+      const response = await PATCH(request, {
+        params: { projectId: mockProjectId },
+      });
       const data = await response.json();
 
       expect(response.status).toBe(401);
@@ -52,13 +64,18 @@ describe('/api/projects/[projectId]/submit', () => {
       mockAuth.mockReturnValue({ userId: mockUserId });
       mockPrisma.hacker.findUnique.mockResolvedValue(null);
 
-      const request = new NextRequest(`http://localhost:3000/api/projects/${mockProjectId}/submit`, {
-        method: 'PATCH',
-        body: JSON.stringify({ status: 'PENDING' }),
-        headers: { 'Content-Type': 'application/json' },
-      });
+      const request = new NextRequest(
+        `http://localhost:3000/api/projects/${mockProjectId}/submit`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify({ status: 'PENDING' }),
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
 
-      const response = await PATCH(request, { params: { projectId: mockProjectId } });
+      const response = await PATCH(request, {
+        params: { projectId: mockProjectId },
+      });
       const data = await response.json();
 
       expect(response.status).toBe(404);
@@ -76,13 +93,18 @@ describe('/api/projects/[projectId]/submit', () => {
       mockPrisma.hacker.findUnique.mockResolvedValue(mockUser as any);
       mockPrisma.project.findUnique.mockResolvedValue(null);
 
-      const request = new NextRequest(`http://localhost:3000/api/projects/${mockProjectId}/submit`, {
-        method: 'PATCH',
-        body: JSON.stringify({ status: 'PENDING' }),
-        headers: { 'Content-Type': 'application/json' },
-      });
+      const request = new NextRequest(
+        `http://localhost:3000/api/projects/${mockProjectId}/submit`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify({ status: 'PENDING' }),
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
 
-      const response = await PATCH(request, { params: { projectId: mockProjectId } });
+      const response = await PATCH(request, {
+        params: { projectId: mockProjectId },
+      });
       const data = await response.json();
 
       expect(response.status).toBe(404);
@@ -106,13 +128,18 @@ describe('/api/projects/[projectId]/submit', () => {
       mockPrisma.hacker.findUnique.mockResolvedValue(mockUser as any);
       mockPrisma.project.findUnique.mockResolvedValue(mockProject as any);
 
-      const request = new NextRequest(`http://localhost:3000/api/projects/${mockProjectId}/submit`, {
-        method: 'PATCH',
-        body: JSON.stringify({ status: 'PENDING' }),
-        headers: { 'Content-Type': 'application/json' },
-      });
+      const request = new NextRequest(
+        `http://localhost:3000/api/projects/${mockProjectId}/submit`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify({ status: 'PENDING' }),
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
 
-      const response = await PATCH(request, { params: { projectId: mockProjectId } });
+      const response = await PATCH(request, {
+        params: { projectId: mockProjectId },
+      });
       const data = await response.json();
 
       expect(response.status).toBe(401);
@@ -143,13 +170,18 @@ describe('/api/projects/[projectId]/submit', () => {
       mockPrisma.project.findUnique.mockResolvedValue(mockProject as any);
       mockPrisma.project.update.mockResolvedValue(mockUpdatedProject as any);
 
-      const request = new NextRequest(`http://localhost:3000/api/projects/${mockProjectId}/submit`, {
-        method: 'PATCH',
-        body: JSON.stringify({ status: 'PENDING' }),
-        headers: { 'Content-Type': 'application/json' },
-      });
+      const request = new NextRequest(
+        `http://localhost:3000/api/projects/${mockProjectId}/submit`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify({ status: 'PENDING' }),
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
 
-      const response = await PATCH(request, { params: { projectId: mockProjectId } });
+      const response = await PATCH(request, {
+        params: { projectId: mockProjectId },
+      });
       const data = await response.json();
 
       expect(response.status).toBe(200);
@@ -180,13 +212,18 @@ describe('/api/projects/[projectId]/submit', () => {
       mockPrisma.project.findUnique.mockResolvedValue(mockProject as any);
       mockPrisma.project.update.mockResolvedValue(mockUpdatedProject as any);
 
-      const request = new NextRequest(`http://localhost:3000/api/projects/${mockProjectId}/submit`, {
-        method: 'PATCH',
-        body: JSON.stringify({ status: 'PENDING' }),
-        headers: { 'Content-Type': 'application/json' },
-      });
+      const request = new NextRequest(
+        `http://localhost:3000/api/projects/${mockProjectId}/submit`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify({ status: 'PENDING' }),
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
 
-      const response = await PATCH(request, { params: { projectId: mockProjectId } });
+      const response = await PATCH(request, {
+        params: { projectId: mockProjectId },
+      });
       const data = await response.json();
 
       expect(response.status).toBe(200);
@@ -217,31 +254,161 @@ describe('/api/projects/[projectId]/submit', () => {
       mockPrisma.project.findUnique.mockResolvedValue(mockProject as any);
       mockPrisma.project.update.mockResolvedValue(mockUpdatedProject as any);
 
-      const request = new NextRequest(`http://localhost:3000/api/projects/${mockProjectId}/submit`, {
-        method: 'PATCH',
-        body: JSON.stringify({ status: 'PENDING' }),
-        headers: { 'Content-Type': 'application/json' },
-      });
+      const request = new NextRequest(
+        `http://localhost:3000/api/projects/${mockProjectId}/submit`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify({ status: 'PENDING' }),
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
 
-      const response = await PATCH(request, { params: { projectId: mockProjectId } });
+      const response = await PATCH(request, {
+        params: { projectId: mockProjectId },
+      });
       const data = await response.json();
 
       expect(response.status).toBe(200);
       expect(data).toEqual(mockUpdatedProject);
     });
 
+    it('publishes into selected events and only the open source pitch queue', async () => {
+      const now = new Date('2026-08-28T17:00:00.000Z');
+      jest.useFakeTimers().setSystemTime(now);
+      const mockUser = { id: mockHackerId, role: 'HACKER' };
+      const mockProject = {
+        id: mockProjectId,
+        launchLeadId: mockHackerId,
+        participants: [],
+      };
+      const mockUpdatedProject = {
+        id: mockProjectId,
+        title: 'Test Project',
+        status: 'APPROVED',
+      };
+      mockPrisma.hacker.findUnique.mockResolvedValue(mockUser as any);
+      mockPrisma.project.findUnique.mockResolvedValue(mockProject as any);
+      mockPrisma.project.update.mockResolvedValue(mockUpdatedProject as any);
+      (mockPrisma.event.findMany as jest.Mock).mockResolvedValue([
+        {
+          id: 'event-source',
+          startTime: new Date('2026-08-28T16:00:00.000Z'),
+          endTime: new Date('2026-08-28T21:00:00.000Z'),
+          pitchSessions: [
+            { id: 'pitch-1', phase: 'VOTING', defaultPitchSec: 180 },
+          ],
+        },
+        {
+          id: 'event-other',
+          startTime: new Date('2026-08-28T16:00:00.000Z'),
+          endTime: new Date('2026-08-28T21:00:00.000Z'),
+          pitchSessions: [
+            { id: 'pitch-2', phase: 'VOTING', defaultPitchSec: 180 },
+          ],
+        },
+      ]);
+      (mockPrisma.pitchProject.findFirst as jest.Mock).mockResolvedValue({
+        position: 2,
+      });
+      (mockPrisma.eventProject.upsert as jest.Mock).mockResolvedValue({});
+      (mockPrisma.pitchProject.create as jest.Mock).mockResolvedValue({});
+
+      const request = new NextRequest(
+        `http://localhost:3000/api/projects/${mockProjectId}/submit`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify({
+            status: 'APPROVED',
+            eventIds: ['event-source', 'event-other'],
+            sourceEventId: 'event-source',
+          }),
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
+
+      const response = await PATCH(request, {
+        params: { projectId: mockProjectId },
+      });
+
+      expect(response.status).toBe(200);
+      expect(mockPrisma.eventProject.upsert).toHaveBeenCalledTimes(2);
+      expect(mockPrisma.pitchProject.create).toHaveBeenCalledTimes(1);
+      expect(mockPrisma.pitchProject.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          pitchSessionId: 'pitch-1',
+          projectId: mockProjectId,
+          position: 3,
+        }),
+      });
+      jest.useRealTimers();
+    });
+
+    it('publishes and joins the event without joining a pitch after the event ends', async () => {
+      jest.useFakeTimers().setSystemTime(new Date('2026-08-28T22:00:00.000Z'));
+      mockPrisma.hacker.findUnique.mockResolvedValue({
+        id: mockHackerId,
+        role: 'HACKER',
+      } as any);
+      mockPrisma.project.findUnique.mockResolvedValue({
+        id: mockProjectId,
+        launchLeadId: mockHackerId,
+        participants: [],
+      } as any);
+      mockPrisma.project.update.mockResolvedValue({
+        id: mockProjectId,
+        status: 'APPROVED',
+      } as any);
+      (mockPrisma.event.findMany as jest.Mock).mockResolvedValue([
+        {
+          id: 'event-source',
+          startTime: new Date('2026-08-28T16:00:00.000Z'),
+          endTime: new Date('2026-08-28T21:00:00.000Z'),
+          pitchSessions: [
+            { id: 'pitch-1', phase: 'VOTING', defaultPitchSec: 180 },
+          ],
+        },
+      ]);
+
+      const request = new NextRequest(
+        `http://localhost:3000/api/projects/${mockProjectId}/submit`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify({
+            status: 'APPROVED',
+            eventIds: ['event-source'],
+            sourceEventId: 'event-source',
+          }),
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
+
+      expect(
+        (await PATCH(request, { params: { projectId: mockProjectId } })).status
+      ).toBe(200);
+      expect(mockPrisma.eventProject.upsert).toHaveBeenCalledTimes(1);
+      expect(mockPrisma.pitchProject.create).not.toHaveBeenCalled();
+      jest.useRealTimers();
+    });
+
     it('should return 500 on internal error', async () => {
       mockAuth.mockReturnValue({ userId: mockUserId });
 
-      mockPrisma.hacker.findUnique.mockRejectedValue(new Error('Database error'));
+      mockPrisma.hacker.findUnique.mockRejectedValue(
+        new Error('Database error')
+      );
 
-      const request = new NextRequest(`http://localhost:3000/api/projects/${mockProjectId}/submit`, {
-        method: 'PATCH',
-        body: JSON.stringify({ status: 'PENDING' }),
-        headers: { 'Content-Type': 'application/json' },
+      const request = new NextRequest(
+        `http://localhost:3000/api/projects/${mockProjectId}/submit`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify({ status: 'PENDING' }),
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
+
+      const response = await PATCH(request, {
+        params: { projectId: mockProjectId },
       });
-
-      const response = await PATCH(request, { params: { projectId: mockProjectId } });
       const data = await response.json();
 
       expect(response.status).toBe(500);

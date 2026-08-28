@@ -227,6 +227,14 @@ Existing `/api/hackers/[hackerId]/organizer-note` routes are cut over to require
 
 ## Projects And Pitch
 
+### `GET /api/events/project-options`
+
+Returns events happening now that may be selected during project creation. Approved, non-cancelled registrants receive their events. Site administrators receive all current events. Each item includes event ID, title, image, chapter, schedule, and whether it is selected by default.
+
+### `PATCH /api/projects/[projectId]/submit`
+
+Publishing accepts `eventIds` and optional `sourceEventId`. It creates the selected `EventProject` rows and creates a `PitchProject` only for a selected source event whose pitch session remains open. Project publication and event participation still succeed when that pitch session has closed.
+
 ### `GET /api/events/[eventId]/projects`
 
 Requires workspace access. Returns projects through the event's pitch session(s), including global project/team/link/tag data and event-specific card status, queue position/status, pitch completion, vote-derived/top-project state, and highlight state.
@@ -238,6 +246,8 @@ Authorized organizers may update `cardStatus` for reporting hygiene. It cannot b
 ### Existing pitch APIs
 
 Existing `/api/events/[eventId]/pitch/*` routes remain the controller contract but cut over to the shared event pitch capability helper for site admin, in-scope chapter admin, MC, and co-MC. Hacker-owned queue/voting permissions remain unchanged.
+
+`GET /api/events/[eventId]/pitch/project-options` returns the current viewer's published projects with event and pitch participation flags. `POST /api/events/[eventId]/pitch/queue` keeps event participation and a new pitch entry atomic. A closed pitch rejects an existing-project addition.
 
 ## Reporting Preview
 

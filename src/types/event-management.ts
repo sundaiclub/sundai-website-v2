@@ -482,11 +482,11 @@ export type CurrentUserEvent = Pick<
   | 'chapter'
   | 'title'
   | 'timezone'
+  | 'image'
   | 'publicLocation'
   | 'startTime'
-> & {
-  endTime: ISODateTimeString | Date;
-};
+  | 'endTime'
+>;
 
 export interface AddToCalendarPayload {
   title: string;
@@ -549,6 +549,7 @@ export interface PublicEventDetail extends PublicEventCard {
   viewerCanManageRegistrations?: boolean;
   viewerCanEditEvent?: boolean;
   viewerCanManageEvent?: boolean;
+  viewerIsSiteAdmin?: boolean;
   pitchSession?: { phase: PitchSessionPhase } | null;
   addToCalendar: AddToCalendarPayload;
 }

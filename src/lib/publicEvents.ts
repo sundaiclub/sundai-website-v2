@@ -251,6 +251,7 @@ export type RedactPublicEventOptions = {
   viewerCanViewApprovedDetails?: boolean;
   viewerCanEditEvent?: boolean;
   viewerCanManageEvent?: boolean;
+  viewerIsSiteAdmin?: boolean;
   viewerIsSignedIn?: boolean;
   approvedCalendarDetails?: boolean;
   approvedCount?: number;
@@ -493,6 +494,7 @@ export async function getPublicEventBySlug(
     viewerCanViewApprovedDetails,
     viewerCanEditEvent,
     viewerCanManageEvent,
+    viewerIsSiteAdmin: readPermissionContext.actor?.role === 'SITE_ADMIN',
     viewerIsSignedIn: Boolean(input.viewer?.hackerId || input.viewer?.clerkId),
     approvedCalendarDetails: input.includeApprovedCalendarDetails,
     now,
@@ -573,6 +575,7 @@ export function redactPublicEventForViewer(
     viewerCanManageRegistrations: options.viewerCanManageRegistrations === true,
     viewerCanEditEvent: options.viewerCanEditEvent === true,
     viewerCanManageEvent: options.viewerCanManageEvent === true,
+    viewerIsSiteAdmin: options.viewerIsSiteAdmin === true,
     pitchSession: approvedDetailsVisible
       ? (event.pitchSessions?.[0] ?? null)
       : null,

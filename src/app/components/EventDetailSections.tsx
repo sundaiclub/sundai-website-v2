@@ -19,6 +19,7 @@ import { EventApplicationForm } from './EventApplicationForm';
 import { ViewerRegistrationStatusBadge } from './PublicEventCard';
 import ProjectMarkdown from './ProjectMarkdown';
 import { SignInAction } from './SignInAction';
+import { AddProjectDialog } from './AddProjectDialog';
 
 function encodeCalendarDate(value: string | Date) {
   return new Date(value)
@@ -131,7 +132,9 @@ function EventTopRegistrationStatusSection({
       !event.applicationControls.signInRequired
     ) {
       return (
-        <ManagementAlert>{event.applicationControls.publicMessage}</ManagementAlert>
+        <ManagementAlert>
+          {event.applicationControls.publicMessage}
+        </ManagementAlert>
       );
     }
 
@@ -235,7 +238,11 @@ function CancelRegistrationAction({ eventId }: { eventId: string }) {
         {isCancelling ? 'Cancelling…' : 'Cancel registration'}
       </button>
       {error && (
-        <p aria-live="assertive" className="mt-2 text-sm text-red-600" role="alert">
+        <p
+          aria-live="assertive"
+          className="mt-2 text-sm text-red-600"
+          role="alert"
+        >
           {error}
         </p>
       )}
@@ -387,38 +394,6 @@ function EventDescriptionSection({ event }: { event: PublicEventDetail }) {
 }
 
 export function EventNarrativeColumn({ event }: { event: PublicEventDetail }) {
-  const midpoint = event.endTime
-    ? (new Date(event.startTime).getTime() +
-        new Date(event.endTime).getTime()) /
-      2
-    : Number.POSITIVE_INFINITY;
-  const [pitchFirst, setPitchFirst] = useState(false);
-
-  useEffect(() => {
-    let timeout: number | undefined;
-
-    function updateAndSchedule() {
-      const isPastMidpoint = Date.now() >= midpoint;
-      setPitchFirst(isPastMidpoint);
-      if (!Number.isFinite(midpoint) || isPastMidpoint) return;
-      timeout = window.setTimeout(
-        updateAndSchedule,
-        Math.min(midpoint - Date.now(), 2_147_000_000)
-      );
-    }
-
-    updateAndSchedule();
-    return () => {
-      if (timeout !== undefined) window.clearTimeout(timeout);
-    };
-  }, [midpoint]);
-
-  const pitch = (
-    <EventPitchSection
-      eventId={event.pitchSession ? event.id : null}
-      phase={event.pitchSession?.phase}
-    />
-  );
   const description = <EventDescriptionSection event={event} />;
   const registrationStatus = (
     <EventTopRegistrationStatusSection event={event} />
@@ -427,46 +402,80 @@ export function EventNarrativeColumn({ event }: { event: PublicEventDetail }) {
 
   return (
     <div className="grid content-start gap-5">
-      {pitchFirst && pitch}
       {registrationStatus}
       {approvedDetails}
       {description}
-      {!pitchFirst && pitch}
     </div>
   );
 }
 
 export function EventPitchSection({
-  eventId,
-  phase,
+  event,
+  returnTo,
 }: {
-  eventId?: string | null;
-  phase?: string | null;
+  event: PublicEventDetail;
+  returnTo?: string;
 }) {
   const classes = useManagementClasses();
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [isActive, setIsActive] = useState(false);
 
-  if (!eventId || !phase) return null;
+  useEffect(() => {
+    function updateActiveState() {
+      const now = Date.now();
+      const start = new Date(event.startTime).getTime();
+      const end = event.endTime
+        ? new Date(event.endTime).getTime()
+        : Number.NEGATIVE_INFINITY;
+      setIsActive(now >= start && now <= end);
+    }
+
+    updateActiveState();
+    const timer = window.setInterval(updateActiveState, 30_000);
+    return () => window.clearInterval(timer);
+  }, [event.endTime, event.startTime]);
+
+  const registrationIsApproved =
+    (event.viewerRegistration?.status ?? event.viewerRegistrationStatus) ===
+      'APPROVED' && !event.viewerRegistration?.cancelledAt;
+  const canAddProject =
+    registrationIsApproved ||
+    Boolean(event.viewerEventStaffRole) ||
+    event.viewerIsSiteAdmin === true;
+  const phase = event.pitchSession?.phase;
+
+  if (!event.pitchSession || !phase || phase === 'FINISHED') return null;
+  if (!isActive || !canAddProject) return null;
 
   return (
-    <ManagementSection
-      title="Pitch session"
-      description="At the end of the event, use the pitch session to present projects to the group."
-      actions={
-        <a
-          className={`${classes.primaryButton} whitespace-nowrap !px-3`}
-          href={`/pitch/${eventId}`}
-        >
-          Go to pitch
-          <span aria-hidden="true">→</span>
-        </a>
-      }
-      size="large"
-    >
-      <p className="text-base leading-7">
-        The pitch session is currently {phase.toLowerCase()}. It keeps the
-        presentation queue, timer, and voting in one place.
-      </p>
-    </ManagementSection>
+    <>
+      <ManagementSection
+        title="Add a project"
+        description="Add a published project to this event and its pitch queue, or start a new project."
+        actions={
+          <button
+            className={`${classes.primaryButton} whitespace-nowrap !px-3`}
+            onClick={() => setDialogOpen(true)}
+            type="button"
+          >
+            Add project
+          </button>
+        }
+        size="large"
+      >
+        <p className="text-base leading-7">
+          Choose one of your published projects or create a new project for{' '}
+          {event.title}.
+        </p>
+      </ManagementSection>
+      <AddProjectDialog
+        eventId={event.id}
+        eventTitle={event.title}
+        onClose={() => setDialogOpen(false)}
+        open={dialogOpen}
+        returnTo={returnTo}
+      />
+    </>
   );
 }
 

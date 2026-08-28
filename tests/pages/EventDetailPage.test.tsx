@@ -77,8 +77,16 @@ jest.mock('@/lib/publicEventProjects', () => ({
   listPublicEventProjects: jest.fn(),
 }));
 
+jest.mock('@/app/components/PitchEventPage', () => ({
+  __esModule: true,
+  default: ({ eventId }: { eventId: string }) => (
+    <div data-testid="event-pitch-controller">Pitch controller {eventId}</div>
+  ),
+}));
+
 type PageComponent = React.ComponentType<{
   params?: { chapterSlug: string; eventSlug: string };
+  searchParams?: { tab?: string };
 }>;
 
 const mockGetPublicEventBySlug = getPublicEventBySlug as jest.Mock;
@@ -439,7 +447,10 @@ function mockEventFetches(event: PublicEventDetail | null) {
   }) as jest.Mock;
 }
 
-async function renderDetailPage(event: PublicEventDetail | null) {
+async function renderDetailPage(
+  event: PublicEventDetail | null,
+  tab?: 'projects' | 'pitch'
+) {
   mockGetPublicEventBySlug.mockResolvedValue(event);
   mockListVisibleEventMaterials.mockResolvedValue(
     (event as (PublicEventDetail & { materials?: unknown[] }) | null)
@@ -457,8 +468,9 @@ async function renderDetailPage(event: PublicEventDetail | null) {
     const element = await (
       EventDetailPage as unknown as (props: {
         params: typeof routeParams;
+        searchParams?: { tab?: string };
       }) => Promise<React.ReactElement>
-    )({ params: routeParams });
+    )({ params: routeParams, searchParams: tab ? { tab } : undefined });
     render(element);
     return;
   }
@@ -550,9 +562,7 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
         alt: 'Sundai Club Logo',
       },
     ]);
-    expect(metadata.twitter?.images).toEqual([
-      DEFAULT_SOCIAL_IMAGE_URL,
-    ]);
+    expect(metadata.twitter?.images).toEqual([DEFAULT_SOCIAL_IMAGE_URL]);
   });
 
   it('renders published public event fields for anonymous visitors', async () => {
@@ -601,6 +611,35 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
       screen.queryByText(/community dinner sponsored/i)
     ).not.toBeInTheDocument();
     expect(screen.queryByText(/expert mentors/i)).not.toBeInTheDocument();
+  });
+
+  it('shows Info, Projects, and Pitch tabs on every event page', async () => {
+    await renderDetailPage(buildEventDetail());
+
+    expect(screen.getByRole('link', { name: 'Info' })).toHaveAttribute(
+      'href',
+      '/events/boston/ai-build-night'
+    );
+    expect(screen.getByRole('link', { name: 'Projects' })).toHaveAttribute(
+      'href',
+      '/events/boston/ai-build-night?tab=projects'
+    );
+    expect(screen.getByRole('link', { name: 'Pitch' })).toHaveAttribute(
+      'href',
+      '/events/boston/ai-build-night?tab=pitch'
+    );
+  });
+
+  it('renders the pitch controller in the Pitch tab', async () => {
+    await renderDetailPage(buildEventDetail(), 'pitch');
+
+    expect(screen.getByTestId('event-pitch-controller')).toHaveTextContent(
+      `Pitch controller ${eventFixture.id}`
+    );
+    expect(screen.getByRole('link', { name: 'Pitch' })).toHaveAttribute(
+      'aria-current',
+      'page'
+    );
   });
 
   it('uses project Markdown spacing for the event description', async () => {
@@ -662,7 +701,7 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
       },
     ]);
 
-    await renderDetailPage(buildEventDetail());
+    await renderDetailPage(buildEventDetail(), 'projects');
 
     const carouselHeading = screen.getByRole('heading', {
       name: /projects from this event/i,
@@ -931,70 +970,49 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
     });
   });
 
-  it('links approved attendees to the attached pitch event', async () => {
+  it('shows active approved attendees the project chooser instead of a pitch link', async () => {
     mockSignedIn();
+    const now = Date.now();
 
     await renderDetailPage(
       buildEventDetail({
+        startTime: new Date(now - 60_000).toISOString(),
+        endTime: new Date(now + 60_000).toISOString(),
         viewerRegistrationStatus: 'APPROVED',
         viewerRegistration: registrationState('APPROVED'),
         approvedDetailsVisible: true,
         pitchSession: { phase: 'VOTING' },
-      })
+      }),
+      'projects'
     );
 
     expect(
-      screen.getByRole('heading', { name: /pitch session/i })
+      await screen.findByRole('heading', { name: /add a project/i })
     ).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /go to pitch/i })).toHaveAttribute(
-      'href',
-      `/pitch/${eventFixture.id}`
-    );
+    expect(
+      screen.queryByRole('link', { name: /go to pitch/i })
+    ).not.toBeInTheDocument();
   });
 
-  it('shows the description before pitch details during the first half of the event', async () => {
+  it('hides project entry before the event starts', async () => {
     const now = Date.now();
     await renderDetailPage(
       buildEventDetail({
         startTime: new Date(now + 60 * 60 * 1000).toISOString(),
         endTime: new Date(now + 3 * 60 * 60 * 1000).toISOString(),
-        pitchSession: { phase: 'SETUP' },
-      })
+        viewerRegistrationStatus: 'APPROVED',
+        viewerRegistration: registrationState('APPROVED'),
+        pitchSession: { phase: 'VOTING' },
+      }),
+      'projects'
     );
 
-    const description = screen.getByRole('heading', {
-      name: /about this event/i,
-    });
-    const pitch = screen.getByRole('heading', { name: /pitch session/i });
     expect(
-      description.compareDocumentPosition(pitch) &
-        Node.DOCUMENT_POSITION_FOLLOWING
-    ).toBeTruthy();
+      screen.queryByRole('heading', { name: /add a project/i })
+    ).not.toBeInTheDocument();
   });
 
-  it('moves pitch details above the description after the event midpoint', async () => {
-    const now = Date.now();
-    await renderDetailPage(
-      buildEventDetail({
-        startTime: new Date(now - 2 * 60 * 60 * 1000).toISOString(),
-        endTime: new Date(now + 60 * 60 * 1000).toISOString(),
-        pitchSession: { phase: 'PITCHING' },
-      })
-    );
-
-    const description = screen.getByRole('heading', {
-      name: /about this event/i,
-    });
-    const pitch = screen.getByRole('heading', { name: /pitch session/i });
-    await waitFor(() => {
-      expect(
-        pitch.compareDocumentPosition(description) &
-          Node.DOCUMENT_POSITION_FOLLOWING
-      ).toBeTruthy();
-    });
-  });
-
-  it('places approved details above the description and below promoted pitch details', async () => {
+  it('hides project entry when the pitch is finished', async () => {
     const now = Date.now();
     await renderDetailPage(
       buildEventDetail({
@@ -1002,36 +1020,32 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
         endTime: new Date(now + 60 * 60 * 1000).toISOString(),
         viewerRegistrationStatus: 'APPROVED',
         viewerRegistration: registrationState('APPROVED'),
-        approvedDetailsVisible: true,
-        approvedDetailsJson: approvedOnlyDetails,
-        pitchSession: { phase: 'PITCHING' },
-      })
+        pitchSession: { phase: 'FINISHED' },
+      }),
+      'projects'
     );
 
-    const pitch = screen.getByRole('heading', { name: /pitch session/i });
-    const details = screen.getByRole('heading', {
-      name: /event-specific details/i,
-    });
-    const approval = screen.getByRole('heading', {
-      name: /you have been approved/i,
-    });
-    const description = screen.getByRole('heading', {
-      name: /about this event/i,
-    });
-    await waitFor(() => {
-      expect(
-        pitch.compareDocumentPosition(approval) &
-          Node.DOCUMENT_POSITION_FOLLOWING
-      ).toBeTruthy();
-      expect(
-        approval.compareDocumentPosition(details) &
-          Node.DOCUMENT_POSITION_FOLLOWING
-      ).toBeTruthy();
-      expect(
-        details.compareDocumentPosition(description) &
-          Node.DOCUMENT_POSITION_FOLLOWING
-      ).toBeTruthy();
-    });
+    expect(
+      screen.queryByRole('heading', { name: /add a project/i })
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows project entry to a site admin without an RSVP', async () => {
+    const now = Date.now();
+    await renderDetailPage(
+      buildEventDetail({
+        startTime: new Date(now - 2 * 60 * 60 * 1000).toISOString(),
+        endTime: new Date(now + 60 * 60 * 1000).toISOString(),
+        viewerIsSiteAdmin: true,
+        approvedDetailsVisible: true,
+        pitchSession: { phase: 'PITCHING' },
+      }),
+      'projects'
+    );
+
+    expect(
+      await screen.findByRole('heading', { name: /add a project/i })
+    ).toBeInTheDocument();
   });
 
   it('never renders organizer-only rows or private storage metadata on the public event surface', async () => {

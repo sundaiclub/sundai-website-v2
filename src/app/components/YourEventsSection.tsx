@@ -1,20 +1,30 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { motion } from 'framer-motion';
 import type { CurrentUserEvent } from '@/types/event-management';
 
 function formatEventTime(event: CurrentUserEvent) {
   const timezone = event.timezone || event.chapter.timezone;
+  const dateTimeFormat = new Intl.DateTimeFormat(undefined, {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZone: timezone,
+  });
   const timeFormat = new Intl.DateTimeFormat(undefined, {
     hour: 'numeric',
     minute: '2-digit',
     timeZone: timezone,
   });
 
-  return `${timeFormat.format(new Date(event.startTime))}–${timeFormat.format(
-    new Date(event.endTime)
-  )}`;
+  const start = dateTimeFormat.format(new Date(event.startTime));
+  return event.endTime
+    ? `${start}–${timeFormat.format(new Date(event.endTime))}`
+    : start;
 }
 
 export default function YourEventsSection({
@@ -32,6 +42,9 @@ export default function YourEventsSection({
     ? 'border-gray-700 bg-gray-800 text-gray-100'
     : 'border-gray-200 bg-white text-gray-900';
   const mutedClasses = isDarkMode ? 'text-gray-400' : 'text-gray-600';
+  const defaultImage = isDarkMode
+    ? '/images/logos/sundai_logo_dark_horizontal.svg'
+    : '/images/logos/sundai_logo_light_horizontal.svg';
 
   return (
     <motion.section
@@ -51,7 +64,7 @@ export default function YourEventsSection({
           Your events
         </h1>
         <p className={`mt-1 text-sm ${mutedClasses}`}>
-          Events that you are taking part in now.
+          Events that you are taking part in.
         </p>
       </div>
 
@@ -69,20 +82,32 @@ export default function YourEventsSection({
               aria-label={`View ${event.title}`}
               className={`group flex flex-col gap-3 rounded-xl border p-4 transition hover:-translate-y-0.5 hover:shadow-md sm:flex-row sm:items-center sm:justify-between ${panelClasses}`}
             >
-              <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="h-2.5 w-2.5 flex-none rounded-full bg-green-500" />
-                  <h2 className="truncate text-lg font-semibold group-hover:underline">
-                    {event.title}
-                  </h2>
+              <div className="flex min-w-0 items-center gap-4">
+                <div className="relative h-16 w-24 flex-none overflow-hidden rounded-lg bg-black">
+                  <Image
+                    src={event.image?.url || defaultImage}
+                    alt={event.image?.alt || `${event.title} event`}
+                    fill
+                    sizes="96px"
+                    className={
+                      event.image?.url ? 'object-cover' : 'object-contain p-3'
+                    }
+                    unoptimized={Boolean(event.image?.url)}
+                  />
                 </div>
-                <p
-                  className={`mt-1 truncate pl-[18px] text-sm ${mutedClasses}`}
-                >
-                  {[event.chapterName, event.publicLocation]
-                    .filter(Boolean)
-                    .join(' · ')}
-                </p>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="h-2.5 w-2.5 flex-none rounded-full bg-green-500" />
+                    <h2 className="truncate text-lg font-semibold group-hover:underline">
+                      {event.title}
+                    </h2>
+                  </div>
+                  <p className={`mt-1 truncate text-sm ${mutedClasses}`}>
+                    {[event.chapterName, event.publicLocation]
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </p>
+                </div>
               </div>
               <div className="flex flex-none items-center justify-between gap-4 pl-[18px] sm:pl-0">
                 <span className={`text-sm ${mutedClasses}`}>

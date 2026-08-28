@@ -1,15 +1,18 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { auth } from '@clerk/nextjs/server';
 import {
   AddToCalendarAction,
   EventMaterialsSection,
   EventNarrativeColumn,
+  EventPitchSection,
   EventRegistrationAction,
   type PublicEventMaterialLink,
 } from '@/app/components/EventDetailSections';
 import { PublicEventHero } from '@/app/components/EventHeroImage';
 import { EventProjectCarousel } from '@/app/components/EventProjectCarousel';
+import PitchEventPage from '@/app/components/PitchEventPage';
 import {
   ManagementLinkButton,
   ManagementPage,
@@ -34,7 +37,16 @@ const DEFAULT_SOCIAL_IMAGE = {
 
 type EventPageProps = {
   params: { chapterSlug: string; eventSlug: string };
+  searchParams?: { tab?: string | string[] };
 };
+
+type EventTab = 'info' | 'projects' | 'pitch';
+
+const eventTabs: Array<{ id: EventTab; label: string }> = [
+  { id: 'info', label: 'Info' },
+  { id: 'projects', label: 'Projects' },
+  { id: 'pitch', label: 'Pitch' },
+];
 
 export async function generateMetadata({
   params,
@@ -135,6 +147,7 @@ function approvedAddress(event: {
 
 export default async function PublicEventDetailPage({
   params,
+  searchParams,
 }: EventPageProps) {
   const { userId } = auth();
   const event = await getPublicEventBySlug({
@@ -145,6 +158,14 @@ export default async function PublicEventDetailPage({
   });
 
   if (!event) notFound();
+
+  const requestedTab = Array.isArray(searchParams?.tab)
+    ? searchParams?.tab[0]
+    : searchParams?.tab;
+  const activeTab: EventTab = eventTabs.some(tab => tab.id === requestedTab)
+    ? (requestedTab as EventTab)
+    : 'info';
+  const eventPath = `/events/${encodeURIComponent(event.chapterSlug)}/${encodeURIComponent(event.slug)}`;
 
   const [visibleMaterials, eventProjects] = await Promise.all([
     listVisibleEventMaterials({
@@ -219,36 +240,75 @@ export default async function PublicEventDetailPage({
         )}
       </div>
 
-      <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
-        <PublicEventHero
-          event={heroEvent}
-          chapterActions={
-            <>
-              <PublicEventStatusBadge status={event.publicStatus} />
-              {event.viewerRegistrationStatus && (
-                <ViewerRegistrationStatusBadge
-                  status={event.viewerRegistrationStatus}
-                />
-              )}
-            </>
-          }
-          actions={
-            <>
-              <EventRegistrationAction
-                event={event}
-                viewerProfile={event.viewerProfile}
-              />
-              <AddToCalendarAction payload={heroEvent.addToCalendar} />
-            </>
-          }
-        />
-        <EventNarrativeColumn event={event} />
-      </div>
+      <nav aria-label="Event sections" className="mb-5 overflow-x-auto">
+        <ul className="flex min-w-max gap-1 border-b" role="list">
+          {eventTabs.map(tab => {
+            const href =
+              tab.id === 'info' ? eventPath : `${eventPath}?tab=${tab.id}`;
+            const isCurrent = activeTab === tab.id;
+            return (
+              <li key={tab.id}>
+                <Link
+                  aria-current={isCurrent ? 'page' : undefined}
+                  className={`block border-b-2 px-4 py-3 text-sm font-semibold outline-none focus-visible:ring-2 ${
+                    isCurrent
+                      ? 'border-current'
+                      : 'border-transparent hover:border-current'
+                  }`}
+                  href={href}
+                >
+                  {tab.label}
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      </nav>
 
-      <div className="mt-6 grid min-w-0 gap-5">
-        <EventProjectCarousel projects={eventProjects} />
-        <EventMaterialsSection materials={materialLinks} />
-      </div>
+      {activeTab === 'info' && (
+        <>
+          <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+            <PublicEventHero
+              event={heroEvent}
+              chapterActions={
+                <>
+                  <PublicEventStatusBadge status={event.publicStatus} />
+                  {event.viewerRegistrationStatus && (
+                    <ViewerRegistrationStatusBadge
+                      status={event.viewerRegistrationStatus}
+                    />
+                  )}
+                </>
+              }
+              actions={
+                <>
+                  <EventRegistrationAction
+                    event={event}
+                    viewerProfile={event.viewerProfile}
+                  />
+                  <AddToCalendarAction payload={heroEvent.addToCalendar} />
+                </>
+              }
+            />
+            <EventNarrativeColumn event={event} />
+          </div>
+          <div className="mt-6 grid min-w-0 gap-5">
+            <EventMaterialsSection materials={materialLinks} />
+          </div>
+        </>
+      )}
+
+      {activeTab === 'projects' && (
+        <div className="grid min-w-0 gap-5">
+          <EventPitchSection
+            event={event}
+            returnTo={`${eventPath}?tab=projects`}
+          />
+          <EventProjectCarousel projects={eventProjects} />
+        </div>
+      )}
+
+      {activeTab === 'pitch' && <PitchEventPage eventId={event.id} />}
     </ManagementPage>
   );
 }

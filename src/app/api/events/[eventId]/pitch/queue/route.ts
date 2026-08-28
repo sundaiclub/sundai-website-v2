@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import prisma from '@/lib/prisma';
 import { requireEventPitchAccess } from '@/lib/eventManagementApi';
-import { canViewApprovedOnlyEventDetailsWithContext } from '@/lib/eventManagementAuth';
 
 // Join queue by adding one of user's projects
 export async function POST(
@@ -31,7 +30,7 @@ export async function POST(
       where: { eventId: params.eventId },
       include: {
         event: {
-          select: { chapterId: true },
+          select: { chapterId: true, startTime: true, endTime: true },
         },
       },
     });
@@ -43,8 +42,19 @@ export async function POST(
         { status: 400 }
       );
     }
+    const now = new Date();
+    if (
+      pitchSession.event.startTime > now ||
+      !pitchSession.event.endTime ||
+      pitchSession.event.endTime < now
+    ) {
+      return NextResponse.json(
+        { message: 'This event is not open for project additions' },
+        { status: 400 }
+      );
+    }
 
-    const [viewerRegistration, chapterMembership, staff] = await Promise.all([
+    const [viewerRegistration, staff] = await Promise.all([
       prisma.eventRegistration.findFirst({
         where: {
           eventId: params.eventId,
@@ -53,13 +63,6 @@ export async function POST(
         },
         orderBy: { createdAt: 'desc' },
         select: { status: true },
-      }),
-      prisma.chapterMembership.findFirst({
-        where: {
-          chapterId: pitchSession.event.chapterId,
-          hackerId: user.id,
-        },
-        select: { role: true, status: true },
       }),
       prisma.eventStaff.findFirst({
         where: {
@@ -72,12 +75,9 @@ export async function POST(
     ]);
 
     if (
-      !canViewApprovedOnlyEventDetailsWithContext({
-        actor: user,
-        chapterMembership,
-        staff,
-        viewerRegistration,
-      })
+      user.role !== 'SITE_ADMIN' &&
+      !staff &&
+      viewerRegistration?.status !== 'APPROVED'
     ) {
       return NextResponse.json(
         { message: 'You must be part of this event to add a project' },
@@ -140,14 +140,14 @@ export async function POST(
       }),
       prisma.pitchProject.create({
         data: {
-        pitchSessionId: pitchSession.id,
-        projectId,
-        addedById: user.id,
-        position: nextPos,
-        isTopProject: false,
-        ...(pitchSession.phase === 'PITCHING' && {
-          allottedSec: pitchSession.defaultPitchSec,
-        }),
+          pitchSessionId: pitchSession.id,
+          projectId,
+          addedById: user.id,
+          position: nextPos,
+          isTopProject: false,
+          ...(pitchSession.phase === 'PITCHING' && {
+            allottedSec: pitchSession.defaultPitchSec,
+          }),
         },
       }),
     ]);

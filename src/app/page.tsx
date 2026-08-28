@@ -101,12 +101,10 @@ export default function Home() {
     let cancelled = false;
     setCurrentEventsLoading(true);
 
-    fetch('/api/events/current')
+    fetch('/api/events/mine')
       .then(async response => {
         if (!response.ok) {
-          throw new Error(
-            `Current events request failed with ${response.status}`
-          );
+          throw new Error(`User events request failed with ${response.status}`);
         }
         return response.json() as Promise<CurrentUserEvent[]>;
       })
@@ -115,7 +113,7 @@ export default function Home() {
       })
       .catch(error => {
         if (!cancelled) {
-          console.error('Error fetching current events:', error);
+          console.error('Error fetching user events:', error);
           setCurrentEvents([]);
         }
       })
