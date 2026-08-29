@@ -536,6 +536,9 @@ describe('/organizer/events/[eventId]/settings', () => {
       { target: { value: 'OPEN_RSVP' } }
     );
     fireEvent.click(
+      screen.getByRole('checkbox', { name: /require application form/i })
+    );
+    fireEvent.click(
       screen.getByRole('checkbox', {
         name: /auto-promote waitlist|waitlist auto-promotion/i,
       })
@@ -568,6 +571,12 @@ describe('/organizer/events/[eventId]/settings', () => {
       `/api/events/${eventSettings.id}`,
       expect.objectContaining({
         body: expect.stringContaining('"autoPromoteWaitlist":true'),
+      })
+    );
+    expect(global.fetch).toHaveBeenCalledWith(
+      `/api/events/${eventSettings.id}`,
+      expect.objectContaining({
+        body: expect.stringContaining('"applicationRequired":false'),
       })
     );
     expect(global.fetch).toHaveBeenCalledWith(

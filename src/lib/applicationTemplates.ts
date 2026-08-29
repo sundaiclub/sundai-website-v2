@@ -99,6 +99,7 @@ export interface ComposeApplicationFieldsInput {
 
 export interface ApplicationControlStateInput {
   applicationMode: EventApplicationMode;
+  applicationRequired?: boolean | null;
   applicationsOpen?: boolean | null;
   applicationsClosedAt?: Date | string | null;
   applicationsCloseReason?: string | null;
@@ -411,6 +412,9 @@ export function buildApplicationControlsState(
 
   return {
     applicationMode: input.applicationMode,
+    applicationRequired:
+      input.applicationMode !== 'OPEN_RSVP' ||
+      input.applicationRequired !== false,
     applicationsOpen,
     applicationsClosedAt: input.applicationsClosedAt ?? null,
     applicationsCloseReason:

@@ -184,6 +184,7 @@ export async function POST(req: Request) {
       publicProgramLabel,
       capacity,
       applicationMode,
+      applicationRequired = true,
       autoPromoteWaitlist,
       approvedDetailsJson,
       applicationQuestionsJson,
@@ -234,6 +235,13 @@ export async function POST(req: Request) {
     if (!parsedApplicationMode) {
       return NextResponse.json(
         { message: 'applicationMode must be REQUIRES_APPROVAL or OPEN_RSVP' },
+        { status: 400 }
+      );
+    }
+
+    if (typeof applicationRequired !== 'boolean') {
+      return NextResponse.json(
+        { message: 'applicationRequired must be a boolean' },
         { status: 400 }
       );
     }
@@ -347,6 +355,8 @@ export async function POST(req: Request) {
             capacity: capacity === null ? null : Number(capacity),
           }),
           applicationMode: parsedApplicationMode,
+          applicationRequired:
+            parsedApplicationMode === 'OPEN_RSVP' ? applicationRequired : true,
           autoPromoteWaitlist: Boolean(autoPromoteWaitlist),
           ...(approvedDetailsJson !== undefined && {
             approvedDetailsJson:

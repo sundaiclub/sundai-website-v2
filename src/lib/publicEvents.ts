@@ -143,6 +143,7 @@ type PublicEventsEventRecord = {
   programType?: string | null;
   capacity?: number | null;
   applicationMode: EventApplicationMode;
+  applicationRequired?: boolean | null;
   applicationsOpen: boolean;
   applicationsClosedAt?: Date | string | null;
   applicationsCloseReason?: string | null;
@@ -776,6 +777,7 @@ function buildApplicationControls(input: {
 
   return buildApplicationControlsState({
     applicationMode: event.applicationMode,
+    applicationRequired: event.applicationRequired,
     applicationsOpen: event.applicationsOpen,
     applicationsClosedAt: event.applicationsClosedAt ?? null,
     applicationsCloseReason: event.applicationsCloseReason ?? null,

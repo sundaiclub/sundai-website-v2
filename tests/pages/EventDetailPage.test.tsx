@@ -809,6 +809,37 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('registers directly when an open RSVP event does not require an application', async () => {
+    mockSignedIn();
+    const event = buildApplicationEvent({
+      applicationControls: {
+        ...buildApplicationEvent().applicationControls,
+        applicationMode: 'OPEN_RSVP',
+        applicationRequired: false,
+        canSubmit: true,
+        signInRequired: false,
+      },
+    });
+
+    await renderDetailPage(event);
+    fireEvent.click(screen.getByRole('button', { name: /^register$/i }));
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        `/api/events/${event.id}/registrations`,
+        {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: '{}',
+        }
+      );
+    });
+    expect(
+      screen.queryByRole('dialog', { name: /register for this event/i })
+    ).not.toBeInTheDocument();
+    expect(mockRouterRefresh).toHaveBeenCalledTimes(1);
+  });
+
   it('hides approved-only details until the viewer is approved', async () => {
     await renderDetailPage(
       buildEventDetail({

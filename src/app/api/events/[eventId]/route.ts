@@ -126,6 +126,7 @@ export async function GET(
         programType: true,
         capacity: true,
         applicationMode: true,
+        applicationRequired: true,
         applicationsOpen: true,
         applicationsClosedAt: true,
         applicationsCloseReason: true,
@@ -297,6 +298,7 @@ export async function PATCH(
       where: { id: params.eventId },
       select: {
         chapterId: true,
+        applicationMode: true,
       },
     });
     if (!existingEvent) return new NextResponse('Not Found', { status: 404 });
@@ -321,6 +323,7 @@ export async function PATCH(
       publicProgramLabel,
       capacity,
       applicationMode,
+      applicationRequired,
       autoPromoteWaitlist,
       approvedDetailsJson,
       applicationQuestionsJson,
@@ -367,6 +370,21 @@ export async function PATCH(
         { status: 400 }
       );
     }
+
+    if (
+      applicationRequired !== undefined &&
+      typeof applicationRequired !== 'boolean'
+    ) {
+      return NextResponse.json(
+        { message: 'applicationRequired must be a boolean' },
+        { status: 400 }
+      );
+    }
+
+    const nextApplicationMode =
+      parsedApplicationMode ?? existingEvent.applicationMode;
+    const nextApplicationRequired =
+      nextApplicationMode === 'REQUIRES_APPROVAL' ? true : applicationRequired;
 
     const parsedApplicationsOpen = parseApplicationsOpen(applicationsOpen);
     if (parsedApplicationsOpen === null) {
@@ -480,6 +498,9 @@ export async function PATCH(
         }),
         ...(parsedApplicationMode !== undefined && {
           applicationMode: parsedApplicationMode,
+        }),
+        ...(nextApplicationRequired !== undefined && {
+          applicationRequired: nextApplicationRequired,
         }),
         ...(autoPromoteWaitlist !== undefined && {
           autoPromoteWaitlist: Boolean(autoPromoteWaitlist),

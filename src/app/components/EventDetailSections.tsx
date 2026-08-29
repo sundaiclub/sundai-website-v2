@@ -284,12 +284,20 @@ export function EventRegistrationAction({
   allowEditing?: boolean;
 }) {
   const classes = useManagementClasses();
+  const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
+  const [isRegistering, setIsRegistering] = useState(false);
+  const [registrationError, setRegistrationError] = useState('');
+  const [registrationComplete, setRegistrationComplete] = useState(false);
+  const applicationRequired =
+    event.applicationControls.applicationRequired !== false;
   const canRegister =
     !event.viewerRegistration &&
+    !registrationComplete &&
     (event.applicationControls.signInRequired ||
       (event.applicationControls.canSubmit &&
-        event.applicationQuestionSet.composedFields.length > 0));
+        (!applicationRequired ||
+          event.applicationQuestionSet.composedFields.length > 0)));
   const canEdit = Boolean(
     allowEditing && event.viewerRegistration?.canEditAnswers
   );
@@ -305,16 +313,62 @@ export function EventRegistrationAction({
 
   if (!canRegister && !canEdit) return null;
 
+  async function registerWithoutApplication() {
+    setIsRegistering(true);
+    setRegistrationError('');
+    try {
+      const response = await fetch(`/api/events/${event.id}/registrations`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(payload?.message || 'Unable to register.');
+      }
+      setRegistrationComplete(true);
+      router.refresh();
+    } catch (error) {
+      setRegistrationError(
+        error instanceof Error ? error.message : 'Unable to register.'
+      );
+    } finally {
+      setIsRegistering(false);
+    }
+  }
+
   return (
     <>
       <button
-        aria-haspopup="dialog"
+        aria-haspopup={
+          event.applicationControls.signInRequired || applicationRequired
+            ? 'dialog'
+            : undefined
+        }
         className={canEdit ? classes.secondaryButton : classes.primaryButton}
-        onClick={() => setIsOpen(true)}
+        disabled={isRegistering}
+        onClick={() => {
+          if (
+            !canEdit &&
+            !event.applicationControls.signInRequired &&
+            !applicationRequired
+          ) {
+            void registerWithoutApplication();
+            return;
+          }
+          setIsOpen(true);
+        }}
         type="button"
       >
-        {canEdit ? 'Edit application' : 'Register'}
+        {canEdit
+          ? 'Edit application'
+          : isRegistering
+            ? 'Registering...'
+            : 'Register'}
       </button>
+      {registrationError && (
+        <ManagementAlert tone="danger">{registrationError}</ManagementAlert>
+      )}
       {isOpen && (
         <div
           aria-labelledby="registration-dialog-title"
