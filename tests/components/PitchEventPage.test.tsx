@@ -129,6 +129,9 @@ describe('PitchEventPage viewer states', () => {
       '[overflow-wrap:anywhere]'
     );
     expect(eventHeading.parentElement).toHaveClass('min-w-0', 'flex-1');
+    expect(
+      screen.queryByRole('link', { name: 'Demo Night' })
+    ).not.toBeInTheDocument();
     expect(screen.queryByText('Voting Open')).not.toBeInTheDocument();
   });
 });

@@ -1,6 +1,5 @@
 'use client';
 import Image from 'next/image';
-import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { useUser } from '@clerk/nextjs';
 import { useTheme } from '../contexts/ThemeContext';
@@ -15,6 +14,7 @@ import {
   formatDateTimeLocalValue,
   serializeDateTimeLocalValue,
 } from '@/lib/datetimeLocal';
+import { defaultVotingEndTime } from '@/lib/eventPitchTiming';
 import { reconcileVoteDeckIds } from '@/lib/votingDeck';
 import type {
   PitchSessionPhase,
@@ -1743,7 +1743,10 @@ export default function PitchEventPage({ eventId }: { eventId: string }) {
       event.votingEndTime
         ? formatDateTimeLocalValue(event.votingEndTime, event.timezone)
         : formatDateTimeLocalValue(
-            new Date(new Date(event.startTime).getTime() + 15 * 60 * 1000),
+            defaultVotingEndTime(
+              new Date(event.startTime),
+              event.endTime ? new Date(event.endTime) : null
+            ),
             event.timezone
           )
     );
@@ -1867,12 +1870,7 @@ export default function PitchEventPage({ eventId }: { eventId: string }) {
           <div className="flex items-start justify-between gap-3 mb-4">
             <div className="min-w-0 flex-1">
               <h1 className="min-w-0 text-2xl font-bold [overflow-wrap:anywhere]">
-                <Link
-                  href={`/events/${event.chapter.slug}/${event.slug}`}
-                  className="block rounded-sm hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500"
-                >
-                  {event.title}
-                </Link>
+                {event.title}
               </h1>
             </div>
             <div className="flex shrink-0 items-center gap-2">
