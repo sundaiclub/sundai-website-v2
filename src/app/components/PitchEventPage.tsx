@@ -2,7 +2,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
-import { useUser, SignInButton } from '@clerk/nextjs';
+import { useUser } from '@clerk/nextjs';
 import { useTheme } from '../contexts/ThemeContext';
 import { useUserContext } from '../contexts/UserContext';
 import type { UserInfo } from '../contexts/UserContext';
@@ -76,6 +76,8 @@ type EventPitchResponse = Omit<
   | 'defaultPitchSec'
   | 'projects'
 > & {
+  canViewPitch?: boolean;
+  pitchPhase?: PitchSessionPhase | null;
   canManagePitch?: boolean;
   pitchSessions?: Array<
     Pick<
@@ -1815,27 +1817,20 @@ export default function PitchEventPage({ eventId }: { eventId: string }) {
       <div
         className={`flex min-h-80 items-center justify-center font-space-mono ${isDarkMode ? 'text-gray-100' : 'text-gray-900'}`}
       >
-        <div className="text-center">
-          <h1 className="text-2xl font-bold mb-4">
-            {eventPreview?.title ?? 'Pitch event'}
-          </h1>
-          {eventPreview?.meetingUrl && (
-            <a
-              href={eventPreview.meetingUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-block px-6 py-3 mb-4 rounded-full bg-indigo-600 text-white hover:bg-indigo-700 transition duration-300 text-lg"
-            >
-              Join meeting
-            </a>
-          )}
-          <p className="mb-4">Log in to use the pitch controls.</p>
-          <SignInButton mode="modal">
-            <button className="px-6 py-3 rounded-full bg-indigo-600 text-white hover:bg-indigo-700 transition duration-300 text-lg">
-              Log In / Sign Up
-            </button>
-          </SignInButton>
-        </div>
+        <p className="text-center">You need to log in to view the pitch.</p>
+      </div>
+    );
+  }
+
+  if (
+    eventPreview?.canViewPitch === false &&
+    eventPreview.pitchPhase === 'VOTING'
+  ) {
+    return (
+      <div
+        className={`flex min-h-80 items-center justify-center font-space-mono ${isDarkMode ? 'text-gray-100' : 'text-gray-900'}`}
+      >
+        <p className="text-center">Voting is currently happening.</p>
       </div>
     );
   }
@@ -1879,14 +1874,13 @@ export default function PitchEventPage({ eventId }: { eventId: string }) {
                   {event.title}
                 </Link>
               </h1>
-              <StageBadge phase={event.phase} />
             </div>
             <div className="flex items-center gap-2">
               {event.meetingUrl && (
                 <a
                   href={event.meetingUrl}
                   target="_blank"
-                  className="px-3 py-2 rounded-md bg-indigo-600 text-white text-sm"
+                  className="px-2.5 py-1.5 rounded-md bg-indigo-600 text-white text-xs"
                 >
                   Join meeting
                 </a>
@@ -1894,7 +1888,7 @@ export default function PitchEventPage({ eventId }: { eventId: string }) {
               {isController && (
                 <button
                   onClick={openEdit}
-                  className={`px-3 py-2 rounded-md text-sm ${isDarkMode ? 'bg-gray-700 text-gray-200 hover:bg-gray-600' : 'bg-gray-200 text-gray-800 hover:bg-gray-300'}`}
+                  className={`px-2.5 py-1.5 rounded-md text-xs ${isDarkMode ? 'bg-gray-700 text-gray-200 hover:bg-gray-600' : 'bg-gray-200 text-gray-800 hover:bg-gray-300'}`}
                 >
                   Edit Event
                 </button>

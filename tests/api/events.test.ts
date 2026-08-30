@@ -286,6 +286,67 @@ describe('/api/events/[eventId]', () => {
     expect(body).not.toHaveProperty('phase');
   });
 
+  it('GET hides voting from signed-in viewers who are not part of the event', async () => {
+    mockAuth.mockReturnValue({ userId: 'clerk-viewer' });
+    prisma.hacker.findUnique.mockResolvedValue({
+      id: 'h-viewer',
+      role: 'HACKER',
+    });
+    prisma.event.findFirst.mockResolvedValue(
+      buildPublicEvent({ pitchSessions: [{ phase: 'VOTING' }] })
+    );
+
+    const response = await GET_EVENT(
+      new NextRequest('http://localhost:3000/api/events/evt-1') as any,
+      { params: { eventId: 'evt-1' } } as any
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body).toEqual(
+      expect.objectContaining({
+        canViewPitch: false,
+        pitchPhase: 'VOTING',
+      })
+    );
+    expect(body).not.toHaveProperty('pitchSessions');
+    expect(prisma.event.findUnique).not.toHaveBeenCalled();
+  });
+
+  it('GET exposes the usual pitch UI once pitching starts to signed-in viewers', async () => {
+    mockAuth.mockReturnValue({ userId: 'clerk-viewer' });
+    prisma.hacker.findUnique.mockResolvedValue({
+      id: 'h-viewer',
+      role: 'HACKER',
+    });
+    prisma.event.findFirst.mockResolvedValue(
+      buildPublicEvent({ pitchSessions: [{ phase: 'PITCHING' }] })
+    );
+    prisma.event.findUnique.mockResolvedValue({
+      staff: [],
+      pitchSessions: [
+        { id: 'pitch-1', phase: 'PITCHING', projects: [] },
+      ],
+    });
+
+    const response = await GET_EVENT(
+      new NextRequest('http://localhost:3000/api/events/evt-1') as any,
+      { params: { eventId: 'evt-1' } } as any
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body).toEqual(
+      expect.objectContaining({
+        canViewPitch: true,
+        pitchPhase: 'PITCHING',
+        pitchSessions: [
+          expect.objectContaining({ id: 'pitch-1', phase: 'PITCHING' }),
+        ],
+      })
+    );
+  });
+
   it('GET exposes the attached pitch event and meeting URL to an approved attendee', async () => {
     mockAuth.mockReturnValue({ userId: 'clerk-approved' });
     prisma.hacker.findUnique.mockResolvedValue({
