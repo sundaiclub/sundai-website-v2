@@ -118,8 +118,17 @@ describe('PitchEventPage viewer states', () => {
       name: 'Join meeting',
     });
     const editEvent = screen.getByRole('button', { name: 'Edit Event' });
+    const eventHeading = screen.getByRole('heading', {
+      level: 1,
+      name: 'Demo Night',
+    });
     expect(joinMeeting).toHaveClass('py-1.5', 'text-xs');
     expect(editEvent).toHaveClass('py-1.5', 'text-xs');
+    expect(eventHeading).toHaveClass(
+      'min-w-0',
+      '[overflow-wrap:anywhere]'
+    );
+    expect(eventHeading.parentElement).toHaveClass('min-w-0', 'flex-1');
     expect(screen.queryByText('Voting Open')).not.toBeInTheDocument();
   });
 });

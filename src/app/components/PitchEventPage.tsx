@@ -1864,18 +1864,18 @@ export default function PitchEventPage({ eventId }: { eventId: string }) {
         className={`font-space-mono ${isDarkMode ? 'text-gray-100' : 'text-gray-900'}`}
       >
         <div className="mx-auto max-w-7xl py-4">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold">
+          <div className="flex items-start justify-between gap-3 mb-4">
+            <div className="min-w-0 flex-1">
+              <h1 className="min-w-0 text-2xl font-bold [overflow-wrap:anywhere]">
                 <Link
                   href={`/events/${event.chapter.slug}/${event.slug}`}
-                  className="rounded-sm hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500"
+                  className="block rounded-sm hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500"
                 >
                   {event.title}
                 </Link>
               </h1>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex shrink-0 items-center gap-2">
               {event.meetingUrl && (
                 <a
                   href={event.meetingUrl}
