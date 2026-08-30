@@ -119,8 +119,9 @@ WEBHOOK_SECRET="whsec_your_webhook_secret_here"
 # Google Cloud Storage (optional for local development)
 GOOGLE_CLOUD_BUCKET="your-bucket-name"
 
-# AI Image Generation (optional for local development)
-GEMINI_API_KEY="your_gemini_api_key_here"
+# Amazon Bedrock text generation and AI image generation
+AWS_REGION="us-east-2"
+AWS_BEARER_TOKEN_BEDROCK="your_bedrock_api_key_here"
 REPLICATE_API_TOKEN="your_replicate_api_token_here"
 
 # PostHog Analytics (optional for local development)
@@ -153,25 +154,24 @@ npm run db:migrate
 npm run db:reset
 ```
 
-### Vercel + Cloud SQL managed connection pooling
+### Vercel + Amazon RDS
 
-If you enable Google Cloud SQL Managed Connection Pooling, point runtime traffic at the pooler and keep Prisma CLI commands on a direct connection:
+Use the limited application login for Vercel runtime traffic. Use the database-owner login only for the automatic migration step during a Vercel build:
 
 ```bash
-# Runtime queries from Vercel / Prisma Client
-DATABASE_URL="postgresql://USER:PASSWORD@DB_HOST:6432/DB_NAME?sslmode=require"
+# Runtime queries from Vercel / Prisma Client. Use the environment-specific app user.
+DATABASE_URL="postgresql://APP_USER:PASSWORD@RDS_HOST:5432/DB_NAME?sslmode=require&connection_limit=1&pool_timeout=10"
 
-# Migrations / Prisma CLI
-DIRECT_URL="postgresql://USER:PASSWORD@DB_HOST:5432/DB_NAME?sslmode=require"
+# Automatic Vercel migration command. Use the environment-specific owner user.
+DIRECT_URL="postgresql://OWNER_USER:PASSWORD@RDS_HOST:5432/DB_NAME?sslmode=require"
 ```
 
 Notes:
 
-- `DATABASE_URL` should use port `6432`, which is Cloud SQL's managed pooler port.
-- `DIRECT_URL` should use port `5432`, which is the direct Postgres port.
-- This project keeps app runtime traffic on `DATABASE_URL`, and `npm run vercel-build` now prefers `DIRECT_URL` for `prisma migrate deploy` when it is set.
-- In Cloud SQL Managed Connection Pooling, keep `pool_mode=transaction` unless you have a specific reason not to, and set `max_prepared_statements` above `0` so Prisma prepared statements are supported.
-- If your Cloud SQL instance is private-only, Vercel won't be able to reach it directly. In that case you need a public path or network bridge rather than only changing env vars.
+- Both URLs use the RDS PostgreSQL port `5432` and require TLS.
+- Vercel must receive the limited application connection as `DATABASE_URL` and the matching owner connection as the sensitive `DIRECT_URL`.
+- `vercel-build` uses `DIRECT_URL` only for `prisma migrate deploy`. The application build and runtime continue to use `DATABASE_URL`.
+- Keep `connection_limit=1` for the current low-volume Vercel deployment. Review this limit and add a managed pooler if concurrency increases.
 
 ### 5. Start Development Server
 
@@ -499,10 +499,14 @@ their short expiry or when current access is removed.
 5. Download service account key JSON file and add to project
 
 ### AI Image Generation Setup (Optional):
-1. **Gemini API**: Get your API key from [Google AI Studio](https://makersuite.google.com/app/apikey)
-2. **Replicate API**: Sign up at [replicate.com](https://replicate.com) and get your API token
-3. Add both keys to your `.env.local` file
-4. The AI image generation feature will be available in project editing for creating pixel-art thumbnails
+1. In Amazon Bedrock, enable access to `openai.gpt-5.6-luna` in a supported region.
+2. Create a Bedrock API key for the application.
+3. Set `AWS_REGION` and `AWS_BEARER_TOKEN_BEDROCK` in `.env.local`.
+4. **Replicate API**: Sign up at [replicate.com](https://replicate.com) and get your API token.
+5. Set `REPLICATE_API_TOKEN` in `.env.local`.
+6. The AI image generation feature will be available in project editing for creating pixel-art thumbnails.
+
+The same Bedrock configuration generates project share posts and rewrites news email content.
 
 ## 🚀 Learn More
 

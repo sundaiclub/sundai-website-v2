@@ -26,11 +26,19 @@
 
 ## Event Project Participation
 
-**Decision**: Use `EventProject` as the event-participation source of truth and keep `PitchProject` solely for pitch-session queue and outcome state. Keep `Project` global. Creating a project during a relevant chapter event creates `EventProject`; adding a project to an event pitch session upserts the same participation atomically.
+**Decision**: Use `EventProject` as the event-participation source of truth and keep `PitchProject` solely for pitch-session queue and outcome state. Keep `Project` global. Remove hidden project attachment based on chapter membership. Project publication creates the event participations that the user selected. Contextual publication may also join the selected source event's open pitch queue. Adding an existing project to an event pitch session upserts the same participation atomically.
 
 **Rationale**: Event participation must exist even when an event has no pitch session. Separating participation/card readiness from optional pitch state avoids manufacturing pitch sessions while the unique `(eventId, projectId)` record prevents duplicate event membership.
 
 **Alternatives considered**: Using only `PitchProject` was rejected because non-pitching events cannot own projects. Creating a synthetic pitch session was rejected because it would misrepresent event operations.
+
+## Attendee Project Entry
+
+**Decision**: Replace the active public event Pitch Session card with a shared Add a project chooser for approved attendees, assigned staff, and site administrators. Reuse the chooser on the current pitch controller until a later feature embeds pitch behavior in an event-page tab. Carry contextual event choices through draft creation in the URL and apply them during publication.
+
+**Rationale**: The user can see and change every event association. URL context survives the two-step draft workflow without creating a second persistence model for unpublished intent.
+
+**Alternatives considered**: Hidden server attachment was rejected because users could not review it. Attaching events at draft creation was rejected because incomplete drafts would appear as event participation. A new draft-intent table was rejected because the contextual URL already supplies the short-lived state.
 
 ## Material Storage And Access
 

@@ -4,6 +4,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import OrganizerNewEventPage from '../../src/app/organizer/events/new/page';
 
 const mockUseTheme = jest.fn();
+const mockRouterPush = jest.fn();
 
 jest.mock('../../src/app/contexts/ThemeContext', () => ({
   useTheme: () => mockUseTheme(),
@@ -13,7 +14,7 @@ jest.mock('next/navigation', () => ({
   usePathname: () => '/organizer/events/new',
   useSearchParams: () => new URLSearchParams(),
   useRouter: () => ({
-    push: jest.fn(),
+    push: mockRouterPush,
     replace: jest.fn(),
     prefetch: jest.fn(),
     back: jest.fn(),
@@ -331,7 +332,32 @@ describe('/organizer/events/new', () => {
     );
     expect((imageCall?.[1].body as FormData).get('image')).toBe(image);
     expect(
-      screen.getByText(/event draft was successfully created/i)
+      await screen.findByText(/event draft was successfully created/i)
+    ).toBeInTheDocument();
+  });
+
+  it('shows the size limit when an event image upload returns 413', async () => {
+    await renderNewEventPage();
+    fillRequiredEventFields();
+    const defaultFetch = (global.fetch as jest.Mock).getMockImplementation()!;
+    (global.fetch as jest.Mock).mockImplementation(
+      (input: RequestInfo | URL, init?: RequestInit) =>
+        requestUrl(input).includes('/api/events/event-created/image')
+          ? jsonResponse({}, 413)
+          : defaultFetch(input, init)
+    );
+
+    fireEvent.change(screen.getByLabelText(/event image/i), {
+      target: {
+        files: [new File(['image'], 'event.webp', { type: 'image/webp' })],
+      },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /save draft/i }));
+
+    expect(
+      await screen.findByText(
+        /file too large\. image files must be smaller than 15 mb\. the event was saved\./i
+      )
     ).toBeInTheDocument();
   });
 
@@ -439,8 +465,18 @@ describe('/organizer/events/new', () => {
       'You are on the waitlist. We will let you know if a spot opens up.'
     );
     expect(screen.getByLabelText(/decline message/i)).toHaveValue(
-      'Thank you for your interest. Unfortunately, we are unable to offer you a spot at this event.'
+      'Thank you for your interest. Unfortunately, we are unable to offer you a spot at this event. Please apply for the next one.'
     );
+  });
+
+  it('selects the first chapter application template by default', async () => {
+    await renderNewEventPage();
+
+    await waitFor(() => {
+      expect(
+        screen.getByLabelText(/chapter application template/i)
+      ).toHaveValue('template-chapter-boston');
+    });
   });
 
   it('submits the site message defaults when the organizer leaves them unchanged', async () => {
@@ -457,17 +493,20 @@ describe('/organizer/events/new', () => {
           waitlistMessage:
             'You are on the waitlist. We will let you know if a spot opens up.',
           declineMessage:
-            'Thank you for your interest. Unfortunately, we are unable to offer you a spot at this event.',
+            'Thank you for your interest. Unfortunately, we are unable to offer you a spot at this event. Please apply for the next one.',
         })
       );
     });
 
     expect(
-      screen.getByText(/event draft was successfully created/i)
+      await screen.findByText(/event draft was successfully created/i)
     ).toBeInTheDocument();
     expect(
       screen.getByRole('link', { name: /event settings page/i })
     ).toHaveAttribute('href', '/organizer/events/event-created/settings');
+    expect(mockRouterPush).toHaveBeenCalledWith(
+      '/organizer/events/event-created/settings'
+    );
   });
 
   it('keeps publish visible but disabled until required fields are present', async () => {
@@ -483,6 +522,59 @@ describe('/organizer/events/new', () => {
     ).not.toBeDisabled();
     expect(screen.getByRole('button', { name: /publish/i })).not.toBeDisabled();
   });
+
+  it.each([
+    ['Save draft', 'Publish'],
+    ['Publish', 'Save draft'],
+  ])(
+    'shows saving and blocks the other action after clicking %s',
+    async (action, otherAction) => {
+      await renderNewEventPage();
+      fillRequiredEventFields();
+
+      const regularFetch = global.fetch as jest.Mock;
+      let resolveCreate: ((response: unknown) => void) | undefined;
+      const pendingCreate = new Promise(resolve => {
+        resolveCreate = resolve;
+      });
+      global.fetch = jest.fn((input: RequestInfo | URL, init?: RequestInit) => {
+        const url = requestUrl(input);
+        if (url.endsWith('/api/events') && init?.method === 'POST') {
+          return pendingCreate;
+        }
+        return regularFetch(input, init);
+      }) as jest.Mock;
+
+      fireEvent.click(
+        screen.getByRole('button', { name: new RegExp(`^${action}$`, 'i') })
+      );
+
+      expect(
+        await screen.findByRole('button', { name: /^saving\.\.\.$/i })
+      ).toBeDisabled();
+      expect(
+        screen.getByRole('button', {
+          name: new RegExp(`^${otherAction}$`, 'i'),
+        })
+      ).toBeDisabled();
+
+      resolveCreate?.(
+        await jsonResponse(
+          {
+            id: 'event-created',
+            status: 'DRAFT',
+          },
+          201
+        )
+      );
+
+      await waitFor(() => {
+        expect(mockRouterPush).toHaveBeenCalledWith(
+          '/organizer/events/event-created/settings'
+        );
+      });
+    }
+  );
 
   it('greys out and disables capacity when no capacity limit is selected', async () => {
     await renderNewEventPage();
@@ -582,6 +674,9 @@ describe('/organizer/events/new', () => {
     expect(
       screen.getByRole('link', { name: /event settings page/i })
     ).toHaveAttribute('href', '/organizer/events/event-created/settings');
+    expect(mockRouterPush).toHaveBeenCalledWith(
+      '/organizer/events/event-created/settings'
+    );
 
     expect(latestFetchBody()).toEqual(
       expect.objectContaining({
@@ -685,7 +780,11 @@ describe('/organizer/events/new', () => {
         (field: { label: string }) => field.label
       );
 
-      expect(labels).toEqual(['What do you want to build?']);
+      expect(labels).toEqual([
+        'Project URL',
+        'Dietary restrictions',
+        'What do you want to build?',
+      ]);
     });
   });
 
@@ -705,13 +804,15 @@ describe('/organizer/events/new', () => {
     fireEvent.click(screen.getByRole('button', { name: /save draft/i }));
 
     await waitFor(() => {
-      expect(latestFetchBody().applicationQuestionsJson).toEqual([
-        expect.objectContaining({
-          label: 'I agree to the event guidelines',
-          type: 'CHECKBOX',
-          required: true,
-        }),
-      ]);
+      expect(latestFetchBody().applicationQuestionsJson).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            label: 'I agree to the event guidelines',
+            type: 'CHECKBOX',
+            required: true,
+          }),
+        ])
+      );
     });
   });
 
@@ -729,12 +830,14 @@ describe('/organizer/events/new', () => {
     fireEvent.click(screen.getByRole('button', { name: /save draft/i }));
 
     await waitFor(() => {
-      expect(latestFetchBody().applicationQuestionsJson).toEqual([
-        expect.objectContaining({
-          label: 'What do you want to build?',
-          reusePreviousAnswer: true,
-        }),
-      ]);
+      expect(latestFetchBody().applicationQuestionsJson).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            label: 'What do you want to build?',
+            reusePreviousAnswer: true,
+          }),
+        ])
+      );
     });
   });
 });

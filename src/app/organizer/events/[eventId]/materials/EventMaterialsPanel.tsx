@@ -144,7 +144,10 @@ export default function EventMaterialsPanel({ eventId }: { eventId: string }) {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(body),
       });
-      if (!response.ok) throw new Error('Unable to create the material.');
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        throw new Error(payload?.error || 'Unable to create the material.');
+      }
       const created = (await response.json()) as EventMaterial;
       setMaterials(current => sortMaterials([...current, created]));
       resetEditor();
@@ -302,14 +305,14 @@ export default function EventMaterialsPanel({ eventId }: { eventId: string }) {
 
             {kind === 'LINK' ? (
               <label className="block">
-                <span className="mb-1 block text-sm font-bold">
-                  HTTPS link URL
-                </span>
+                <span className="mb-1 block text-sm font-bold">Link URL</span>
                 <input
                   className={classes.input}
+                  inputMode="url"
                   onChange={event => setExternalUrl(event.target.value)}
+                  placeholder="example.com/resource"
                   required
-                  type="url"
+                  type="text"
                   value={externalUrl}
                 />
               </label>

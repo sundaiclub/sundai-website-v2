@@ -157,6 +157,9 @@ describe('AdminPage', () => {
     expect(
       screen.getByText('Please sign in to view this page.')
     ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /^sign in$/i })
+    ).toBeInTheDocument();
   });
 
   it('should handle undefined isAdmin gracefully', () => {

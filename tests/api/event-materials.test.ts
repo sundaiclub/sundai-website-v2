@@ -128,7 +128,9 @@ describe('/api/events/[eventId]/materials', () => {
       expiresAt: '2026-07-10T12:05:00.000Z',
     });
     prisma.$transaction.mockImplementation(async (operation: any) =>
-      typeof operation === 'function' ? operation(prisma) : Promise.all(operation)
+      typeof operation === 'function'
+        ? operation(prisma)
+        : Promise.all(operation)
     );
   });
 
@@ -162,7 +164,7 @@ describe('/api/events/[eventId]/materials', () => {
     expect(prisma.eventMaterial.create).not.toHaveBeenCalled();
   });
 
-  it('creates an HTTPS link with its selected visibility and audit', async () => {
+  it('adds HTTPS to a scheme-free link before it stores the material', async () => {
     mockOrganizer();
     prisma.eventMaterial.create.mockResolvedValue({
       ...fileMaterial,
@@ -188,7 +190,7 @@ describe('/api/events/[eventId]/materials', () => {
         body: {
           kind: 'LINK',
           title: 'Brainstorming board',
-          externalUrl: 'https://example.com/board',
+          externalUrl: 'example.com/board',
           visibility: 'APPROVED_ATTENDEES',
           position: 20,
         },
@@ -341,6 +343,8 @@ describe('/api/events/[eventId]/materials', () => {
     expect(allowed.status).toBeGreaterThanOrEqual(300);
     expect(allowed.status).toBeLessThan(400);
     expect(allowed.headers.get('location')).toMatch(/^https:/);
-    expect(allowed.headers.get('location')).not.toContain(fileMaterial.objectKey);
+    expect(allowed.headers.get('location')).not.toContain(
+      fileMaterial.objectKey
+    );
   });
 });

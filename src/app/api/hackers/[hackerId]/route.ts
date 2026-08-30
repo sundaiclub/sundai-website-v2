@@ -3,6 +3,7 @@ import { auth } from "@clerk/nextjs/server";
 import type { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { phoneNumberForStorage } from "@/lib/phoneNumbers";
+import { HttpsUrlInputError, normalizeOptionalHttpsUrl } from "@/lib/httpsUrls";
 
 const REQUIRED_HACKER_UPDATE_FIELDS = ["name"] as const;
 
@@ -21,6 +22,15 @@ const ALLOWED_HACKER_UPDATE_FIELDS = [
   ...REQUIRED_HACKER_UPDATE_FIELDS,
   ...NULLABLE_HACKER_UPDATE_FIELDS,
 ] as const;
+
+const HACKER_URL_FIELD_LABELS: Partial<
+  Record<(typeof NULLABLE_HACKER_UPDATE_FIELDS)[number], string>
+> = {
+  githubUrl: "GitHub URL",
+  linkedinUrl: "LinkedIn URL",
+  twitterUrl: "Twitter URL",
+  websiteUrl: "Website URL",
+};
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object";
@@ -135,9 +145,12 @@ export async function PATCH(
       for (const key of NULLABLE_HACKER_UPDATE_FIELDS) {
         const value = data[key];
         if (typeof value === "string" || value === null) {
+          const urlFieldLabel = HACKER_URL_FIELD_LABELS[key];
           sanitizedData[key] =
             key === "phoneNumber" && typeof value === "string"
               ? phoneNumberForStorage(value)
+              : urlFieldLabel
+                ? normalizeOptionalHttpsUrl(value, urlFieldLabel)
               : value;
         }
       }
@@ -191,6 +204,9 @@ export async function PATCH(
 
     return NextResponse.json(updatedHacker);
   } catch (error) {
+    if (error instanceof HttpsUrlInputError) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
     console.error("Error updating builder:", error);
     return NextResponse.json(
       { error: "Error updating builder" },

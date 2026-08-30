@@ -11,6 +11,7 @@ import {
   ManagementEmptyState,
   useManagementClasses,
 } from './ManagementSurface';
+import { normalizeHttpsUrl } from '@/lib/httpsUrls';
 
 const REVIEW_STATUSES: RegistrationStatus[] = [
   'PENDING',
@@ -134,6 +135,7 @@ function RegistrationReviewRow({
           if (field.id === 'name' || field.id === 'email') return null;
           const value = answerLabel(field, row);
           if (!value) return null;
+          const url = field.type === 'URL' ? normalizeHttpsUrl(value) : null;
           return (
             <div key={field.id}>
               <dt
@@ -141,7 +143,20 @@ function RegistrationReviewRow({
               >
                 {field.label}
               </dt>
-              <dd className="mt-1 whitespace-pre-wrap text-sm">{value}</dd>
+              <dd className="mt-1 whitespace-pre-wrap text-sm">
+                {url?.valid ? (
+                  <a
+                    className="break-all underline underline-offset-2"
+                    href={url.normalizedUrl}
+                    rel="noopener noreferrer"
+                    target="_blank"
+                  >
+                    {value}
+                  </a>
+                ) : (
+                  value
+                )}
+              </dd>
             </div>
           );
         })}

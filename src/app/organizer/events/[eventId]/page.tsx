@@ -1,13 +1,13 @@
 'use client';
-
-import { useEffect, useState } from 'react';
 import {
-  ManagementAlert,
   ManagementLinkButton,
   ManagementSection,
   useManagementClasses,
 } from '../../../components/ManagementSurface';
-import type { EventWorkspacePayload } from './WorkspaceShell';
+import {
+  useEventWorkspace,
+  type EventWorkspacePayload,
+} from './WorkspaceShell';
 import EventStaffPanel from './staff/EventStaffPanel';
 
 function words(value: string) {
@@ -111,67 +111,7 @@ export default function OrganizerEventOverviewPage({
   params: { eventId: string };
 }) {
   const classes = useManagementClasses();
-  const [workspace, setWorkspace] = useState<EventWorkspacePayload | null>(
-    null
-  );
-  const [state, setState] = useState<
-    'loading' | 'ready' | 'permission-lost' | 'unavailable'
-  >('loading');
-
-  useEffect(() => {
-    let isCurrent = true;
-    setState('loading');
-    setWorkspace(null);
-
-    fetch(`/api/events/${params.eventId}/workspace`)
-      .then(async response => {
-        if (response.status === 401 || response.status === 403) {
-          if (isCurrent) setState('permission-lost');
-          return null;
-        }
-        if (!response.ok) {
-          if (isCurrent) setState('unavailable');
-          return null;
-        }
-        return response.json() as Promise<EventWorkspacePayload>;
-      })
-      .then(payload => {
-        if (!isCurrent || !payload) return;
-        setWorkspace(payload);
-        setState('ready');
-      })
-      .catch(() => {
-        if (isCurrent) setState('unavailable');
-      });
-
-    return () => {
-      isCurrent = false;
-    };
-  }, [params.eventId]);
-
-  if (state === 'loading') {
-    return (
-      <ManagementAlert>
-        <span role="status">Loading event overview…</span>
-      </ManagementAlert>
-    );
-  }
-
-  if (state === 'permission-lost') {
-    return (
-      <ManagementAlert tone="danger">
-        <span role="alert">You no longer have access to this event.</span>
-      </ManagementAlert>
-    );
-  }
-
-  if (state === 'unavailable' || !workspace) {
-    return (
-      <ManagementAlert tone="danger">
-        <span role="alert">The event overview is unavailable.</span>
-      </ManagementAlert>
-    );
-  }
+  const workspace = useEventWorkspace();
 
   const { event, capabilities } = workspace;
 
@@ -181,9 +121,9 @@ export default function OrganizerEventOverviewPage({
         title="Overview"
         actions={
           <div className="flex flex-wrap gap-2">
-            {capabilities.managePitch && (
+            {capabilities.managePitch && event.status !== 'DRAFT' && (
               <ManagementLinkButton
-                href={`/pitch/${params.eventId}`}
+                href={`${event.publicUrl}?tab=pitch`}
                 variant="secondary"
               >
                 Open pitch controller

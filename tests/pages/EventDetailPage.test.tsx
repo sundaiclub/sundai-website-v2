@@ -10,6 +10,8 @@ import { publicCalendarPayloadFixture } from '../utils/event-rsvp-fixtures';
 import { getPublicEventBySlug } from '@/lib/publicEvents';
 import { listVisibleEventMaterials } from '@/lib/eventMaterials';
 import { listPublicEventProjects } from '@/lib/publicEventProjects';
+import { getPublicEventSocialMetadata } from '@/lib/eventSocialMetadata';
+import { DEFAULT_SOCIAL_IMAGE_URL, publicUrl } from '@/lib/siteUrl';
 import { mockProject } from '../utils/test-utils';
 
 const mockUseTheme = jest.fn();
@@ -20,6 +22,7 @@ const mockUseAuth = jest.fn();
 const mockServerAuth = jest.fn();
 const mockCurrentUser = jest.fn();
 const mockNotFound = jest.fn();
+const mockRouterRefresh = jest.fn();
 
 jest.mock('../../src/app/contexts/ThemeContext', () => ({
   useTheme: () => mockUseTheme(),
@@ -39,7 +42,7 @@ jest.mock('next/navigation', () => ({
     prefetch: jest.fn(),
     back: jest.fn(),
     forward: jest.fn(),
-    refresh: jest.fn(),
+    refresh: mockRouterRefresh,
   }),
   notFound: () => mockNotFound(),
 }));
@@ -62,6 +65,10 @@ jest.mock('@/lib/publicEvents', () => ({
   getPublicEventBySlug: jest.fn(),
 }));
 
+jest.mock('@/lib/eventSocialMetadata', () => ({
+  getPublicEventSocialMetadata: jest.fn(),
+}));
+
 jest.mock('@/lib/eventMaterials', () => ({
   listVisibleEventMaterials: jest.fn(),
 }));
@@ -70,11 +77,21 @@ jest.mock('@/lib/publicEventProjects', () => ({
   listPublicEventProjects: jest.fn(),
 }));
 
+jest.mock('@/app/components/PitchEventPage', () => ({
+  __esModule: true,
+  default: ({ eventId }: { eventId: string }) => (
+    <div data-testid="event-pitch-controller">Pitch controller {eventId}</div>
+  ),
+}));
+
 type PageComponent = React.ComponentType<{
   params?: { chapterSlug: string; eventSlug: string };
+  searchParams?: { tab?: string };
 }>;
 
 const mockGetPublicEventBySlug = getPublicEventBySlug as jest.Mock;
+const mockGetPublicEventSocialMetadata =
+  getPublicEventSocialMetadata as jest.Mock;
 const mockListVisibleEventMaterials = listVisibleEventMaterials as jest.Mock;
 const mockListPublicEventProjects = listPublicEventProjects as jest.Mock;
 const routeParams = { chapterSlug: 'boston', eventSlug: 'ai-build-night' };
@@ -430,7 +447,10 @@ function mockEventFetches(event: PublicEventDetail | null) {
   }) as jest.Mock;
 }
 
-async function renderDetailPage(event: PublicEventDetail | null) {
+async function renderDetailPage(
+  event: PublicEventDetail | null,
+  tab?: 'projects' | 'pitch'
+) {
   mockGetPublicEventBySlug.mockResolvedValue(event);
   mockListVisibleEventMaterials.mockResolvedValue(
     (event as (PublicEventDetail & { materials?: unknown[] }) | null)
@@ -448,8 +468,9 @@ async function renderDetailPage(event: PublicEventDetail | null) {
     const element = await (
       EventDetailPage as unknown as (props: {
         params: typeof routeParams;
+        searchParams?: { tab?: string };
       }) => Promise<React.ReactElement>
-    )({ params: routeParams });
+    )({ params: routeParams, searchParams: tab ? { tab } : undefined });
     render(element);
     return;
   }
@@ -487,6 +508,63 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
     mockSignedOut();
   });
 
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('uses the event image in link preview metadata', async () => {
+    const event = buildEventDetail({
+      image: {
+        id: 'event-image',
+        url: 'https://cdn.example.com/ai-build-night.webp',
+        alt: 'AI Build Night artwork',
+      },
+    });
+    mockGetPublicEventSocialMetadata.mockResolvedValue(event);
+    const {
+      generateMetadata,
+    } = require('../../src/app/events/[chapterSlug]/[eventSlug]/page');
+
+    const metadata = await generateMetadata({ params: routeParams });
+
+    expect(mockGetPublicEventSocialMetadata).toHaveBeenCalledWith({
+      ...routeParams,
+    });
+    expect(metadata.openGraph?.url).toBe(
+      publicUrl('/events/boston/ai-build-night')
+    );
+    expect(metadata.alternates?.canonical).toBe(
+      publicUrl('/events/boston/ai-build-night')
+    );
+    expect(metadata.openGraph?.images).toEqual([
+      {
+        url: event.image?.url,
+        alt: event.image?.alt,
+      },
+    ]);
+    expect(metadata.twitter?.images).toEqual([event.image?.url]);
+  });
+
+  it('uses the black-background Sundai image for event link previews without artwork', async () => {
+    mockGetPublicEventSocialMetadata.mockResolvedValue(buildEventDetail());
+    const {
+      generateMetadata,
+    } = require('../../src/app/events/[chapterSlug]/[eventSlug]/page');
+
+    const metadata = await generateMetadata({ params: routeParams });
+
+    expect(metadata.openGraph?.images).toEqual([
+      {
+        url: DEFAULT_SOCIAL_IMAGE_URL,
+        width: 1200,
+        height: 630,
+        type: 'image/png',
+        alt: 'Sundai Club Logo',
+      },
+    ]);
+    expect(metadata.twitter?.images).toEqual([DEFAULT_SOCIAL_IMAGE_URL]);
+  });
+
   it('renders published public event fields for anonymous visitors', async () => {
     await renderDetailPage(buildEventDetail());
 
@@ -496,7 +574,25 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
     await expectSomeText(/boston, ma/i);
     await expectSomeText(/july 10, 2026/i);
     await expectSomeText(/6:00\s*pm|6 pm/i);
-    await expectSomeText(/sign in/i);
+    expect(
+      screen.getByRole('button', { name: /^register$/i })
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText('Sign in to apply for this event.')
+    ).not.toBeInTheDocument();
+
+    await openRegistrationForm();
+
+    const registrationDialog = screen.getByRole('dialog', {
+      name: /register for this event/i,
+    });
+    expect(registrationDialog).toBeInTheDocument();
+    expect(registrationDialog.firstElementChild).toHaveStyle({
+      backgroundColor: '#ffffff',
+    });
+    expect(
+      screen.getByRole('button', { name: /sign in to register/i })
+    ).toBeInTheDocument();
     expect(
       screen.getByRole('link', { name: /back to sundai boston/i })
     ).toHaveAttribute('href', '/chapters/boston');
@@ -517,20 +613,48 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
     expect(screen.queryByText(/expert mentors/i)).not.toBeInTheDocument();
   });
 
-  it('preserves line breaks in the event description', async () => {
+  it('shows Info, Projects, and Pitch tabs on every event page', async () => {
+    await renderDetailPage(buildEventDetail());
+
+    expect(screen.getByRole('link', { name: 'Info' })).toHaveAttribute(
+      'href',
+      '/events/boston/ai-build-night'
+    );
+    expect(screen.getByRole('link', { name: 'Projects' })).toHaveAttribute(
+      'href',
+      '/events/boston/ai-build-night?tab=projects'
+    );
+    expect(screen.getByRole('link', { name: 'Pitch' })).toHaveAttribute(
+      'href',
+      '/events/boston/ai-build-night?tab=pitch'
+    );
+  });
+
+  it('renders the pitch controller in the Pitch tab', async () => {
+    await renderDetailPage(buildEventDetail(), 'pitch');
+
+    expect(screen.getByTestId('event-pitch-controller')).toHaveTextContent(
+      `Pitch controller ${eventFixture.id}`
+    );
+    expect(screen.getByRole('link', { name: 'Pitch' })).toHaveAttribute(
+      'aria-current',
+      'page'
+    );
+  });
+
+  it('uses project Markdown spacing for the event description', async () => {
     await renderDetailPage(
-      buildEventDetail({ description: 'First event line\nSecond event line' })
+      buildEventDetail({ description: 'First paragraph\n\nSecond paragraph' })
     );
 
-    const description = screen.getByText((_, element) => {
-      return element?.tagName === 'DIV' &&
-        element.classList.contains('whitespace-pre-wrap') &&
-        element.textContent === 'First event line\nSecond event line'
-        ? true
-        : false;
-    });
+    const description = screen
+      .getByRole('heading', { name: 'About this event' })
+      .closest('section')
+      ?.querySelector('.prose');
 
-    expect(description).toHaveClass('whitespace-pre-wrap');
+    expect(description).toHaveTextContent('First paragraph Second paragraph');
+    expect(description).toHaveClass('prose', 'prose-lg', 'max-w-none');
+    expect(description).not.toHaveClass('whitespace-pre-wrap');
   });
 
   it('shows uploaded event artwork on the public event page', async () => {
@@ -549,7 +673,7 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
     ).toHaveAttribute('src', 'https://cdn.example.com/ai-build-night.webp');
   });
 
-  it('shows event projects as a pitch-vote-ranked carousel above registration', async () => {
+  it('shows event projects as a pitch-vote-ranked carousel without a lower registration section', async () => {
     mockListPublicEventProjects.mockResolvedValue([
       {
         ...mockProject,
@@ -577,13 +701,10 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
       },
     ]);
 
-    await renderDetailPage(buildEventDetail());
+    await renderDetailPage(buildEventDetail(), 'projects');
 
     const carouselHeading = screen.getByRole('heading', {
       name: /projects from this event/i,
-    });
-    const registrationHeading = screen.getByRole('heading', {
-      name: /^registration$/i,
     });
     const projectLinks = screen.getAllByRole('link', {
       name: /top project|second project/i,
@@ -593,21 +714,10 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
       Array.from(new Set(projectLinks.map(link => link.getAttribute('href'))))
     ).toEqual(['/projects/project-high', '/projects/project-low']);
     expect(screen.getByText(/8 votes/)).toBeInTheDocument();
+    expect(carouselHeading).toBeInTheDocument();
     expect(
-      screen.getByRole('list', {
-        name: /event projects ranked by pitch votes/i,
-      })
-    ).toHaveClass(
-      'min-w-0',
-      'max-w-full',
-      'snap-x',
-      'overflow-x-auto',
-      'overscroll-x-contain'
-    );
-    expect(
-      carouselHeading.compareDocumentPosition(registrationHeading) &
-        Node.DOCUMENT_POSITION_FOLLOWING
-    ).toBeTruthy();
+      screen.queryByRole('heading', { name: /^registration$/i })
+    ).not.toBeInTheDocument();
     expect(mockListPublicEventProjects).toHaveBeenCalledWith({
       eventId: eventFixture.id,
     });
@@ -623,10 +733,15 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
       })
     );
 
-    expect(screen.getByRole('link', { name: /^manage$/i })).toHaveAttribute(
+    const manageLink = screen.getByRole('link', { name: /^manage$/i });
+    const backLink = screen.getByRole('link', {
+      name: /back to sundai boston/i,
+    });
+    expect(manageLink).toHaveAttribute(
       'href',
       `/organizer/events/${eventFixture.id}`
     );
+    expect(manageLink.parentElement).toBe(backLink.parentElement);
     expect(screen.getAllByRole('link', { name: /^manage$/i })).toHaveLength(1);
   });
 
@@ -645,6 +760,39 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
     );
   });
 
+  it.each([
+    ['MC', 'You are an MC'],
+    ['CO_MC', 'You are an MC'],
+  ] as const)(
+    'shows the staff event status without registration cancellation for %s viewers',
+    async (role, heading) => {
+      mockSignedIn();
+
+      await renderDetailPage(
+        buildEventDetail({
+          viewerCanManageEvent: true,
+          viewerEventStaffRole: role,
+          viewerRegistrationStatus: 'APPROVED',
+          viewerRegistration: registrationState('APPROVED', {
+            canCancel: false,
+          }),
+        })
+      );
+
+      expect(
+        screen.getByRole('heading', { name: heading })
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          'Use the Manage button in the top right to approve users or make changes to the event.'
+        )
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', { name: /cancel registration/i })
+      ).not.toBeInTheDocument();
+    }
+  );
+
   it('loads signed-in viewer status instead of anonymous application controls', async () => {
     mockSignedIn();
 
@@ -659,6 +807,37 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
     expect(
       screen.queryByText(/sign in to (?:register|apply) for this event/i)
     ).not.toBeInTheDocument();
+  });
+
+  it('registers directly when an open RSVP event does not require an application', async () => {
+    mockSignedIn();
+    const event = buildApplicationEvent({
+      applicationControls: {
+        ...buildApplicationEvent().applicationControls,
+        applicationMode: 'OPEN_RSVP',
+        applicationRequired: false,
+        canSubmit: true,
+        signInRequired: false,
+      },
+    });
+
+    await renderDetailPage(event);
+    fireEvent.click(screen.getByRole('button', { name: /^register$/i }));
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        `/api/events/${event.id}/registrations`,
+        {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: '{}',
+        }
+      );
+    });
+    expect(
+      screen.queryByRole('dialog', { name: /register for this event/i })
+    ).not.toBeInTheDocument();
+    expect(mockRouterRefresh).toHaveBeenCalledTimes(1);
   });
 
   it('hides approved-only details until the viewer is approved', async () => {
@@ -762,6 +941,24 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('hides the event-specific details section when no details are set', async () => {
+    await renderDetailPage(
+      buildEventDetail({
+        approvedDetailsVisible: true,
+        approvedDetailsJson: {
+          address: '42 Private Lane',
+          details: '   ',
+        },
+        viewerRegistrationStatus: 'APPROVED',
+        viewerRegistration: registrationState('APPROVED'),
+      })
+    );
+
+    expect(
+      screen.queryByRole('heading', { name: /event-specific details/i })
+    ).not.toBeInTheDocument();
+  });
+
   it('renders only public material links for anonymous and non-approved viewers', async () => {
     await renderDetailPage(
       buildEventDetail({
@@ -804,24 +1001,82 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
     });
   });
 
-  it('links approved attendees to the attached pitch event', async () => {
+  it('shows active approved attendees the project chooser instead of a pitch link', async () => {
     mockSignedIn();
+    const now = Date.now();
 
     await renderDetailPage(
       buildEventDetail({
+        startTime: new Date(now - 60_000).toISOString(),
+        endTime: new Date(now + 60_000).toISOString(),
         viewerRegistrationStatus: 'APPROVED',
         viewerRegistration: registrationState('APPROVED'),
         approvedDetailsVisible: true,
         pitchSession: { phase: 'VOTING' },
-      })
+      }),
+      'projects'
     );
 
     expect(
-      screen.getByRole('heading', { name: /pitch session/i })
+      await screen.findByRole('heading', { name: /add a project/i })
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('link', { name: /open pitch event/i })
-    ).toHaveAttribute('href', `/pitch/${eventFixture.id}`);
+      screen.queryByRole('link', { name: /go to pitch/i })
+    ).not.toBeInTheDocument();
+  });
+
+  it('hides project entry before the event starts', async () => {
+    const now = Date.now();
+    await renderDetailPage(
+      buildEventDetail({
+        startTime: new Date(now + 60 * 60 * 1000).toISOString(),
+        endTime: new Date(now + 3 * 60 * 60 * 1000).toISOString(),
+        viewerRegistrationStatus: 'APPROVED',
+        viewerRegistration: registrationState('APPROVED'),
+        pitchSession: { phase: 'VOTING' },
+      }),
+      'projects'
+    );
+
+    expect(
+      screen.queryByRole('heading', { name: /add a project/i })
+    ).not.toBeInTheDocument();
+  });
+
+  it('hides project entry when the pitch is finished', async () => {
+    const now = Date.now();
+    await renderDetailPage(
+      buildEventDetail({
+        startTime: new Date(now - 2 * 60 * 60 * 1000).toISOString(),
+        endTime: new Date(now + 60 * 60 * 1000).toISOString(),
+        viewerRegistrationStatus: 'APPROVED',
+        viewerRegistration: registrationState('APPROVED'),
+        pitchSession: { phase: 'FINISHED' },
+      }),
+      'projects'
+    );
+
+    expect(
+      screen.queryByRole('heading', { name: /add a project/i })
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows project entry to a site admin without an RSVP', async () => {
+    const now = Date.now();
+    await renderDetailPage(
+      buildEventDetail({
+        startTime: new Date(now - 2 * 60 * 60 * 1000).toISOString(),
+        endTime: new Date(now + 60 * 60 * 1000).toISOString(),
+        viewerIsSiteAdmin: true,
+        approvedDetailsVisible: true,
+        pitchSession: { phase: 'PITCHING' },
+      }),
+      'projects'
+    );
+
+    expect(
+      await screen.findByRole('heading', { name: /add a project/i })
+    ).toBeInTheDocument();
   });
 
   it('never renders organizer-only rows or private storage metadata on the public event surface', async () => {
@@ -971,6 +1226,41 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
     expect(screen.queryByText(/42 private lane/i)).not.toBeInTheDocument();
   });
 
+  it('cancels the current user registration and refreshes the event detail', async () => {
+    mockSignedIn();
+    jest.spyOn(window, 'confirm').mockReturnValue(true);
+    const event = buildEventDetail({
+      viewerRegistrationStatus: 'APPROVED',
+      viewerRegistration: registrationState('APPROVED', {
+        canEditAnswers: false,
+        canCancel: true,
+      }),
+      applicationControls: {
+        ...buildEventDetail().applicationControls,
+        canSubmit: false,
+        canEditAnswers: false,
+        canCancelRegistration: true,
+      },
+    });
+
+    await renderDetailPage(event);
+    fireEvent.click(
+      screen.getByRole('button', { name: /cancel registration/i })
+    );
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        `/api/events/${event.id}/registrations/me/cancel`,
+        { method: 'POST' }
+      );
+    });
+    expect(await screen.findByText(/registration cancelled/i)).toHaveAttribute(
+      'role',
+      'status'
+    );
+    expect(mockRouterRefresh).toHaveBeenCalledTimes(1);
+  });
+
   it('provides an add-to-calendar action using the public calendar payload', async () => {
     await renderDetailPage(
       buildEventDetail({ viewerRegistrationStatus: 'APPROVED' })
@@ -981,8 +1271,6 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
     expect(
       screen.getAllByRole('link', { name: /add.*calendar/i })
     ).toHaveLength(1);
-    expect(calendarAction.parentElement).toHaveTextContent(/open/i);
-    expect(calendarAction.parentElement).toHaveTextContent(/registered/i);
 
     if (calendarAction.tagName.toLowerCase() === 'a') {
       expect(calendarAction).toHaveAttribute(
@@ -1010,10 +1298,21 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
       await renderDetailPage(buildApplicationEvent());
 
       expect(screen.queryByLabelText(/full name/i)).not.toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /^register$/i })).toBeEnabled();
+      const registerButton = screen.getByRole('button', {
+        name: /^register$/i,
+      });
+      const whenLabel = screen.getByText(/^when$/i);
+      expect(registerButton).toBeEnabled();
+      expect(
+        registerButton.compareDocumentPosition(whenLabel) &
+          Node.DOCUMENT_POSITION_FOLLOWING
+      ).toBeTruthy();
 
       await openRegistrationForm();
 
+      expect(
+        screen.getByRole('dialog', { name: /register for this event/i })
+      ).toBeInTheDocument();
       const nameInput = await screen.findByLabelText(/full name/i);
       const emailInput = screen.getByRole('textbox', { name: /email/i });
       const phoneInput = screen.getByLabelText(/phone number/i);
@@ -1115,6 +1414,25 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
       );
     });
 
+    it('refreshes the event page after an application is submitted', async () => {
+      await renderDetailPage(buildApplicationEvent());
+
+      await openRegistrationForm();
+      fireEvent.change(await screen.findByLabelText(/full name/i), {
+        target: { value: 'Signed In Applicant' },
+      });
+      fireEvent.change(screen.getByLabelText(/project idea/i), {
+        target: { value: 'Build an event scheduler' },
+      });
+      fireEvent.click(
+        screen.getByRole('button', { name: /submit application/i })
+      );
+
+      await waitFor(() => {
+        expect(mockRouterRefresh).toHaveBeenCalledTimes(1);
+      });
+    });
+
     it('uses saved chapter preferences as the application defaults', async () => {
       await renderDetailPage(
         buildApplicationEvent({
@@ -1142,7 +1460,7 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
       ).toBeChecked();
     });
 
-    it('prefills only prior answers enabled for reuse', async () => {
+    it('prefills the prior site name and answers enabled for reuse', async () => {
       const event = buildApplicationEvent();
       const composedFields = event.applicationQuestionSet.composedFields.map(
         field => ({
@@ -1154,6 +1472,7 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
       await renderDetailPage({
         ...event,
         reusableAnswersJson: {
+          name: 'Name from my previous application',
           project: 'Answer from my previous application',
           chapterGoals: 'This answer should not be reused',
         },
@@ -1165,6 +1484,9 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
 
       await openRegistrationForm();
 
+      expect(screen.getByLabelText(/full name/i)).toHaveValue(
+        'Name from my previous application'
+      );
       expect(screen.getByLabelText(/project idea/i)).toHaveValue(
         'Answer from my previous application'
       );
@@ -1244,6 +1566,9 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
         })
       );
 
+      expect(
+        screen.getByRole('dialog', { name: /edit your application/i })
+      ).toBeInTheDocument();
       expect(
         screen.getByDisplayValue('Scheduler prototype')
       ).toBeInTheDocument();

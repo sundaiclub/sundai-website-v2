@@ -191,7 +191,13 @@ export async function GET(
         })
       : undefined;
 
-    const { events = [], ...chapterDetails } = chapter;
+    const {
+      events = [],
+      defaultApprovalMessage,
+      defaultWaitlistMessage,
+      defaultRejectionMessage,
+      ...chapterDetails
+    } = chapter;
     const projectsById = new Map<
       string,
       (typeof events)[number]['projects'][number]['project']
@@ -228,6 +234,13 @@ export async function GET(
 
     return NextResponse.json({
       ...chapterDetails,
+      ...(canManageChapter
+        ? {
+            defaultApprovalMessage,
+            defaultWaitlistMessage,
+            defaultRejectionMessage,
+          }
+        : {}),
       upcomingEvents: events.map(publicEvent),
       happeningNowEvents: happeningNowEvents.map(publicEvent),
       previousEvents: previousEvents.map(publicEvent),
@@ -278,11 +291,21 @@ export async function PATCH(
       'accessMode',
       'mailingListName',
       'mailingListExternalId',
+      'defaultApprovalMessage',
+      'defaultWaitlistMessage',
+      'defaultRejectionMessage',
     ] as const;
     const data: Record<string, unknown> = {};
 
     if (body?.timezone !== undefined && !isChapterTimezone(body.timezone)) {
       return badRequest('timezone must be a supported IANA timezone');
+    }
+
+    if (body?.name !== undefined) {
+      if (typeof body.name !== 'string' || !body.name.trim()) {
+        return badRequest('name is required');
+      }
+      body.name = body.name.trim();
     }
 
     for (const key of allowedKeys) {

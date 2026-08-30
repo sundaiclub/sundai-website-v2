@@ -11,6 +11,7 @@ import {
   buildApplicationControlsState,
   getApplicationPublicStatus,
   parseTemplateFieldsJson,
+  shouldReusePreviousApplicationAnswer,
 } from '@/lib/applicationTemplates';
 import { fetchMergedApplicationTemplate } from '@/lib/applicationTemplateQueries';
 import type {
@@ -142,6 +143,7 @@ type PublicEventsEventRecord = {
   programType?: string | null;
   capacity?: number | null;
   applicationMode: EventApplicationMode;
+  applicationRequired?: boolean | null;
   applicationsOpen: boolean;
   applicationsClosedAt?: Date | string | null;
   applicationsCloseReason?: string | null;
@@ -222,6 +224,7 @@ export type PublicEventViewer = {
 
 export type ListPublicEventsOptions = {
   chapterSlug?: string | null;
+  period?: 'upcoming' | 'previous';
   viewer?: PublicEventViewer | null;
   now?: Date;
   take?: number;
@@ -244,10 +247,12 @@ export type RedactPublicEventOptions = {
   viewerProfile?: ProfilePrefillSource | null;
   viewerNotificationPreferences?: PublicEventDetail['viewerNotificationPreferences'];
   viewerRegistration?: PublicViewerRegistrationState | null;
+  viewerEventStaffRole?: EventStaffRole | null;
   viewerCanManageRegistrations?: boolean;
   viewerCanViewApprovedDetails?: boolean;
   viewerCanEditEvent?: boolean;
   viewerCanManageEvent?: boolean;
+  viewerIsSiteAdmin?: boolean;
   viewerIsSignedIn?: boolean;
   approvedCalendarDetails?: boolean;
   approvedCount?: number;
@@ -342,8 +347,17 @@ function publicEventVisibilityWhere(
 
 function publicEventListingWhere(
   now: Date,
-  chapterSlug?: string | null
+  chapterSlug?: string | null,
+  period: 'upcoming' | 'previous' = 'upcoming'
 ): Prisma.EventWhereInput {
+  if (period === 'previous') {
+    return {
+      ...publicEventVisibilityWhere(chapterSlug),
+      startTime: { lt: now },
+      OR: [{ endTime: null }, { endTime: { lte: now } }],
+    };
+  }
+
   return {
     ...publicEventVisibilityWhere(chapterSlug),
     OR: [
@@ -365,10 +379,14 @@ export async function listPublicEvents(
 ): Promise<PublicEventCard[]> {
   const client = options.prismaClient ?? defaultPrisma;
   const now = options.now ?? new Date();
+  const period = options.period ?? 'upcoming';
   const events = await client.event.findMany({
-    where: publicEventListingWhere(now, options.chapterSlug),
+    where: publicEventListingWhere(now, options.chapterSlug, period),
     include: publicEventInclude(),
-    orderBy: [{ startTime: 'asc' }, { title: 'asc' }],
+    orderBy:
+      period === 'previous'
+        ? [{ startTime: 'desc' }, { title: 'asc' }]
+        : [{ startTime: 'asc' }, { title: 'asc' }],
     take: options.take,
     skip: options.skip,
   });
@@ -472,10 +490,12 @@ export async function getPublicEventBySlug(
           }
         : null,
     viewerRegistration,
+    viewerEventStaffRole: readPermissionContext.staff?.role ?? null,
     viewerCanManageRegistrations,
     viewerCanViewApprovedDetails,
     viewerCanEditEvent,
     viewerCanManageEvent,
+    viewerIsSiteAdmin: readPermissionContext.actor?.role === 'SITE_ADMIN',
     viewerIsSignedIn: Boolean(input.viewer?.hackerId || input.viewer?.clerkId),
     approvedCalendarDetails: input.includeApprovedCalendarDetails,
     now,
@@ -506,8 +526,16 @@ export function redactPublicEventForViewer(
   options: RedactPublicEventOptions = {}
 ): PublicEventDetail {
   const now = options.now ?? new Date();
+  const viewerRegistration = options.viewerRegistration
+    ? {
+        ...options.viewerRegistration,
+        canCancel: options.viewerEventStaffRole
+          ? false
+          : options.viewerRegistration.canCancel,
+      }
+    : null;
   const approvedDetailsVisible = canViewApprovedDetails({
-    viewerRegistration: options.viewerRegistration,
+    viewerRegistration,
     viewerCanViewApprovedDetails: options.viewerCanViewApprovedDetails,
     viewerCanManageRegistrations: options.viewerCanManageRegistrations,
   });
@@ -516,9 +544,9 @@ export function redactPublicEventForViewer(
     : null;
   const applicationControls = buildApplicationControls({
     event,
-    viewerRegistration: options.viewerRegistration ?? null,
+    viewerRegistration,
     viewerIsSignedIn:
-      options.viewerIsSignedIn === true || Boolean(options.viewerRegistration),
+      options.viewerIsSignedIn === true || Boolean(viewerRegistration),
     approvedCount: options.approvedCount,
     now,
   });
@@ -543,10 +571,12 @@ export function redactPublicEventForViewer(
     viewerProfile: options.viewerProfile ?? null,
     viewerNotificationPreferences:
       options.viewerNotificationPreferences ?? null,
-    viewerRegistration: options.viewerRegistration ?? null,
+    viewerRegistration,
+    viewerEventStaffRole: options.viewerEventStaffRole ?? null,
     viewerCanManageRegistrations: options.viewerCanManageRegistrations === true,
     viewerCanEditEvent: options.viewerCanEditEvent === true,
     viewerCanManageEvent: options.viewerCanManageEvent === true,
+    viewerIsSiteAdmin: options.viewerIsSiteAdmin === true,
     pitchSession: approvedDetailsVisible
       ? (event.pitchSessions?.[0] ?? null)
       : null,
@@ -564,7 +594,7 @@ async function getReusableAnswersForViewer(input: {
   viewerHackerId?: EntityId | null;
 }): Promise<JsonObject> {
   const reusableFieldIds = input.fields
-    .filter(field => field.reusePreviousAnswer === true)
+    .filter(shouldReusePreviousApplicationAnswer)
     .map(field => field.id);
 
   if (!input.viewerHackerId || reusableFieldIds.length === 0) return {};
@@ -747,6 +777,7 @@ function buildApplicationControls(input: {
 
   return buildApplicationControlsState({
     applicationMode: event.applicationMode,
+    applicationRequired: event.applicationRequired,
     applicationsOpen: event.applicationsOpen,
     applicationsClosedAt: event.applicationsClosedAt ?? null,
     applicationsCloseReason: event.applicationsCloseReason ?? null,

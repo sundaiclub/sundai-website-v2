@@ -31,6 +31,9 @@ jest.mock('../../src/lib/prisma', () => ({
     hacker: {
       findUnique: jest.fn(),
     },
+    chapter: {
+      findUnique: jest.fn(),
+    },
     chapterMembership: {
       findMany: jest.fn(),
       findFirst: jest.fn(),
@@ -185,6 +188,12 @@ describe('/api/events', () => {
       id: 'h-admin',
       role: 'SITE_ADMIN',
     });
+    prisma.chapter.findUnique.mockResolvedValue({
+      id: 'boston',
+      defaultApprovalMessage: null,
+      defaultWaitlistMessage: null,
+      defaultRejectionMessage: null,
+    });
     const created = {
       id: 'evt-1',
       title: 'Test',
@@ -198,6 +207,7 @@ describe('/api/events', () => {
     request.json = jest.fn().mockResolvedValue({
       title: 'Test',
       startTime: new Date().toISOString(),
+      meetingUrl: 'zoom.us/j/1234567890',
     });
     const res = await POST_EVENTS(request as any);
     expect(res.status).toBe(200);
@@ -205,11 +215,14 @@ describe('/api/events', () => {
     expect(prisma.event.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
+          meetingUrl: 'https://zoom.us/j/1234567890',
+          virtualUrl: 'https://zoom.us/j/1234567890',
           pitchSessions: {
             create: expect.objectContaining({
               chapterId: 'boston',
               title: 'Test',
               createdById: 'h-admin',
+              meetingUrl: 'https://zoom.us/j/1234567890',
             }),
           },
         }),
@@ -240,7 +253,9 @@ describe('/api/events/[eventId]', () => {
   });
 
   it('GET single event returns public event detail', async () => {
-    prisma.event.findFirst.mockResolvedValue(buildPublicEvent());
+    prisma.event.findFirst.mockResolvedValue(
+      buildPublicEvent({ meetingUrl: 'https://zoom.us/j/1234567890' })
+    );
     const request = new NextRequest('http://localhost:3000/api/events/evt-1');
     const res = await GET_EVENT(
       request as any,
@@ -267,17 +282,21 @@ describe('/api/events/[eventId]', () => {
         signInRequired: true,
       })
     );
+    expect(body.meetingUrl).toBe('https://zoom.us/j/1234567890');
     expect(body).not.toHaveProperty('phase');
   });
 
-  it('GET exposes the attached pitch event to an approved attendee', async () => {
+  it('GET exposes the attached pitch event and meeting URL to an approved attendee', async () => {
     mockAuth.mockReturnValue({ userId: 'clerk-approved' });
     prisma.hacker.findUnique.mockResolvedValue({
       id: 'h-approved',
       role: 'HACKER',
     });
     prisma.event.findFirst.mockResolvedValue(
-      buildPublicEvent({ pitchSessions: [{ phase: 'VOTING' }] })
+      buildPublicEvent({
+        meetingUrl: 'https://zoom.us/j/1234567890',
+        pitchSessions: [{ phase: 'VOTING' }],
+      })
     );
     prisma.eventRegistration.findFirst.mockResolvedValue({
       id: 'registration-approved',
@@ -289,7 +308,7 @@ describe('/api/events/[eventId]', () => {
     });
     prisma.eventStaff.findFirst.mockResolvedValue(null);
     prisma.event.findUnique.mockResolvedValue({
-      meetingUrl: null,
+      meetingUrl: 'https://zoom.us/j/1234567890',
       staff: [],
       pitchSessions: [
         {
@@ -311,6 +330,79 @@ describe('/api/events/[eventId]', () => {
     expect(body.pitchSessions).toEqual([
       expect.objectContaining({ id: 'pitch-1', phase: 'VOTING' }),
     ]);
+    expect(body.canManagePitch).toBe(false);
+    expect(body.meetingUrl).toBe('https://zoom.us/j/1234567890');
+  });
+
+  it('GET identifies a chapter admin as a pitch manager', async () => {
+    mockAuth.mockReturnValue({ userId: 'clerk-chapter-admin' });
+    prisma.hacker.findUnique.mockResolvedValue({
+      id: 'h-chapter-admin',
+      role: 'HACKER',
+    });
+    prisma.event.findFirst.mockResolvedValue(
+      buildPublicEvent({ pitchSessions: [{ phase: 'VOTING' }] })
+    );
+    prisma.chapterMembership.findFirst.mockResolvedValue({
+      role: 'ADMIN',
+      status: 'ACTIVE',
+    });
+    prisma.eventStaff.findFirst.mockResolvedValue(null);
+    prisma.event.findUnique.mockResolvedValue({
+      staff: [],
+      pitchSessions: [{ id: 'pitch-1', phase: 'VOTING', projects: [] }],
+    });
+
+    const response = await GET_EVENT(
+      new NextRequest('http://localhost:3000/api/events/evt-1') as any,
+      { params: { eventId: 'evt-1' } } as any
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual(
+      expect.objectContaining({ canManagePitch: true })
+    );
+  });
+
+  it('GET keeps the meeting URL in pitch manager refresh responses', async () => {
+    mockAuth.mockReturnValue({ userId: 'clerk-mc' });
+    prisma.hacker.findUnique.mockResolvedValue({
+      id: 'h-mc',
+      role: 'HACKER',
+    });
+    prisma.event.findFirst.mockResolvedValue(
+      buildPublicEvent({
+        meetingUrl: 'https://zoom.us/j/1234567890',
+        pitchSessions: [{ phase: 'VOTING' }],
+      })
+    );
+    prisma.eventStaff.findFirst.mockResolvedValue({ role: 'MC' });
+    prisma.event.findUnique.mockResolvedValue({
+      meetingUrl: 'https://zoom.us/j/1234567890',
+      staff: [
+        {
+          id: 'staff-mc',
+          role: 'MC',
+          hacker: { id: 'h-mc', name: 'Event MC' },
+        },
+      ],
+      pitchSessions: [
+        {
+          id: 'pitch-1',
+          phase: 'VOTING',
+          projects: [],
+        },
+      ],
+    });
+
+    const response = await GET_EVENT(
+      new NextRequest('http://localhost:3000/api/events/evt-1') as any,
+      { params: { eventId: 'evt-1' } } as any
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.meetingUrl).toBe('https://zoom.us/j/1234567890');
   });
 
   it('GET management event details requires sign-in', async () => {
@@ -389,26 +481,27 @@ describe('/api/events/[eventId]', () => {
       .mockResolvedValueOnce({
         id: 'evt-1',
         title: 'Updated Event',
+        chapter: {
+          id: 'chapter-boston',
+          slug: 'boston',
+          timezone: 'America/New_York',
+        },
         pitchSessions: [
           {
             id: 'pitch-1',
             phase: 'PITCHING',
-            topPresentingSec: 150,
-            topQuestionsSec: 180,
-            defaultPresentingSec: 75,
-            defaultQuestionsSec: 120,
+            topPitchSec: 330,
+            defaultPitchSec: 195,
             projects: [
               {
                 id: 'ep-top',
                 isTopProject: true,
-                allottedPresentingSec: 150,
-                allottedQuestionsSec: 180,
+                allottedSec: 330,
               },
               {
                 id: 'ep-regular',
                 isTopProject: false,
-                allottedPresentingSec: 75,
-                allottedQuestionsSec: 120,
+                allottedSec: 195,
               },
             ],
           },
@@ -419,10 +512,8 @@ describe('/api/events/[eventId]', () => {
     prisma.pitchSession.findFirst.mockResolvedValue({
       id: 'pitch-1',
       phase: 'PITCHING',
-      topPresentingSec: 120,
-      topQuestionsSec: 180,
-      defaultPresentingSec: 60,
-      defaultQuestionsSec: 120,
+      topPitchSec: 300,
+      defaultPitchSec: 180,
     });
     prisma.pitchSession.update.mockResolvedValue({ id: 'pitch-1' });
     prisma.pitchProject.updateMany.mockResolvedValue({ count: 1 });
@@ -435,8 +526,8 @@ describe('/api/events/[eventId]', () => {
     });
     request.json = jest.fn().mockResolvedValue({
       title: 'Updated Event',
-      topPresentingSec: 150,
-      defaultPresentingSec: 75,
+      topPitchSec: 330,
+      defaultPitchSec: 195,
     });
 
     const res = await PATCH_EVENT(
@@ -453,8 +544,7 @@ describe('/api/events/[eventId]', () => {
         status: { in: ['CURRENT', 'APPROVED'] },
       },
       data: {
-        allottedPresentingSec: 150,
-        allottedQuestionsSec: 180,
+        allottedSec: 330,
       },
     });
     expect(prisma.pitchProject.updateMany).toHaveBeenNthCalledWith(2, {
@@ -464,14 +554,19 @@ describe('/api/events/[eventId]', () => {
         status: { in: ['CURRENT', 'APPROVED'] },
       },
       data: {
-        allottedPresentingSec: 75,
-        allottedQuestionsSec: 120,
+        allottedSec: 195,
       },
     });
 
     const body = await res.json();
-    expect(body.pitchSessions[0].projects[0].allottedPresentingSec).toBe(150);
-    expect(body.pitchSessions[0].projects[1].allottedPresentingSec).toBe(75);
+    expect(body.chapter.slug).toBe('boston');
+    expect(body.pitchSessions[0].projects[0].allottedSec).toBe(330);
+    expect(body.pitchSessions[0].projects[1].allottedSec).toBe(195);
+    expect(prisma.event.findUnique).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        include: expect.objectContaining({ chapter: true }),
+      })
+    );
   });
 
   it.each([

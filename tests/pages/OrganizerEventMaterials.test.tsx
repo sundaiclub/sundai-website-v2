@@ -66,8 +66,7 @@ const organizerFile: EventMaterial = {
   visibility: 'ORGANIZERS_ONLY',
   title: 'Sponsor contacts',
   originalFilename: 'sponsor-contacts.xlsx',
-  mimeType:
-    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   position: 30,
   isAvailable: false,
 };
@@ -79,7 +78,9 @@ function jsonResponse(data: unknown, status = 200) {
     json: jest.fn().mockResolvedValue(data),
     text: jest
       .fn()
-      .mockResolvedValue(typeof data === 'string' ? data : JSON.stringify(data)),
+      .mockResolvedValue(
+        typeof data === 'string' ? data : JSON.stringify(data)
+      ),
   });
 }
 
@@ -92,7 +93,8 @@ function requestUrl(input: RequestInfo | URL) {
 }
 
 function mockMaterialsFetch(
-  materials: EventMaterial[] = [publicLink, approvedFile, organizerFile]
+  materials: EventMaterial[] = [publicLink, approvedFile, organizerFile],
+  createError?: string
 ) {
   global.fetch = jest.fn((input: RequestInfo | URL, init?: RequestInit) => {
     const url = requestUrl(input);
@@ -114,6 +116,7 @@ function mockMaterialsFetch(
       return jsonResponse(null, 200);
     }
     if (url === `/api/events/${eventId}/materials` && init?.method === 'POST') {
+      if (createError) return jsonResponse({ error: createError }, 400);
       const body = JSON.parse(String(init.body));
       return jsonResponse(
         body.kind === 'LINK'
@@ -128,7 +131,10 @@ function mockMaterialsFetch(
       );
     }
     if (init?.method === 'PATCH') {
-      return jsonResponse({ ...approvedFile, ...JSON.parse(String(init.body)) });
+      return jsonResponse({
+        ...approvedFile,
+        ...JSON.parse(String(init.body)),
+      });
     }
     if (init?.method === 'DELETE') {
       return jsonResponse(null, 204);
@@ -156,8 +162,7 @@ function renderPage() {
 
 function fetchBody(path: string, method: string) {
   const call = (global.fetch as jest.Mock).mock.calls.find(
-    ([input, init]) =>
-      requestUrl(input) === path && init?.method === method
+    ([input, init]) => requestUrl(input) === path && init?.method === method
   );
   if (!call) throw new Error(`Expected ${method} ${path}`);
   return JSON.parse(String(call[1].body));
@@ -192,7 +197,7 @@ describe('/organizer/events/[eventId]/materials', () => {
     ).toBeInTheDocument();
   });
 
-  it('creates an https link with organizer-selected visibility and ordering', async () => {
+  it('creates a scheme-free link with organizer-selected visibility and ordering', async () => {
     renderPage();
     await screen.findByText('Public schedule');
 
@@ -201,8 +206,8 @@ describe('/organizer/events/[eventId]/materials', () => {
     fireEvent.change(screen.getByLabelText(/title/i), {
       target: { value: 'Brainstorming board' },
     });
-    fireEvent.change(screen.getByLabelText(/https.*url|link url/i), {
-      target: { value: 'https://example.com/board' },
+    fireEvent.change(screen.getByLabelText(/link url/i), {
+      target: { value: 'example.com/board' },
     });
     fireEvent.change(screen.getByLabelText(/visibility/i), {
       target: { value: 'APPROVED_ATTENDEES' },
@@ -218,11 +223,33 @@ describe('/organizer/events/[eventId]/materials', () => {
       ).toMatchObject({
         kind: 'LINK',
         title: 'Brainstorming board',
-        externalUrl: 'https://example.com/board',
+        externalUrl: 'example.com/board',
         visibility: 'APPROVED_ATTENDEES',
         position: 25,
       });
     });
+  });
+
+  it('shows the specific reason that a material URL was rejected', async () => {
+    mockMaterialsFetch(
+      [publicLink],
+      'Material link: HTTP links are not supported. Use HTTPS or omit the protocol.'
+    );
+    renderPage();
+    await screen.findByText('Public schedule');
+
+    fireEvent.click(screen.getByRole('button', { name: /add material/i }));
+    fireEvent.change(screen.getByLabelText(/title/i), {
+      target: { value: 'Unsafe link' },
+    });
+    fireEvent.change(screen.getByLabelText(/link url/i), {
+      target: { value: 'http://example.com' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /create material/i }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'HTTP links are not supported. Use HTTPS or omit the protocol.'
+    );
   });
 
   it('uploads a file through an intent before finalizing the material record', async () => {
@@ -247,10 +274,7 @@ describe('/organizer/events/[eventId]/materials', () => {
 
     await waitFor(() => {
       expect(
-        fetchBody(
-          `/api/events/${eventId}/materials/upload-intents`,
-          'POST'
-        )
+        fetchBody(`/api/events/${eventId}/materials/upload-intents`, 'POST')
       ).toMatchObject({
         filename: 'sponsor-brief.pdf',
         mimeType: 'application/pdf',

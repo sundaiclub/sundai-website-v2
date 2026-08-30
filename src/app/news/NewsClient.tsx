@@ -131,7 +131,7 @@ export default function NewsClient() {
           </div>
           <p style="margin:0 0 6px;color:#374151">${p.preview || ""}</p>
           <p style="margin:0 0 10px;color:#6b7280">Built by: ${teamLinks}</p>
-          ${p.thumbnailUrl ? `<img src="${p.thumbnailUrl}" alt="${p.title}" style="width:260px;height:auto;border-radius:0;border:1px solid #e5e7eb;margin:8px 0" />` : ''}
+          ${p.thumbnailUrl ? `<img src="${p.thumbnailUrl}" alt="${p.title}" width="260" height="173" style="display:block;width:260px;height:173px;object-fit:contain;background:#000000;border-radius:0;border:1px solid #e5e7eb;margin:8px 0" />` : ''}
           <div style="margin-top:8px">
             <a href="${p.projectUrl}" style="display:inline-block;padding:10px 14px;background:#111827;color:#ffffff;text-decoration:none;border-radius:0;border:1px solid #111827">View project</a>
             <a href="${likeUrl}" style="display:inline-block;padding:10px 14px;background:transparent;color:#111827;text-decoration:none;border-radius:0;border:1px solid #111827;margin-left:8px">Like on Sundai</a>

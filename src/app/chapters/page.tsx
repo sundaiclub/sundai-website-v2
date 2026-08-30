@@ -73,12 +73,12 @@ export default function ChaptersPage() {
               href={`/chapters/${chapter.slug}`}
             />
             <div
-              className={`${classes.subtlePanel} relative mb-4 flex aspect-[16/9] w-full items-center justify-center overflow-hidden rounded-md`}
+              className={`${classes.subtlePanel} relative mb-4 flex aspect-[3/2] w-full items-center justify-center overflow-hidden rounded-md !bg-black`}
             >
               {chapter.heroImage?.url ? (
                 <Image
                   alt={chapter.heroImage.alt || `${chapter.name} chapter`}
-                  className="object-cover"
+                  className="object-contain"
                   fill
                   src={chapter.heroImage.url}
                   sizes="(min-width: 640px) 50vw, 100vw"
@@ -99,12 +99,11 @@ export default function ChaptersPage() {
                 <div className="block truncate text-lg font-bold group-hover:underline">
                   {chapter.name}
                 </div>
-                <div className={`mt-1 text-sm ${classes.mutedText}`}>
-                  {chapter.city}
-                </div>
-                <div className={`mt-1 text-xs ${classes.mutedText}`}>
-                  {chapter.timezone}
-                </div>
+                {chapter.description && (
+                  <div className={`mt-1 text-sm ${classes.mutedText}`}>
+                    {chapter.description}
+                  </div>
+                )}
               </div>
               <ManagementBadge>{chapter.accessMode}</ManagementBadge>
             </div>

@@ -8,6 +8,7 @@ import {
   ManagementSection,
   useManagementClasses,
 } from '../../../../components/ManagementSurface';
+import { useEventWorkspace } from '../WorkspaceShell';
 
 type PitchProject = {
   queue?: { status?: string; position?: number | null };
@@ -35,6 +36,7 @@ export default function OrganizerEventPitchPage({
   params: { eventId: string };
 }) {
   const classes = useManagementClasses();
+  const workspace = useEventWorkspace();
   const [projects, setProjects] = useState<PitchProject[]>([]);
   const [state, setState] = useState<'loading' | 'ready' | 'unavailable'>(
     'loading'
@@ -115,12 +117,14 @@ export default function OrganizerEventPitchPage({
       title="Pitch summary"
       description="Review event pitch state here, then open the focused controller to operate the live session."
       actions={
-        <ManagementLinkButton
-          href={`/pitch/${params.eventId}`}
-          variant="primary"
-        >
-          Open pitch controller
-        </ManagementLinkButton>
+        workspace.event.status !== 'DRAFT' ? (
+          <ManagementLinkButton
+            href={`${workspace.event.publicUrl}?tab=pitch`}
+            variant="primary"
+          >
+            Open pitch controller
+          </ManagementLinkButton>
+        ) : undefined
       }
     >
       {projects.length === 0 ? (

@@ -99,6 +99,7 @@ export interface ComposeApplicationFieldsInput {
 
 export interface ApplicationControlStateInput {
   applicationMode: EventApplicationMode;
+  applicationRequired?: boolean | null;
   applicationsOpen?: boolean | null;
   applicationsClosedAt?: Date | string | null;
   applicationsCloseReason?: string | null;
@@ -411,6 +412,9 @@ export function buildApplicationControlsState(
 
   return {
     applicationMode: input.applicationMode,
+    applicationRequired:
+      input.applicationMode !== 'OPEN_RSVP' ||
+      input.applicationRequired !== false,
     applicationsOpen,
     applicationsClosedAt: input.applicationsClosedAt ?? null,
     applicationsCloseReason:
@@ -528,6 +532,15 @@ export function applyProfilePrefillToAnswers(
     ...mapProfileToApplicationPrefill(input),
     ...(input.existingAnswers ?? {}),
   };
+}
+
+export function shouldReusePreviousApplicationAnswer(
+  field: TemplateFieldDefinition
+): boolean {
+  return (
+    field.reusePreviousAnswer === true ||
+    (field.id === 'name' && field.siteRequired === true)
+  );
 }
 
 function getPublicSafeApplicationStatusMessage(

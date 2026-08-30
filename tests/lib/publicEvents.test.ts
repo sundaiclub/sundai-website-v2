@@ -243,6 +243,22 @@ describe('public event helpers', () => {
     );
   });
 
+  it('exposes the viewer staff role and disables staff registration cancellation', () => {
+    const detail = redactPublicEventForViewer(buildPublicEvent(), {
+      viewerRegistration: {
+        id: 'registration-mc',
+        status: 'APPROVED',
+        canEditAnswers: false,
+        canCancel: true,
+      },
+      viewerEventStaffRole: 'MC',
+      now,
+    });
+
+    expect(detail.viewerEventStaffRole).toBe('MC');
+    expect(detail.viewerRegistration?.canCancel).toBe(false);
+  });
+
   it('queries only public published current and upcoming events in active public chapters', async () => {
     const event = buildPublicEvent({
       id: 'event-2',
@@ -383,6 +399,35 @@ describe('public event helpers', () => {
     expect(prisma.eventRegistration.findMany).not.toHaveBeenCalled();
   });
 
+  it('queries previous events from newest to oldest', async () => {
+    const prisma = buildPrismaMock();
+    prisma.event.findMany.mockResolvedValue([]);
+
+    await listPublicEvents({
+      chapterSlug: 'boston',
+      period: 'previous',
+      now,
+      prismaClient: prisma,
+    });
+
+    expect(prisma.event.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          status: 'PUBLISHED',
+          visibility: 'PUBLIC',
+          chapter: {
+            status: 'ACTIVE',
+            accessMode: 'PUBLIC',
+            slug: 'boston',
+          },
+          startTime: { lt: now },
+          OR: [{ endTime: null }, { endTime: { lte: now } }],
+        },
+        orderBy: [{ startTime: 'desc' }, { title: 'asc' }],
+      })
+    );
+  });
+
   it('loads public event detail by public chapter and event slug with viewer registration state', async () => {
     const event = buildPublicEvent({
       pitchSessions: [{ phase: 'VOTING' }],
@@ -475,7 +520,7 @@ describe('public event helpers', () => {
     ).toEqual(['name', 'email', 'phoneNumber']);
   });
 
-  it('returns the latest prior answer only for questions configured for reuse', async () => {
+  it('returns the latest site name and answers configured for reuse', async () => {
     const event = buildPublicEvent({
       applicationQuestionsJson: [
         {
@@ -506,11 +551,16 @@ describe('public event helpers', () => {
     prisma.eventRegistration.findMany.mockResolvedValue([
       buildRegistration({
         eventId: 'event-prior-newer',
-        answersJson: { project: '   ', 'private-note': 'Do not reuse this' },
+        answersJson: {
+          name: 'Latest Applicant Name',
+          project: '   ',
+          'private-note': 'Do not reuse this',
+        },
       }),
       buildRegistration({
         eventId: 'event-prior-older',
         answersJson: {
+          name: 'Older Applicant Name',
           project: 'Reusable project answer',
           'private-note': 'Still do not reuse this',
         },
@@ -540,6 +590,7 @@ describe('public event helpers', () => {
       take: 50,
     });
     expect(detail?.reusableAnswersJson).toEqual({
+      name: 'Latest Applicant Name',
       project: 'Reusable project answer',
     });
   });

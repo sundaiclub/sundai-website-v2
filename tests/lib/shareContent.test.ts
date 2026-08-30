@@ -1,24 +1,17 @@
-// Mock @google/genai SDK
-const generateContentMock = jest.fn();
-jest.mock(
-  '@google/genai',
-  () => {
-    return {
-      __esModule: true,
-      GoogleGenAI: jest.fn().mockImplementation(() => ({
-        models: {
-          generateContent: generateContentMock,
-        },
-      })),
-    };
-  },
-  { virtual: true }
-);
+jest.mock('../../src/lib/bedrockText', () => ({
+  BEDROCK_TEXT_MODEL: 'openai.gpt-5.6-luna',
+  generateBedrockText: jest.fn(),
+}));
 
+import { generateBedrockText } from '../../src/lib/bedrockText';
 import {
   buildShareContentPrompt,
   generateShareContent,
 } from '../../src/lib/shareContent';
+
+const generateBedrockTextMock = generateBedrockText as jest.MockedFunction<
+  typeof generateBedrockText
+>;
 
 // Mock the Project type
 const mockProject = {
@@ -49,9 +42,7 @@ const mockProject = {
 describe('ShareContent', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    process.env.GEMINI_API_KEY = 'test-api-key';
-    // Reset default behavior
-    generateContentMock.mockReset();
+    generateBedrockTextMock.mockReset();
   });
 
   describe('buildShareContentPrompt', () => {
@@ -84,10 +75,10 @@ describe('ShareContent', () => {
   });
 
   describe('generateShareContent', () => {
-    it('should generate content using Gemini API successfully', async () => {
-      generateContentMock.mockResolvedValueOnce({
-        text: '🚀 We just built Amazing Project! Check out this incredible innovation #TechInnovation #Sundai',
-      });
+    it('generates content with GPT-5.6 Luna on Bedrock', async () => {
+      generateBedrockTextMock.mockResolvedValueOnce(
+        '🚀 We just built Amazing Project! Check out this incredible innovation #TechInnovation #Sundai'
+      );
 
       const result = await generateShareContent({
         project: mockProject,
@@ -102,17 +93,14 @@ describe('ShareContent', () => {
         characterCount: 94,
       });
 
-      expect(generateContentMock).toHaveBeenCalledWith(
-        expect.objectContaining({
-          model: 'gemini-2.5-flash',
-          contents: expect.stringContaining('Amazing Project'),
-        })
+      expect(generateBedrockTextMock).toHaveBeenCalledWith(
+        expect.stringContaining('Amazing Project')
       );
     });
 
     it('propagates provider failures', async () => {
       const providerError = new Error('API Error');
-      generateContentMock.mockRejectedValueOnce(providerError);
+      generateBedrockTextMock.mockRejectedValueOnce(providerError);
 
       await expect(
         generateShareContent({
@@ -124,7 +112,7 @@ describe('ShareContent', () => {
     });
 
     it('rejects an empty provider response', async () => {
-      generateContentMock.mockResolvedValueOnce({ text: '' });
+      generateBedrockTextMock.mockResolvedValueOnce('');
 
       await expect(
         generateShareContent({
@@ -132,7 +120,7 @@ describe('ShareContent', () => {
           platform: 'twitter',
           isTeamMember: true,
         })
-      ).rejects.toThrow('Gemini returned no share content.');
+      ).rejects.toThrow('No share content was generated.');
     });
   });
 });

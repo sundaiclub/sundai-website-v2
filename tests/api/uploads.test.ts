@@ -76,6 +76,24 @@ describe('/api/uploads/image', () => {
       expect(await response.json()).toEqual({ error: 'No file provided' });
     });
 
+    it('should return 413 when the image is too large', async () => {
+      mockAuth.mockReturnValue({ userId: 'test-user-id' });
+      const file = new File(['test'], 'test.jpg', { type: 'image/jpeg' });
+      Object.defineProperty(file, 'size', { value: 15 * 1024 * 1024 });
+
+      const response = await POST({
+        formData: jest.fn().mockResolvedValue({
+          get: jest.fn().mockReturnValue(file),
+        }),
+      } as any);
+
+      expect(response.status).toBe(413);
+      expect(await response.json()).toEqual({
+        error: 'File too large. Image files must be smaller than 15 MB.',
+      });
+      expect(mockUploadToGCS).not.toHaveBeenCalled();
+    });
+
     it('should handle upload errors', async () => {
       const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
       

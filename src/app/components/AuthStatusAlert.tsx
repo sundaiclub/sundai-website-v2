@@ -1,6 +1,7 @@
 'use client';
 
 import { ManagementAlert } from './ManagementSurface';
+import { SignInAction } from './SignInAction';
 
 export type AuthStatus = 'unauthenticated' | 'forbidden' | 'not-found';
 
@@ -26,7 +27,18 @@ function authStatusMessage(status: AuthStatus) {
 }
 
 export function AuthStatusAlert({ status }: { status: AuthStatus }) {
+  if (status !== 'unauthenticated') {
+    return (
+      <ManagementAlert tone="danger">{authStatusMessage(status)}</ManagementAlert>
+    );
+  }
+
   return (
-    <ManagementAlert tone="danger">{authStatusMessage(status)}</ManagementAlert>
+    <ManagementAlert tone="danger">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <span>{authStatusMessage(status)}</span>
+        <SignInAction />
+      </div>
+    </ManagementAlert>
   );
 }

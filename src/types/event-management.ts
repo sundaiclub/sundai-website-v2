@@ -61,7 +61,7 @@ export type PitchProjectStatus =
 
 export type PitchProjectVoteValue = 'LIKE' | 'DISLIKE';
 
-export type PitchPhase = 'WAITING' | 'PRESENTING' | 'QUESTIONS' | 'COMPLETED';
+export type PitchTimerPhase = 'WAITING' | 'RUNNING' | 'COMPLETED';
 
 interface EventManagementHackerSummary {
   id: EntityId;
@@ -93,6 +93,9 @@ export interface Chapter {
   accessMode: ChapterAccessMode;
   mailingListName?: string | null;
   mailingListExternalId?: string | null;
+  defaultApprovalMessage?: string | null;
+  defaultWaitlistMessage?: string | null;
+  defaultRejectionMessage?: string | null;
   createdAt: ISODateTimeString | Date;
   updatedAt: ISODateTimeString | Date;
 }
@@ -210,6 +213,9 @@ export type ManageableChapterListItem = Pick<
   | 'timezone'
   | 'status'
   | 'accessMode'
+  | 'defaultApprovalMessage'
+  | 'defaultWaitlistMessage'
+  | 'defaultRejectionMessage'
   | 'heroImage'
 > & {
   viewerMembership?: Pick<ChapterMembership, 'role' | 'status'> | null;
@@ -385,6 +391,7 @@ export type OrganizerEventListItem = {
   visibility?: EventVisibility;
   publicStatus?: PublicEventStatus;
   applicationMode?: EventApplicationMode;
+  applicationRequired?: boolean;
   applicationsOpen?: boolean;
   capacity?: number | null;
   _count?: {
@@ -408,6 +415,7 @@ export type OrganizerEventSettings = {
   visibility?: EventVisibility;
   publicStatus?: PublicEventStatus;
   applicationMode?: EventApplicationMode;
+  applicationRequired?: boolean;
   applicationsOpen?: boolean;
   applicationsClosedAt?: ISODateTimeString | Date | null;
   applicationsClosedById?: EntityId | null;
@@ -467,6 +475,21 @@ export interface PublicEventCard {
   viewerRegistrationStatus?: RegistrationStatus | null;
 }
 
+export type CurrentUserEvent = Pick<
+  PublicEventCard,
+  | 'id'
+  | 'slug'
+  | 'chapterSlug'
+  | 'chapterName'
+  | 'chapter'
+  | 'title'
+  | 'timezone'
+  | 'image'
+  | 'publicLocation'
+  | 'startTime'
+  | 'endTime'
+>;
+
 export interface AddToCalendarPayload {
   title: string;
   description?: string | null;
@@ -489,6 +512,7 @@ export interface ApplicationQuestionSet {
 
 export interface ApplicationControlsState {
   applicationMode: EventApplicationMode;
+  applicationRequired?: boolean;
   applicationsOpen: boolean;
   applicationsClosedAt?: ISODateTimeString | Date | null;
   applicationsCloseReason?: string | null;
@@ -524,9 +548,11 @@ export interface PublicEventDetail extends PublicEventCard {
     | 'smsConsentVersion'
   > | null;
   viewerRegistration?: PublicViewerRegistrationState | null;
+  viewerEventStaffRole?: EventStaffRole | null;
   viewerCanManageRegistrations?: boolean;
   viewerCanEditEvent?: boolean;
   viewerCanManageEvent?: boolean;
+  viewerIsSiteAdmin?: boolean;
   pitchSession?: { phase: PitchSessionPhase } | null;
   addToCalendar: AddToCalendarPayload;
 }
@@ -696,6 +722,9 @@ export type OrganizerChapterSettings = Pick<
   | 'description'
   | 'status'
   | 'accessMode'
+  | 'defaultApprovalMessage'
+  | 'defaultWaitlistMessage'
+  | 'defaultRejectionMessage'
   | 'heroImage'
 >;
 

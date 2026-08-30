@@ -12,7 +12,10 @@ export async function POST(
     const { userId } = auth();
     if (!userId) return new NextResponse('Unauthorized', { status: 401 });
 
-    const user = await prisma.hacker.findUnique({ where: { clerkId: userId } });
+    const user = await prisma.hacker.findUnique({
+      where: { clerkId: userId },
+      select: { id: true, role: true },
+    });
     if (!user) return new NextResponse('User not found', { status: 404 });
 
     const body = await req.json();
@@ -25,13 +28,60 @@ export async function POST(
 
     const pitchSession = await prisma.pitchSession.findFirst({
       where: { eventId: params.eventId },
+      include: {
+        event: {
+          select: { chapterId: true, startTime: true, endTime: true },
+        },
+      },
     });
-    if (!pitchSession)
+    if (!pitchSession || !pitchSession.event)
       return new NextResponse('Pitch session not found', { status: 404 });
     if (pitchSession.phase === 'FINISHED') {
       return NextResponse.json(
         { message: 'Cannot add projects to a finished event' },
         { status: 400 }
+      );
+    }
+    const now = new Date();
+    if (
+      pitchSession.event.startTime > now ||
+      !pitchSession.event.endTime ||
+      pitchSession.event.endTime < now
+    ) {
+      return NextResponse.json(
+        { message: 'This event is not open for project additions' },
+        { status: 400 }
+      );
+    }
+
+    const [viewerRegistration, staff] = await Promise.all([
+      prisma.eventRegistration.findFirst({
+        where: {
+          eventId: params.eventId,
+          hackerId: user.id,
+          cancelledAt: null,
+        },
+        orderBy: { createdAt: 'desc' },
+        select: { status: true },
+      }),
+      prisma.eventStaff.findFirst({
+        where: {
+          eventId: params.eventId,
+          hackerId: user.id,
+          role: { in: ['MC', 'CO_MC'] },
+        },
+        select: { role: true },
+      }),
+    ]);
+
+    if (
+      user.role !== 'SITE_ADMIN' &&
+      !staff &&
+      viewerRegistration?.status !== 'APPROVED'
+    ) {
+      return NextResponse.json(
+        { message: 'You must be part of this event to add a project' },
+        { status: 403 }
       );
     }
 
@@ -90,15 +140,14 @@ export async function POST(
       }),
       prisma.pitchProject.create({
         data: {
-        pitchSessionId: pitchSession.id,
-        projectId,
-        addedById: user.id,
-        position: nextPos,
-        isTopProject: false,
-        ...(pitchSession.phase === 'PITCHING' && {
-          allottedPresentingSec: pitchSession.defaultPresentingSec,
-          allottedQuestionsSec: pitchSession.defaultQuestionsSec,
-        }),
+          pitchSessionId: pitchSession.id,
+          projectId,
+          addedById: user.id,
+          position: nextPos,
+          isTopProject: false,
+          ...(pitchSession.phase === 'PITCHING' && {
+            allottedSec: pitchSession.defaultPitchSec,
+          }),
         },
       }),
     ]);

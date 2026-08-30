@@ -107,14 +107,11 @@ export function projectEventWorkspacePitchProject(
       : null,
     pitch: entry
       ? {
-          phase: entry.pitchPhase,
+          phase: entry.timerPhase,
           sessionPhase: entry.pitchSession.phase,
-          presentingStartedAt: entry.presentingStartedAt ?? null,
-          questionsStartedAt: entry.questionsStartedAt ?? null,
+          startedAt: entry.timerStartedAt ?? null,
           completedAt: entry.completedAt ?? null,
-          pausedAt: entry.pausedAt ?? null,
-          allottedPresentingSec: entry.allottedPresentingSec ?? null,
-          allottedQuestionsSec: entry.allottedQuestionsSec ?? null,
+          allottedSec: entry.allottedSec ?? null,
           isTopProject: entry.isTopProject,
           votes: { likes, dislikes, total: likes + dislikes },
         }

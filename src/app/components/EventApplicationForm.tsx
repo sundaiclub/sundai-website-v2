@@ -1,9 +1,11 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import {
   applyProfilePrefillToAnswers,
+  shouldReusePreviousApplicationAnswer,
   validateRequiredApplicationAnswers,
 } from '@/lib/applicationTemplates';
 import type {
@@ -62,7 +64,7 @@ function initialAnswers(input: {
   const existingAnswers = jsonObject(input.registration?.answersJson);
   const answers = input.fields.reduce<JsonObject>((result, field) => {
     if (
-      field.reusePreviousAnswer === true &&
+      shouldReusePreviousApplicationAnswer(field) &&
       reusableAnswers[field.id] !== undefined
     ) {
       result[field.id] = reusableAnswers[field.id];
@@ -83,7 +85,6 @@ function initialAnswers(input: {
 function inputTypeFor(field: TemplateFieldDefinition) {
   if (field.type === 'EMAIL') return 'email';
   if (field.type === 'PHONE') return 'tel';
-  if (field.type === 'URL') return 'url';
   if (field.type === 'NUMBER') return 'number';
   if (field.type === 'DATE') return 'date';
   if (field.type === 'DATETIME') return 'datetime-local';
@@ -172,6 +173,7 @@ function FieldInput({
         <input
           className={classes.input}
           id={inputId}
+          inputMode={field.type === 'URL' ? 'url' : undefined}
           onChange={event =>
             onChange(normalizeSubmissionValue(field, event.target.value))
           }
@@ -193,17 +195,22 @@ export function EventApplicationForm({
   viewerProfile,
   onRegistrationChange,
   embedded = false,
+  initialEditing = false,
+  hideStartButton = false,
 }: {
   event: PublicEventDetail;
   viewerProfile?: ProfilePrefillSource | null;
   onRegistrationChange?: (registration: PublicRegistrationResponse) => void;
   embedded?: boolean;
+  initialEditing?: boolean;
+  hideStartButton?: boolean;
 }) {
   const classes = useManagementClasses();
+  const router = useRouter();
   const fields = event.applicationQuestionSet.composedFields;
   const registration = event.viewerRegistration;
   const controls: ApplicationControlsState = event.applicationControls;
-  const [isEditing, setIsEditing] = useState(false);
+  const [isEditing, setIsEditing] = useState(initialEditing);
   const [answers, setAnswers] = useState<JsonObject>(() =>
     initialAnswers({
       fields,
@@ -242,12 +249,13 @@ export function EventApplicationForm({
     );
     setEmailNotificationsEnabled(savedEmailPreference);
     setSmsConsentGranted(savedSmsPreference);
-    setIsEditing(false);
+    setIsEditing(initialEditing);
   }, [
     controls.canSubmit,
     event.reusableAnswersJson,
     fields,
     registration,
+    initialEditing,
     savedEmailPreference,
     savedSmsPreference,
     viewerProfile,
@@ -258,7 +266,8 @@ export function EventApplicationForm({
     controls.canSubmit &&
     !registration &&
     !isEditing &&
-    !actionMessage;
+    !actionMessage &&
+    !hideStartButton;
   const canShowForm = fields.length > 0 && isEditing;
   const submitLabel = registration ? 'Save changes' : 'Submit application';
 
@@ -308,6 +317,26 @@ export function EventApplicationForm({
       );
       const payload = await response.json().catch(() => null);
       if (!response.ok) {
+        if (Array.isArray(payload?.issues)) {
+          setErrors(
+            Object.fromEntries(
+              payload.issues
+                .filter(
+                  (issue: unknown) =>
+                    typeof issue === 'object' &&
+                    issue !== null &&
+                    'fieldId' in issue &&
+                    typeof issue.fieldId === 'string' &&
+                    'message' in issue &&
+                    typeof issue.message === 'string'
+                )
+                .map((issue: { fieldId: string; message: string }) => [
+                  issue.fieldId,
+                  issue.message,
+                ])
+            )
+          );
+        }
         throw new Error(payload?.message || 'Unable to save application.');
       }
       setActionMessage(
@@ -315,6 +344,7 @@ export function EventApplicationForm({
       );
       setIsEditing(false);
       if (payload) onRegistrationChange?.(payload);
+      router.refresh();
     } catch (error) {
       setActionError(
         error instanceof Error ? error.message : 'Unable to save application.'

@@ -722,6 +722,55 @@ describe('/api/chapters', () => {
     );
   });
 
+  it('rejects a blank chapter name', async () => {
+    const siteAdmin = buildSiteAdmin();
+    const chapter = buildChapter({ id: 'chapter-boston' });
+
+    mockActor(siteAdmin);
+    prisma.chapter.findUnique.mockResolvedValue(chapter);
+
+    const response = await PATCH_CHAPTER(
+      createJsonRequest('/api/chapters/chapter-boston', {
+        method: 'PATCH',
+        body: { name: '   ' },
+      }) as any,
+      createRouteContext({ chapterId: chapter.id }) as any
+    );
+
+    expect(response.status).toBe(400);
+    expect(prisma.chapter.update).not.toHaveBeenCalled();
+  });
+
+  it('lets a chapter admin update chapter decision message defaults', async () => {
+    const { chapter, hacker, membership } = buildChapterAdminFixture();
+    const updateBody = {
+      defaultApprovalMessage: 'Welcome to the Boston event.',
+      defaultWaitlistMessage: 'You are on the Boston waitlist.',
+      defaultRejectionMessage: 'Boston cannot offer you a spot this time.',
+    };
+
+    mockActor(hacker);
+    mockMembershipLookup(membership);
+    prisma.chapter.findUnique.mockResolvedValue(chapter);
+    prisma.chapter.update.mockResolvedValue({ ...chapter, ...updateBody });
+
+    const response = await PATCH_CHAPTER(
+      createJsonRequest(`/api/chapters/${chapter.id}`, {
+        method: 'PATCH',
+        body: updateBody,
+      }) as any,
+      createRouteContext({ chapterId: chapter.id }) as any
+    );
+
+    expect(response.status).toBe(200);
+    expect(prisma.chapter.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: chapter.id },
+        data: updateBody,
+      })
+    );
+  });
+
   it('rejects an unsupported chapter timezone', async () => {
     const siteAdmin = buildSiteAdmin();
     const chapter = buildChapter({ id: 'chapter-boston' });
@@ -868,5 +917,28 @@ describe('/api/chapters', () => {
       id: chapter.id,
       heroImage: expect.objectContaining({ url: newImage.url }),
     });
+  });
+
+  it('returns 413 when a chapter image is too large', async () => {
+    const { chapter, hacker, membership } = buildChapterAdminFixture();
+    const file = new File(['image'], 'large.jpg', { type: 'image/jpeg' });
+    Object.defineProperty(file, 'size', { value: 15 * 1024 * 1024 });
+    const formData = new FormData();
+    formData.append('file', file);
+
+    mockActor(hacker);
+    prisma.chapter.findUnique.mockResolvedValue({ id: chapter.id });
+    prisma.chapterMembership.findFirst.mockResolvedValue(membership);
+
+    const response = await POST_CHAPTER_IMAGE(
+      { formData: jest.fn().mockResolvedValue(formData) } as any,
+      createRouteContext({ chapterId: chapter.id }) as any
+    );
+
+    expect(response.status).toBe(413);
+    expect(await response.json()).toEqual({
+      error: 'File too large. Image files must be smaller than 15 MB.',
+    });
+    expect(uploadToGCS).not.toHaveBeenCalled();
   });
 });

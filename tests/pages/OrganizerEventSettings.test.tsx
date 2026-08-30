@@ -494,7 +494,7 @@ describe('/organizer/events/[eventId]/settings', () => {
       'You are on the waitlist. We will let you know if a spot opens up.'
     );
     expect(screen.getByLabelText(/decline message/i)).toHaveValue(
-      'Thank you for your interest. Unfortunately, we are unable to offer you a spot at this event.'
+      'Thank you for your interest. Unfortunately, we are unable to offer you a spot at this event. Please apply for the next one.'
     );
   });
 
@@ -536,6 +536,9 @@ describe('/organizer/events/[eventId]/settings', () => {
       { target: { value: 'OPEN_RSVP' } }
     );
     fireEvent.click(
+      screen.getByRole('checkbox', { name: /require application form/i })
+    );
+    fireEvent.click(
       screen.getByRole('checkbox', {
         name: /auto-promote waitlist|waitlist auto-promotion/i,
       })
@@ -568,6 +571,12 @@ describe('/organizer/events/[eventId]/settings', () => {
       `/api/events/${eventSettings.id}`,
       expect.objectContaining({
         body: expect.stringContaining('"autoPromoteWaitlist":true'),
+      })
+    );
+    expect(global.fetch).toHaveBeenCalledWith(
+      `/api/events/${eventSettings.id}`,
+      expect.objectContaining({
+        body: expect.stringContaining('"applicationRequired":false'),
       })
     );
     expect(global.fetch).toHaveBeenCalledWith(

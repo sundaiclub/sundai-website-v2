@@ -86,6 +86,19 @@ const publicEvents: PublicEventCard[] = [
   },
 ];
 
+const previousEvents: PublicEventCard[] = [
+  {
+    ...publicEvents[0],
+    id: 'event-boston-demo-day',
+    slug: 'demo-day',
+    title: 'Boston Demo Day',
+    startTime: '2026-06-10T22:00:00.000Z',
+    endTime: '2026-06-11T01:00:00.000Z',
+    publicStatus: 'CLOSED',
+    viewerRegistrationStatus: 'APPROVED',
+  },
+];
+
 const chapters = [
   {
     id: 'chapter-boston',
@@ -120,7 +133,10 @@ function requestUrl(input: RequestInfo | URL) {
   return input.toString();
 }
 
-function mockEventsFetch(events: unknown[] = publicEvents) {
+function mockEventsFetch(
+  events: unknown[] = publicEvents,
+  pastEvents: unknown[] = []
+) {
   global.fetch = jest.fn((input: RequestInfo | URL) => {
     const url = requestUrl(input);
 
@@ -131,8 +147,10 @@ function mockEventsFetch(events: unknown[] = publicEvents) {
     if (url.includes('/api/events')) {
       const request = new URL(url, 'http://localhost');
       const chapterSlug = request.searchParams.get('chapterSlug');
+      const sourceEvents =
+        request.searchParams.get('period') === 'previous' ? pastEvents : events;
       const visibleEvents = chapterSlug
-        ? events.filter(event => {
+        ? sourceEvents.filter(event => {
             return (
               typeof event === 'object' &&
               event !== null &&
@@ -140,7 +158,7 @@ function mockEventsFetch(events: unknown[] = publicEvents) {
               event.chapterSlug === chapterSlug
             );
           })
-        : events;
+        : sourceEvents;
 
       return jsonResponse(visibleEvents);
     }
@@ -262,6 +280,28 @@ describe('/events native public listing page', () => {
       'href',
       '/events/san-francisco/agent-salon'
     );
+  });
+
+  it('shows previous events after the upcoming events section', async () => {
+    mockEventsFetch(publicEvents, previousEvents);
+
+    render(<EventsPage />);
+
+    const previousEventHeading = await screen.findByRole('heading', {
+      name: 'Boston Demo Day',
+    });
+    const upcomingHeading = screen.getByRole('heading', {
+      name: /upcoming events/i,
+    });
+    const previousHeading = screen.getByRole('heading', {
+      name: /previous events/i,
+    });
+    expect(
+      upcomingHeading.compareDocumentPosition(previousHeading) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+    expect(previousEventHeading).toBeInTheDocument();
+    expect(global.fetch).toHaveBeenCalledWith('/api/events?period=previous');
   });
 
   it('shows an empty state when no upcoming published events are available', async () => {

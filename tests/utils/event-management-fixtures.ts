@@ -73,6 +73,9 @@ export type ChapterFixture = {
   accessMode: ChapterAccessMode;
   mailingListName: string | null;
   mailingListExternalId: string | null;
+  defaultApprovalMessage: string | null;
+  defaultWaitlistMessage: string | null;
+  defaultRejectionMessage: string | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -223,6 +226,7 @@ export type EventFixture = {
   publicProgramLabel: string | null;
   capacity: number | null;
   applicationMode: EventApplicationMode;
+  applicationRequired?: boolean;
   autoPromoteWaitlist: boolean;
   approvedDetailsJson: JsonObject | null;
   applicationQuestionsJson: JsonValue;
@@ -405,6 +409,9 @@ export const buildChapter = (
   accessMode: 'PUBLIC',
   mailingListName: null,
   mailingListExternalId: null,
+  defaultApprovalMessage: null,
+  defaultWaitlistMessage: null,
+  defaultRejectionMessage: null,
   createdAt: fixtureNow(),
   updatedAt: fixtureNow(),
   ...overrides,
@@ -545,6 +552,7 @@ export const buildEvent = (
   publicProgramLabel: 'AI Build Night',
   capacity: 40,
   applicationMode: 'REQUIRES_APPROVAL',
+  applicationRequired: true,
   autoPromoteWaitlist: false,
   approvedDetailsJson: buildApprovedOnlyDetails(),
   applicationQuestionsJson: [

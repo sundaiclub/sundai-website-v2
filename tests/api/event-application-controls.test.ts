@@ -35,6 +35,9 @@ jest.mock('../../src/lib/prisma', () => ({
     hacker: {
       findUnique: jest.fn(),
     },
+    chapter: {
+      findUnique: jest.fn(),
+    },
     chapterMembership: {
       findFirst: jest.fn(),
     },
@@ -700,6 +703,7 @@ describe('T070 waitlist auto-promotion API controls', () => {
     mockAuthenticatedClerk({ userId: hacker.clerkId });
     mockHackerLookup(hacker);
     mockChapterMembershipLookup(membership);
+    prisma.chapter.findUnique.mockResolvedValue(chapter);
     prisma.event.create.mockResolvedValue(createdEvent);
 
     const response = await POST_EVENTS(

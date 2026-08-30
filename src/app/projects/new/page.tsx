@@ -1,8 +1,9 @@
-"use client";
-import React, { useState, useEffect } from "react";
-import { useUser } from "@clerk/nextjs";
-import { useRouter } from "next/navigation";
-import { XMarkIcon } from "@heroicons/react/24/solid";
+'use client';
+import React, { useState, useEffect } from 'react';
+import { useUser } from '@clerk/nextjs';
+import { useRouter, useSearchParams } from 'next/navigation';
+import Image from 'next/image';
+import { XMarkIcon } from '@heroicons/react/24/solid';
 import toast from 'react-hot-toast';
 import { useTheme } from '../../contexts/ThemeContext';
 import { HackerSelector, ProjectRoles } from '../../components/HackerSelector';
@@ -11,129 +12,179 @@ import type { HackerSelectionOption, HackerTeamMember } from '@/types/hacker';
 const MAX_PREVIEW_LENGTH = 100;
 const MAX_TITLE_LENGTH = 32;
 
+type ProjectEventOption = {
+  id: string;
+  title: string;
+  chapterName: string;
+  image?: { url: string; alt?: string | null } | null;
+  selectedByDefault: boolean;
+};
+
 export default function NewProject() {
   const { user } = useUser();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const sourceEventId = searchParams.get('sourceEventId');
+  const returnTo = searchParams.get('returnTo');
   const [loading, setLoading] = useState(false);
   const [hackers, setHackers] = useState<HackerSelectionOption[]>([]);
   const [showModal, setShowModal] = useState(false);
-  const [selectedMembers, setSelectedMembers] = useState<HackerTeamMember[]>([]);
-  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedMembers, setSelectedMembers] = useState<HackerTeamMember[]>(
+    []
+  );
+  const [searchTerm, setSearchTerm] = useState('');
   const [project, setProject] = useState({
-    title: "",
-    preview: "",
-    launchLeadId: "",
+    title: '',
+    preview: '',
+    launchLeadId: '',
     members: [] as string[],
   });
-  const [selectedRole, setSelectedRole] = useState("hacker");
+  const [selectedRole, setSelectedRole] = useState('hacker');
   const { isDarkMode } = useTheme();
+  const defaultEventImage = isDarkMode
+    ? '/images/logos/sundai_logo_dark_horizontal.svg'
+    : '/images/logos/sundai_logo_light_horizontal.svg';
   const [showLaunchLeadModal, setShowLaunchLeadModal] = useState(false);
-  const [teamSearchTerm, setTeamSearchTerm] = useState("");
-  const [leadSearchTerm, setLeadSearchTerm] = useState("");
+  const [teamSearchTerm, setTeamSearchTerm] = useState('');
+  const [leadSearchTerm, setLeadSearchTerm] = useState('');
+  const [eventOptions, setEventOptions] = useState<ProjectEventOption[]>([]);
+  const [selectedEventIds, setSelectedEventIds] = useState<string[]>([]);
 
   useEffect(() => {
-    fetch("/api/hackers")
-      .then((res) => res.json())
-      .then((data) => setHackers(data))
-      .catch((error) => console.error("Error fetching hackers:", error));
+    fetch('/api/hackers')
+      .then(res => res.json())
+      .then(data => setHackers(data))
+      .catch(error => console.error('Error fetching hackers:', error));
   }, []);
 
   useEffect(() => {
+    fetch('/api/events/project-options')
+      .then(async response => {
+        if (!response.ok) throw new Error('Unable to load current events');
+        return response.json() as Promise<ProjectEventOption[]>;
+      })
+      .then(events => {
+        setEventOptions(events);
+        setSelectedEventIds(
+          events
+            .filter(
+              event => event.selectedByDefault || event.id === sourceEventId
+            )
+            .map(event => event.id)
+        );
+      })
+      .catch(error => console.error('Error fetching project events:', error));
+  }, [sourceEventId]);
+
+  useEffect(() => {
     if (user) {
-      const currentUserInHackers = hackers.find(h => h.email === user.primaryEmailAddress?.emailAddress);
+      const currentUserInHackers = hackers.find(
+        h => h.email === user.primaryEmailAddress?.emailAddress
+      );
       if (currentUserInHackers) {
         setProject(prev => ({
           ...prev,
-          launchLeadId: currentUserInHackers.id
+          launchLeadId: currentUserInHackers.id,
         }));
       }
     }
   }, [user, hackers]);
 
-  const filteredTeamHackers = hackers.filter(hacker =>
-    hacker.name.toLowerCase().includes(teamSearchTerm.toLowerCase()) ||
-    hacker.email?.toLowerCase().includes(teamSearchTerm.toLowerCase())
+  const filteredTeamHackers = hackers.filter(
+    hacker =>
+      hacker.name.toLowerCase().includes(teamSearchTerm.toLowerCase()) ||
+      hacker.email?.toLowerCase().includes(teamSearchTerm.toLowerCase())
   );
 
-  const filteredLeadHackers = hackers.filter(hacker =>
-    hacker.name.toLowerCase().includes(leadSearchTerm.toLowerCase()) ||
-    hacker.email?.toLowerCase().includes(leadSearchTerm.toLowerCase())
+  const filteredLeadHackers = hackers.filter(
+    hacker =>
+      hacker.name.toLowerCase().includes(leadSearchTerm.toLowerCase()) ||
+      hacker.email?.toLowerCase().includes(leadSearchTerm.toLowerCase())
   );
 
   const handleAddMember = (hacker: HackerSelectionOption, role: string) => {
     if (selectedMembers.some(member => member.id === hacker.id)) {
-      toast.error("This team member has already been added");
+      toast.error('This team member has already been added');
       return;
     }
 
     setSelectedMembers([...selectedMembers, { ...hacker, role }]);
-    setProject((prev) => ({
+    setProject(prev => ({
       ...prev,
       members: [...prev.members, hacker.id],
     }));
-    setTeamSearchTerm("");
+    setTeamSearchTerm('');
   };
 
   const handleRemoveMember = (hackerId: string) => {
     setSelectedMembers(
-      selectedMembers.filter((member) => member.id !== hackerId)
+      selectedMembers.filter(member => member.id !== hackerId)
     );
-    setProject((prev) => ({
+    setProject(prev => ({
       ...prev,
-      members: prev.members.filter((id) => id !== hackerId),
+      members: prev.members.filter(id => id !== hackerId),
     }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) {
-      toast.error("Please sign in to create a project");
+      toast.error('Please sign in to create a project');
       return;
     }
 
     if (!project.launchLeadId) {
-      toast.error("Please select a launch lead");
+      toast.error('Please select a launch lead');
       return;
     }
 
     setLoading(true);
     try {
       const formData = new FormData();
-      formData.append("title", project.title);
-      formData.append("preview", project.preview);
-      formData.append("launchLeadId", project.launchLeadId);
+      formData.append('title', project.title);
+      formData.append('preview', project.preview);
+      formData.append('launchLeadId', project.launchLeadId);
       formData.append(
-        "members",
+        'members',
         JSON.stringify(
-          selectedMembers.map((member) => ({
+          selectedMembers.map(member => ({
             id: member.id,
             role: member.role,
           }))
         )
       );
 
-      const response = await fetch("/api/projects", {
-        method: "POST",
+      const response = await fetch('/api/projects', {
+        method: 'POST',
         body: formData,
       });
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => null);
-        console.error("Failed to create project", {
+        console.error('Failed to create project', {
           status: response.status,
           statusText: response.statusText,
-          error: errorData
+          error: errorData,
         });
-        toast.error(errorData?.message || "Failed to create project");
+        toast.error(errorData?.message || 'Failed to create project');
         return;
       }
 
       const projectData = await response.json();
-      toast.success("Project created successfully");
-      router.push(`/projects/${projectData.id}/edit`);
+      toast.success('Project created successfully');
+      const editParams = new URLSearchParams();
+      selectedEventIds.forEach(eventId =>
+        editParams.append('eventId', eventId)
+      );
+      if (sourceEventId) editParams.set('sourceEventId', sourceEventId);
+      if (returnTo) editParams.set('returnTo', returnTo);
+      const query = editParams.toString();
+      router.push(
+        `/projects/${projectData.id}/edit${query ? `?${query}` : ''}`
+      );
     } catch (error) {
-      console.error("Error creating project:", error);
-      toast.error("Error creating project");
+      console.error('Error creating project:', error);
+      toast.error('Error creating project');
     } finally {
       setLoading(false);
     }
@@ -145,31 +196,37 @@ export default function NewProject() {
     >
   ) => {
     const { name, value } = e.target;
-    setProject((prev) => ({ ...prev, [name]: value }));
+    setProject(prev => ({ ...prev, [name]: value }));
   };
 
   return (
-    <div className={`min-h-screen py-16 ${
-      isDarkMode 
-        ? 'bg-gradient-to-b from-gray-900 to-black text-gray-100' 
-        : 'bg-gradient-to-b from-[#E5E5E5] to-[#F0F0F0] text-gray-800'
-    } font-space-mono`}>
-      <div className={`max-w-2xl mx-auto p-6 ${
-        isDarkMode 
-          ? 'bg-gray-800 shadow-lg' 
-          : 'bg-white shadow-sm'
-      } rounded-lg`}>
-        <h1 className={`text-3xl font-bold mb-8 font-space-mono ${
-          isDarkMode ? 'text-gray-100' : 'text-gray-900'
-        }`}>
+    <div
+      className={`min-h-screen py-16 ${
+        isDarkMode
+          ? 'bg-gradient-to-b from-gray-900 to-black text-gray-100'
+          : 'bg-gradient-to-b from-[#E5E5E5] to-[#F0F0F0] text-gray-800'
+      } font-space-mono`}
+    >
+      <div
+        className={`max-w-2xl mx-auto p-6 ${
+          isDarkMode ? 'bg-gray-800 shadow-lg' : 'bg-white shadow-sm'
+        } rounded-lg`}
+      >
+        <h1
+          className={`text-3xl font-bold mb-8 font-space-mono ${
+            isDarkMode ? 'text-gray-100' : 'text-gray-900'
+          }`}
+        >
           Initialize New Project
         </h1>
 
         <form onSubmit={handleSubmit} noValidate className="space-y-6">
           <div>
-            <label className={`block text-sm font-medium mb-1 ${
-              isDarkMode ? 'text-gray-300' : 'text-gray-700'
-            } font-fira-code`}>
+            <label
+              className={`block text-sm font-medium mb-1 ${
+                isDarkMode ? 'text-gray-300' : 'text-gray-700'
+              } font-fira-code`}
+            >
               Launch Lead *
             </label>
             <div className="relative">
@@ -177,21 +234,33 @@ export default function NewProject() {
                 <div
                   onClick={() => setShowLaunchLeadModal(true)}
                   className={`inline-flex items-center px-3 py-1 rounded-full text-sm cursor-pointer transition-colors ${
-                    isDarkMode 
-                      ? 'bg-purple-900/50 text-purple-100 hover:bg-purple-800/50' 
+                    isDarkMode
+                      ? 'bg-purple-900/50 text-purple-100 hover:bg-purple-800/50'
                       : 'bg-purple-100 text-purple-800 hover:bg-purple-200'
                   }`}
                 >
-                  <span>{hackers.find(h => h.id === project.launchLeadId)?.name}</span>
-                  <span className={`mx-1 ${isDarkMode ? 'text-purple-400' : 'text-purple-400'}`}>•</span>
-                  <span className={isDarkMode ? 'text-purple-300' : 'text-purple-600'}>Launch Lead</span>
+                  <span>
+                    {hackers.find(h => h.id === project.launchLeadId)?.name}
+                  </span>
+                  <span
+                    className={`mx-1 ${isDarkMode ? 'text-purple-400' : 'text-purple-400'}`}
+                  >
+                    •
+                  </span>
+                  <span
+                    className={
+                      isDarkMode ? 'text-purple-300' : 'text-purple-600'
+                    }
+                  >
+                    Launch Lead
+                  </span>
                 </div>
               ) : (
                 <div
                   onClick={() => setShowLaunchLeadModal(true)}
                   className={`inline-flex items-center px-3 py-1 rounded-full text-sm cursor-pointer transition-colors ${
-                    isDarkMode 
-                      ? 'bg-purple-900/50 text-purple-100 hover:bg-purple-800/50' 
+                    isDarkMode
+                      ? 'bg-purple-900/50 text-purple-100 hover:bg-purple-800/50'
                       : 'bg-purple-100 text-purple-800 hover:bg-purple-200'
                   }`}
                 >
@@ -219,13 +288,15 @@ export default function NewProject() {
               value={project.title}
               onChange={handleChange}
               className={`mt-1 block w-full px-3 py-2 rounded-md shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 ${
-                isDarkMode 
-                  ? 'bg-gray-700 border-gray-600 text-gray-100' 
+                isDarkMode
+                  ? 'bg-gray-700 border-gray-600 text-gray-100'
                   : 'bg-white border-2 border-gray-200 text-gray-900 hover:border-gray-300'
               } font-fira-code`}
               placeholder="Enter project title"
             />
-            <span className={` text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+            <span
+              className={` text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}
+            >
               {project.title.length}/{MAX_TITLE_LENGTH} characters
             </span>
           </div>
@@ -250,44 +321,54 @@ export default function NewProject() {
                 onChange={handleChange}
                 className={`mt-1 block w-full px-3 py-2 rounded-md shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 ${
                   isDarkMode
-                    ? 'bg-gray-700 border-gray-600 text-gray-100' 
+                    ? 'bg-gray-700 border-gray-600 text-gray-100'
                     : 'bg-white border-2 border-gray-200 text-gray-900 hover:border-gray-300'
                 } font-fira-code`}
                 placeholder="Brief description of your project"
               />
             </div>
-            <span className={` text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+            <span
+              className={` text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}
+            >
               {project.preview.length}/{MAX_PREVIEW_LENGTH} characters
             </span>
           </div>
 
           <div>
-            <label className={`block text-sm font-medium mb-1 ${
-              isDarkMode ? 'text-gray-300' : 'text-gray-700'
-            } font-fira-code`}>
+            <label
+              className={`block text-sm font-medium mb-1 ${
+                isDarkMode ? 'text-gray-300' : 'text-gray-700'
+              } font-fira-code`}
+            >
               Team Members
             </label>
             <div className="flex flex-wrap gap-2 mb-2">
-              {selectedMembers.map((member) => (
+              {selectedMembers.map(member => (
                 <div
                   key={member.id}
                   className={`flex items-center px-3 py-1 rounded-full text-sm ${
-                    isDarkMode 
-                      ? 'bg-gray-700 text-gray-100' 
+                    isDarkMode
+                      ? 'bg-gray-700 text-gray-100'
                       : 'bg-indigo-100 text-indigo-800'
                   }`}
                 >
                   <span>{member.name}</span>
-                  <span className={`mx-1 ${isDarkMode ? 'text-gray-400' : 'text-indigo-400'}`}>•</span>
-                  <span className={isDarkMode ? 'text-gray-300' : 'text-indigo-600'}>
-                    {ProjectRoles.find((r) => r.id === member.role)?.label}
+                  <span
+                    className={`mx-1 ${isDarkMode ? 'text-gray-400' : 'text-indigo-400'}`}
+                  >
+                    •
+                  </span>
+                  <span
+                    className={isDarkMode ? 'text-gray-300' : 'text-indigo-600'}
+                  >
+                    {ProjectRoles.find(r => r.id === member.role)?.label}
                   </span>
                   <button
                     type="button"
                     onClick={() => handleRemoveMember(member.id)}
                     className={`ml-2 ${
-                      isDarkMode 
-                        ? 'text-gray-400 hover:text-gray-200' 
+                      isDarkMode
+                        ? 'text-gray-400 hover:text-gray-200'
                         : 'text-indigo-600 hover:text-indigo-800'
                     }`}
                   >
@@ -300,8 +381,8 @@ export default function NewProject() {
               type="button"
               onClick={() => setShowModal(true)}
               className={`text-sm font-medium ${
-                isDarkMode 
-                  ? 'text-indigo-400 hover:text-indigo-300' 
+                isDarkMode
+                  ? 'text-indigo-400 hover:text-indigo-300'
                   : 'text-indigo-600 hover:text-indigo-800'
               }`}
             >
@@ -309,12 +390,84 @@ export default function NewProject() {
             </button>
           </div>
 
+          <fieldset>
+            <legend
+              className={`block text-sm font-medium mb-2 ${
+                isDarkMode ? 'text-gray-300' : 'text-gray-700'
+              } font-fira-code`}
+            >
+              Add to current events
+            </legend>
+            {eventOptions.length === 0 ? (
+              <p
+                className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}
+              >
+                You have no current events available.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {eventOptions.map(event => (
+                  <label
+                    className={`flex cursor-pointer items-center gap-3 rounded-md border p-3 ${
+                      isDarkMode
+                        ? 'border-gray-700 bg-gray-900'
+                        : 'border-gray-200 bg-gray-50'
+                    }`}
+                    key={event.id}
+                  >
+                    <input
+                      checked={selectedEventIds.includes(event.id)}
+                      onChange={change =>
+                        setSelectedEventIds(current =>
+                          change.target.checked
+                            ? [...current, event.id]
+                            : current.filter(id => id !== event.id)
+                        )
+                      }
+                      type="checkbox"
+                    />
+                    {event.image?.url ? (
+                      <Image
+                        alt={event.image.alt || event.title}
+                        className="h-12 w-16 rounded object-cover"
+                        height={48}
+                        src={event.image.url}
+                        unoptimized
+                        width={64}
+                      />
+                    ) : (
+                      <Image
+                        alt={`${event.title} event`}
+                        className="h-12 w-16 rounded bg-black object-contain p-1"
+                        height={48}
+                        src={defaultEventImage}
+                        width={64}
+                      />
+                    )}
+                    <span className="min-w-0">
+                      <span className="block truncate font-medium">
+                        {event.title}
+                      </span>
+                      <span
+                        className={`block text-xs ${
+                          isDarkMode ? 'text-gray-400' : 'text-gray-600'
+                        }`}
+                      >
+                        {event.chapterName}
+                      </span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+            )}
+          </fieldset>
+
           <div className="flex justify-end pt-4">
             <button
               type="submit"
               disabled={loading}
               className={`${
-                loading ? "bg-indigo-400" : "bg-indigo-600 hover:bg-indigo-700"
+                loading ? 'bg-indigo-400' : 'bg-indigo-600 hover:bg-indigo-700'
               } text-white px-6 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 flex items-center space-x-2`}
             >
               {loading ? (
@@ -337,7 +490,7 @@ export default function NewProject() {
         searchTerm={leadSearchTerm}
         setSearchTerm={setLeadSearchTerm}
         filteredHackers={filteredLeadHackers}
-        handleAddMember={(hacker) => {
+        handleAddMember={hacker => {
           setProject(prev => ({ ...prev, launchLeadId: hacker.id }));
           setShowLaunchLeadModal(false);
         }}
@@ -354,7 +507,7 @@ export default function NewProject() {
         searchTerm={teamSearchTerm}
         setSearchTerm={setTeamSearchTerm}
         filteredHackers={filteredTeamHackers.filter(
-          (hacker) => !selectedMembers.some(m => m.id === hacker.id)
+          hacker => !selectedMembers.some(m => m.id === hacker.id)
         )}
         title="Add Team Members"
         selectedIds={selectedMembers.map(m => m.id)}

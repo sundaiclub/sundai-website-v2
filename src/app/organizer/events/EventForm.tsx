@@ -34,6 +34,10 @@ import type {
 import { DEFAULT_EVENT_MESSAGES } from '@/lib/eventMessageDefaults';
 import { parseTemplateFieldsJson } from '@/lib/applicationTemplates';
 import { CHAPTER_TIMEZONE_GROUPS } from '@/lib/chapterTimezones';
+import {
+  getImageUploadError,
+  validateImageUploadSize,
+} from '@/lib/imageUploads';
 
 type ChapterListPayload = ManageableChapterListItem[] | null;
 type StaffListPayload =
@@ -197,6 +201,7 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
   const [capacity, setCapacity] = useState(DEFAULT_CAPACITY);
   const [hasNoCapacityLimit, setHasNoCapacityLimit] = useState(false);
   const [applicationMode, setApplicationMode] = useState('REQUIRES_APPROVAL');
+  const [applicationRequired, setApplicationRequired] = useState(true);
   const [autoPromoteWaitlist, setAutoPromoteWaitlist] = useState(false);
   const [approvedAddress, setApprovedAddress] = useState('');
   const [approvedDetails, setApprovedDetails] = useState('');
@@ -244,7 +249,10 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
   const [message, setMessage] = useState('');
   const [savedEventId, setSavedEventId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
+  const [savingAction, setSavingAction] = useState<'draft' | 'publish' | null>(
+    null
+  );
+  const isSaving = savingAction !== null;
   const [savedSettingsFingerprint, setSavedSettingsFingerprint] = useState<
     string | null
   >(null);
@@ -337,6 +345,7 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
           setApplicationMode(
             eventPayload.applicationMode ?? 'REQUIRES_APPROVAL'
           );
+          setApplicationRequired(eventPayload.applicationRequired !== false);
           setApplicationsOpen(eventPayload.applicationsOpen !== false);
           setApplicationsCloseReason(
             eventPayload.applicationsCloseReason ?? ''
@@ -505,6 +514,18 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
   useEffect(() => {
     if (!isEditing && selectedChapter) {
       setTimezone(selectedChapter.timezone);
+      setConfirmationMessage(
+        selectedChapter.defaultApprovalMessage ??
+          DEFAULT_EVENT_MESSAGES.confirmation
+      );
+      setWaitlistMessage(
+        selectedChapter.defaultWaitlistMessage ??
+          DEFAULT_EVENT_MESSAGES.waitlist
+      );
+      setDeclineMessage(
+        selectedChapter.defaultRejectionMessage ??
+          DEFAULT_EVENT_MESSAGES.decline
+      );
     }
   }, [isEditing, selectedChapter]);
 
@@ -527,8 +548,12 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
       })
       .then(payload => {
         if (!isCurrent) return;
-        setTemplates(applicationTemplateList(payload));
-        setSelectedChapterTemplateId('');
+        const nextTemplates = applicationTemplateList(payload);
+        const firstChapterTemplate = nextTemplates.find(
+          template => template.scope === 'CHAPTER'
+        );
+        setTemplates(nextTemplates);
+        setSelectedChapterTemplateId(firstChapterTemplate?.id ?? '');
       })
       .catch(() => {
         if (!isCurrent) return;
@@ -548,6 +573,15 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
   }
 
   function selectEventImage(file: File | null) {
+    if (file) {
+      const sizeError = validateImageUploadSize(file);
+      if (sizeError) {
+        setEventImageFile(null);
+        setEventImagePrompt(null);
+        setMessage(sizeError);
+        return;
+      }
+    }
     setEventImageFile(file);
     setEventImagePrompt(null);
     if (file) setEventImagePreview(URL.createObjectURL(file));
@@ -565,11 +599,12 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
       if (!response.ok) throw new Error('Unable to download generated image');
 
       const blob = await response.blob();
-      setEventImageFile(
-        new File([blob], 'ai-generated-event-image.webp', {
-          type: 'image/webp',
-        })
-      );
+      const generatedFile = new File([blob], 'ai-generated-event-image.webp', {
+        type: 'image/webp',
+      });
+      const sizeError = validateImageUploadSize(generatedFile);
+      if (sizeError) throw new Error(sizeError);
+      setEventImageFile(generatedFile);
       setEventImagePrompt(prompt);
       setEventImagePreview(url);
       setMessage('AI-generated event image selected.');
@@ -696,6 +731,8 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
       timezone,
       capacity: hasNoCapacityLimit ? null : Number(capacity),
       applicationMode,
+      applicationRequired:
+        applicationMode !== 'OPEN_RSVP' || applicationRequired,
       autoPromoteWaitlist,
       approvedDetailsJson: {
         address: approvedAddress,
@@ -753,86 +790,110 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
   async function saveEvent(shouldPublish: boolean) {
     setMessage('');
     setSavedEventId(null);
-    setIsSaving(true);
-    const eventPayload = buildEventPayload();
-    const savedFingerprint = settingsFingerprint(eventPayload, null);
-    const response = await fetch(
-      isEditing ? `/api/events/${eventId}` : '/api/events',
-      {
-        method: isEditing ? 'PATCH' : 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(eventPayload),
+    setSavingAction(shouldPublish ? 'publish' : 'draft');
+    try {
+      const eventPayload = buildEventPayload();
+      const savedFingerprint = settingsFingerprint(eventPayload, null);
+      const response = await fetch(
+        isEditing ? `/api/events/${eventId}` : '/api/events',
+        {
+          method: isEditing ? 'PATCH' : 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(eventPayload),
+        }
+      );
+      const nextAuthStatus = authStatusFromResponse(response);
+      if (nextAuthStatus) {
+        setAuthStatus(nextAuthStatus);
+        return;
       }
-    ).finally(() => setIsSaving(false));
-    const nextAuthStatus = authStatusFromResponse(response);
-    if (nextAuthStatus) {
-      setAuthStatus(nextAuthStatus);
-      return;
-    }
 
-    if (!response.ok) {
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        setMessage(
+          payload?.message ||
+            (isEditing
+              ? 'Unable to save event settings'
+              : 'Unable to save event')
+        );
+        return;
+      }
+
+      const savedEvent = await response.json().catch(() => null);
+      if (eventImageFile && savedEvent?.id) {
+        const imageFormData = new FormData();
+        imageFormData.append('image', eventImageFile);
+        if (eventImagePrompt) imageFormData.append('prompt', eventImagePrompt);
+        const imageResponse = await fetch(
+          `/api/events/${savedEvent.id}/image`,
+          {
+            method: 'POST',
+            body: imageFormData,
+          }
+        );
+        if (!imageResponse.ok) {
+          setSavedEventId(savedEvent.id);
+          const uploadError = await getImageUploadError(
+            imageResponse,
+            'Unable to upload the event image.'
+          );
+          setMessage(`${uploadError} The event was saved.`);
+          return;
+        }
+        const image = await imageResponse.json();
+        setEventImageFile(null);
+        setEventImagePrompt(null);
+        setEventImagePreview(image.url);
+        if (isEditing) {
+          setLoadedEvent(current =>
+            current ? { ...current, image } : current
+          );
+        }
+      }
+      if (isEditing) setSavedSettingsFingerprint(savedFingerprint);
+      if (shouldPublish && savedEvent?.id) {
+        const publishResponse = await fetch(
+          `/api/events/${savedEvent.id}/publish`,
+          {
+            method: 'POST',
+          }
+        );
+        if (!publishResponse.ok) {
+          setMessage('Event saved, but publishing failed.');
+          return;
+        }
+        setSavedEventId(savedEvent.id);
+        setMessage('Event was successfully published.');
+        if (isEditing) {
+          setLoadedEvent(current =>
+            current ? { ...current, status: 'PUBLISHED' } : current
+          );
+        } else {
+          router.push(`/organizer/events/${savedEvent.id}/settings`);
+        }
+        return;
+      }
+
+      if (isEditing) {
+        setMessage('Event settings saved');
+        return;
+      }
+
+      if (savedEvent?.id) {
+        setSavedEventId(savedEvent.id);
+        setMessage('Event draft was successfully created.');
+        router.push(`/organizer/events/${savedEvent.id}/settings`);
+        return;
+      }
+
+      setMessage('Event was successfully created.');
+    } catch {
       setMessage(
         isEditing ? 'Unable to save event settings' : 'Unable to save event'
       );
-      return;
+    } finally {
+      setSavingAction(null);
     }
-
-    const savedEvent = await response.json().catch(() => null);
-    if (eventImageFile && savedEvent?.id) {
-      const imageFormData = new FormData();
-      imageFormData.append('image', eventImageFile);
-      if (eventImagePrompt) imageFormData.append('prompt', eventImagePrompt);
-      const imageResponse = await fetch(`/api/events/${savedEvent.id}/image`, {
-        method: 'POST',
-        body: imageFormData,
-      });
-      if (!imageResponse.ok) {
-        setSavedEventId(savedEvent.id);
-        setMessage('Unable to upload the event image. The event was saved.');
-        return;
-      }
-      const image = await imageResponse.json();
-      setEventImageFile(null);
-      setEventImagePrompt(null);
-      setEventImagePreview(image.url);
-      if (isEditing) {
-        setLoadedEvent(current => (current ? { ...current, image } : current));
-      }
-    }
-    if (isEditing) setSavedSettingsFingerprint(savedFingerprint);
-    if (shouldPublish && savedEvent?.id) {
-      const publishResponse = await fetch(
-        `/api/events/${savedEvent.id}/publish`,
-        {
-          method: 'POST',
-        }
-      );
-      if (!publishResponse.ok) {
-        setMessage('Event saved, but publishing failed.');
-        return;
-      }
-      setSavedEventId(savedEvent.id);
-      setMessage('Event was successfully published.');
-      if (isEditing) {
-        setLoadedEvent(current =>
-          current ? { ...current, status: 'PUBLISHED' } : current
-        );
-      }
-      return;
-    }
-
-    if (isEditing) {
-      setMessage('Event settings saved');
-      return;
-    }
-
-    if (savedEvent?.id) {
-      setSavedEventId(savedEvent.id);
-      setMessage('Event draft was successfully created.');
-      return;
-    }
-
-    setMessage('Event was successfully created.');
   }
 
   async function deleteDraft() {
@@ -1022,12 +1083,12 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
               <span className="text-sm font-semibold">Event image</span>
               <div className="grid gap-4 sm:grid-cols-[minmax(0,240px)_1fr] sm:items-center">
                 <div
-                  className={`${classes.subtlePanel} relative aspect-[16/9] overflow-hidden rounded-md`}
+                  className={`${classes.subtlePanel} relative aspect-[3/2] overflow-hidden rounded-md !bg-black`}
                 >
                   {eventImagePreview ? (
                     <Image
                       alt={`${title || 'Event'} preview`}
-                      className="object-cover"
+                      className="object-contain"
                       fill
                       src={eventImagePreview}
                       sizes="240px"
@@ -1043,7 +1104,7 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
                 </div>
                 <div className="grid gap-3">
                   <span className={`text-sm ${classes.mutedText}`}>
-                    JPEG, PNG, WebP, or GIF. Maximum 10 MB.
+                    JPEG, PNG, WebP, or GIF.
                   </span>
                   <label className="grid gap-2">
                     <span className="sr-only">Upload event image</span>
@@ -1182,7 +1243,12 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
               <select
                 aria-label="Application mode"
                 className={classes.input}
-                onChange={event => setApplicationMode(event.target.value)}
+                onChange={event => {
+                  setApplicationMode(event.target.value);
+                  if (event.target.value !== 'OPEN_RSVP') {
+                    setApplicationRequired(true);
+                  }
+                }}
                 value={applicationMode}
               >
                 <option value="REQUIRES_APPROVAL">REQUIRES_APPROVAL</option>
@@ -1196,6 +1262,22 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
                 </span>
               )}
             </label>
+            {applicationMode === 'OPEN_RSVP' && (
+              <label className="flex items-center gap-2 pt-7">
+                <input
+                  aria-label="Require application form"
+                  checked={applicationRequired}
+                  className={classes.checkbox}
+                  onChange={event =>
+                    setApplicationRequired(event.target.checked)
+                  }
+                  type="checkbox"
+                />
+                <span className="text-sm font-semibold">
+                  Require application form
+                </span>
+              </label>
+            )}
             <label className="flex items-center gap-2 pt-7">
               <input
                 aria-label="Auto-promote waitlist"
@@ -1555,16 +1637,20 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
             disabled={!canSubmit || isSaving}
             type="submit"
           >
-            {isEditing ? 'Save settings' : 'Save draft'}
+            {savingAction === 'draft'
+              ? 'Saving...'
+              : isEditing
+                ? 'Save settings'
+                : 'Save draft'}
           </button>
           {canAdminister && (!isEditing || loadedEvent?.status === 'DRAFT') && (
             <button
               className={classes.secondaryButton}
-              disabled={!canSubmit}
+              disabled={!canSubmit || isSaving}
               onClick={() => void saveEvent(true)}
               type="button"
             >
-              Publish
+              {savingAction === 'publish' ? 'Saving...' : 'Publish'}
             </button>
           )}
           {isEditing &&

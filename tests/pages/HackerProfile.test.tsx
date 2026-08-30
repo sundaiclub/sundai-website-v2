@@ -174,6 +174,63 @@ describe('HackerProfile', () => {
     });
   });
 
+  it('shows the specific reason that a profile URL was rejected', async () => {
+    mockUseUser.mockReturnValue({
+      isLoaded: true,
+      isSignedIn: true,
+      user: { id: 'same-user-id' },
+    } as any);
+    (global.fetch as jest.Mock).mockImplementation(
+      (url: string, init?: RequestInit) => {
+        if (url.includes('/api/hackers?clerkId=')) {
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({ id: 'test-hacker-id' }),
+          });
+        }
+        if (
+          url.includes('/api/hackers/test-hacker-id') &&
+          init?.method === 'PATCH'
+        ) {
+          return Promise.resolve({
+            ok: false,
+            json: () =>
+              Promise.resolve({
+                error:
+                  'GitHub URL: URLs cannot contain spaces. Remove the spaces and try again.',
+              }),
+          });
+        }
+        if (url.includes('/api/hackers/test-hacker-id')) {
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve(mockHacker),
+          });
+        }
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve([]),
+        });
+      }
+    );
+
+    render(
+      <ThemeProvider>
+        <HackerProfile />
+      </ThemeProvider>
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: /edit profile/i }));
+    fireEvent.change(screen.getByLabelText('GitHub URL'), {
+      target: { value: 'github.com/my profile' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'URLs cannot contain spaces. Remove the spaces and try again.'
+    );
+  });
+
   it('should not show edit button for other profiles', async () => {
     mockUseUser.mockReturnValue({
       isLoaded: true,

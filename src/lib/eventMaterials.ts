@@ -9,6 +9,7 @@ import {
   deletePrivateObject,
   inspectPrivateObject,
 } from '@/lib/gcp-storage';
+import { normalizeHttpsUrl } from '@/lib/httpsUrls';
 
 export const MAX_EVENT_MATERIAL_SIZE = 25 * 1024 * 1024;
 const MAX_EVENT_MATERIAL_PAGE_SIZE = 100;
@@ -119,15 +120,12 @@ export function validateEventMaterialUpload(input: {
   return result(true);
 }
 
-export function validateEventMaterialLink(url: string) {
-  try {
-    const parsed = new URL(url);
-    return parsed.protocol === 'https:'
-      ? result(true)
-      : result(false, 'Material links must use HTTPS.');
-  } catch {
-    return result(false, 'Material link is invalid.');
-  }
+export function validateEventMaterialLink(
+  url: string
+): { valid: true; normalizedUrl: string } | { valid: false; error: string } {
+  const result = normalizeHttpsUrl(url);
+  if (result.valid) return result;
+  return { valid: false, error: `Material link: ${result.error}` };
 }
 
 function date(value: Date | string | null) {
@@ -279,9 +277,9 @@ export async function createEventMaterialLink({
   if (typeof input.externalUrl !== 'string') {
     throw new Error('Material link is required.');
   }
-  const externalUrl = input.externalUrl;
-  const link = validateEventMaterialLink(externalUrl);
+  const link = validateEventMaterialLink(input.externalUrl);
   if (!link.valid) throw new Error(link.error);
+  const externalUrl = link.normalizedUrl;
   const { from, until, title, visibility } = validateCommonInput(input);
 
   return db.$transaction(async tx => {

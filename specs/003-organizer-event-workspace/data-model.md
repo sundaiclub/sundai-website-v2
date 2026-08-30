@@ -67,7 +67,9 @@ Physical event-specific project participation, independent of optional pitching.
 - Unique event participation is `(eventId, projectId)`.
 - Card status is reporting hygiene only and never blocks queue, voting, or pitching.
 - A global `Project` may participate in many events.
-- Project creation attaches to every currently running published event for which the creator has an active chapter membership or approved registration.
+- Draft creation does not attach an event through hidden membership or registration logic.
+- Publication creates only the event participations selected by the user.
+- Normal publication does not create pitch entries. Contextual publication may create one entry for its selected source event while that pitch session is open.
 - Creating a `PitchProject` for an event atomically upserts its `EventProject`.
 
 ### PitchProject
