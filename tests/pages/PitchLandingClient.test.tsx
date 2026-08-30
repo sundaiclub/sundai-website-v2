@@ -14,6 +14,7 @@ describe('PitchLandingClient', () => {
               chapterName: 'Sundai Boston',
               chapterSlug: 'boston',
               slug: 'build-night',
+              image: null,
             },
           ]}
         />
@@ -31,6 +32,40 @@ describe('PitchLandingClient', () => {
         'returnTo=%2Fevents%2Fboston%2Fbuild-night%3Ftab%3Dpitch'
       )
     );
+    expect(
+      screen.getByRole('img', { name: 'Boston Build Night event' })
+    ).toHaveAttribute(
+      'src',
+      expect.stringMatching(
+        /\/images\/logos\/sundai_logo_(?:dark|light)_horizontal\.svg/
+      )
+    );
+  });
+
+  it('uses the event image when one is available', () => {
+    render(
+      <ThemeProvider>
+        <PitchLandingClient
+          events={[
+            {
+              id: 'event-1',
+              title: 'Boston Build Night',
+              chapterName: 'Sundai Boston',
+              chapterSlug: 'boston',
+              slug: 'build-night',
+              image: {
+                url: 'https://example.com/build-night.png',
+                alt: 'People building projects',
+              },
+            },
+          ]}
+        />
+      </ThemeProvider>
+    );
+
+    expect(
+      screen.getByRole('img', { name: 'People building projects' })
+    ).toHaveAttribute('src', 'https://example.com/build-night.png');
   });
 
   it('shows the agreed empty state', () => {

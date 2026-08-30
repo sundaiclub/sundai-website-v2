@@ -39,6 +39,7 @@ describe('PitchLandingPage', () => {
         id: 'event-1',
         title: 'Boston Build Night',
         slug: 'build-night',
+        image: null,
         chapter: { name: 'Sundai Boston', slug: 'boston' },
       },
     ]);
@@ -71,6 +72,9 @@ describe('PitchLandingPage', () => {
           ]),
         }),
         orderBy: [{ endTime: 'asc' }, { title: 'asc' }],
+        select: expect.objectContaining({
+          image: { select: { url: true, alt: true } },
+        }),
       })
     );
   });

@@ -77,6 +77,7 @@ export default async function PitchLandingPage() {
       id: true,
       title: true,
       slug: true,
+      image: { select: { url: true, alt: true } },
       chapter: { select: { name: true, slug: true } },
     },
   });
@@ -87,6 +88,7 @@ export default async function PitchLandingPage() {
         id: event.id,
         title: event.title,
         slug: event.slug,
+        image: event.image,
         chapterName: event.chapter.name,
         chapterSlug: event.chapter.slug,
       }))}
