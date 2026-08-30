@@ -201,6 +201,7 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
   const [capacity, setCapacity] = useState(DEFAULT_CAPACITY);
   const [hasNoCapacityLimit, setHasNoCapacityLimit] = useState(false);
   const [applicationMode, setApplicationMode] = useState('REQUIRES_APPROVAL');
+  const [applicationRequired, setApplicationRequired] = useState(true);
   const [autoPromoteWaitlist, setAutoPromoteWaitlist] = useState(false);
   const [approvedAddress, setApprovedAddress] = useState('');
   const [approvedDetails, setApprovedDetails] = useState('');
@@ -344,6 +345,7 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
           setApplicationMode(
             eventPayload.applicationMode ?? 'REQUIRES_APPROVAL'
           );
+          setApplicationRequired(eventPayload.applicationRequired !== false);
           setApplicationsOpen(eventPayload.applicationsOpen !== false);
           setApplicationsCloseReason(
             eventPayload.applicationsCloseReason ?? ''
@@ -729,6 +731,8 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
       timezone,
       capacity: hasNoCapacityLimit ? null : Number(capacity),
       applicationMode,
+      applicationRequired:
+        applicationMode !== 'OPEN_RSVP' || applicationRequired,
       autoPromoteWaitlist,
       approvedDetailsJson: {
         address: approvedAddress,
@@ -1239,7 +1243,12 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
               <select
                 aria-label="Application mode"
                 className={classes.input}
-                onChange={event => setApplicationMode(event.target.value)}
+                onChange={event => {
+                  setApplicationMode(event.target.value);
+                  if (event.target.value !== 'OPEN_RSVP') {
+                    setApplicationRequired(true);
+                  }
+                }}
                 value={applicationMode}
               >
                 <option value="REQUIRES_APPROVAL">REQUIRES_APPROVAL</option>
@@ -1253,6 +1262,22 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
                 </span>
               )}
             </label>
+            {applicationMode === 'OPEN_RSVP' && (
+              <label className="flex items-center gap-2 pt-7">
+                <input
+                  aria-label="Require application form"
+                  checked={applicationRequired}
+                  className={classes.checkbox}
+                  onChange={event =>
+                    setApplicationRequired(event.target.checked)
+                  }
+                  type="checkbox"
+                />
+                <span className="text-sm font-semibold">
+                  Require application form
+                </span>
+              </label>
+            )}
             <label className="flex items-center gap-2 pt-7">
               <input
                 aria-label="Auto-promote waitlist"

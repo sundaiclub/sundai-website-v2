@@ -188,6 +188,7 @@ type PublicRegistrableEventRecord = {
   id: EntityId;
   chapterId: EntityId;
   applicationMode: EventApplicationMode;
+  applicationRequired: boolean;
   applicationsOpen: boolean;
 };
 
@@ -665,56 +666,61 @@ export async function submitPublicEventRegistration(
       return { ok: false, reason: 'APPLICATIONS_CLOSED' };
     }
 
-    const template = await fetchMergedApplicationTemplate({
-      eventId: input.eventId,
-      prisma: tx,
-    });
-    const issues = validatePublicRegistrationSubmission(
-      input.answersJson,
-      template.fields
-    );
+    const applicationRequired =
+      event.applicationMode !== 'OPEN_RSVP' ||
+      event.applicationRequired !== false;
+    let answers: JsonObject | null = null;
+    let templateSnapshot: TemplateFieldDefinition[] | null = null;
 
-    if (issues.length > 0) {
-      return {
-        ok: false,
-        reason: 'VALIDATION_FAILED',
-        issues,
-      };
+    if (applicationRequired) {
+      const template = await fetchMergedApplicationTemplate({
+        eventId: input.eventId,
+        prisma: tx,
+      });
+      const issues = validatePublicRegistrationSubmission(
+        input.answersJson,
+        template.fields
+      );
+
+      if (issues.length > 0) {
+        return {
+          ok: false,
+          reason: 'VALIDATION_FAILED',
+          issues,
+        };
+      }
+
+      answers = normalizeRegistrationAnswers(
+        input.answersJson,
+        template.fields
+      );
+      templateSnapshot = cloneTemplateSnapshot(template.fields);
+      await updateHackerApplicationProfile(
+        input.hackerId,
+        answers,
+        input.smsConsentGranted === true,
+        tx
+      );
+      await saveApplicationNotificationPreferences(
+        {
+          chapterId: event.chapterId,
+          hackerId: input.hackerId,
+          emailNotificationsEnabled: input.emailNotificationsEnabled,
+          smsNotificationsEnabled: input.smsNotificationsEnabled,
+          smsConsentGranted: input.smsConsentGranted === true,
+        },
+        tx
+      );
     }
-
-    const answers = normalizeRegistrationAnswers(
-      input.answersJson,
-      template.fields
-    );
-    await updateHackerApplicationProfile(
-      input.hackerId,
-      answers,
-      input.smsConsentGranted === true,
-      tx
-    );
-    await saveApplicationNotificationPreferences(
-      {
-        chapterId: event.chapterId,
-        hackerId: input.hackerId,
-        emailNotificationsEnabled: input.emailNotificationsEnabled,
-        smsNotificationsEnabled: input.smsNotificationsEnabled,
-        smsConsentGranted: input.smsConsentGranted === true,
-      },
-      tx
-    );
     const toStatus = getInitialPublicRegistrationStatus(event.applicationMode);
     const submittedAt = new Date();
     const registrationData = {
       status: toStatus,
       source: 'WEBSITE' as const,
       answersJson: toNullableJsonInput(answers),
-      templateSnapshotJson: toNullableJsonInput(
-        cloneTemplateSnapshot(template.fields)
-      ),
+      templateSnapshotJson: toNullableJsonInput(templateSnapshot),
       publicSafeMessage: null,
-      decidedById: isApplicantDecisionStatus(toStatus)
-        ? input.hackerId
-        : null,
+      decidedById: isApplicantDecisionStatus(toStatus) ? input.hackerId : null,
       decidedAt: isApplicantDecisionStatus(toStatus) ? submittedAt : null,
       waitlistedAt: toStatus === 'WAITLISTED' ? submittedAt : null,
     };
@@ -747,10 +753,15 @@ export async function submitPublicEventRegistration(
         toStatus,
         changeJson: {
           action: isReapplication
-            ? 'REAPPLY_PUBLIC_REGISTRATION'
-            : 'SUBMIT_PUBLIC_REGISTRATION',
+            ? applicationRequired
+              ? 'REAPPLY_PUBLIC_REGISTRATION'
+              : 'REREGISTER_PUBLIC_EVENT'
+            : applicationRequired
+              ? 'SUBMIT_PUBLIC_REGISTRATION'
+              : 'REGISTER_PUBLIC_EVENT',
           source: 'WEBSITE',
           applicationMode: event.applicationMode,
+          ...(!applicationRequired && { applicationRequired: false }),
         },
       },
       tx
@@ -1138,6 +1149,7 @@ async function findPublicRegistrableEvent(
       id: true,
       chapterId: true,
       applicationMode: true,
+      applicationRequired: true,
       applicationsOpen: true,
     },
   }) as Promise<PublicRegistrableEventRecord | null>;

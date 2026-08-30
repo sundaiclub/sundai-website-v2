@@ -226,6 +226,7 @@ export type EventFixture = {
   publicProgramLabel: string | null;
   capacity: number | null;
   applicationMode: EventApplicationMode;
+  applicationRequired?: boolean;
   autoPromoteWaitlist: boolean;
   approvedDetailsJson: JsonObject | null;
   applicationQuestionsJson: JsonValue;
@@ -551,6 +552,7 @@ export const buildEvent = (
   publicProgramLabel: 'AI Build Night',
   capacity: 40,
   applicationMode: 'REQUIRES_APPROVAL',
+  applicationRequired: true,
   autoPromoteWaitlist: false,
   approvedDetailsJson: buildApprovedOnlyDetails(),
   applicationQuestionsJson: [

@@ -170,6 +170,7 @@ function mockPublicRegistrationDatabase({
         id: event.id,
         chapterId: event.chapterId,
         applicationMode: event.applicationMode,
+        applicationRequired: event.applicationRequired,
         applicationsOpen: event.applicationsOpen,
       };
     }
@@ -349,6 +350,53 @@ describe('POST /api/events/[eventId]/registrations public submissions', () => {
         smsConsentAt: submittedAt,
         smsConsentVersion: 'site-application-checkbox-2026-08-04',
       },
+    });
+  });
+
+  it('registers a signed-in user without application answers when open RSVP does not require an application', async () => {
+    const fixture = buildNativeEventRsvpFixture();
+    const event = {
+      ...fixture.publishedEvent,
+      applicationMode: 'OPEN_RSVP' as const,
+      applicationRequired: false,
+    };
+
+    mockAuthenticatedClerk({ userId: fixture.applicant.clerkId });
+    mockPublicRegistrationDatabase({
+      event,
+      hacker: fixture.applicant,
+    });
+
+    const response = await POST_REGISTRATION(
+      createCurrentUserRegistrationRequest(event.id, {}) as any,
+      createRouteContext({ eventId: event.id })
+    );
+
+    expect(response.status).toBe(201);
+    await expect(response.json()).resolves.toEqual(
+      expect.objectContaining({ status: 'APPROVED' })
+    );
+    expect(fetchMergedApplicationTemplate).not.toHaveBeenCalled();
+    expect(prisma.hacker.update).not.toHaveBeenCalled();
+    expect(prisma.chapterMembership.upsert).not.toHaveBeenCalled();
+    expect(prisma.eventRegistration.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        eventId: event.id,
+        hackerId: fixture.applicant.id,
+        status: 'APPROVED',
+        source: 'WEBSITE',
+        answersJson: Prisma.DbNull,
+        templateSnapshotJson: Prisma.DbNull,
+      }),
+    });
+    expect(prisma.eventRegistrationAudit.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        changeJson: expect.objectContaining({
+          action: 'REGISTER_PUBLIC_EVENT',
+          applicationMode: 'OPEN_RSVP',
+          applicationRequired: false,
+        }),
+      }),
     });
   });
 

@@ -391,6 +391,7 @@ export type OrganizerEventListItem = {
   visibility?: EventVisibility;
   publicStatus?: PublicEventStatus;
   applicationMode?: EventApplicationMode;
+  applicationRequired?: boolean;
   applicationsOpen?: boolean;
   capacity?: number | null;
   _count?: {
@@ -414,6 +415,7 @@ export type OrganizerEventSettings = {
   visibility?: EventVisibility;
   publicStatus?: PublicEventStatus;
   applicationMode?: EventApplicationMode;
+  applicationRequired?: boolean;
   applicationsOpen?: boolean;
   applicationsClosedAt?: ISODateTimeString | Date | null;
   applicationsClosedById?: EntityId | null;
@@ -510,6 +512,7 @@ export interface ApplicationQuestionSet {
 
 export interface ApplicationControlsState {
   applicationMode: EventApplicationMode;
+  applicationRequired?: boolean;
   applicationsOpen: boolean;
   applicationsClosedAt?: ISODateTimeString | Date | null;
   applicationsCloseReason?: string | null;
