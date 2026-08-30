@@ -128,7 +128,14 @@ describe('PitchEventPage viewer states', () => {
       'min-w-0',
       '[overflow-wrap:anywhere]'
     );
-    expect(eventHeading.parentElement).toHaveClass('min-w-0', 'flex-1');
+    expect(eventHeading.parentElement).toHaveClass(
+      'min-w-0',
+      'lg:col-span-2'
+    );
+    expect(eventHeading.parentElement?.parentElement).toHaveClass(
+      'lg:grid-cols-3',
+      'lg:gap-6'
+    );
     expect(
       screen.queryByRole('link', { name: 'Demo Night' })
     ).not.toBeInTheDocument();
