@@ -8,6 +8,8 @@
 
 Cut over organizer event operations to `/organizer/events/[eventId]`, providing one permission-scoped workspace for overview, registration review, communications, materials, projects, pitch access, organizer notes, and a reporting preview. The implementation extends the existing Next.js App Router, Prisma/PostgreSQL event foundations, AWS SES/Twilio notification adapters, Google Cloud Storage integration, registration review, organizer notes, and `/pitch/[eventId]` controller. It adds auditable materials, communication snapshots and delivery results, staff changes, and event-specific project-card readiness while explicitly excluding phase 3 check-in/attendance behavior.
 
+The project-entry cutover also replaces hidden event attachment with visible publish-time selection, shares one add-project chooser between active public event and pitch surfaces, and carries contextual return state through the existing two-step project draft workflow.
+
 ## Dependency Verification
 
 - Phase 1 and Phase 2 event models, chapter roles, `EventStaff`, public event pages, native registrations, waitlists, global-ban filtering, organizer notes, and shared permission helpers exist locally.

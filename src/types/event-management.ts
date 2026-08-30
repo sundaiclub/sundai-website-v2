@@ -391,6 +391,7 @@ export type OrganizerEventListItem = {
   visibility?: EventVisibility;
   publicStatus?: PublicEventStatus;
   applicationMode?: EventApplicationMode;
+  applicationRequired?: boolean;
   applicationsOpen?: boolean;
   capacity?: number | null;
   _count?: {
@@ -414,6 +415,7 @@ export type OrganizerEventSettings = {
   visibility?: EventVisibility;
   publicStatus?: PublicEventStatus;
   applicationMode?: EventApplicationMode;
+  applicationRequired?: boolean;
   applicationsOpen?: boolean;
   applicationsClosedAt?: ISODateTimeString | Date | null;
   applicationsClosedById?: EntityId | null;
@@ -473,6 +475,21 @@ export interface PublicEventCard {
   viewerRegistrationStatus?: RegistrationStatus | null;
 }
 
+export type CurrentUserEvent = Pick<
+  PublicEventCard,
+  | 'id'
+  | 'slug'
+  | 'chapterSlug'
+  | 'chapterName'
+  | 'chapter'
+  | 'title'
+  | 'timezone'
+  | 'image'
+  | 'publicLocation'
+  | 'startTime'
+  | 'endTime'
+>;
+
 export interface AddToCalendarPayload {
   title: string;
   description?: string | null;
@@ -495,6 +512,7 @@ export interface ApplicationQuestionSet {
 
 export interface ApplicationControlsState {
   applicationMode: EventApplicationMode;
+  applicationRequired?: boolean;
   applicationsOpen: boolean;
   applicationsClosedAt?: ISODateTimeString | Date | null;
   applicationsCloseReason?: string | null;
@@ -534,6 +552,7 @@ export interface PublicEventDetail extends PublicEventCard {
   viewerCanManageRegistrations?: boolean;
   viewerCanEditEvent?: boolean;
   viewerCanManageEvent?: boolean;
+  viewerIsSiteAdmin?: boolean;
   pitchSession?: { phase: PitchSessionPhase } | null;
   addToCalendar: AddToCalendarPayload;
 }

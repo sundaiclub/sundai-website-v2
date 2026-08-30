@@ -310,7 +310,11 @@ describe('/chapters/[chapterSlug] public chapter page', () => {
       within(demoNight).getByText('18 people applied')
     ).toBeInTheDocument();
     expect(within(agentJam).getByText('1 person applied')).toBeInTheDocument();
-    expect(demoNight.closest('div.grid')).toHaveClass('max-w-2xl');
+    expect(demoNight.closest('div.grid')).toHaveClass(
+      'sm:grid-cols-2',
+      'lg:grid-cols-3'
+    );
+    expect(demoNight.closest('div.grid')).not.toHaveClass('max-w-2xl');
   });
 
   it('shows previous events beneath upcoming events with native event links', async () => {
@@ -474,6 +478,11 @@ describe('/chapters/[chapterSlug] public chapter page', () => {
     expect(within(pendingEventLink).getByText(/^TBD · /)).toBeInTheDocument();
     expect(within(pendingEventLink).getByText('DRAFT')).toBeInTheDocument();
     expect(within(pendingEventLink).getByText('PUBLIC')).toBeInTheDocument();
+    expect(pendingEventLink.closest('div.grid')).toHaveClass(
+      'sm:grid-cols-2',
+      'lg:grid-cols-3'
+    );
+    expect(pendingEventLink.closest('div.grid')).not.toHaveClass('max-w-2xl');
   });
 
   it('does not show pending chapter events to signed-out visitors even when public admin memberships are present', async () => {

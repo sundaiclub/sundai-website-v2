@@ -124,6 +124,7 @@ export async function listPublicEventProjects({
       eventId,
       project: {
         is_broken: false,
+        status: 'APPROVED',
         launchLead: { userBans: { none: { revokedAt: null } } },
       },
     },

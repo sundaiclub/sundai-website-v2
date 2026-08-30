@@ -109,6 +109,25 @@ Site admins and chapter admins can manage event staff and lifecycle actions with
 2. **Given** an MC or co-MC has event access but no separate admin role, **When** they attempt to assign staff or change the event lifecycle, **Then** the action is denied.
 3. **Given** a chapter admin attempts to manage an event outside their chapter, **When** they request an administrative action, **Then** the action is denied without exposing private workspace information.
 
+---
+
+### User Story 7 - Attendees Add Projects From an Active Event (Priority: P1)
+
+Approved attendees, event staff, and site administrators can add a published project or start a new project from an event that is happening now.
+
+**Why this priority**: Project submission must be available in the event context without sending attendees to a separate pitch page.
+
+**Independent Test**: Open an active event as each supported viewer, add an existing project, create and publish a new project with event choices, and verify event and pitch participation, visibility, and return navigation.
+
+**Acceptance Scenarios**:
+
+1. **Given** an event and pitch session are active, **When** an approved attendee, assigned staff member, or site administrator opens the public event page, **Then** they see an Add a project section instead of the pitch-session link.
+2. **Given** an eligible viewer opens the project chooser, **When** they inspect their published projects, **Then** existing pitch entries are marked Already added and event-only projects remain available to add to the pitch queue.
+3. **Given** a user starts a new project from an event or pitch page, **When** the project form opens, **Then** the source event is selected and shown with its image, name, and chapter.
+4. **Given** a user publishes a new project, **When** selected events are submitted, **Then** the project joins those events and joins only the open source pitch queue.
+5. **Given** the source pitch closes before publication, **When** the user publishes, **Then** publication and event participation succeed but no pitch entry is created.
+6. **Given** a site administrator opens normal project creation, **When** current events load, **Then** all current events are available and none are selected by default.
+
 ### Edge Cases
 
 - If an event has no registrations, projects, materials, notes, or messages, the workspace shows useful empty states rather than errors or misleading zero-derived conclusions.
@@ -121,6 +140,8 @@ Site admins and chapter admins can manage event staff and lifecycle actions with
 - If an organizer attempts to expose an organizer-only material through a public message, the system prevents the restricted resource from being sent as publicly accessible content.
 - If a hacker is globally blocked, non-site-admin organizers do not see the hacker, a hidden count, or ban information through workspace audiences, notes, registrations, projects, or exports.
 - If phase 3-derived concepts such as checked-in attendees or no-shows are requested, the workspace treats them as unavailable until the redesigned check-in and attendance phase is specified and delivered.
+- If an event or pitch ends while a contextual project draft is being edited, publication still succeeds and the project joins the selected event, but it does not join the closed pitch queue.
+- If an existing project is already linked to an event but not its pitch queue, it remains available for pitch submission.
 
 ## Requirements _(mandatory)_
 
@@ -170,8 +191,20 @@ Site admins and chapter admins can manage event staff and lifecycle actions with
 - **FR-042**: Phase 3 check-in and attendance functionality from issue #144 MUST NOT be implemented as part of this feature; it is intentionally deferred for redesign.
 - **FR-043**: Until the redesigned phase 3 is specified and delivered, the workspace MUST NOT offer a check-in workflow or checked-in/no-show communication audiences and MUST NOT treat legacy week-based attendance as event attendance.
 - **FR-044**: This phase MUST NOT rebuild pitch behavior, automate social or newsletter publication, add guest workflows, expose ban management to MCs or co-MCs, automate rejection from organizer notes, import historical external-event data, or add sponsor access.
-- **FR-045**: Creating a project while a published event is in progress MUST attach it to each relevant event where the creator has active chapter membership or an approved, non-cancelled registration.
-- **FR-046**: Adding a project to a pitch session linked to an event MUST also attach the project to that event, atomically and without duplicating project identity.
+- **FR-045**: Project creation MUST NOT infer event participation from chapter membership or other hidden context.
+- **FR-046**: The new-project flow MUST show events happening now for which the user has an approved, non-cancelled registration; site administrators MUST see all events happening now.
+- **FR-047**: Eligible events MUST be shown with event image, event name, and chapter name; the standard event placeholder MUST be shown when an event has no image; eligible registered-user events MUST be selected by default and site-admin events MUST be deselected by default.
+- **FR-048**: Users MUST be able to select no events or any subset of the shown events.
+- **FR-049**: Selected event participation MUST be created when the project is published, not when its draft is created.
+- **FR-050**: Normal project creation MUST add the published project only to selected events and MUST NOT add it to pitch queues.
+- **FR-051**: Contextual creation from an event or pitch page MUST add the published project to the source pitch queue only when the source event remains selected and its pitch session is open.
+- **FR-052**: Closing the source pitch before publication MUST NOT block project publication or selected event participation.
+- **FR-053**: The active public event page MUST replace its Pitch Session section with an Add a project section for approved attendees, assigned staff, and site administrators; the section MUST be absent outside the event duration or after the pitch session finishes.
+- **FR-054**: The event and pitch project chooser MUST show a New project action above the user's published projects, identify projects already in the pitch queue, and allow event-only projects to join the queue.
+- **FR-055**: Adding a project to a pitch session linked to an event MUST also attach the project to that event atomically and MUST keep the chooser open with a success message.
+- **FR-056**: Contextual project editing MUST remove the Save Draft action, retain Publish, and return to the source pitch page after publication.
+- **FR-057**: Draft projects MUST NOT appear in the public event project carousel.
+- **FR-058**: The project edit page MUST show current eligible events, identify events that already contain the project, and let an authorized editor add an approved project to additional selected events without adding it to their pitch queues.
 
 ### Key Entities _(include if feature involves data)_
 
@@ -201,6 +234,8 @@ Site admins and chapter admins can manage event staff and lifecycle actions with
 - **SC-011**: 100% of tested staff, material, message, applicant-decision, and organizer-note changes identify the actor and action time in the appropriate audit history.
 - **SC-012**: The delivered workspace contains no functional check-in, checked-in/no-show audience, or event-attendance claim derived from the deferred phase 3 or legacy week attendance.
 - **SC-013**: At least 90% of organizers in a task-based usability review can locate an event resource, registration queue, communication history, hacker note, project list, and pitch controls on their first attempt without assistance.
+- **SC-014**: In acceptance testing, 100% of project publications create exactly the selected event participations and create no non-source pitch entries.
+- **SC-015**: In acceptance testing, the active-event Add a project section is visible to every approved attendee, assigned staff member, and site administrator and to no other viewer.
 
 ## Assumptions
 
@@ -208,7 +243,7 @@ Site admins and chapter admins can manage event staff and lifecycle actions with
 - Phase 3 from issue #144 is intentionally skipped because it is optional for phase 4 and phase 5 progress; its check-in and attendance design will be replaced by a future specification.
 - Skipping phase 3 means check-in controls, event-native attendance, checked-in/no-show audiences, attendance counts, and attendance exports are outside this feature even where issue #145 originally listed them as workspace tabs or metrics.
 - The workspace will expose only completed capabilities; it will not create a compatibility layer over legacy week-based attendance.
-- Existing project and pitch capabilities remain the source of truth for pitching. This phase brings them into the event workspace context without redesigning their core user experience.
+- Existing project and pitch capabilities remain the source of truth for pitching. This phase reuses the project chooser while a later feature will move the pitch controller into an event-page tab.
 - Approval and decline communication behavior from phase 2 remains intact. Event blasts use the same established email/SMS channel preferences and consent boundaries.
 - Email and SMS provider selection is an implementation concern established by prior planning; user-facing requirements are defined by channel availability, consent, preferences, auditability, and delivery outcomes.
 - The active upload policy may be configured during planning, but organizers must see it before choosing a file and enforcement must be consistent.

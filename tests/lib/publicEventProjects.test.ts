@@ -105,6 +105,7 @@ describe('public event projects', () => {
     );
     const query = findMany.mock.calls[0][0];
     expect(query.where.project.is_broken).toBe(false);
+    expect(query.where.project.status).toBe('APPROVED');
     expect(
       query.select.project.select.pitchEntries.select.pitchVotes.where
     ).toEqual(

@@ -113,6 +113,7 @@ export default function HackerProfile() {
   const [projectSort, setProjectSort] = useState<ProjectSort>("recent");
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [avatarError, setAvatarError] = useState<string | null>(null);
+  const [profileEditError, setProfileEditError] = useState<string | null>(null);
   const { isDarkMode } = useTheme();
 
   const AvatarImage = ({ src, alt, size }: { src: string | null; alt: string; size: number }) => {
@@ -276,6 +277,7 @@ export default function HackerProfile() {
 
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setProfileEditError(null);
     try {
       const response = await fetch(`/api/hackers/${params?.hackerId}`, {
         method: "PATCH",
@@ -286,7 +288,8 @@ export default function HackerProfile() {
       });
 
       if (!response.ok) {
-        throw new Error("Failed to update profile");
+        const payload = await response.json().catch(() => null);
+        throw new Error(payload?.error || "Failed to update profile");
       }
 
       const updatedHacker = await response.json();
@@ -294,6 +297,9 @@ export default function HackerProfile() {
       setIsEditing(false);
     } catch (error) {
       console.error("Error updating profile:", error);
+      setProfileEditError(
+        error instanceof Error ? error.message : "Failed to update profile"
+      );
     }
   };
 
@@ -731,7 +737,10 @@ export default function HackerProfile() {
                   </h1>
                   {isOwnProfile && (
                     <button
-                      onClick={() => setIsEditing(true)}
+                      onClick={() => {
+                        setProfileEditError(null);
+                        setIsEditing(true);
+                      }}
                       aria-label="Edit profile"
                       className={`p-2 ${
                         isDarkMode
@@ -950,6 +959,11 @@ export default function HackerProfile() {
               </button>
             </div>
             <form onSubmit={handleEditSubmit} className="px-6 py-4 space-y-4">
+              {profileEditError && (
+                <p className="text-sm text-red-600" role="alert">
+                  {profileEditError}
+                </p>
+              )}
               {(() => {
                 const fieldClasses = `w-full px-3 py-2 border rounded-lg ${
                   isDarkMode
@@ -1002,7 +1016,8 @@ export default function HackerProfile() {
                         ) : (
                           <input
                             id={`profile-${key}`}
-                            type={type}
+                            inputMode={type === "url" ? "url" : undefined}
+                            type={type === "url" ? "text" : type}
                             value={value}
                             onChange={(e) =>
                               setEditForm({ ...editForm, [key]: e.target.value })

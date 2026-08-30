@@ -22,6 +22,7 @@ import {
   parseEventDateTimeInput,
   parseOptionalEventDateTimeInput,
 } from '@/lib/eventDateTime';
+import { HttpsUrlInputError, normalizeOptionalHttpsUrl } from '@/lib/httpsUrls';
 
 const MAX_EVENT_SLUG_ATTEMPTS = 100;
 
@@ -183,6 +184,7 @@ export async function POST(req: Request) {
       publicProgramLabel,
       capacity,
       applicationMode,
+      applicationRequired = true,
       autoPromoteWaitlist,
       approvedDetailsJson,
       applicationQuestionsJson,
@@ -233,6 +235,13 @@ export async function POST(req: Request) {
     if (!parsedApplicationMode) {
       return NextResponse.json(
         { message: 'applicationMode must be REQUIRES_APPROVAL or OPEN_RSVP' },
+        { status: 400 }
+      );
+    }
+
+    if (typeof applicationRequired !== 'boolean') {
+      return NextResponse.json(
+        { message: 'applicationRequired must be a boolean' },
         { status: 400 }
       );
     }
@@ -305,6 +314,14 @@ export async function POST(req: Request) {
     if (parsedEndTime && parsedEndTime <= parsedStartTime) {
       throw new EventDateTimeInputError('endTime must be after startTime');
     }
+    const normalizedMeetingUrl = normalizeOptionalHttpsUrl(
+      meetingUrl,
+      'Meeting URL'
+    );
+    const normalizedVirtualUrl = normalizeOptionalHttpsUrl(
+      virtualUrl,
+      'Virtual URL'
+    );
 
     const baseSlug = slugifyEventValue(slug || title);
     const createEvent = (eventSlug: string) =>
@@ -319,12 +336,12 @@ export async function POST(req: Request) {
           }),
           chapterId,
           slug: eventSlug,
-          meetingUrl: meetingUrl || null,
+          meetingUrl: normalizedMeetingUrl,
           location: location || null,
           venueName: venueName || null,
           publicLocation: publicLocation ?? location ?? null,
           address: address || null,
-          virtualUrl: virtualUrl ?? meetingUrl ?? null,
+          virtualUrl: normalizedVirtualUrl ?? normalizedMeetingUrl,
           createdById: user.id,
           ...(status !== undefined && { status }),
           ...(visibility !== undefined && { visibility }),
@@ -338,6 +355,8 @@ export async function POST(req: Request) {
             capacity: capacity === null ? null : Number(capacity),
           }),
           applicationMode: parsedApplicationMode,
+          applicationRequired:
+            parsedApplicationMode === 'OPEN_RSVP' ? applicationRequired : true,
           autoPromoteWaitlist: Boolean(autoPromoteWaitlist),
           ...(approvedDetailsJson !== undefined && {
             approvedDetailsJson:
@@ -395,7 +414,7 @@ export async function POST(req: Request) {
               title,
               description: description || null,
               startTime: parsedStartTime,
-              meetingUrl: meetingUrl || null,
+              meetingUrl: normalizedMeetingUrl,
               location: location || null,
               createdById: user.id,
               audienceCanReorder,
@@ -445,6 +464,9 @@ export async function POST(req: Request) {
 
     return NextResponse.json(event);
   } catch (error) {
+    if (error instanceof HttpsUrlInputError) {
+      return NextResponse.json({ message: error.message }, { status: 400 });
+    }
     if (error instanceof EventDateTimeInputError) {
       return NextResponse.json({ message: error.message }, { status: 400 });
     }

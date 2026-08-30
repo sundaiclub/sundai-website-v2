@@ -123,7 +123,7 @@ export default function OrganizerEventOverviewPage({
           <div className="flex flex-wrap gap-2">
             {capabilities.managePitch && event.status !== 'DRAFT' && (
               <ManagementLinkButton
-                href={`/pitch/${params.eventId}`}
+                href={`${event.publicUrl}?tab=pitch`}
                 variant="secondary"
               >
                 Open pitch controller

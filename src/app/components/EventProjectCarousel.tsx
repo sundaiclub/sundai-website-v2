@@ -6,7 +6,11 @@ import type { PublicEventProject } from '@/types/event-management';
 import { useUserContext } from '@/app/contexts/UserContext';
 import { useTheme } from '@/app/contexts/ThemeContext';
 import { ProjectCard } from './Project';
-import { ManagementSection, useManagementClasses } from './ManagementSurface';
+import {
+  ManagementEmptyState,
+  ManagementSection,
+  useManagementClasses,
+} from './ManagementSurface';
 
 export function EventProjectCarousel({
   projects,
@@ -19,8 +23,6 @@ export function EventProjectCarousel({
   const { userInfo } = useUserContext();
   const [eventProjects, setEventProjects] = useState(projects);
   const listRef = useRef<HTMLOListElement>(null);
-
-  if (projects.length === 0) return null;
 
   function move(direction: -1 | 1) {
     listRef.current?.scrollBy({
@@ -98,29 +100,35 @@ export function EventProjectCarousel({
         }
         size="large"
       >
-        <ol
-          aria-label="Event projects ranked by pitch votes"
-          className="flex min-w-0 max-w-full snap-x snap-mandatory gap-4 overflow-x-auto overscroll-x-contain pb-3"
-          ref={listRef}
-        >
-          {eventProjects.map((project, index) => (
-            <li
-              className="w-[85%] min-w-0 shrink-0 snap-start sm:w-80"
-              key={project.id}
-            >
-              <ProjectCard
-                project={project}
-                userInfo={userInfo}
-                handleLike={handleLike}
-                isDarkMode={isDarkMode}
-                show_status={false}
-                show_team={true}
-                variant="trending"
-                imageBadge={`#${index + 1} · ${project.pitchVoteCount} ${project.pitchVoteCount === 1 ? 'vote' : 'votes'}`}
-              />
-            </li>
-          ))}
-        </ol>
+        {eventProjects.length === 0 ? (
+          <ManagementEmptyState>
+            No projects have been added to this event.
+          </ManagementEmptyState>
+        ) : (
+          <ol
+            aria-label="Event projects ranked by pitch votes"
+            className="flex min-w-0 max-w-full snap-x snap-mandatory gap-4 overflow-x-auto overscroll-x-contain pb-3"
+            ref={listRef}
+          >
+            {eventProjects.map((project, index) => (
+              <li
+                className="w-[85%] min-w-0 shrink-0 snap-start sm:w-80"
+                key={project.id}
+              >
+                <ProjectCard
+                  project={project}
+                  userInfo={userInfo}
+                  handleLike={handleLike}
+                  isDarkMode={isDarkMode}
+                  show_status={false}
+                  show_team={true}
+                  variant="trending"
+                  imageBadge={`#${index + 1} · ${project.pitchVoteCount} ${project.pitchVoteCount === 1 ? 'vote' : 'votes'}`}
+                />
+              </li>
+            ))}
+          </ol>
+        )}
       </ManagementSection>
     </div>
   );

@@ -179,34 +179,6 @@ export async function POST(req: Request) {
     }
 
     const currentWeek = await getOrCreateCurrentWeek();
-    const now = new Date();
-    const activeEvents = await prisma.event.findMany({
-      where: {
-        status: 'PUBLISHED',
-        startTime: { lte: now },
-        endTime: { gte: now },
-        OR: [
-          {
-            chapter: {
-              memberships: {
-                some: { hackerId: hacker.id, status: 'ACTIVE' },
-              },
-            },
-          },
-          {
-            registrations: {
-              some: {
-                hackerId: hacker.id,
-                status: 'APPROVED',
-                cancelledAt: null,
-              },
-            },
-          },
-        ],
-      },
-      select: { id: true },
-    });
-
     const isResearchSite = process.env.IS_RESEARCH_SITE === 'true';
     const hack_type = isResearchSite ? 'RESEARCH' : 'REGULAR';
 
@@ -228,12 +200,6 @@ export async function POST(req: Request) {
           create: members.map((member: { id: string; role: string }) => ({
             hackerId: member.id,
             role: member.role,
-          })),
-        },
-        eventParticipations: {
-          create: activeEvents.map(event => ({
-            eventId: event.id,
-            addedById: hacker.id,
           })),
         },
       },

@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import {
   applyProfilePrefillToAnswers,
@@ -84,7 +85,6 @@ function initialAnswers(input: {
 function inputTypeFor(field: TemplateFieldDefinition) {
   if (field.type === 'EMAIL') return 'email';
   if (field.type === 'PHONE') return 'tel';
-  if (field.type === 'URL') return 'url';
   if (field.type === 'NUMBER') return 'number';
   if (field.type === 'DATE') return 'date';
   if (field.type === 'DATETIME') return 'datetime-local';
@@ -173,6 +173,7 @@ function FieldInput({
         <input
           className={classes.input}
           id={inputId}
+          inputMode={field.type === 'URL' ? 'url' : undefined}
           onChange={event =>
             onChange(normalizeSubmissionValue(field, event.target.value))
           }
@@ -205,6 +206,7 @@ export function EventApplicationForm({
   hideStartButton?: boolean;
 }) {
   const classes = useManagementClasses();
+  const router = useRouter();
   const fields = event.applicationQuestionSet.composedFields;
   const registration = event.viewerRegistration;
   const controls: ApplicationControlsState = event.applicationControls;
@@ -315,6 +317,26 @@ export function EventApplicationForm({
       );
       const payload = await response.json().catch(() => null);
       if (!response.ok) {
+        if (Array.isArray(payload?.issues)) {
+          setErrors(
+            Object.fromEntries(
+              payload.issues
+                .filter(
+                  (issue: unknown) =>
+                    typeof issue === 'object' &&
+                    issue !== null &&
+                    'fieldId' in issue &&
+                    typeof issue.fieldId === 'string' &&
+                    'message' in issue &&
+                    typeof issue.message === 'string'
+                )
+                .map((issue: { fieldId: string; message: string }) => [
+                  issue.fieldId,
+                  issue.message,
+                ])
+            )
+          );
+        }
         throw new Error(payload?.message || 'Unable to save application.');
       }
       setActionMessage(
@@ -322,6 +344,7 @@ export function EventApplicationForm({
       );
       setIsEditing(false);
       if (payload) onRegistrationChange?.(payload);
+      router.refresh();
     } catch (error) {
       setActionError(
         error instanceof Error ? error.message : 'Unable to save application.'

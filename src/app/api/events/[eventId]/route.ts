@@ -8,8 +8,8 @@ import {
 import { sanitizeApprovedDetailsJson } from '@/lib/approvedEventDetails';
 import {
   canDecideRegistrationsWithContext,
-  canManageChapterSettings,
   canManageEventPitchWithContext,
+  canManageChapterSettings,
   canViewApprovedOnlyEventDetailsWithContext,
 } from '@/lib/eventManagementAuth';
 import {
@@ -24,6 +24,7 @@ import {
   redactPublicEventForViewer,
 } from '@/lib/publicEvents';
 import { requireEventSettingsManager } from '@/lib/eventManagementApi';
+import { HttpsUrlInputError, normalizeOptionalHttpsUrl } from '@/lib/httpsUrls';
 import { approveEventStaffRegistrations } from '@/lib/eventStaffRegistrations';
 import {
   EventDateTimeInputError,
@@ -117,6 +118,7 @@ export async function GET(
         description: true,
         startTime: true,
         endTime: true,
+        meetingUrl: true,
         publicLocation: true,
         status: true,
         visibility: true,
@@ -124,6 +126,7 @@ export async function GET(
         programType: true,
         capacity: true,
         applicationMode: true,
+        applicationRequired: true,
         applicationsOpen: true,
         applicationsClosedAt: true,
         applicationsCloseReason: true,
@@ -213,7 +216,6 @@ export async function GET(
       chapterMembership,
       staff,
     });
-
     const publicEvent = redactPublicEventForViewer(event, {
       viewerRegistration,
       viewerCanManageRegistrations,
@@ -223,13 +225,15 @@ export async function GET(
     });
 
     if (!viewerCanViewApprovedDetails) {
-      return NextResponse.json(publicEvent);
+      return NextResponse.json({
+        ...publicEvent,
+        ...(event.meetingUrl ? { meetingUrl: event.meetingUrl } : {}),
+      });
     }
 
     const pitchEvent = await prisma.event.findUnique({
       where: { id: params.eventId },
       select: {
-        meetingUrl: true,
         staff: {
           select: {
             id: true,
@@ -270,9 +274,8 @@ export async function GET(
 
     return NextResponse.json({
       ...publicEvent,
-      ...(viewerCanManagePitch && pitchEvent?.meetingUrl
-        ? { meetingUrl: pitchEvent.meetingUrl }
-        : {}),
+      ...(event.meetingUrl ? { meetingUrl: event.meetingUrl } : {}),
+      canManagePitch: viewerCanManagePitch,
       staff: pitchEvent?.staff ?? [],
       pitchSessions: pitchEvent?.pitchSessions ?? [],
     });
@@ -295,6 +298,7 @@ export async function PATCH(
       where: { id: params.eventId },
       select: {
         chapterId: true,
+        applicationMode: true,
       },
     });
     if (!existingEvent) return new NextResponse('Not Found', { status: 404 });
@@ -319,6 +323,7 @@ export async function PATCH(
       publicProgramLabel,
       capacity,
       applicationMode,
+      applicationRequired,
       autoPromoteWaitlist,
       approvedDetailsJson,
       applicationQuestionsJson,
@@ -366,6 +371,21 @@ export async function PATCH(
       );
     }
 
+    if (
+      applicationRequired !== undefined &&
+      typeof applicationRequired !== 'boolean'
+    ) {
+      return NextResponse.json(
+        { message: 'applicationRequired must be a boolean' },
+        { status: 400 }
+      );
+    }
+
+    const nextApplicationMode =
+      parsedApplicationMode ?? existingEvent.applicationMode;
+    const nextApplicationRequired =
+      nextApplicationMode === 'REQUIRES_APPROVAL' ? true : applicationRequired;
+
     const parsedApplicationsOpen = parseApplicationsOpen(applicationsOpen);
     if (parsedApplicationsOpen === null) {
       return NextResponse.json(
@@ -412,6 +432,14 @@ export async function PATCH(
     if (parsedStartTime && parsedEndTime && parsedEndTime <= parsedStartTime) {
       throw new EventDateTimeInputError('endTime must be after startTime');
     }
+    const normalizedMeetingUrl =
+      meetingUrl === undefined
+        ? undefined
+        : normalizeOptionalHttpsUrl(meetingUrl, 'Meeting URL');
+    const normalizedVirtualUrl =
+      virtualUrl === undefined
+        ? undefined
+        : normalizeOptionalHttpsUrl(virtualUrl, 'Virtual URL');
 
     if (applicationQuestionsJson !== undefined) {
       parseTemplateFieldsJson(
@@ -448,14 +476,14 @@ export async function PATCH(
         ...(endTime !== undefined && {
           endTime: parsedEndTime,
         }),
-        ...(meetingUrl !== undefined && { meetingUrl: meetingUrl || null }),
+        ...(meetingUrl !== undefined && { meetingUrl: normalizedMeetingUrl }),
         ...(location !== undefined && { location: location || null }),
         ...(venueName !== undefined && { venueName: venueName || null }),
         ...(publicLocation !== undefined && {
           publicLocation: publicLocation || null,
         }),
         ...(address !== undefined && { address: address || null }),
-        ...(virtualUrl !== undefined && { virtualUrl: virtualUrl || null }),
+        ...(virtualUrl !== undefined && { virtualUrl: normalizedVirtualUrl }),
         ...(slug !== undefined && {
           slug: slugifyEventValue(slug || title || params.eventId),
         }),
@@ -470,6 +498,9 @@ export async function PATCH(
         }),
         ...(parsedApplicationMode !== undefined && {
           applicationMode: parsedApplicationMode,
+        }),
+        ...(nextApplicationRequired !== undefined && {
+          applicationRequired: nextApplicationRequired,
         }),
         ...(autoPromoteWaitlist !== undefined && {
           autoPromoteWaitlist: Boolean(autoPromoteWaitlist),
@@ -653,6 +684,9 @@ export async function PATCH(
 
     return NextResponse.json(event);
   } catch (error) {
+    if (error instanceof HttpsUrlInputError) {
+      return NextResponse.json({ message: error.message }, { status: 400 });
+    }
     if (error instanceof EventDateTimeInputError) {
       return NextResponse.json({ message: error.message }, { status: 400 });
     }

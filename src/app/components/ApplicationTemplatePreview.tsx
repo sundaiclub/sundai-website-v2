@@ -80,9 +80,7 @@ function PreviewControl({ field }: { field: TemplateFieldDefinition }) {
       ? 'email'
       : field.type === 'PHONE'
         ? 'tel'
-        : field.type === 'URL'
-          ? 'url'
-          : field.type === 'NUMBER'
+        : field.type === 'NUMBER'
             ? 'number'
             : field.type === 'DATE'
               ? 'date'
@@ -96,6 +94,7 @@ function PreviewControl({ field }: { field: TemplateFieldDefinition }) {
       <input
         className={`${classes.input} mt-2 block w-full`}
         disabled
+        inputMode={field.type === 'URL' ? 'url' : undefined}
         placeholder={field.placeholder ?? ''}
         type={inputType}
       />

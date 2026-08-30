@@ -108,3 +108,24 @@ npm run build
 - Co-MC pitch controls still work and co-MC registration decisions still fail.
 - Project-card status never blocks existing pitch queue/voting behavior.
 - No workspace route, audience enum, count, or report uses legacy `Week`/`Attendance` as event attendance.
+
+### Project Entry Cutover Verification — 2026-08-28
+
+| Command | Result |
+| --- | --- |
+| `npm run test -- --runInBand` | PASS — 147 suites, 1,119 tests. |
+| `npx tsc --noEmit` | PASS — no type errors. |
+| `npm run build` | PASS — production build and static generation completed. |
+
+Verified behaviors include visible current-event selection, no hidden chapter-based attachment, publish-time event participation, source-only pitch entry, closed-pitch handling, draft exclusion from public event projects, active-event project-entry visibility, shared project chooser state, and contextual return navigation.
+
+### Project Entry Polish Verification — 2026-08-28
+
+| Command | Result |
+| --- | --- |
+| Focused Jest suites | PASS — 4 suites, 23 tests. |
+| `npm run test -- --runInBand` | PASS — 147 suites, 1,121 tests. |
+| `npx tsc --noEmit` | PASS — no type errors. |
+| `npm run build` | PASS — production build and static generation completed. |
+
+Verified behaviors include the opaque shared chooser, standard placeholder images for events without uploads, current eligible events on the project edit page, protected existing event links, and additive event participation for approved projects.

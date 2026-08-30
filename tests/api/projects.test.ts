@@ -1,6 +1,6 @@
-import { NextRequest } from 'next/server'
-import { GET, POST } from '../../src/app/api/projects/route'
-import { mockProject, mockHacker } from '../utils/test-utils'
+import { NextRequest } from 'next/server';
+import { GET, POST } from '../../src/app/api/projects/route';
+import { mockProject, mockHacker } from '../utils/test-utils';
 
 // Mock Prisma
 jest.mock('../../src/lib/prisma', () => ({
@@ -22,76 +22,83 @@ jest.mock('../../src/lib/prisma', () => ({
       create: jest.fn(),
     },
   },
-}))
+}));
 
 // Mock Clerk auth
 jest.mock('@clerk/nextjs/server', () => ({
   auth: jest.fn(),
-}))
+}));
 
 // Mock GCP storage
 jest.mock('../../src/lib/gcp-storage', () => ({
   uploadToGCS: jest.fn(),
-}))
+}));
 
 // Get the mocked Prisma
-const mockPrisma = require('../../src/lib/prisma').default
+const mockPrisma = require('../../src/lib/prisma').default;
 
 describe('/api/projects', () => {
   beforeEach(() => {
-    jest.clearAllMocks()
-    process.env.IS_RESEARCH_SITE = 'false'
-    mockPrisma.event.findMany.mockResolvedValue([])
-  })
+    jest.clearAllMocks();
+    process.env.IS_RESEARCH_SITE = 'false';
+    mockPrisma.event.findMany.mockResolvedValue([]);
+  });
 
   describe('GET', () => {
     it('fetches projects successfully', async () => {
-      mockPrisma.project.findMany.mockResolvedValue([mockProject])
+      mockPrisma.project.findMany.mockResolvedValue([mockProject]);
 
-      const request = new NextRequest('http://localhost:3000/api/projects')
-      const response = await GET(request)
-      const data = await response.json()
+      const request = new NextRequest('http://localhost:3000/api/projects');
+      const response = await GET(request);
+      const data = await response.json();
 
-      expect(response.status).toBe(200)
-      expect(data).toHaveLength(1)
+      expect(response.status).toBe(200);
+      expect(data).toHaveLength(1);
       expect(data[0]).toMatchObject({
         id: 'test-project-id',
         title: 'Test Project',
         status: 'APPROVED',
-      })
-    })
+      });
+    });
 
     it('filters projects by status', async () => {
-      mockPrisma.project.findMany.mockResolvedValue([mockProject])
+      mockPrisma.project.findMany.mockResolvedValue([mockProject]);
 
-      const request = new NextRequest('http://localhost:3000/api/projects?status=APPROVED')
-      const response = await GET(request)
-      const data = await response.json()
+      const request = new NextRequest(
+        'http://localhost:3000/api/projects?status=APPROVED'
+      );
+      const response = await GET(request);
+      const data = await response.json();
 
-      expect(response.status).toBe(200)
-      expect(data).toHaveLength(1)
-    })
+      expect(response.status).toBe(200);
+      expect(data).toHaveLength(1);
+    });
 
     it('returns paginated projects when limit and offset are provided', async () => {
       const secondProject = {
         ...mockProject,
         id: 'test-project-id-2',
         title: 'Another Test Project',
-      }
-      mockPrisma.project.findMany.mockResolvedValue([mockProject, secondProject])
-      mockPrisma.project.count.mockResolvedValue(25)
+      };
+      mockPrisma.project.findMany.mockResolvedValue([
+        mockProject,
+        secondProject,
+      ]);
+      mockPrisma.project.count.mockResolvedValue(25);
 
-      const request = new NextRequest('http://localhost:3000/api/projects?status=APPROVED&limit=1&offset=2')
-      const response = await GET(request)
-      const data = await response.json()
+      const request = new NextRequest(
+        'http://localhost:3000/api/projects?status=APPROVED&limit=1&offset=2'
+      );
+      const response = await GET(request);
+      const data = await response.json();
 
-      expect(response.status).toBe(200)
+      expect(response.status).toBe(200);
       expect(mockPrisma.project.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           skip: 2,
           take: 2,
         })
-      )
+      );
       expect(data).toMatchObject({
         hasMore: true,
         totalCount: 25,
@@ -101,63 +108,68 @@ describe('/api/projects', () => {
             title: 'Test Project',
           }),
         ],
-      })
-      expect(data.projects).toHaveLength(1)
-    })
+      });
+      expect(data.projects).toHaveLength(1);
+    });
 
     it('handles research site environment', async () => {
-      process.env.IS_RESEARCH_SITE = 'true'
-      mockPrisma.project.findMany.mockResolvedValue([])
+      process.env.IS_RESEARCH_SITE = 'true';
+      mockPrisma.project.findMany.mockResolvedValue([]);
 
-      const request = new NextRequest('http://localhost:3000/api/projects')
-      const response = await GET(request)
-      const data = await response.json()
+      const request = new NextRequest('http://localhost:3000/api/projects');
+      const response = await GET(request);
+      const data = await response.json();
 
-      expect(response.status).toBe(200)
-      expect(data).toEqual([])
-    })
+      expect(response.status).toBe(200);
+      expect(data).toEqual([]);
+    });
 
     it('handles database errors', async () => {
-      mockPrisma.project.findMany.mockRejectedValue(new Error('Database error'))
+      mockPrisma.project.findMany.mockRejectedValue(
+        new Error('Database error')
+      );
 
-      const request = new NextRequest('http://localhost:3000/api/projects')
-      const response = await GET(request)
-      const data = await response.json()
+      const request = new NextRequest('http://localhost:3000/api/projects');
+      const response = await GET(request);
+      const data = await response.json();
 
-      expect(response.status).toBe(500)
-      expect(data).toEqual({ error: 'Error fetching projects' })
-    })
-  })
+      expect(response.status).toBe(500);
+      expect(data).toEqual({ error: 'Error fetching projects' });
+    });
+  });
 
   describe('POST', () => {
-    const mockAuth = require('@clerk/nextjs/server').auth
+    const mockAuth = require('@clerk/nextjs/server').auth;
 
     it('creates a new project successfully', async () => {
-      mockAuth.mockReturnValue({ userId: 'test-clerk-id' })
-      mockPrisma.hacker.findUnique.mockResolvedValue(mockHacker)
+      mockAuth.mockReturnValue({ userId: 'test-clerk-id' });
+      mockPrisma.hacker.findUnique.mockResolvedValue(mockHacker);
       mockPrisma.week.findFirst.mockResolvedValue({
         id: 'test-week-id',
         number: 1,
-      })
-      mockPrisma.project.create.mockResolvedValue(mockProject)
+      });
+      mockPrisma.project.create.mockResolvedValue(mockProject);
 
-      const formData = new FormData()
-      formData.append('title', 'New Project')
-      formData.append('preview', 'A new project preview')
-      formData.append('members', JSON.stringify([{ id: 'test-hacker-id', role: 'Developer' }]))
+      const formData = new FormData();
+      formData.append('title', 'New Project');
+      formData.append('preview', 'A new project preview');
+      formData.append(
+        'members',
+        JSON.stringify([{ id: 'test-hacker-id', role: 'Developer' }])
+      );
 
       const request = new NextRequest('http://localhost:3000/api/projects', {
         method: 'POST',
         body: formData,
-      })
+      });
 
       // Mock the formData method to return our test data
-      request.formData = jest.fn().mockResolvedValue(formData)
+      request.formData = jest.fn().mockResolvedValue(formData);
 
-      const response = await POST(request)
-      const data = await response.json()
+      const response = await POST(request);
+      const data = await response.json();
 
-      expect(response.status).toBe(200)
+      expect(response.status).toBe(200);
       expect(data).toMatchObject({
         id: mockProject.id,
         title: mockProject.title,
@@ -169,183 +181,177 @@ describe('/api/projects', () => {
         status: mockProject.status,
         is_starred: mockProject.is_starred,
         is_broken: mockProject.is_broken,
-      })
+      });
       expect(mockPrisma.project.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({
-            eventParticipations: { create: [] },
+          data: expect.not.objectContaining({
+            eventParticipations: expect.anything(),
           }),
         })
-      )
-    })
+      );
+    });
 
-    it('attaches a new project to relevant chapter events happening now', async () => {
-      mockAuth.mockReturnValue({ userId: 'test-clerk-id' })
-      mockPrisma.hacker.findUnique.mockResolvedValue(mockHacker)
-      mockPrisma.week.findFirst.mockResolvedValue({ id: 'test-week-id', number: 1 })
-      mockPrisma.event.findMany.mockResolvedValue([{ id: 'active-event' }])
-      mockPrisma.project.create.mockResolvedValue(mockProject)
-
-      const formData = new FormData()
-      formData.append('title', 'Event Project')
-      formData.append('preview', 'Built during the event')
-      formData.append('members', JSON.stringify([]))
-      const request = new NextRequest('http://localhost:3000/api/projects', {
-        method: 'POST',
-        body: formData,
-      })
-      request.formData = jest.fn().mockResolvedValue(formData)
-
-      expect((await POST(request)).status).toBe(200)
-      expect(mockPrisma.event.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({
-            status: 'PUBLISHED',
-            startTime: { lte: expect.any(Date) },
-            endTime: { gte: expect.any(Date) },
-          }),
-        })
-      )
-      expect(mockPrisma.project.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({
-            eventParticipations: {
-              create: [{ eventId: 'active-event', addedById: mockHacker.id }],
-            },
-          }),
-        })
-      )
-    })
-
-    it('returns 401 when user is not authenticated', async () => {
-      mockAuth.mockReturnValue({ userId: null })
-
-      const formData = new FormData()
-      formData.append('title', 'New Project')
-      formData.append('preview', 'A new project preview')
-      formData.append('members', JSON.stringify([]))
-
-      const request = new NextRequest('http://localhost:3000/api/projects', {
-        method: 'POST',
-        body: formData,
-      })
-
-      request.formData = jest.fn().mockResolvedValue(formData)
-
-      const response = await POST(request)
-
-      expect(response.status).toBe(401)
-    })
-
-    it('returns 400 when title is missing', async () => {
-      mockAuth.mockReturnValue({ userId: 'test-clerk-id' })
-
-      const formData = new FormData()
-      formData.append('preview', 'A new project preview')
-      formData.append('members', JSON.stringify([]))
-
-      const request = new NextRequest('http://localhost:3000/api/projects', {
-        method: 'POST',
-        body: formData,
-      })
-
-      request.formData = jest.fn().mockResolvedValue(formData)
-
-      const response = await POST(request)
-      const data = await response.json()
-
-      expect(response.status).toBe(400)
-      expect(data).toEqual({ message: 'Title is required' })
-    })
-
-    it('returns 400 when preview is missing', async () => {
-      mockAuth.mockReturnValue({ userId: 'test-clerk-id' })
-
-      const formData = new FormData()
-      formData.append('title', 'New Project')
-      formData.append('members', JSON.stringify([]))
-
-      const request = new NextRequest('http://localhost:3000/api/projects', {
-        method: 'POST',
-        body: formData,
-      })
-
-      request.formData = jest.fn().mockResolvedValue(formData)
-
-      const response = await POST(request)
-      const data = await response.json()
-
-      expect(response.status).toBe(400)
-      expect(data).toEqual({ message: 'Preview is required' })
-    })
-
-    it('returns 400 when preview is too long', async () => {
-      mockAuth.mockReturnValue({ userId: 'test-clerk-id' })
-
-      const formData = new FormData()
-      formData.append('title', 'New Project')
-      formData.append('preview', 'A'.repeat(101)) // 101 characters
-      formData.append('members', JSON.stringify([]))
-
-      const request = new NextRequest('http://localhost:3000/api/projects', {
-        method: 'POST',
-        body: formData,
-      })
-
-      request.formData = jest.fn().mockResolvedValue(formData)
-
-      const response = await POST(request)
-      const data = await response.json()
-
-      expect(response.status).toBe(400)
-      expect(data).toEqual({ message: 'Preview must be 100 characters or less' })
-    })
-
-    it('returns 404 when hacker is not found', async () => {
-      mockAuth.mockReturnValue({ userId: 'test-clerk-id' })
-      mockPrisma.hacker.findUnique.mockResolvedValue(null)
-
-      const formData = new FormData()
-      formData.append('title', 'New Project')
-      formData.append('preview', 'A new project preview')
-      formData.append('members', JSON.stringify([]))
-
-      const request = new NextRequest('http://localhost:3000/api/projects', {
-        method: 'POST',
-        body: formData,
-      })
-
-      request.formData = jest.fn().mockResolvedValue(formData)
-
-      const response = await POST(request)
-
-      expect(response.status).toBe(404)
-    })
-
-    it('handles database errors during creation', async () => {
-      mockAuth.mockReturnValue({ userId: 'test-clerk-id' })
-      mockPrisma.hacker.findUnique.mockResolvedValue(mockHacker)
+    it('does not attach a draft through hidden event logic', async () => {
+      mockAuth.mockReturnValue({ userId: 'test-clerk-id' });
+      mockPrisma.hacker.findUnique.mockResolvedValue(mockHacker);
       mockPrisma.week.findFirst.mockResolvedValue({
         id: 'test-week-id',
         number: 1,
-      })
-      mockPrisma.project.create.mockRejectedValue(new Error('Database error'))
+      });
+      mockPrisma.project.create.mockResolvedValue(mockProject);
 
-      const formData = new FormData()
-      formData.append('title', 'New Project')
-      formData.append('preview', 'A new project preview')
-      formData.append('members', JSON.stringify([]))
+      const formData = new FormData();
+      formData.append('title', 'Event Project');
+      formData.append('preview', 'Built during the event');
+      formData.append('members', JSON.stringify([]));
+      const request = new NextRequest('http://localhost:3000/api/projects', {
+        method: 'POST',
+        body: formData,
+      });
+      request.formData = jest.fn().mockResolvedValue(formData);
+
+      expect((await POST(request)).status).toBe(200);
+      expect(mockPrisma.event.findMany).not.toHaveBeenCalled();
+      expect(mockPrisma.project.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.not.objectContaining({
+            eventParticipations: expect.anything(),
+          }),
+        })
+      );
+    });
+
+    it('returns 401 when user is not authenticated', async () => {
+      mockAuth.mockReturnValue({ userId: null });
+
+      const formData = new FormData();
+      formData.append('title', 'New Project');
+      formData.append('preview', 'A new project preview');
+      formData.append('members', JSON.stringify([]));
 
       const request = new NextRequest('http://localhost:3000/api/projects', {
         method: 'POST',
         body: formData,
-      })
+      });
 
-      request.formData = jest.fn().mockResolvedValue(formData)
+      request.formData = jest.fn().mockResolvedValue(formData);
 
-      const response = await POST(request)
+      const response = await POST(request);
 
-      expect(response.status).toBe(500)
-    })
-  })
-})
+      expect(response.status).toBe(401);
+    });
+
+    it('returns 400 when title is missing', async () => {
+      mockAuth.mockReturnValue({ userId: 'test-clerk-id' });
+
+      const formData = new FormData();
+      formData.append('preview', 'A new project preview');
+      formData.append('members', JSON.stringify([]));
+
+      const request = new NextRequest('http://localhost:3000/api/projects', {
+        method: 'POST',
+        body: formData,
+      });
+
+      request.formData = jest.fn().mockResolvedValue(formData);
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data).toEqual({ message: 'Title is required' });
+    });
+
+    it('returns 400 when preview is missing', async () => {
+      mockAuth.mockReturnValue({ userId: 'test-clerk-id' });
+
+      const formData = new FormData();
+      formData.append('title', 'New Project');
+      formData.append('members', JSON.stringify([]));
+
+      const request = new NextRequest('http://localhost:3000/api/projects', {
+        method: 'POST',
+        body: formData,
+      });
+
+      request.formData = jest.fn().mockResolvedValue(formData);
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data).toEqual({ message: 'Preview is required' });
+    });
+
+    it('returns 400 when preview is too long', async () => {
+      mockAuth.mockReturnValue({ userId: 'test-clerk-id' });
+
+      const formData = new FormData();
+      formData.append('title', 'New Project');
+      formData.append('preview', 'A'.repeat(101)); // 101 characters
+      formData.append('members', JSON.stringify([]));
+
+      const request = new NextRequest('http://localhost:3000/api/projects', {
+        method: 'POST',
+        body: formData,
+      });
+
+      request.formData = jest.fn().mockResolvedValue(formData);
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data).toEqual({
+        message: 'Preview must be 100 characters or less',
+      });
+    });
+
+    it('returns 404 when hacker is not found', async () => {
+      mockAuth.mockReturnValue({ userId: 'test-clerk-id' });
+      mockPrisma.hacker.findUnique.mockResolvedValue(null);
+
+      const formData = new FormData();
+      formData.append('title', 'New Project');
+      formData.append('preview', 'A new project preview');
+      formData.append('members', JSON.stringify([]));
+
+      const request = new NextRequest('http://localhost:3000/api/projects', {
+        method: 'POST',
+        body: formData,
+      });
+
+      request.formData = jest.fn().mockResolvedValue(formData);
+
+      const response = await POST(request);
+
+      expect(response.status).toBe(404);
+    });
+
+    it('handles database errors during creation', async () => {
+      mockAuth.mockReturnValue({ userId: 'test-clerk-id' });
+      mockPrisma.hacker.findUnique.mockResolvedValue(mockHacker);
+      mockPrisma.week.findFirst.mockResolvedValue({
+        id: 'test-week-id',
+        number: 1,
+      });
+      mockPrisma.project.create.mockRejectedValue(new Error('Database error'));
+
+      const formData = new FormData();
+      formData.append('title', 'New Project');
+      formData.append('preview', 'A new project preview');
+      formData.append('members', JSON.stringify([]));
+
+      const request = new NextRequest('http://localhost:3000/api/projects', {
+        method: 'POST',
+        body: formData,
+      });
+
+      request.formData = jest.fn().mockResolvedValue(formData);
+
+      const response = await POST(request);
+
+      expect(response.status).toBe(500);
+    });
+  });
+});

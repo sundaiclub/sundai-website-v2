@@ -225,6 +225,33 @@
 
 ---
 
+## Phase 10: User Story 7 - Attendees Add Projects From an Active Event (Priority: P1)
+
+**Goal**: Replace hidden project-to-event behavior with visible selection and a shared active-event project chooser.
+
+### Tests for User Story 7
+
+- [X] T091 [P] [US7] Add failing project-option and publish-time event/pitch attachment tests in `tests/api/project-event-options.test.ts` and `tests/api/projects-projectId-submit.test.ts`
+- [X] T092 [P] [US7] Replace the hidden auto-attachment regression and add draft filtering in `tests/api/projects.test.ts` and `tests/lib/publicEventProjects.test.ts`
+- [X] T093 [P] [US7] Add failing shared chooser, event-page visibility, contextual new-project, and contextual editor tests in `tests/components/AddProjectDialog.test.tsx`, `tests/pages/EventDetailPage.test.tsx`, `tests/pages/NewProject.test.tsx`, and `tests/pages/ProjectEdit.test.tsx`
+
+### Implementation for User Story 7
+
+- [X] T094 [US7] Implement current project-event options and publish-time selected participation/source-pitch attachment in `src/app/api/events/project-options/route.ts` and `src/app/api/projects/[projectId]/submit/route.ts`
+- [X] T095 [US7] Remove hidden project creation attachment and exclude drafts from public event projects in `src/app/api/projects/route.ts` and `src/lib/publicEventProjects.ts`
+- [X] T096 [US7] Implement reusable project option loading and queue attachment routes in `src/app/api/events/[eventId]/pitch/project-options/route.ts` and `src/app/api/events/[eventId]/pitch/queue/route.ts`
+- [X] T097 [US7] Build the shared chooser and replace the public Pitch Session card while reusing it on `/pitch/[eventId]` in `src/app/components/AddProjectDialog.tsx`, `src/app/components/EventDetailSections.tsx`, and `src/app/pitch/[eventId]/page.tsx`
+- [X] T098 [US7] Add visible event selection and contextual publish/return behavior in `src/app/projects/new/page.tsx` and `src/app/projects/[projectId]/edit/page.tsx`
+- [X] T099 [US7] Run focused tests and production build, then record the verification result in `specs/003-organizer-event-workspace/quickstart.md`
+
+### Follow-up polish for User Story 7
+
+- [X] T100 [P] [US7] Add popup opacity, event placeholder, and edit-page event-selection regressions in `tests/components/AddProjectDialog.test.tsx`, `tests/pages/NewProject.test.tsx`, `tests/pages/ProjectEdit.test.tsx`, and `tests/api/project-event-options.test.ts`
+- [X] T101 [US7] Make the shared chooser opaque, use the standard event placeholder, and add additive current-event selection to project editing in `src/app/components/AddProjectDialog.tsx`, `src/app/projects/new/page.tsx`, `src/app/projects/[projectId]/edit/page.tsx`, and `src/app/api/events/project-options/route.ts`
+- [X] T102 [US7] Run focused tests, the complete Jest suite, type checking, and production build, then record the result in `specs/003-organizer-event-workspace/quickstart.md`
+
+---
+
 ## Dependencies & Execution Order
 
 ### Phase Dependencies

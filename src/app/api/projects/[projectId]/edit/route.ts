@@ -6,6 +6,7 @@ import {
   IMAGE_UPLOAD_SIZE_ERROR,
   validateImageUploadSize,
 } from "@/lib/imageUploads";
+import { HttpsUrlInputError, normalizeOptionalHttpsUrl } from "@/lib/httpsUrls";
 
 const PROJECT_STATUSES = ["DRAFT", "PENDING", "APPROVED"] as const satisfies readonly ProjectStatus[];
 
@@ -117,9 +118,9 @@ export async function PATCH(
     const endDate = formData.get('endDate');
     if (endDate) updateData.endDate = new Date(endDate.toString());
 
-    updateData.githubUrl = formData.get('githubUrl')?.toString() || null;
-    updateData.demoUrl = formData.get('demoUrl')?.toString() || null;
-    updateData.blogUrl = formData.get('blogUrl')?.toString() || null;
+    updateData.githubUrl = normalizeOptionalHttpsUrl(formData.get('githubUrl'), 'GitHub URL');
+    updateData.demoUrl = normalizeOptionalHttpsUrl(formData.get('demoUrl'), 'Demo URL');
+    updateData.blogUrl = normalizeOptionalHttpsUrl(formData.get('blogUrl'), 'Blog URL');
     
     const isBroken = formData.get('is_broken');
     if (isBroken !== null) updateData.is_broken = isBroken === 'true';
@@ -237,6 +238,9 @@ export async function PATCH(
 
     return NextResponse.json(updatedProject);
   } catch (error) {
+    if (error instanceof HttpsUrlInputError) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
     console.error("[PROJECT_UPDATE]", error);
     return new NextResponse("Internal Error", { status: 500 });
   }

@@ -22,7 +22,11 @@ export function publicRegistrationActionResponse(
 
   if (result.reason === 'VALIDATION_FAILED') {
     return NextResponse.json(
-      { message: 'Application answers are invalid.', issues: result.issues },
+      {
+        message:
+          result.issues?.[0]?.message ?? 'Application answers are invalid.',
+        issues: result.issues,
+      },
       { status: 400 }
     );
   }

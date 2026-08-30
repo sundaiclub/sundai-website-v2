@@ -207,6 +207,7 @@ describe('/api/events', () => {
     request.json = jest.fn().mockResolvedValue({
       title: 'Test',
       startTime: new Date().toISOString(),
+      meetingUrl: 'zoom.us/j/1234567890',
     });
     const res = await POST_EVENTS(request as any);
     expect(res.status).toBe(200);
@@ -214,11 +215,14 @@ describe('/api/events', () => {
     expect(prisma.event.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
+          meetingUrl: 'https://zoom.us/j/1234567890',
+          virtualUrl: 'https://zoom.us/j/1234567890',
           pitchSessions: {
             create: expect.objectContaining({
               chapterId: 'boston',
               title: 'Test',
               createdById: 'h-admin',
+              meetingUrl: 'https://zoom.us/j/1234567890',
             }),
           },
         }),
@@ -249,7 +253,9 @@ describe('/api/events/[eventId]', () => {
   });
 
   it('GET single event returns public event detail', async () => {
-    prisma.event.findFirst.mockResolvedValue(buildPublicEvent());
+    prisma.event.findFirst.mockResolvedValue(
+      buildPublicEvent({ meetingUrl: 'https://zoom.us/j/1234567890' })
+    );
     const request = new NextRequest('http://localhost:3000/api/events/evt-1');
     const res = await GET_EVENT(
       request as any,
@@ -276,17 +282,21 @@ describe('/api/events/[eventId]', () => {
         signInRequired: true,
       })
     );
+    expect(body.meetingUrl).toBe('https://zoom.us/j/1234567890');
     expect(body).not.toHaveProperty('phase');
   });
 
-  it('GET exposes the attached pitch event to an approved attendee', async () => {
+  it('GET exposes the attached pitch event and meeting URL to an approved attendee', async () => {
     mockAuth.mockReturnValue({ userId: 'clerk-approved' });
     prisma.hacker.findUnique.mockResolvedValue({
       id: 'h-approved',
       role: 'HACKER',
     });
     prisma.event.findFirst.mockResolvedValue(
-      buildPublicEvent({ pitchSessions: [{ phase: 'VOTING' }] })
+      buildPublicEvent({
+        meetingUrl: 'https://zoom.us/j/1234567890',
+        pitchSessions: [{ phase: 'VOTING' }],
+      })
     );
     prisma.eventRegistration.findFirst.mockResolvedValue({
       id: 'registration-approved',
@@ -298,7 +308,7 @@ describe('/api/events/[eventId]', () => {
     });
     prisma.eventStaff.findFirst.mockResolvedValue(null);
     prisma.event.findUnique.mockResolvedValue({
-      meetingUrl: null,
+      meetingUrl: 'https://zoom.us/j/1234567890',
       staff: [],
       pitchSessions: [
         {
@@ -320,6 +330,38 @@ describe('/api/events/[eventId]', () => {
     expect(body.pitchSessions).toEqual([
       expect.objectContaining({ id: 'pitch-1', phase: 'VOTING' }),
     ]);
+    expect(body.canManagePitch).toBe(false);
+    expect(body.meetingUrl).toBe('https://zoom.us/j/1234567890');
+  });
+
+  it('GET identifies a chapter admin as a pitch manager', async () => {
+    mockAuth.mockReturnValue({ userId: 'clerk-chapter-admin' });
+    prisma.hacker.findUnique.mockResolvedValue({
+      id: 'h-chapter-admin',
+      role: 'HACKER',
+    });
+    prisma.event.findFirst.mockResolvedValue(
+      buildPublicEvent({ pitchSessions: [{ phase: 'VOTING' }] })
+    );
+    prisma.chapterMembership.findFirst.mockResolvedValue({
+      role: 'ADMIN',
+      status: 'ACTIVE',
+    });
+    prisma.eventStaff.findFirst.mockResolvedValue(null);
+    prisma.event.findUnique.mockResolvedValue({
+      staff: [],
+      pitchSessions: [{ id: 'pitch-1', phase: 'VOTING', projects: [] }],
+    });
+
+    const response = await GET_EVENT(
+      new NextRequest('http://localhost:3000/api/events/evt-1') as any,
+      { params: { eventId: 'evt-1' } } as any
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual(
+      expect.objectContaining({ canManagePitch: true })
+    );
   });
 
   it('GET keeps the meeting URL in pitch manager refresh responses', async () => {
@@ -329,7 +371,10 @@ describe('/api/events/[eventId]', () => {
       role: 'HACKER',
     });
     prisma.event.findFirst.mockResolvedValue(
-      buildPublicEvent({ pitchSessions: [{ phase: 'VOTING' }] })
+      buildPublicEvent({
+        meetingUrl: 'https://zoom.us/j/1234567890',
+        pitchSessions: [{ phase: 'VOTING' }],
+      })
     );
     prisma.eventStaff.findFirst.mockResolvedValue({ role: 'MC' });
     prisma.event.findUnique.mockResolvedValue({

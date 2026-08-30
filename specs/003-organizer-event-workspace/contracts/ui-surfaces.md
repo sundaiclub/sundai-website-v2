@@ -83,6 +83,18 @@ Shows current pitch-session phase, queue/project summary, timer/session availabi
 
 The workspace does not embed or rebuild the controller. Site admin, in-scope chapter admin, MC, and co-MC can open it. Existing hacker voting/own-project behavior remains available through existing pitch surfaces.
 
+## Public Event Project Entry
+
+During the event and while its pitch is open, approved attendees, assigned staff, and site administrators see Add a project instead of the Pitch Session card. Other viewers and inactive events show no project-entry section.
+
+The shared chooser shows New project first and Add existing project below it. Published projects owned by or shared with the viewer show event and pitch state. Projects already in the pitch queue show Already added. Event-only projects can still be added. A successful addition keeps the chooser open, shows a success message, and refreshes row state so the user can add another project.
+
+New-project forms show current event choices with image, name, and chapter. An event without an uploaded image uses the standard event placeholder. Registered-user choices start selected. Site-admin choices start deselected. Contextual source events start selected. Users may clear every choice. The detailed contextual editor shows Publish without Save Draft and returns to `/pitch/[eventId]` after publication.
+
+The project edit form shows the same current eligible event previews. Existing event links are selected, identified as already added, and cannot be removed from this additive control. An editor can select more current events. Saving an approved project creates the new event links without adding the project to a pitch queue.
+
+The shared Add a project dialog uses an opaque theme background for its panel.
+
 ## Notes
 
 Search/list includes only hackers relevant to this event. Selecting a hacker opens the shared current notepad and event context.

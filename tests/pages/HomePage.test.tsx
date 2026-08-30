@@ -34,31 +34,94 @@ jest.mock('@clerk/nextjs', () => ({
   }),
 }));
 
+const currentEvent = {
+  id: 'event-current',
+  slug: 'live-build',
+  chapterSlug: 'boston',
+  chapterName: 'Sundai Boston',
+  chapter: {
+    id: 'chapter-boston',
+    slug: 'boston',
+    name: 'Sundai Boston',
+    timezone: 'America/New_York',
+  },
+  title: 'Live Build',
+  timezone: 'America/New_York',
+  publicLocation: 'Cambridge, MA',
+  startTime: '2026-08-28T16:00:00.000Z',
+  endTime: '2026-08-28T20:00:00.000Z',
+};
+
 describe('Home Page', () => {
   beforeEach(() => {
-    // Mock fetch for projects API - make the project starred so it shows up
     const starredProject = { ...mockProject, is_starred: true };
-    global.fetch = jest.fn().mockResolvedValue({
-      ok: true,
-      json: jest.fn().mockResolvedValue([starredProject]),
-    });
+    global.fetch = jest.fn().mockImplementation((input: string) =>
+      Promise.resolve({
+        ok: true,
+        json: jest
+          .fn()
+          .mockResolvedValue(
+            input === '/api/events/mine'
+              ? [currentEvent]
+              : input === '/api/events'
+                ? []
+                : [starredProject]
+          ),
+      })
+    );
   });
 
   afterEach(() => {
     jest.clearAllMocks();
   });
 
-  it('renders the main heading', async () => {
+  it('replaces the marketing intro with Your events', async () => {
     await act(async () => {
       render(<Home />);
     });
 
     await waitFor(() => {
-      expect(screen.getByText('Sundai')).toBeInTheDocument();
+      expect(
+        screen.getByRole('heading', { name: 'Your events' })
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByText('Building & Launching AI Prototypes Every Sunday.')
+      ).not.toBeInTheDocument();
     });
   });
 
-  it('renders the tagline', async () => {
+  it('renders current user events as linked rows', async () => {
+    await act(async () => {
+      render(<Home />);
+    });
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('link', { name: 'View Live Build' })
+      ).toHaveAttribute('href', '/events/boston/live-build');
+      expect(
+        screen.getByText('Sundai Boston · Cambridge, MA')
+      ).toBeInTheDocument();
+      expect(screen.getByAltText('Live Build event')).toHaveAttribute(
+        'src',
+        '/images/logos/sundai_logo_light_horizontal.svg'
+      );
+    });
+  });
+
+  it('shows the Sundai intro when the user has no current events', async () => {
+    const starredProject = { ...mockProject, is_starred: true };
+    global.fetch = jest.fn().mockImplementation((input: string) =>
+      Promise.resolve({
+        ok: true,
+        json: jest
+          .fn()
+          .mockResolvedValue(
+            input === '/api/projects?status=APPROVED' ? [starredProject] : []
+          ),
+      })
+    );
+
     await act(async () => {
       render(<Home />);
     });
@@ -67,32 +130,9 @@ describe('Home Page', () => {
       expect(
         screen.getByText('Building & Launching AI Prototypes Every Sunday.')
       ).toBeInTheDocument();
-    });
-  });
-
-  it('renders the typewriter effect text', async () => {
-    await act(async () => {
-      render(<Home />);
-    });
-
-    // The typewriter effect is mocked, so we just check that the component renders
-    // The actual text will be rendered by the mock
-    expect(
-      screen.getByText('Building & Launching AI Prototypes Every Sunday.')
-    ).toBeInTheDocument();
-  });
-
-  it('renders university logos', async () => {
-    await act(async () => {
-      render(<Home />);
-    });
-
-    await waitFor(() => {
-      const mitLogo = screen.getByAltText('Logo MIT');
-      const harvardLogo = screen.getByAltText('Logo Harvard');
-
-      expect(mitLogo).toBeInTheDocument();
-      expect(harvardLogo).toBeInTheDocument();
+      expect(
+        screen.queryByRole('heading', { name: 'Your events' })
+      ).not.toBeInTheDocument();
     });
   });
 
@@ -146,6 +186,7 @@ describe('Home Page', () => {
         '/api/projects?status=APPROVED'
       );
       expect(global.fetch).toHaveBeenCalledWith('/api/events');
+      expect(global.fetch).toHaveBeenCalledWith('/api/events/mine');
     });
   });
 
@@ -222,8 +263,9 @@ describe('Home Page', () => {
     });
 
     await waitFor(() => {
-      // Should still render the page even if projects fail to load
-      expect(screen.getByText('Sundai')).toBeInTheDocument();
+      expect(
+        screen.getByText('Building & Launching AI Prototypes Every Sunday.')
+      ).toBeInTheDocument();
     });
   });
 });

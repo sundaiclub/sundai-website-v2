@@ -528,7 +528,7 @@ export default function ChapterLandingPage({
               title="Pending events"
               description="Draft, paused, private, and unlisted events for this chapter."
             >
-              <div className="grid max-w-2xl gap-4 sm:grid-cols-2">
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {pendingEvents.map(event => (
                   <EventSummaryCard
                     event={event}
@@ -539,7 +539,7 @@ export default function ChapterLandingPage({
                   />
                 ))}
                 {pendingEvents.length === 0 && (
-                  <div className="sm:col-span-2">
+                  <div className="sm:col-span-2 lg:col-span-3">
                     <ManagementEmptyState>
                       No pending events are listed.
                     </ManagementEmptyState>
@@ -550,7 +550,7 @@ export default function ChapterLandingPage({
           )}
 
           <ManagementSection title="Upcoming events">
-            <div className="grid max-w-2xl gap-4 sm:grid-cols-2">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {(chapter?.upcomingEvents ?? []).map(event => (
                 <EventSummaryCard
                   event={event}
@@ -561,7 +561,7 @@ export default function ChapterLandingPage({
                 />
               ))}
               {(chapter?.upcomingEvents ?? []).length === 0 && (
-                <div className="sm:col-span-2">
+                <div className="sm:col-span-2 lg:col-span-3">
                   <ManagementEmptyState>
                     No upcoming events are listed.
                   </ManagementEmptyState>

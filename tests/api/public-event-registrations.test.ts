@@ -121,6 +121,11 @@ const answersJson = {
   email: 'applicant@example.com',
   phoneNumber: '+15551234567',
   why_this_event: 'I want to build with the Boston AI community.',
+  project_url: 'example.com/applicant-project',
+};
+
+const normalizedAnswersJson = {
+  ...answersJson,
   project_url: 'https://example.com/applicant-project',
 };
 
@@ -165,6 +170,7 @@ function mockPublicRegistrationDatabase({
         id: event.id,
         chapterId: event.chapterId,
         applicationMode: event.applicationMode,
+        applicationRequired: event.applicationRequired,
         applicationsOpen: event.applicationsOpen,
       };
     }
@@ -296,7 +302,7 @@ describe('POST /api/events/[eventId]/registrations public submissions', () => {
         hackerId: fixture.applicant.id,
         status: 'PENDING',
         source: 'WEBSITE',
-        answersJson,
+        answersJson: normalizedAnswersJson,
         templateSnapshotJson: templateFields,
         publicSafeMessage: null,
         internalReviewNotes: null,
@@ -347,6 +353,88 @@ describe('POST /api/events/[eventId]/registrations public submissions', () => {
     });
   });
 
+  it('registers a signed-in user without application answers when open RSVP does not require an application', async () => {
+    const fixture = buildNativeEventRsvpFixture();
+    const event = {
+      ...fixture.publishedEvent,
+      applicationMode: 'OPEN_RSVP' as const,
+      applicationRequired: false,
+    };
+
+    mockAuthenticatedClerk({ userId: fixture.applicant.clerkId });
+    mockPublicRegistrationDatabase({
+      event,
+      hacker: fixture.applicant,
+    });
+
+    const response = await POST_REGISTRATION(
+      createCurrentUserRegistrationRequest(event.id, {}) as any,
+      createRouteContext({ eventId: event.id })
+    );
+
+    expect(response.status).toBe(201);
+    await expect(response.json()).resolves.toEqual(
+      expect.objectContaining({ status: 'APPROVED' })
+    );
+    expect(fetchMergedApplicationTemplate).not.toHaveBeenCalled();
+    expect(prisma.hacker.update).not.toHaveBeenCalled();
+    expect(prisma.chapterMembership.upsert).not.toHaveBeenCalled();
+    expect(prisma.eventRegistration.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        eventId: event.id,
+        hackerId: fixture.applicant.id,
+        status: 'APPROVED',
+        source: 'WEBSITE',
+        answersJson: Prisma.DbNull,
+        templateSnapshotJson: Prisma.DbNull,
+      }),
+    });
+    expect(prisma.eventRegistrationAudit.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        changeJson: expect.objectContaining({
+          action: 'REGISTER_PUBLIC_EVENT',
+          applicationMode: 'OPEN_RSVP',
+          applicationRequired: false,
+        }),
+      }),
+    });
+  });
+
+  it('explains why an application URL was rejected', async () => {
+    const fixture = buildNativeEventRsvpFixture();
+    mockAuthenticatedClerk({ userId: fixture.applicant.clerkId });
+    mockPublicRegistrationDatabase({
+      event: fixture.publishedEvent,
+      hacker: fixture.applicant,
+    });
+
+    const response = await POST_REGISTRATION(
+      createCurrentUserRegistrationRequest(fixture.publishedEvent.id, {
+        answersJson: {
+          ...answersJson,
+          project_url: 'http://example.com/project',
+        },
+      }) as any,
+      createRouteContext({ eventId: fixture.publishedEvent.id })
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual(
+      expect.objectContaining({
+        message:
+          'Project URL: HTTP links are not supported. Use HTTPS or omit the protocol.',
+        issues: [
+          expect.objectContaining({
+            fieldId: 'project_url',
+            message:
+              'Project URL: HTTP links are not supported. Use HTTPS or omit the protocol.',
+          }),
+        ],
+      })
+    );
+    expect(prisma.eventRegistration.create).not.toHaveBeenCalled();
+  });
+
   it('rejects duplicate registrations with the current public status response', async () => {
     const fixture = buildNativeEventRsvpFixture();
     const existingRegistration = buildEventRegistration({
@@ -384,6 +472,91 @@ describe('POST /api/events/[eventId]/registrations public submissions', () => {
     expect(prisma.eventRegistration.create).not.toHaveBeenCalled();
     expect(prisma.eventRegistrationAudit.create).not.toHaveBeenCalled();
   });
+
+  it.each([
+    ['REQUIRES_APPROVAL', 'PENDING'],
+    ['OPEN_RSVP', 'APPROVED'],
+  ] as const)(
+    'reactivates a cancelled registration for %s events with %s status',
+    async (applicationMode, expectedStatus) => {
+      const fixture = buildNativeEventRsvpFixture();
+      const event = { ...fixture.publishedEvent, applicationMode };
+      const previousSubmittedAt = new Date('2026-06-01T12:00:00.000Z');
+      const existingRegistration = buildEventRegistration({
+        id: 'registration-existing-cancelled',
+        eventId: event.id,
+        hackerId: fixture.applicant.id,
+        status: 'CANCELLED',
+        source: 'WEBSITE',
+        publicSafeMessage: 'Registration cancelled.',
+        internalReviewNotes: 'Notes from the prior application.',
+        submittedAt: previousSubmittedAt,
+        cancelledAt: previousSubmittedAt,
+        cancelledById: fixture.applicant.id,
+        decidedAt: previousSubmittedAt,
+        decidedById: fixture.applicant.id,
+        createdAt: previousSubmittedAt,
+        updatedAt: previousSubmittedAt,
+      });
+
+      mockAuthenticatedClerk({ userId: fixture.applicant.clerkId });
+      mockPublicRegistrationDatabase({
+        event,
+        hacker: fixture.applicant,
+        existingRegistration,
+      });
+
+      const response = await POST_REGISTRATION(
+        createCurrentUserRegistrationRequest(event.id, {
+          answersJson,
+        }) as any,
+        createRouteContext({ eventId: event.id })
+      );
+
+      expect(response.status).toBe(201);
+      await expect(response.json()).resolves.toEqual({
+        id: existingRegistration.id,
+        status: expectedStatus,
+        submittedAt: submittedAt.toISOString(),
+        publicSafeMessage: null,
+      });
+      expect(prisma.eventRegistration.create).not.toHaveBeenCalled();
+      expect(prisma.eventRegistration.update).toHaveBeenCalledWith({
+        where: { id: existingRegistration.id },
+        data: expect.objectContaining({
+          status: expectedStatus,
+          source: 'WEBSITE',
+          answersJson: normalizedAnswersJson,
+          templateSnapshotJson: templateFields,
+          publicSafeMessage: null,
+          submittedAt,
+          cancelledAt: null,
+          cancelledById: null,
+          decidedById:
+            expectedStatus === 'APPROVED' ? fixture.applicant.id : null,
+          decidedAt: expectedStatus === 'APPROVED' ? submittedAt : null,
+          waitlistedAt: null,
+        }),
+      });
+      expect(
+        prisma.eventRegistration.update.mock.calls[0][0].data
+      ).not.toHaveProperty('internalReviewNotes');
+      expect(prisma.eventRegistrationAudit.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          registrationId: existingRegistration.id,
+          eventId: event.id,
+          actorId: fixture.applicant.id,
+          fromStatus: 'CANCELLED',
+          toStatus: expectedStatus,
+          changeJson: {
+            action: 'REAPPLY_PUBLIC_REGISTRATION',
+            source: 'WEBSITE',
+            applicationMode,
+          },
+        }),
+      });
+    }
+  );
 
   it('stores a blocked registration for banned users and returns only the generic public-safe response', async () => {
     const fixture = buildNativeEventRsvpFixture();
@@ -482,6 +655,10 @@ describe('PATCH /api/events/[eventId]/registrations/me', () => {
     const updatedAnswersJson = {
       ...answersJson,
       why_this_event: 'I want to update my application with a stronger plan.',
+      project_url: 'example.com/updated-project',
+    };
+    const normalizedUpdatedAnswersJson = {
+      ...updatedAnswersJson,
       project_url: 'https://example.com/updated-project',
     };
 
@@ -512,7 +689,7 @@ describe('PATCH /api/events/[eventId]/registrations/me', () => {
     expect(prisma.eventRegistration.update).toHaveBeenCalledWith({
       where: { id: existingRegistration.id },
       data: {
-        answersJson: updatedAnswersJson,
+        answersJson: normalizedUpdatedAnswersJson,
         templateSnapshotJson: templateFields,
       },
     });

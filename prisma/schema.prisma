@@ -426,6 +426,7 @@ model Event {
   publicProgramLabel          String?
   capacity                    Int?
   applicationMode             EventApplicationMode     @default(REQUIRES_APPROVAL)
+  applicationRequired         Boolean                  @default(true)
   autoPromoteWaitlist         Boolean                  @default(false)
   approvedDetailsJson         Json?
   applicationQuestionsJson    Json?
