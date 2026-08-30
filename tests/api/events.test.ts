@@ -229,6 +229,47 @@ describe('/api/events', () => {
       })
     );
   });
+
+  it('POST defaults voting to 15 minutes into the final two hours', async () => {
+    mockAuth.mockReturnValue({ userId: 'clerk-admin' });
+    prisma.hacker.findUnique.mockResolvedValue({
+      id: 'h-admin',
+      role: 'SITE_ADMIN',
+    });
+    prisma.chapter.findUnique.mockResolvedValue({
+      id: 'boston',
+      defaultApprovalMessage: null,
+      defaultWaitlistMessage: null,
+      defaultRejectionMessage: null,
+    });
+    prisma.event.create.mockResolvedValue({ id: 'evt-1' });
+
+    const request = new NextRequest('http://localhost:3000/api/events', {
+      method: 'POST',
+    });
+    request.json = jest.fn().mockResolvedValue({
+      title: 'Test',
+      chapterId: 'boston',
+      timezone: 'America/New_York',
+      startTime: '2026-08-30T18:00:00.000Z',
+      endTime: '2026-08-31T02:00:00.000Z',
+    });
+
+    const response = await POST_EVENTS(request as any);
+
+    expect(response.status).toBe(200);
+    expect(prisma.event.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          pitchSessions: {
+            create: expect.objectContaining({
+              votingEndTime: new Date('2026-08-31T00:15:00.000Z'),
+            }),
+          },
+        }),
+      })
+    );
+  });
 });
 
 describe('/api/events/[eventId]', () => {

@@ -81,7 +81,7 @@ describe('PitchEventPage viewer states', () => {
     });
   });
 
-  it('uses compact header actions without a voting-open badge', async () => {
+  it('uses prominent header actions without a voting-open badge', async () => {
     mockUseUser.mockReturnValue({ isLoaded: true, isSignedIn: true });
     global.fetch = jest.fn().mockResolvedValue({
       ok: true,
@@ -118,8 +118,27 @@ describe('PitchEventPage viewer states', () => {
       name: 'Join meeting',
     });
     const editEvent = screen.getByRole('button', { name: 'Edit Event' });
-    expect(joinMeeting).toHaveClass('py-1.5', 'text-xs');
-    expect(editEvent).toHaveClass('py-1.5', 'text-xs');
+    const eventHeading = screen.getByRole('heading', {
+      level: 1,
+      name: 'Demo Night',
+    });
+    expect(joinMeeting).toHaveClass('px-4', 'py-2', 'text-sm');
+    expect(editEvent).toHaveClass('px-4', 'py-2', 'text-sm');
+    expect(eventHeading).toHaveClass(
+      'min-w-0',
+      '[overflow-wrap:anywhere]'
+    );
+    expect(eventHeading.parentElement).toHaveClass(
+      'min-w-0',
+      'lg:col-span-2'
+    );
+    expect(eventHeading.parentElement?.parentElement).toHaveClass(
+      'lg:grid-cols-3',
+      'lg:gap-6'
+    );
+    expect(
+      screen.queryByRole('link', { name: 'Demo Night' })
+    ).not.toBeInTheDocument();
     expect(screen.queryByText('Voting Open')).not.toBeInTheDocument();
   });
 });

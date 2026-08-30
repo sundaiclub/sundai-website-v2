@@ -22,6 +22,7 @@ import {
   parseEventDateTimeInput,
   parseOptionalEventDateTimeInput,
 } from '@/lib/eventDateTime';
+import { defaultVotingEndTime } from '@/lib/eventPitchTiming';
 import { HttpsUrlInputError, normalizeOptionalHttpsUrl } from '@/lib/httpsUrls';
 
 const MAX_EVENT_SLUG_ATTEMPTS = 100;
@@ -420,7 +421,7 @@ export async function POST(req: Request) {
               audienceCanReorder,
               votingEndTime:
                 parsedVotingEndTime ??
-                new Date(parsedStartTime.getTime() + 15 * 60 * 1000),
+                defaultVotingEndTime(parsedStartTime, parsedEndTime),
               ...(topProjectCount !== undefined && { topProjectCount }),
               ...(topPitchSec !== undefined && { topPitchSec }),
               ...(defaultPitchSec !== undefined && { defaultPitchSec }),

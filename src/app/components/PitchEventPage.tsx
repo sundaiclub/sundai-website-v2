@@ -1,6 +1,5 @@
 'use client';
 import Image from 'next/image';
-import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { useUser } from '@clerk/nextjs';
 import { useTheme } from '../contexts/ThemeContext';
@@ -15,6 +14,7 @@ import {
   formatDateTimeLocalValue,
   serializeDateTimeLocalValue,
 } from '@/lib/datetimeLocal';
+import { defaultVotingEndTime } from '@/lib/eventPitchTiming';
 import { reconcileVoteDeckIds } from '@/lib/votingDeck';
 import type {
   PitchSessionPhase,
@@ -1743,7 +1743,10 @@ export default function PitchEventPage({ eventId }: { eventId: string }) {
       event.votingEndTime
         ? formatDateTimeLocalValue(event.votingEndTime, event.timezone)
         : formatDateTimeLocalValue(
-            new Date(new Date(event.startTime).getTime() + 15 * 60 * 1000),
+            defaultVotingEndTime(
+              new Date(event.startTime),
+              event.endTime ? new Date(event.endTime) : null
+            ),
             event.timezone
           )
     );
@@ -1864,23 +1867,18 @@ export default function PitchEventPage({ eventId }: { eventId: string }) {
         className={`font-space-mono ${isDarkMode ? 'text-gray-100' : 'text-gray-900'}`}
       >
         <div className="mx-auto max-w-7xl py-4">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold">
-                <Link
-                  href={`/events/${event.chapter.slug}/${event.slug}`}
-                  className="rounded-sm hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500"
-                >
-                  {event.title}
-                </Link>
+          <div className="mb-4 grid grid-cols-1 items-start gap-3 lg:grid-cols-3 lg:gap-6">
+            <div className="min-w-0 lg:col-span-2">
+              <h1 className="min-w-0 text-2xl font-bold [overflow-wrap:anywhere]">
+                {event.title}
               </h1>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 lg:justify-end">
               {event.meetingUrl && (
                 <a
                   href={event.meetingUrl}
                   target="_blank"
-                  className="px-2.5 py-1.5 rounded-md bg-indigo-600 text-white text-xs"
+                  className="px-4 py-2 rounded-md bg-indigo-600 text-white text-sm"
                 >
                   Join meeting
                 </a>
@@ -1888,7 +1886,7 @@ export default function PitchEventPage({ eventId }: { eventId: string }) {
               {isController && (
                 <button
                   onClick={openEdit}
-                  className={`px-2.5 py-1.5 rounded-md text-xs ${isDarkMode ? 'bg-gray-700 text-gray-200 hover:bg-gray-600' : 'bg-gray-200 text-gray-800 hover:bg-gray-300'}`}
+                  className={`px-4 py-2 rounded-md text-sm ${isDarkMode ? 'bg-gray-700 text-gray-200 hover:bg-gray-600' : 'bg-gray-200 text-gray-800 hover:bg-gray-300'}`}
                 >
                   Edit Event
                 </button>
