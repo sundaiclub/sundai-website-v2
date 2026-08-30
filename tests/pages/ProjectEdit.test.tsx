@@ -308,7 +308,7 @@ describe('ProjectEdit', () => {
   it('shows only Publish and returns to pitch for contextual drafts', async () => {
     mockSearchParams.mockReturnValue(
       new URLSearchParams(
-        'eventId=event-1&sourceEventId=event-1&returnTo=%2Fpitch%2Fevent-1'
+        'eventId=event-1&sourceEventId=event-1&returnTo=%2Fevents%2Fboston%2Fbuild-night%3Ftab%3Dpitch'
       )
     );
     const draftProject = { ...mockProject, status: 'DRAFT' };
@@ -354,7 +354,9 @@ describe('ProjectEdit', () => {
     fireEvent.click(publishButtons[0]);
 
     await waitFor(() =>
-      expect(mockPush).toHaveBeenCalledWith('/pitch/event-1')
+      expect(mockPush).toHaveBeenCalledWith(
+        '/events/boston/build-night?tab=pitch'
+      )
     );
     const submitCall = (global.fetch as jest.Mock).mock.calls.find(
       ([url]) => url === '/api/projects/test-project-id/submit'

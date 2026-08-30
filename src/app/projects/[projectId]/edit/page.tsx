@@ -182,6 +182,11 @@ export default function ProjectEditPage() {
   const contextualEventIds = searchParams.getAll('eventId');
   const contextualEventIdsKey = contextualEventIds.join(',');
   const sourceEventId = searchParams.get('sourceEventId');
+  const requestedReturnTo = searchParams.get('returnTo');
+  const returnTo =
+    requestedReturnTo?.startsWith('/') && !requestedReturnTo.startsWith('//')
+      ? requestedReturnTo
+      : null;
   const contextual = Boolean(sourceEventId);
   const [loading, setLoading] = useState(true);
   const { isAdmin, userInfo } = useUserContext();
@@ -556,7 +561,7 @@ export default function ProjectEditPage() {
       toast.success('Project published!');
       router.push(
         sourceEventId
-          ? `/pitch/${sourceEventId}`
+          ? (returnTo ?? `/pitch/${sourceEventId}`)
           : `/projects/${params?.projectId}`
       );
     } catch (error) {

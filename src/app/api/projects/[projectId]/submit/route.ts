@@ -90,13 +90,29 @@ export async function PATCH(
         ...(isAdmin
           ? {}
           : {
-              registrations: {
-                some: {
-                  hackerId: currentUser.id,
-                  status: 'APPROVED',
-                  cancelledAt: null,
+              OR: [
+                {
+                  registrations: {
+                    some: {
+                      hackerId: currentUser.id,
+                      status: 'APPROVED' as const,
+                      cancelledAt: null,
+                    },
+                  },
                 },
-              },
+                { staff: { some: { hackerId: currentUser.id } } },
+                {
+                  chapter: {
+                    memberships: {
+                      some: {
+                        hackerId: currentUser.id,
+                        role: 'ADMIN' as const,
+                        status: 'ACTIVE' as const,
+                      },
+                    },
+                  },
+                },
+              ],
             }),
       },
       select: {

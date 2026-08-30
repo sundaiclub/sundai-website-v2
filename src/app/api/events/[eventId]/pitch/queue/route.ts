@@ -19,7 +19,7 @@ export async function POST(
     if (!user) return new NextResponse('User not found', { status: 404 });
 
     const body = await req.json();
-    const { projectId } = body || {};
+    const { projectId, confirmCrossEvent } = body || {};
     if (!projectId)
       return NextResponse.json(
         { message: 'projectId required' },
@@ -54,7 +54,7 @@ export async function POST(
       );
     }
 
-    const [viewerRegistration, staff] = await Promise.all([
+    const [viewerRegistration, staff, chapterAdmin] = await Promise.all([
       prisma.eventRegistration.findFirst({
         where: {
           eventId: params.eventId,
@@ -72,11 +72,21 @@ export async function POST(
         },
         select: { role: true },
       }),
+      prisma.chapterMembership.findFirst({
+        where: {
+          chapterId: pitchSession.event.chapterId,
+          hackerId: user.id,
+          role: 'ADMIN',
+          status: 'ACTIVE',
+        },
+        select: { id: true },
+      }),
     ]);
 
     if (
       user.role !== 'SITE_ADMIN' &&
       !staff &&
+      !chapterAdmin &&
       viewerRegistration?.status !== 'APPROVED'
     ) {
       return NextResponse.json(
@@ -100,6 +110,50 @@ export async function POST(
 
     if (!isOwnerOrParticipant) {
       return new NextResponse('Unauthorized', { status: 401 });
+    }
+
+    if (confirmCrossEvent !== true) {
+      const activeOtherEntries =
+        (await prisma.pitchProject.findMany({
+          where: {
+            projectId,
+            pitchSession: {
+              eventId: { not: params.eventId },
+              phase: { not: 'FINISHED' },
+              event: {
+                is: {
+                  status: 'PUBLISHED',
+                  startTime: { lte: now },
+                  endTime: { gte: now },
+                },
+              },
+            },
+          },
+          select: {
+            pitchSession: {
+              select: { event: { select: { id: true, title: true } } },
+            },
+          },
+        })) ?? [];
+      const activeOtherEvents = Array.from(
+        new Map(
+          activeOtherEntries.flatMap(entry => {
+            const event = entry.pitchSession.event;
+            return event ? [[event.id, event] as const] : [];
+          })
+        ).values()
+      );
+
+      if (activeOtherEvents.length > 0) {
+        return NextResponse.json(
+          {
+            code: 'ACTIVE_EVENT_CONFLICT',
+            message: 'This project is already queued in another active event',
+            events: activeOtherEvents,
+          },
+          { status: 409 }
+        );
+      }
     }
 
     // Prevent duplicates
