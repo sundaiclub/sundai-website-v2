@@ -67,8 +67,10 @@ export default function NewProject() {
         setEventOptions(events);
         setSelectedEventIds(
           events
-            .filter(
-              event => event.selectedByDefault || event.id === sourceEventId
+            .filter(event =>
+              sourceEventId
+                ? event.id === sourceEventId
+                : event.selectedByDefault
             )
             .map(event => event.id)
         );
@@ -408,7 +410,7 @@ export default function NewProject() {
               <div className="space-y-2">
                 {eventOptions.map(event => (
                   <label
-                    className={`flex cursor-pointer items-center gap-3 rounded-md border p-3 ${
+                    className={`flex min-w-0 max-w-full cursor-pointer items-center gap-3 overflow-hidden rounded-md border p-3 ${
                       isDarkMode
                         ? 'border-gray-700 bg-gray-900'
                         : 'border-gray-200 bg-gray-50'
@@ -425,11 +427,12 @@ export default function NewProject() {
                         )
                       }
                       type="checkbox"
+                      className="shrink-0"
                     />
                     {event.image?.url ? (
                       <Image
                         alt={event.image.alt || event.title}
-                        className="h-12 w-16 rounded object-cover"
+                        className="h-12 w-16 shrink-0 rounded object-cover"
                         height={48}
                         src={event.image.url}
                         unoptimized
@@ -438,18 +441,18 @@ export default function NewProject() {
                     ) : (
                       <Image
                         alt={`${event.title} event`}
-                        className="h-12 w-16 rounded bg-black object-contain p-1"
+                        className="h-12 w-16 shrink-0 rounded bg-black object-contain p-1"
                         height={48}
                         src={defaultEventImage}
                         width={64}
                       />
                     )}
-                    <span className="min-w-0">
+                    <span className="min-w-0 flex-1">
                       <span className="block truncate font-medium">
                         {event.title}
                       </span>
                       <span
-                        className={`block text-xs ${
+                        className={`block truncate text-xs ${
                           isDarkMode ? 'text-gray-400' : 'text-gray-600'
                         }`}
                       >

@@ -24,6 +24,19 @@ export async function GET(
         id: true,
         startTime: true,
         endTime: true,
+        chapter: {
+          select: {
+            memberships: {
+              where: {
+                hackerId: hacker.id,
+                role: 'ADMIN',
+                status: 'ACTIVE',
+              },
+              select: { id: true },
+              take: 1,
+            },
+          },
+        },
         registrations: {
           where: {
             hackerId: hacker.id,
@@ -52,7 +65,8 @@ export async function GET(
     const canUseChooser =
       hacker.role === 'SITE_ADMIN' ||
       event.registrations.length > 0 ||
-      event.staff.length > 0;
+      event.staff.length > 0 ||
+      (event.chapter?.memberships.length ?? 0) > 0;
     const isActive =
       event.startTime <= now && Boolean(event.endTime && event.endTime >= now);
 

@@ -252,4 +252,35 @@ describe('NewProject', () => {
       )
     );
   });
+
+  it('constrains long event names to the event card', async () => {
+    const longTitle =
+      'A very long current event title that must stay inside its project form card';
+    (global.fetch as jest.Mock).mockImplementation(
+      (input: RequestInfo | URL) => {
+        if (input === '/api/events/project-options') {
+          return Promise.resolve({
+            ok: true,
+            json: async () => [
+              {
+                id: 'event-long-title',
+                title: longTitle,
+                chapterName: 'Sundai Boston',
+                image: null,
+                selectedByDefault: false,
+              },
+            ],
+          });
+        }
+        return Promise.resolve({ ok: true, json: async () => [] });
+      }
+    );
+
+    renderWithTheme(<NewProject />);
+
+    const title = await screen.findByText(longTitle);
+    expect(title).toHaveClass('truncate');
+    expect(title.parentElement).toHaveClass('min-w-0', 'flex-1');
+    expect(title.closest('label')).toHaveClass('max-w-full', 'overflow-hidden');
+  });
 });

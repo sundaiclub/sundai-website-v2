@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useManagementClasses } from './ManagementSurface';
 
@@ -20,6 +21,7 @@ export function AddProjectDialog({
   onClose,
   onProjectAdded,
   returnTo,
+  redirectTo,
 }: {
   eventId: string;
   eventTitle: string;
@@ -27,7 +29,9 @@ export function AddProjectDialog({
   onClose: () => void;
   onProjectAdded?: () => void | Promise<void>;
   returnTo?: string;
+  redirectTo?: string;
 }) {
+  const router = useRouter();
   const classes = useManagementClasses();
   const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState('');
@@ -36,6 +40,9 @@ export function AddProjectDialog({
   const [adding, setAdding] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [conflictingEvents, setConflictingEvents] = useState<
+    Array<{ id: string; title: string }>
+  >([]);
 
   const loadProjects = useCallback(async () => {
     setLoading(true);
@@ -66,6 +73,7 @@ export function AddProjectDialog({
     setSearchTerm('');
     setMessage('');
     setError('');
+    setConflictingEvents([]);
     void loadProjects();
   }, [loadProjects, open]);
 
@@ -79,7 +87,7 @@ export function AddProjectDialog({
     );
   }, [projects, searchTerm]);
 
-  async function addProject() {
+  async function addProject(confirmCrossEvent = false) {
     if (!selectedProjectId) return;
     setAdding(true);
     setMessage('');
@@ -88,15 +96,31 @@ export function AddProjectDialog({
       const response = await fetch(`/api/events/${eventId}/pitch/queue`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectId: selectedProjectId }),
+        body: JSON.stringify({
+          projectId: selectedProjectId,
+          confirmCrossEvent,
+        }),
       });
       const body = await response.json().catch(() => null);
+      if (
+        response.status === 409 &&
+        body?.code === 'ACTIVE_EVENT_CONFLICT' &&
+        Array.isArray(body.events)
+      ) {
+        setConflictingEvents(body.events);
+        return;
+      }
       if (!response.ok) {
         throw new Error(body?.message || 'Unable to add this project.');
       }
 
       setMessage('Successfully added to the event and pitch queue.');
       setSelectedProjectId('');
+      setConflictingEvents([]);
+      if (redirectTo) {
+        router.push(redirectTo);
+        return;
+      }
       await loadProjects();
       await onProjectAdded?.();
     } catch (addError) {
@@ -253,13 +277,56 @@ export function AddProjectDialog({
           <button
             className={classes.primaryButton}
             disabled={!selectedProjectId || adding}
-            onClick={addProject}
+            onClick={() => void addProject()}
             type="button"
           >
             {adding ? 'Adding...' : 'Add project'}
           </button>
         </div>
       </div>
+
+      {conflictingEvents.length > 0 && (
+        <div
+          aria-labelledby="cross-event-warning-title"
+          aria-modal="true"
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4"
+          role="alertdialog"
+        >
+          <div
+            className={`${classes.panel} ${classes.isDarkMode ? '!bg-gray-900' : '!bg-white'} w-full max-w-md p-6`}
+          >
+            <h3 className="text-xl font-bold" id="cross-event-warning-title">
+              This project is already in another active pitch queue
+            </h3>
+            <p className={`mt-3 text-sm leading-6 ${classes.mutedText}`}>
+              Adding it here will place it in both pitch queues. If you intend
+              to switch events, remove it from the other queue first.
+            </p>
+            <ul className="mt-3 list-disc space-y-1 pl-5 text-sm font-semibold">
+              {conflictingEvents.map(event => (
+                <li key={event.id}>{event.title}</li>
+              ))}
+            </ul>
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                className={classes.secondaryButton}
+                onClick={() => setConflictingEvents([])}
+                type="button"
+              >
+                Cancel
+              </button>
+              <button
+                className={classes.primaryButton}
+                disabled={adding}
+                onClick={() => void addProject(true)}
+                type="button"
+              >
+                {adding ? 'Adding...' : 'Add anyway'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

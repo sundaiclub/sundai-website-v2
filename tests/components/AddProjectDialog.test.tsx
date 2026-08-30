@@ -89,4 +89,63 @@ describe('AddProjectDialog', () => {
     expect(screen.getByRole('dialog')).toBeInTheDocument();
     await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(3));
   });
+
+  it('requires an explicit confirmation for another active queue', async () => {
+    global.fetch = jest
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          projects: [
+            {
+              id: 'project-1',
+              title: 'Shared project',
+              startDate: '2026-08-20T00:00:00.000Z',
+              eventAdded: false,
+              pitchAdded: false,
+            },
+          ],
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 409,
+        json: async () => ({
+          code: 'ACTIVE_EVENT_CONFLICT',
+          events: [{ id: 'event-2', title: 'Cambridge Build Night' }],
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ id: 'pitch-project-1' }),
+      });
+
+    render(
+      <ThemeProvider>
+        <AddProjectDialog
+          eventId="event-1"
+          eventTitle="Boston Build Night"
+          onClose={jest.fn()}
+          open
+          redirectTo="/events/boston/build-night?tab=pitch"
+        />
+      </ThemeProvider>
+    );
+
+    fireEvent.click(
+      await screen.findByRole('radio', { name: /shared project/i })
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Add project' }));
+
+    expect(await screen.findByRole('alertdialog')).toHaveTextContent(
+      'Cambridge Build Night'
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Add anyway' }));
+
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(3));
+    expect(
+      JSON.parse((global.fetch as jest.Mock).mock.calls[2][1].body)
+    ).toEqual({ projectId: 'project-1', confirmCrossEvent: true });
+  });
 });

@@ -55,13 +55,28 @@ describe('GET /api/events/project-options', () => {
           status: 'PUBLISHED',
           startTime: { lte: now },
           endTime: { gte: now },
-          registrations: {
-            some: {
-              hackerId: 'hacker-1',
-              status: 'APPROVED',
-              cancelledAt: null,
+          OR: expect.arrayContaining([
+            {
+              registrations: {
+                some: {
+                  hackerId: 'hacker-1',
+                  status: 'APPROVED',
+                  cancelledAt: null,
+                },
+              },
             },
-          },
+            {
+              chapter: {
+                memberships: {
+                  some: {
+                    hackerId: 'hacker-1',
+                    role: 'ADMIN',
+                    status: 'ACTIVE',
+                  },
+                },
+              },
+            },
+          ]),
         }),
       })
     );
@@ -95,10 +110,33 @@ describe('GET /api/events/project-options', () => {
     );
     const query = prisma.event.findMany.mock.calls[0][0];
 
-    expect(query.where.registrations).toBeUndefined();
+    expect(query.where.OR).toBeUndefined();
     await expect(response.json()).resolves.toEqual([
       expect.objectContaining({ id: 'event-1', selectedByDefault: false }),
     ]);
+  });
+
+  it('includes active events managed by a chapter admin', async () => {
+    prisma.hacker.findUnique.mockResolvedValue({
+      id: 'chapter-admin-1',
+      role: 'HACKER',
+    });
+    prisma.event.findMany.mockResolvedValue([]);
+
+    await GET(new Request('http://localhost/api/events/project-options'));
+
+    const query = prisma.event.findMany.mock.calls[0][0];
+    expect(query.where.OR).toContainEqual({
+      chapter: {
+        memberships: {
+          some: {
+            hackerId: 'chapter-admin-1',
+            role: 'ADMIN',
+            status: 'ACTIVE',
+          },
+        },
+      },
+    });
   });
 
   it('marks current events that already contain an editable project', async () => {
