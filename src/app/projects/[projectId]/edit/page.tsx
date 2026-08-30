@@ -458,7 +458,16 @@ export default function ProjectEditPage() {
       const updatedProject = await response.json();
       setProject(updatedProject);
 
-      if (project.status === 'APPROVED' && selectedEventIds.length > 0) {
+      const removedEventIds = eventOptions
+        .filter(
+          event => event.alreadyAdded && !selectedEventIds.includes(event.id)
+        )
+        .map(event => event.id);
+
+      if (
+        project.status === 'APPROVED' &&
+        (selectedEventIds.length > 0 || removedEventIds.length > 0)
+      ) {
         const eventResponse = await fetch(
           `/api/projects/${params?.projectId}/submit`,
           {
@@ -467,6 +476,7 @@ export default function ProjectEditPage() {
             body: JSON.stringify({
               status: 'APPROVED',
               eventIds: selectedEventIds,
+              removedEventIds,
               sourceEventId: null,
             }),
           }
@@ -549,6 +559,12 @@ export default function ProjectEditPage() {
           body: JSON.stringify({
             status: 'APPROVED',
             eventIds: selectedEventIds,
+            removedEventIds: eventOptions
+              .filter(
+                event =>
+                  event.alreadyAdded && !selectedEventIds.includes(event.id)
+              )
+              .map(event => event.id),
             sourceEventId,
           }),
         }
@@ -796,15 +812,15 @@ export default function ProjectEditPage() {
             aria-labelledby="project-events-heading"
           >
             <h2 id="project-events-heading" className="font-medium">
-              Add to current events
+              Current events
             </h2>
             <p
               className={`mt-1 text-sm ${
                 isDarkMode ? 'text-gray-400' : 'text-gray-600'
               }`}
             >
-              Select an event to add this project. Existing event links stay
-              selected.
+              Select the events this project belongs to. Clear an event to
+              remove the project and its pitch entry from that event.
             </p>
             {eventOptions.length > 0 ? (
               <div className="mt-3 grid gap-3 sm:grid-cols-2">
@@ -815,12 +831,11 @@ export default function ProjectEditPage() {
                       isDarkMode
                         ? 'border-gray-600 bg-gray-900'
                         : 'border-gray-200 bg-white'
-                    } ${event.alreadyAdded ? 'cursor-default opacity-80' : ''}`}
+                    }`}
                   >
                     <input
                       type="checkbox"
                       checked={selectedEventIds.includes(event.id)}
-                      disabled={event.alreadyAdded}
                       onChange={eventSelection =>
                         handleEventSelection(
                           event.id,
