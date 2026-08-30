@@ -81,7 +81,7 @@ describe('PitchEventPage viewer states', () => {
     });
   });
 
-  it('uses compact header actions without a voting-open badge', async () => {
+  it('uses prominent header actions without a voting-open badge', async () => {
     mockUseUser.mockReturnValue({ isLoaded: true, isSignedIn: true });
     global.fetch = jest.fn().mockResolvedValue({
       ok: true,
@@ -122,8 +122,8 @@ describe('PitchEventPage viewer states', () => {
       level: 1,
       name: 'Demo Night',
     });
-    expect(joinMeeting).toHaveClass('py-1.5', 'text-xs');
-    expect(editEvent).toHaveClass('py-1.5', 'text-xs');
+    expect(joinMeeting).toHaveClass('px-4', 'py-2', 'text-sm');
+    expect(editEvent).toHaveClass('px-4', 'py-2', 'text-sm');
     expect(eventHeading).toHaveClass(
       'min-w-0',
       '[overflow-wrap:anywhere]'
