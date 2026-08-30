@@ -12,8 +12,14 @@ jest.mock('../../src/lib/prisma', () => ({
     update: jest.fn(),
   },
   event: { findMany: jest.fn() },
-  eventProject: { upsert: jest.fn() },
-  pitchProject: { findFirst: jest.fn(), create: jest.fn() },
+  eventProject: { upsert: jest.fn(), deleteMany: jest.fn() },
+  pitchProject: {
+    findFirst: jest.fn(),
+    findMany: jest.fn(),
+    create: jest.fn(),
+    deleteMany: jest.fn(),
+  },
+  pitchProjectVote: { deleteMany: jest.fn() },
   $transaction: jest.fn((operations: Promise<unknown>[]) =>
     Promise.all(operations)
   ),
@@ -36,6 +42,7 @@ describe('/api/projects/[projectId]/submit', () => {
     // Set up default auth mock
     mockAuth.mockReturnValue({ userId: mockUserId });
     (mockPrisma.event.findMany as jest.Mock).mockResolvedValue([]);
+    (mockPrisma.pitchProject.findMany as jest.Mock).mockResolvedValue([]);
   });
 
   describe('PATCH', () => {
@@ -388,6 +395,65 @@ describe('/api/projects/[projectId]/submit', () => {
       expect(mockPrisma.eventProject.upsert).toHaveBeenCalledTimes(1);
       expect(mockPrisma.pitchProject.create).not.toHaveBeenCalled();
       jest.useRealTimers();
+    });
+
+    it('removes an approved project and its pitch data from a selected event', async () => {
+      mockPrisma.hacker.findUnique.mockResolvedValue({
+        id: mockHackerId,
+        role: 'HACKER',
+      } as any);
+      mockPrisma.project.findUnique.mockResolvedValue({
+        id: mockProjectId,
+        launchLeadId: mockHackerId,
+        participants: [],
+      } as any);
+      mockPrisma.project.update.mockResolvedValue({
+        id: mockProjectId,
+        status: 'APPROVED',
+      } as any);
+      (mockPrisma.event.findMany as jest.Mock).mockResolvedValue([
+        {
+          id: 'event-remove',
+          startTime: new Date('2026-08-28T16:00:00.000Z'),
+          endTime: new Date('2026-08-28T21:00:00.000Z'),
+          pitchSessions: [],
+        },
+      ]);
+      (mockPrisma.pitchProject.findMany as jest.Mock).mockResolvedValue([
+        { id: 'pitch-project-remove' },
+      ]);
+
+      const request = new NextRequest(
+        `http://localhost:3000/api/projects/${mockProjectId}/submit`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify({
+            status: 'APPROVED',
+            eventIds: [],
+            removedEventIds: ['event-remove'],
+            sourceEventId: null,
+          }),
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
+
+      const response = await PATCH(request, {
+        params: { projectId: mockProjectId },
+      });
+
+      expect(response.status).toBe(200);
+      expect(mockPrisma.pitchProjectVote.deleteMany).toHaveBeenCalledWith({
+        where: { pitchProjectId: { in: ['pitch-project-remove'] } },
+      });
+      expect(mockPrisma.pitchProject.deleteMany).toHaveBeenCalledWith({
+        where: { id: { in: ['pitch-project-remove'] } },
+      });
+      expect(mockPrisma.eventProject.deleteMany).toHaveBeenCalledWith({
+        where: {
+          projectId: mockProjectId,
+          eventId: { in: ['event-remove'] },
+        },
+      });
     });
 
     it('should return 500 on internal error', async () => {
