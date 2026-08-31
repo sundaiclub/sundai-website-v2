@@ -1136,10 +1136,15 @@ export default function ProjectEditPage() {
               generationBody={{
                 prompt:
                   'Generate pixel-art thumbnails based on project description',
+                title: editableTitle,
+                preview: editablePreview,
+                description: editableDescription,
+                techTags: project?.techTags?.map(tag => tag.name) ?? [],
+                domainTags: project?.domainTags?.map(tag => tag.name) ?? [],
               }}
               subjectLabel="Project"
-              subjectTitle={project?.title || ''}
-              subjectDescription={project?.preview || ''}
+              subjectTitle={editableTitle}
+              subjectDescription={editableDescription || editablePreview}
               onImageSelect={handleAIGeneratedImageSelect}
               isDarkMode={isDarkMode}
             />

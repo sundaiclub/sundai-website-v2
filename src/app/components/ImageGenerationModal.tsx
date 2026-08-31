@@ -13,7 +13,7 @@ interface ImageGenerationModalProps {
   showModal: boolean;
   setShowModal: (show: boolean) => void;
   generationEndpoint: string;
-  generationBody: Record<string, string>;
+  generationBody: Record<string, unknown>;
   subjectLabel: string;
   subjectTitle: string;
   subjectDescription: string;
