@@ -185,6 +185,7 @@ describe('/organizer/events/[eventId]/communications', () => {
     expect(screen.getByText(/sms.*unavailable/i)).toBeInTheDocument();
     expect(screen.getByText(/active consent copy/i)).toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: /^sms$/i })).toBeDisabled();
+    expect(screen.getByRole('checkbox', { name: /^sms$/i })).not.toBeChecked();
   });
 
   it('composes an email with channel, audience, subject, and body', async () => {
@@ -212,7 +213,7 @@ describe('/organizer/events/[eventId]/communications', () => {
     const email = await screen.findByRole('checkbox', { name: /^email$/i });
     const sms = screen.getByRole('checkbox', { name: /^sms$/i });
     expect(email).toBeChecked();
-    fireEvent.click(sms);
+    expect(sms).toBeChecked();
     fireEvent.click(screen.getByRole('checkbox', { name: /pending/i }));
     fireEvent.click(screen.getByRole('checkbox', { name: /waitlisted/i }));
     fireEvent.change(screen.getByLabelText(/subject/i), {
