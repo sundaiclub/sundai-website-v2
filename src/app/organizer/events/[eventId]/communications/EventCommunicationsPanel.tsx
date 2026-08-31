@@ -113,17 +113,13 @@ export default function EventCommunicationsPanel({
         setHistory(payload.items ?? []);
         if (payload.providerAvailability) {
           setProviders(payload.providerAvailability);
-          setChannels(current => {
-            const available = current.filter(channel =>
+          setChannels(
+            (['EMAIL', 'SMS'] as const).filter(channel =>
               channel === 'EMAIL'
                 ? payload.providerAvailability!.email.available
                 : payload.providerAvailability!.sms.available
-            );
-            if (available.length > 0) return available;
-            if (payload.providerAvailability!.email.available) return ['EMAIL'];
-            if (payload.providerAvailability!.sms.available) return ['SMS'];
-            return [];
-          });
+            )
+          );
         }
         setLoadState('ready');
       })
