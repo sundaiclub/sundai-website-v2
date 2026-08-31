@@ -392,7 +392,7 @@ export default function NewProject() {
             </button>
           </div>
 
-          <fieldset>
+          <fieldset className="min-w-0">
             <legend
               className={`block text-sm font-medium mb-2 ${
                 isDarkMode ? 'text-gray-300' : 'text-gray-700'

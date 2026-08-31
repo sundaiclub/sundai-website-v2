@@ -282,5 +282,6 @@ describe('NewProject', () => {
     expect(title).toHaveClass('truncate');
     expect(title.parentElement).toHaveClass('min-w-0', 'flex-1');
     expect(title.closest('label')).toHaveClass('max-w-full', 'overflow-hidden');
+    expect(title.closest('fieldset')).toHaveClass('min-w-0');
   });
 });
