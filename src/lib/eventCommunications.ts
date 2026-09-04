@@ -10,6 +10,7 @@ import type {
 
 export const EVENT_COMMUNICATION_AUDIENCES = [
   'ACTIVE_REGISTERED',
+  'CHAPTER_MEMBERS',
   'PENDING',
   'APPROVED',
   'WAITLISTED',
@@ -58,9 +59,19 @@ type AudienceRegistration = {
   } | null;
 };
 
+type AudienceChapterMembership = {
+  status: string;
+  notificationsAllowed: boolean;
+  emailNotificationsEnabled: boolean;
+  smsNotificationsEnabled: boolean;
+  smsConsentAt?: Date | string | null;
+  smsConsentVersion?: string | null;
+  hacker: AudienceRegistration['hacker'];
+};
+
 export type ResolvedCommunicationRecipient = {
   hackerId: string;
-  registrationId: string;
+  registrationId: string | null;
   contactValue: string;
   displayName: string;
 };
@@ -74,6 +85,11 @@ export type CommunicationAudienceResolution = {
     ineligible: number;
   };
 };
+
+type CommunicationAudienceDb = Pick<
+  PrismaClient,
+  'eventRegistration' | 'chapterMembership' | 'userBan'
+>;
 
 function isAudienceStatus(
   status: string,
@@ -203,6 +219,204 @@ export function resolveEventCommunicationAudience({
 
   recipients.sort((left, right) => left.hackerId.localeCompare(right.hackerId));
   return { recipients, exclusions };
+}
+
+export function resolveChapterMemberCommunicationAudience({
+  memberships,
+  channel,
+}: {
+  memberships: AudienceChapterMembership[];
+  channel: EventCommunicationChannel;
+}): CommunicationAudienceResolution {
+  const recipients: ResolvedCommunicationRecipient[] = [];
+  const exclusions = {
+    cancelled: 0,
+    missingContact: 0,
+    preferenceDisabled: 0,
+    ineligible: 0,
+  };
+
+  for (const membership of memberships) {
+    if (membership.status !== 'ACTIVE' || membership.hacker.isGloballyBanned) {
+      exclusions.ineligible += 1;
+      continue;
+    }
+    if (!membership.notificationsAllowed) {
+      exclusions.preferenceDisabled += 1;
+      continue;
+    }
+
+    let contactValue: string | null | undefined;
+    if (channel === 'EMAIL') {
+      if (!membership.emailNotificationsEnabled) {
+        exclusions.preferenceDisabled += 1;
+        continue;
+      }
+      contactValue = membership.hacker.email;
+      if (!usableEmail(contactValue)) {
+        exclusions.missingContact += 1;
+        continue;
+      }
+    } else {
+      if (!membership.smsNotificationsEnabled) {
+        exclusions.preferenceDisabled += 1;
+        continue;
+      }
+      contactValue = normalizeSmsPhoneNumber(membership.hacker.phoneNumber);
+      if (!contactValue) {
+        exclusions.missingContact += 1;
+        continue;
+      }
+      if (
+        !SMS_CONSENT_CONFIGURED ||
+        !membership.smsConsentAt ||
+        membership.smsConsentVersion !== SMS_CONSENT_VERSION
+      ) {
+        exclusions.ineligible += 1;
+        continue;
+      }
+    }
+
+    recipients.push({
+      hackerId: membership.hacker.id,
+      registrationId: null,
+      contactValue: contactValue!,
+      displayName: membership.hacker.name,
+    });
+  }
+
+  recipients.sort((left, right) => left.hackerId.localeCompare(right.hackerId));
+  return { recipients, exclusions };
+}
+
+export async function resolveCurrentEventCommunicationAudience({
+  db = prisma,
+  eventId,
+  chapterId,
+  audienceType,
+  audienceDefinition,
+  channel,
+}: {
+  db?: CommunicationAudienceDb;
+  eventId: string;
+  chapterId: string;
+  audienceType: EventCommunicationAudience;
+  audienceDefinition: unknown;
+  channel: EventCommunicationChannel;
+}): Promise<CommunicationAudienceResolution> {
+  if (audienceType === 'CHAPTER_MEMBERS') {
+    const memberships = await db.chapterMembership.findMany({
+      where: { chapterId, status: 'ACTIVE' },
+      select: {
+        status: true,
+        notificationsAllowed: true,
+        emailNotificationsEnabled: true,
+        smsNotificationsEnabled: true,
+        smsConsentAt: true,
+        smsConsentVersion: true,
+        hacker: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            phoneNumber: true,
+          },
+        },
+      },
+    });
+    const hackerIds = memberships.map(membership => membership.hacker.id);
+    const activeBans = await db.userBan.findMany({
+      where: { hackerId: { in: hackerIds }, revokedAt: null },
+      select: { hackerId: true },
+    });
+    const bannedHackerIds = new Set(activeBans.map(ban => ban.hackerId));
+    return resolveChapterMemberCommunicationAudience({
+      memberships: memberships.map(membership => ({
+        ...membership,
+        hacker: {
+          ...membership.hacker,
+          isGloballyBanned: bannedHackerIds.has(membership.hacker.id),
+        },
+      })),
+      channel,
+    });
+  }
+
+  const registrations = await db.eventRegistration.findMany({
+    where: { eventId },
+    select: {
+      id: true,
+      hackerId: true,
+      status: true,
+      cancelledAt: true,
+      hacker: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          phoneNumber: true,
+          smsConsentAt: true,
+          smsConsentVersion: true,
+        },
+      },
+    },
+  });
+  const hackerIds = registrations.map(registration => registration.hackerId);
+  const [memberships, activeBans] = await Promise.all([
+    db.chapterMembership.findMany({
+      where: { chapterId, hackerId: { in: hackerIds } },
+      select: {
+        hackerId: true,
+        status: true,
+        notificationsAllowed: true,
+        emailNotificationsEnabled: true,
+        smsNotificationsEnabled: true,
+        smsConsentAt: true,
+        smsConsentVersion: true,
+      },
+    }),
+    db.userBan.findMany({
+      where: { hackerId: { in: hackerIds }, revokedAt: null },
+      select: { hackerId: true },
+    }),
+  ]);
+  const membershipByHacker = new Map(
+    memberships.map(membership => [membership.hackerId, membership])
+  );
+  const bannedHackerIds = new Set(activeBans.map(ban => ban.hackerId));
+  const definition = audienceDefinition as {
+    hackerIds?: unknown;
+    statuses?: unknown;
+  } | null;
+  const selectedHackerIds = Array.isArray(definition?.hackerIds)
+    ? definition.hackerIds.filter(
+        (value): value is string => typeof value === 'string'
+      )
+    : [];
+  const audienceTypes = Array.isArray(definition?.statuses)
+    ? definition.statuses.filter(
+        (value): value is 'PENDING' | 'APPROVED' | 'WAITLISTED' | 'DECLINED' =>
+          typeof value === 'string' &&
+          EVENT_COMMUNICATION_STATUS_AUDIENCES.includes(
+            value as (typeof EVENT_COMMUNICATION_STATUS_AUDIENCES)[number]
+          )
+      )
+    : [];
+
+  return resolveEventCommunicationAudience({
+    registrations: registrations.map(registration => ({
+      ...registration,
+      hacker: {
+        ...registration.hacker,
+        isGloballyBanned: bannedHackerIds.has(registration.hackerId),
+      },
+      membership: membershipByHacker.get(registration.hackerId) ?? null,
+    })),
+    audienceType,
+    audienceTypes,
+    selectedHackerIds,
+    channel,
+  });
 }
 
 export function fingerprintEventCommunicationAudience({

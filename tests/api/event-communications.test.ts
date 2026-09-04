@@ -13,6 +13,7 @@ jest.mock('../../src/lib/prisma', () => ({
   __esModule: true,
   default: {
     hacker: { findUnique: jest.fn() },
+    chapter: { findUnique: jest.fn() },
     event: { findUnique: jest.fn() },
     eventStaff: { findFirst: jest.fn() },
     chapterMembership: { findFirst: jest.fn(), findMany: jest.fn() },
@@ -20,6 +21,8 @@ jest.mock('../../src/lib/prisma', () => ({
     userBan: { findMany: jest.fn() },
     eventCommunication: {
       create: jest.fn(),
+      findFirst: jest.fn(),
+      findMany: jest.fn(),
       findUnique: jest.fn(),
       update: jest.fn(),
     },
@@ -131,7 +134,17 @@ function mockOrganizer() {
   prisma.event.findUnique.mockResolvedValue({
     id: eventId,
     chapterId: 'chapter-boston',
+    title: 'AI Build Night',
+    slug: 'ai-build-night',
+    status: 'PUBLISHED',
+    startTime: new Date('2026-09-05T22:00:00.000Z'),
+    timezone: 'America/New_York',
+    venueName: 'Build Lab',
     staff: [{ role: 'MC' }],
+  });
+  prisma.chapter.findUnique.mockResolvedValue({
+    name: 'Sundai Boston',
+    slug: 'boston',
   });
   prisma.eventStaff.findFirst.mockResolvedValue({
     id: 'staff-mc',
@@ -168,6 +181,46 @@ describe('/api/events/[eventId]/blasts', () => {
       typeof operation === 'function'
         ? operation(prisma)
         : Promise.all(operation)
+    );
+  });
+
+  it('returns the latest sent chapter invitation status', async () => {
+    const sentAt = new Date('2026-09-04T18:50:00.000Z');
+    prisma.eventCommunication.findMany.mockResolvedValue([]);
+    prisma.eventCommunication.findFirst.mockResolvedValue({
+      id: 'chapter-invitation-email',
+      channel: 'EMAIL',
+      status: 'SENT',
+      recipientCount: 6,
+      sentCount: 6,
+      failedCount: 0,
+      sentAt,
+    });
+    const { GET } = loadRoute<{ GET: Function }>(
+      '../../src/app/api/events/[eventId]/blasts/route'
+    );
+
+    const response = await GET(
+      createJsonRequest(`/api/events/${eventId}/blasts`),
+      createRouteContext({ eventId })
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      chapterInvitationStatus: {
+        status: 'SENT',
+        sentCount: 6,
+        failedCount: 0,
+        sentAt: sentAt.toISOString(),
+      },
+    });
+    expect(prisma.eventCommunication.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          audienceType: 'CHAPTER_MEMBERS',
+          sentAt: { not: null },
+        }),
+      })
     );
   });
 
@@ -233,6 +286,61 @@ describe('/api/events/[eventId]/blasts', () => {
     });
     expect(firstBody.previewFingerprint).toBe(secondBody.previewFingerprint);
     expect(firstBody.exclusions).not.toHaveProperty('banned');
+  });
+
+  it('previews active chapter members without requiring event registrations', async () => {
+    prisma.eventCommunication.findUnique.mockResolvedValue({
+      ...draft,
+      audienceType: 'CHAPTER_MEMBERS',
+    });
+    prisma.chapterMembership.findMany.mockResolvedValue([
+      {
+        status: 'ACTIVE',
+        notificationsAllowed: true,
+        emailNotificationsEnabled: true,
+        smsNotificationsEnabled: false,
+        smsConsentAt: null,
+        smsConsentVersion: null,
+        hacker: {
+          id: 'hacker-member',
+          name: 'Chapter Member',
+          email: 'member@example.com',
+          phoneNumber: null,
+        },
+      },
+    ]);
+    const { POST } = loadRoute<{ POST: Function }>(
+      '../../src/app/api/events/[eventId]/blasts/[blastId]/preview/route'
+    );
+
+    const response = await POST(
+      createJsonRequest(`/api/events/${eventId}/blasts/${blastId}/preview`, {
+        method: 'POST',
+      }),
+      createRouteContext({ eventId, blastId })
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ eligibleCount: 1 });
+    expect(prisma.eventRegistration.findMany).not.toHaveBeenCalled();
+  });
+
+  it('provides formatted invitation defaults only for a published event', async () => {
+    const { GET } = loadRoute<{ GET: Function }>(
+      '../../src/app/api/events/[eventId]/blasts/invitation/route'
+    );
+
+    const response = await GET(
+      createJsonRequest(`/api/events/${eventId}/blasts/invitation`),
+      createRouteContext({ eventId })
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      subject: "You're invited to AI Build Night",
+      emailBody: expect.stringContaining('Build Lab'),
+      smsBody: expect.stringContaining('AI Build Night'),
+    });
   });
 
   it('previews the union of selected registration-status audiences', async () => {

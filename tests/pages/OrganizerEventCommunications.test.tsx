@@ -1,5 +1,11 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 
 const mockUseTheme = jest.fn();
 
@@ -45,12 +51,22 @@ const sentCommunication = {
 function mockCommunicationFetch({
   changedAudience = false,
   smsAvailable = false,
+  chapterInvitationStatus = null as null | {
+    id: string;
+    channel: 'EMAIL' | 'SMS';
+    status: string;
+    recipientCount: number;
+    sentCount: number;
+    failedCount: number;
+    sentAt: string;
+  },
 } = {}) {
   global.fetch = jest.fn((input: RequestInfo | URL, init?: RequestInit) => {
     const url = requestUrl(input);
     if (url === `/api/events/${eventId}/blasts` && !init?.method) {
       return jsonResponse({
         items: [sentCommunication],
+        chapterInvitationStatus,
         providerAvailability: {
           email: { available: true },
           sms: smsAvailable
@@ -61,6 +77,13 @@ function mockCommunicationFetch({
                   'SMS requires provider configuration and active consent copy.',
               },
         },
+      });
+    }
+    if (url === `/api/events/${eventId}/blasts/invitation`) {
+      return jsonResponse({
+        subject: "You're invited to AI Build Night",
+        emailBody: 'Join Sundai Boston for AI Build Night.',
+        smsBody: "Sundai Boston: You're invited to AI Build Night.",
       });
     }
     if (url === `/api/events/${eventId}/blasts` && init?.method === 'POST') {
@@ -186,6 +209,34 @@ describe('/organizer/events/[eventId]/communications', () => {
     expect(screen.getByText(/active consent copy/i)).toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: /^sms$/i })).toBeDisabled();
     expect(screen.getByRole('checkbox', { name: /^sms$/i })).not.toBeChecked();
+    expect(screen.getByText(/invitation not sent/i)).toBeInTheDocument();
+  });
+
+  it('shows when a chapter invitation was already sent', async () => {
+    mockCommunicationFetch({
+      chapterInvitationStatus: {
+        id: 'chapter-invitation-email',
+        channel: 'EMAIL',
+        status: 'SENT',
+        recipientCount: 6,
+        sentCount: 6,
+        failedCount: 0,
+        sentAt: '2026-09-04T18:50:00.000Z',
+      },
+    });
+    renderPage();
+
+    const status = await screen.findByText(/^invitation sent$/i);
+    const inviteSection = screen.getByRole('heading', {
+      name: /invite chapter members/i,
+    });
+
+    expect(status).toBeInTheDocument();
+    expect(
+      status.compareDocumentPosition(inviteSection) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+    expect(screen.getByText(/6 sent.*0 failed.*email/i)).toBeInTheDocument();
   });
 
   it('composes an email with channel, audience, subject, and body', async () => {
@@ -249,6 +300,57 @@ describe('/organizer/events/[eventId]/communications', () => {
     expect(
       screen.queryByRole('button', { name: /new message/i })
     ).not.toBeInTheDocument();
+  });
+
+  it('opens a separate modal to review and confirm chapter invitations', async () => {
+    mockCommunicationFetch({ smsAvailable: true });
+    renderPage();
+
+    fireEvent.click(
+      await screen.findByRole('button', { name: /invite chapter members/i })
+    );
+    const dialog = await screen.findByRole('dialog', {
+      name: /confirm chapter invitation/i,
+    });
+    expect(
+      within(dialog).getByText(/review the message and eligible recipients/i)
+    ).toBeInTheDocument();
+
+    await waitFor(() => {
+      const createCalls = (global.fetch as jest.Mock).mock.calls.filter(
+        ([url, init]) =>
+          url === `/api/events/${eventId}/blasts` && init?.method === 'POST'
+      );
+      expect(createCalls).toHaveLength(2);
+      expect(createCalls.map(([, init]) => JSON.parse(init.body))).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            channel: 'EMAIL',
+            audienceType: 'CHAPTER_MEMBERS',
+            subject: "You're invited to AI Build Night",
+          }),
+          expect.objectContaining({
+            channel: 'SMS',
+            audienceType: 'CHAPTER_MEMBERS',
+            subject: null,
+          }),
+        ])
+      );
+    });
+    const confirm = await within(dialog).findByRole('button', {
+      name: /confirm and send invitation/i,
+    });
+    expect(confirm).toBeInTheDocument();
+    fireEvent.click(confirm);
+
+    await waitFor(() => {
+      const sendCalls = (global.fetch as jest.Mock).mock.calls.filter(
+        ([url]) => url.includes('/blasts/blast-draft-') && url.endsWith('/send')
+      );
+      expect(sendCalls).toHaveLength(2);
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+    expect(screen.getByText(/chapter invitation sent/i)).toBeInTheDocument();
   });
 
   it('shows eligible and aggregate exclusion counts and requires explicit confirmation', async () => {

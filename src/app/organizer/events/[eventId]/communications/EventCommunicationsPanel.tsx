@@ -47,7 +47,7 @@ type CommunicationDetail = CommunicationSummary & {
 
 type RegistrationAudience = Exclude<
   EventCommunicationAudience,
-  'ACTIVE_REGISTERED' | 'SELECTED'
+  'ACTIVE_REGISTERED' | 'CHAPTER_MEMBERS' | 'SELECTED'
 >;
 
 const audiences: Array<{
@@ -64,6 +64,23 @@ type DraftPreview = {
   id: string;
   preview: EventCommunicationPreview;
 };
+
+type ChapterInvitationDefaults = {
+  subject: string;
+  emailBody: string;
+  smsBody: string;
+};
+
+type ChapterInvitationStatus = Pick<
+  CommunicationSummary,
+  | 'id'
+  | 'channel'
+  | 'status'
+  | 'recipientCount'
+  | 'sentCount'
+  | 'failedCount'
+  | 'sentAt'
+>;
 
 export default function EventCommunicationsPanel({
   eventId,
@@ -91,6 +108,18 @@ export default function EventCommunicationsPanel({
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
   const [draftPreviews, setDraftPreviews] = useState<DraftPreview[]>([]);
+  const [invitationOpen, setInvitationOpen] = useState(false);
+  const [invitationState, setInvitationState] = useState<
+    'idle' | 'loading' | 'ready' | 'error'
+  >('idle');
+  const [invitationContent, setInvitationContent] =
+    useState<ChapterInvitationDefaults | null>(null);
+  const [invitationPreviews, setInvitationPreviews] = useState<DraftPreview[]>(
+    []
+  );
+  const [invitationNotice, setInvitationNotice] = useState('');
+  const [chapterInvitationStatus, setChapterInvitationStatus] =
+    useState<ChapterInvitationStatus | null>(null);
   const [sending, setSending] = useState(false);
   const [notice, setNotice] = useState('');
   const [detail, setDetail] = useState<CommunicationDetail | null>(null);
@@ -106,11 +135,13 @@ export default function EventCommunicationsPanel({
             email: ProviderState;
             sms: ProviderState;
           };
+          chapterInvitationStatus?: ChapterInvitationStatus | null;
         }>;
       })
       .then(payload => {
         if (!isCurrent) return;
         setHistory(payload.items ?? []);
+        setChapterInvitationStatus(payload.chapterInvitationStatus ?? null);
         if (payload.providerAvailability) {
           setProviders(payload.providerAvailability);
           setChannels(
@@ -197,6 +228,91 @@ export default function EventCommunicationsPanel({
     if (previews) setDraftPreviews(previews);
   }
 
+  async function previewChapterInvitation() {
+    setNotice('');
+    setInvitationOpen(true);
+    setInvitationState('loading');
+    setInvitationNotice('');
+    setInvitationContent(null);
+    setInvitationPreviews([]);
+    try {
+      const invitationResponse = await fetch(
+        `/api/events/${eventId}/blasts/invitation`
+      );
+      if (!invitationResponse.ok) {
+        const payload = await invitationResponse.json().catch(() => null);
+        throw new Error(
+          payload?.error ?? 'Unable to prepare the chapter invitation.'
+        );
+      }
+      const invitation =
+        (await invitationResponse.json()) as ChapterInvitationDefaults;
+      setInvitationContent(invitation);
+      const availableChannels = (['EMAIL', 'SMS'] as const).filter(channel =>
+        channel === 'EMAIL'
+          ? providers.email.available
+          : providers.sms.available
+      );
+      if (availableChannels.length === 0) {
+        throw new Error('No communication provider is available.');
+      }
+
+      const previews = await Promise.all(
+        availableChannels.map(async channel => {
+          const draftResponse = await fetch(`/api/events/${eventId}/blasts`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({
+              channel,
+              subject: channel === 'EMAIL' ? invitation.subject : null,
+              body:
+                channel === 'EMAIL' ? invitation.emailBody : invitation.smsBody,
+              audienceType: 'CHAPTER_MEMBERS',
+              audienceDefinition: {},
+            }),
+          });
+          if (!draftResponse.ok) {
+            const payload = await draftResponse.json().catch(() => null);
+            throw new Error(
+              payload?.error ?? 'Unable to save the invitation draft.'
+            );
+          }
+          const draft = (await draftResponse.json()) as { id: string };
+          const previewResponse = await fetch(
+            `/api/events/${eventId}/blasts/${draft.id}/preview`,
+            { method: 'POST' }
+          );
+          if (!previewResponse.ok) {
+            throw new Error('Unable to preview the chapter invitation.');
+          }
+          return {
+            id: draft.id,
+            preview:
+              (await previewResponse.json()) as EventCommunicationPreview,
+          };
+        })
+      );
+      setInvitationPreviews(previews);
+      setInvitationState('ready');
+    } catch (error) {
+      setInvitationNotice(
+        error instanceof Error
+          ? error.message
+          : 'Unable to prepare the chapter invitation.'
+      );
+      setInvitationState('error');
+    }
+  }
+
+  function closeChapterInvitation() {
+    if (sending) return;
+    setInvitationOpen(false);
+    setInvitationState('idle');
+    setInvitationContent(null);
+    setInvitationPreviews([]);
+    setInvitationNotice('');
+  }
+
   async function confirmSend() {
     if (draftPreviews.length === 0) return;
     setSending(true);
@@ -246,8 +362,76 @@ export default function EventCommunicationsPanel({
         ...results.map(result => result.payload as CommunicationSummary),
         ...current,
       ]);
+      const latestResult = results
+        .map(result => result.payload as ChapterInvitationStatus)
+        .sort((left, right) =>
+          String(right.sentAt).localeCompare(String(left.sentAt))
+        )[0];
+      setChapterInvitationStatus(latestResult ?? null);
       setDraftPreviews([]);
       setNotice('Communication sent.');
+    } finally {
+      setSending(false);
+    }
+  }
+
+  async function confirmChapterInvitation() {
+    if (invitationPreviews.length === 0) return;
+    setSending(true);
+    setInvitationNotice('');
+    try {
+      const results = await Promise.all(
+        invitationPreviews.map(async draft => {
+          const response = await fetch(
+            `/api/events/${eventId}/blasts/${draft.id}/send`,
+            {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                previewFingerprint: draft.preview.previewFingerprint,
+              }),
+            }
+          );
+          return { draft, response, payload: await response.json() };
+        })
+      );
+      const changed = results.filter(result => result.response.status === 409);
+      if (changed.length > 0) {
+        setInvitationPreviews(current =>
+          current.map(draft => {
+            const replacement = changed.find(
+              result => result.draft.id === draft.id
+            );
+            return replacement
+              ? {
+                  id: draft.id,
+                  preview: replacement.payload
+                    .preview as EventCommunicationPreview,
+                }
+              : draft;
+          })
+        );
+        setInvitationNotice(
+          'Audience changed. Review the updated audience and confirm again.'
+        );
+        return;
+      }
+      if (results.some(result => !result.response.ok)) {
+        setInvitationNotice(
+          'Invitation delivery failed. You can retry safely.'
+        );
+        return;
+      }
+      setHistory(current => [
+        ...results.map(result => result.payload as CommunicationSummary),
+        ...current,
+      ]);
+      setInvitationOpen(false);
+      setInvitationState('idle');
+      setInvitationContent(null);
+      setInvitationPreviews([]);
+      setInvitationNotice('');
+      setNotice('Chapter invitation sent.');
     } finally {
       setSending(false);
     }
@@ -280,6 +464,67 @@ export default function EventCommunicationsPanel({
 
   return (
     <div className="space-y-5">
+      {notice && (
+        <ManagementAlert tone={notice.includes('sent') ? 'success' : 'danger'}>
+          <span role="status">{notice}</span>
+        </ManagementAlert>
+      )}
+
+      <div className="flex flex-wrap items-center gap-3">
+        {chapterInvitationStatus ? (
+          <>
+            <ManagementBadge
+              tone={
+                chapterInvitationStatus.status === 'SENT'
+                  ? 'success'
+                  : chapterInvitationStatus.status === 'PARTIAL'
+                    ? 'warning'
+                    : 'danger'
+              }
+            >
+              {chapterInvitationStatus.status === 'SENT'
+                ? 'Invitation sent'
+                : chapterInvitationStatus.status === 'PARTIAL'
+                  ? 'Partially sent'
+                  : 'Last send failed'}
+            </ManagementBadge>
+            <p className={`text-sm ${classes.mutedText}`}>
+              {chapterInvitationStatus.sentCount} sent ·{' '}
+              {chapterInvitationStatus.failedCount} failed via{' '}
+              {chapterInvitationStatus.channel === 'EMAIL' ? 'email' : 'SMS'}
+              {chapterInvitationStatus.sentAt
+                ? ` on ${new Date(chapterInvitationStatus.sentAt).toLocaleString()}`
+                : ''}
+            </p>
+          </>
+        ) : (
+          <ManagementBadge>Invitation not sent</ManagementBadge>
+        )}
+      </div>
+
+      <ManagementSection
+        title="Invite chapter members"
+        description="Invite all active chapter members to this published event. Email and SMS delivery follows each member’s chapter notification preferences."
+        actions={
+          <button
+            className={classes.primaryButton}
+            disabled={
+              sending ||
+              (!providers.email.available && !providers.sms.available)
+            }
+            onClick={previewChapterInvitation}
+            type="button"
+          >
+            Invite chapter members
+          </button>
+        }
+      >
+        <p className={`text-sm ${classes.mutedText}`}>
+          The email includes the event link and a link where members can change
+          their notification preferences or unsubscribe.
+        </p>
+      </ManagementSection>
+
       <ManagementSection
         title="Communications"
         description="Draft, preview, and send messages to current registration audiences."
@@ -306,14 +551,6 @@ export default function EventCommunicationsPanel({
             )}
           </div>
         </div>
-
-        {notice && (
-          <ManagementAlert
-            tone={notice.includes('sent') ? 'success' : 'danger'}
-          >
-            <span role="status">{notice}</span>
-          </ManagementAlert>
-        )}
 
         <div className={`${classes.subtlePanel} space-y-5 p-4 sm:p-5`}>
           <div className="grid gap-5 lg:grid-cols-2">
@@ -514,6 +751,123 @@ export default function EventCommunicationsPanel({
             ))}
           </ul>
         </ManagementSection>
+      )}
+
+      {invitationOpen && (
+        <div
+          aria-labelledby="chapter-invitation-title"
+          aria-modal="true"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+          role="dialog"
+        >
+          <div
+            className={`${classes.panel} ${
+              classes.isDarkMode ? '!bg-gray-900' : '!bg-white'
+            } max-h-[90vh] w-full max-w-2xl overflow-y-auto p-5 sm:p-6`}
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-bold" id="chapter-invitation-title">
+                  Confirm chapter invitation
+                </h2>
+                <p className={`mt-1 text-sm ${classes.mutedText}`}>
+                  Review the message and eligible recipients before you send.
+                </p>
+              </div>
+              <button
+                className={classes.ghostButton}
+                disabled={sending}
+                onClick={closeChapterInvitation}
+                type="button"
+              >
+                Close
+              </button>
+            </div>
+
+            {invitationState === 'loading' && (
+              <p className={`mt-5 ${classes.mutedText}`} role="status">
+                Preparing invitation…
+              </p>
+            )}
+            {invitationNotice && (
+              <div className="mt-5">
+                <ManagementAlert tone="danger">
+                  <span role="alert">{invitationNotice}</span>
+                </ManagementAlert>
+              </div>
+            )}
+            {invitationContent && invitationState === 'ready' && (
+              <div className="mt-5 space-y-5">
+                {providers.email.available && (
+                  <div className={`${classes.subtlePanel} p-4`}>
+                    <h3 className="font-bold">Email</h3>
+                    <p className="mt-2 text-sm font-semibold">
+                      {invitationContent.subject}
+                    </p>
+                    <p className="mt-2 whitespace-pre-wrap text-sm">
+                      {invitationContent.emailBody}
+                    </p>
+                    <p className={`mt-3 text-xs ${classes.mutedText}`}>
+                      The delivered email also includes the event button and the
+                      notification-preferences link.
+                    </p>
+                  </div>
+                )}
+                {providers.sms.available && (
+                  <div className={`${classes.subtlePanel} p-4`}>
+                    <h3 className="font-bold">SMS</h3>
+                    <p className="mt-2 text-sm">{invitationContent.smsBody}</p>
+                  </div>
+                )}
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {invitationPreviews.map(({ id, preview }) => (
+                    <div className="rounded-md border p-3" key={id}>
+                      <p className="text-sm font-bold">
+                        {preview.channel === 'EMAIL' ? 'Email' : 'SMS'} ·{' '}
+                        {preview.eligibleCount} eligible recipients
+                      </p>
+                      <ul
+                        className={`mt-2 space-y-1 text-sm ${classes.mutedText}`}
+                      >
+                        <li>
+                          {preview.exclusions.missingContact} missing contact
+                        </li>
+                        <li>
+                          {preview.exclusions.preferenceDisabled} preference
+                          disabled
+                        </li>
+                        <li>{preview.exclusions.ineligible} ineligible</li>
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex flex-wrap justify-end gap-3">
+                  <button
+                    className={classes.secondaryButton}
+                    disabled={sending}
+                    onClick={closeChapterInvitation}
+                    type="button"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    className={classes.primaryButton}
+                    disabled={
+                      sending ||
+                      invitationPreviews.every(
+                        draft => draft.preview.eligibleCount === 0
+                      )
+                    }
+                    onClick={confirmChapterInvitation}
+                    type="button"
+                  >
+                    {sending ? 'Sending…' : 'Confirm and send invitation'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );

@@ -172,6 +172,7 @@ export interface UpdateEventMaterialInput {
 export type EventCommunicationChannel = 'EMAIL' | 'SMS';
 export type EventCommunicationAudience =
   | 'ACTIVE_REGISTERED'
+  | 'CHAPTER_MEMBERS'
   | 'PENDING'
   | 'APPROVED'
   | 'WAITLISTED'
@@ -215,7 +216,7 @@ export interface EventCommunicationRecipient {
   id: EntityId;
   communicationId: EntityId;
   hackerId: EntityId;
-  registrationId: EntityId;
+  registrationId: EntityId | null;
   contactValue: string;
   displayName: string;
   status: EventCommunicationRecipientStatus;

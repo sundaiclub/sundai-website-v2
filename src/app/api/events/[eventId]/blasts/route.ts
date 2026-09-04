@@ -31,36 +31,56 @@ export async function GET(
       );
     }
     const cursor = url.searchParams.get('cursor');
-    const rows = await prisma.eventCommunication.findMany({
-      where: { eventId: params.eventId },
-      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-      take: limit + 1,
-      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
-      select: {
-        id: true,
-        eventId: true,
-        channel: true,
-        status: true,
-        subject: true,
-        body: true,
-        audienceType: true,
-        audienceDefinitionJson: true,
-        recipientCount: true,
-        sentCount: true,
-        failedCount: true,
-        sentAt: true,
-        createdAt: true,
-        updatedAt: true,
-        createdBy: { select: { id: true, name: true } },
-        sentBy: { select: { id: true, name: true } },
-      },
-    });
+    const [rows, chapterInvitationStatus] = await Promise.all([
+      prisma.eventCommunication.findMany({
+        where: { eventId: params.eventId },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        take: limit + 1,
+        ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+        select: {
+          id: true,
+          eventId: true,
+          channel: true,
+          status: true,
+          subject: true,
+          body: true,
+          audienceType: true,
+          audienceDefinitionJson: true,
+          recipientCount: true,
+          sentCount: true,
+          failedCount: true,
+          sentAt: true,
+          createdAt: true,
+          updatedAt: true,
+          createdBy: { select: { id: true, name: true } },
+          sentBy: { select: { id: true, name: true } },
+        },
+      }),
+      prisma.eventCommunication.findFirst({
+        where: {
+          eventId: params.eventId,
+          audienceType: 'CHAPTER_MEMBERS',
+          sentAt: { not: null },
+        },
+        orderBy: [{ sentAt: 'desc' }, { id: 'desc' }],
+        select: {
+          id: true,
+          channel: true,
+          status: true,
+          recipientCount: true,
+          sentCount: true,
+          failedCount: true,
+          sentAt: true,
+        },
+      }),
+    ]);
     const hasMore = rows.length > limit;
     const items = hasMore ? rows.slice(0, limit) : rows;
 
     return NextResponse.json({
       items,
       nextCursor: hasMore ? (items.at(-1)?.id ?? null) : null,
+      chapterInvitationStatus,
       providerAvailability: getEventCommunicationProviderAvailability(),
     });
   } catch (error) {
@@ -103,6 +123,15 @@ export async function POST(
         { status: 400 }
       );
     }
+    if (
+      body.audienceType === 'CHAPTER_MEMBERS' &&
+      access.event!.status !== 'PUBLISHED'
+    ) {
+      return NextResponse.json(
+        { error: 'Publish the event before inviting chapter members.' },
+        { status: 409 }
+      );
+    }
 
     const providers = getEventCommunicationProviderAvailability();
     const selectedProvider =
@@ -127,6 +156,7 @@ export async function POST(
         body: String(body.body).trim(),
         audienceType: body.audienceType as
           | 'ACTIVE_REGISTERED'
+          | 'CHAPTER_MEMBERS'
           | 'PENDING'
           | 'APPROVED'
           | 'WAITLISTED'

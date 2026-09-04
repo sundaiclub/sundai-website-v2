@@ -61,6 +61,34 @@ describe('event delivery provider adapters', () => {
     );
   });
 
+  it('uses supplied formatted HTML for an event invitation email', async () => {
+    const { sendEventEmail } = loadDelivery();
+    const send = jest.fn().mockResolvedValue({ MessageId: 'ses-invite' });
+
+    await sendEventEmail(
+      {
+        to: 'ada@example.com',
+        subject: 'You are invited',
+        body: 'Plain-text invitation',
+        html: '<html><body><a href="https://example.com/preferences">Unsubscribe</a></body></html>',
+      },
+      { config: configuredProviders, send }
+    );
+
+    expect(send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        Message: expect.objectContaining({
+          Body: expect.objectContaining({
+            Html: expect.objectContaining({
+              Data: expect.stringContaining('Unsubscribe'),
+            }),
+            Text: expect.objectContaining({ Data: 'Plain-text invitation' }),
+          }),
+        }),
+      })
+    );
+  });
+
   it('saves the SES error code and message when SES rejects a message', async () => {
     const { sendEventEmail } = loadDelivery();
     const providerError = Object.assign(
@@ -129,8 +157,7 @@ describe('event delivery provider adapters', () => {
         to: '+16175550123',
         messagingServiceSid: configuredProviders.twilioMessagingServiceSid,
         body: 'Doors open at 9:30.',
-        statusCallback:
-          'https://www.sundai.club/api/webhooks/twilio/status',
+        statusCallback: 'https://www.sundai.club/api/webhooks/twilio/status',
       });
     } finally {
       if (previousBaseUrl === undefined) {

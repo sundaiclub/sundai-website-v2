@@ -62,6 +62,28 @@ export default function ChapterLandingPage({
   const [smsConsentGranted, setSmsConsentGranted] = useState(false);
 
   useEffect(() => {
+    if (
+      new URLSearchParams(window.location.search).get('tab') === 'preferences'
+    ) {
+      setActiveTab('preferences');
+    }
+  }, []);
+
+  useEffect(() => {
+    if (
+      activeTab === 'preferences' &&
+      window.location.hash === '#notification-preferences' &&
+      chapter
+    ) {
+      requestAnimationFrame(() =>
+        document
+          .getElementById('notification-preferences')
+          ?.scrollIntoView({ block: 'start' })
+      );
+    }
+  }, [activeTab, chapter]);
+
+  useEffect(() => {
     setDenied(false);
     setLoadError('');
     fetch(`/api/chapters/${params.chapterSlug}`)
@@ -409,8 +431,7 @@ export default function ChapterLandingPage({
                 <ManagementAlert tone={actionError ? 'danger' : 'success'}>
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <span>{actionError || actionMessage}</span>
-                    {actionError ===
-                      'Please sign in to join this chapter.' && (
+                    {actionError === 'Please sign in to join this chapter.' && (
                       <SignInAction label="Sign in to join" />
                     )}
                   </div>
@@ -641,77 +662,81 @@ export default function ChapterLandingPage({
             )}
           </div>
           {membership?.status === 'ACTIVE' ? (
-            <ManagementSection
-              title="Notification preferences"
-              description="Choose how this chapter can contact you."
-            >
-              <div className="grid max-w-md gap-3">
-                {actionError && (
-                  <ManagementAlert tone="danger">{actionError}</ManagementAlert>
-                )}
-                <label className="flex items-center gap-3 text-sm font-semibold">
-                  <input
-                    aria-label="Email"
-                    className={classes.checkbox}
-                    checked={emailNotificationsEnabled}
-                    onChange={event =>
-                      setEmailNotificationsEnabled(event.target.checked)
-                    }
-                    type="checkbox"
-                  />
-                  Email
-                </label>
-                <label className="flex items-center gap-3 text-sm font-semibold">
-                  <input
-                    aria-label="SMS"
-                    className={classes.checkbox}
-                    checked={smsNotificationsEnabled}
-                    disabled={!SMS_CONSENT_CONFIGURED}
-                    onChange={event => {
-                      setSmsNotificationsEnabled(event.target.checked);
-                      if (!event.target.checked) setSmsConsentGranted(false);
-                    }}
-                    type="checkbox"
-                  />
-                  SMS
-                </label>
-                {!SMS_CONSENT_CONFIGURED && (
-                  <p className={`text-sm ${classes.mutedText}`} role="status">
-                    SMS notifications are unavailable until consent information
-                    is configured.
-                  </p>
-                )}
-                {smsNotificationsEnabled && SMS_CONSENT_CONFIGURED && (
-                  <div className={`${classes.subtlePanel} grid gap-2 p-3`}>
-                    <label className="flex items-start gap-3 text-sm">
-                      <input
-                        aria-label={SMS_CONSENT_COPY}
-                        checked={smsConsentGranted}
-                        className={`${classes.checkbox} mt-0.5`}
-                        onChange={event =>
-                          setSmsConsentGranted(event.target.checked)
-                        }
-                        type="checkbox"
-                      />
-                      <span>{SMS_CONSENT_COPY}</span>
-                    </label>
-                    <p className={`text-xs ${classes.mutedText}`}>
-                      Consent version {SMS_CONSENT_VERSION}
+            <div id="notification-preferences">
+              <ManagementSection
+                title="Notification preferences"
+                description="Choose how this chapter can contact you."
+              >
+                <div className="grid max-w-md gap-3">
+                  {actionError && (
+                    <ManagementAlert tone="danger">
+                      {actionError}
+                    </ManagementAlert>
+                  )}
+                  <label className="flex items-center gap-3 text-sm font-semibold">
+                    <input
+                      aria-label="Email"
+                      className={classes.checkbox}
+                      checked={emailNotificationsEnabled}
+                      onChange={event =>
+                        setEmailNotificationsEnabled(event.target.checked)
+                      }
+                      type="checkbox"
+                    />
+                    Email
+                  </label>
+                  <label className="flex items-center gap-3 text-sm font-semibold">
+                    <input
+                      aria-label="SMS"
+                      className={classes.checkbox}
+                      checked={smsNotificationsEnabled}
+                      disabled={!SMS_CONSENT_CONFIGURED}
+                      onChange={event => {
+                        setSmsNotificationsEnabled(event.target.checked);
+                        if (!event.target.checked) setSmsConsentGranted(false);
+                      }}
+                      type="checkbox"
+                    />
+                    SMS
+                  </label>
+                  {!SMS_CONSENT_CONFIGURED && (
+                    <p className={`text-sm ${classes.mutedText}`} role="status">
+                      SMS notifications are unavailable until consent
+                      information is configured.
                     </p>
+                  )}
+                  {smsNotificationsEnabled && SMS_CONSENT_CONFIGURED && (
+                    <div className={`${classes.subtlePanel} grid gap-2 p-3`}>
+                      <label className="flex items-start gap-3 text-sm">
+                        <input
+                          aria-label={SMS_CONSENT_COPY}
+                          checked={smsConsentGranted}
+                          className={`${classes.checkbox} mt-0.5`}
+                          onChange={event =>
+                            setSmsConsentGranted(event.target.checked)
+                          }
+                          type="checkbox"
+                        />
+                        <span>{SMS_CONSENT_COPY}</span>
+                      </label>
+                      <p className={`text-xs ${classes.mutedText}`}>
+                        Consent version {SMS_CONSENT_VERSION}
+                      </p>
+                    </div>
+                  )}
+                  <div className="mt-2 flex justify-end gap-3">
+                    <button
+                      className={classes.primaryButton}
+                      disabled={isActing}
+                      onClick={updateNotifications}
+                      type="button"
+                    >
+                      {isActing ? 'Saving...' : 'Save preferences'}
+                    </button>
                   </div>
-                )}
-                <div className="mt-2 flex justify-end gap-3">
-                  <button
-                    className={classes.primaryButton}
-                    disabled={isActing}
-                    onClick={updateNotifications}
-                    type="button"
-                  >
-                    {isActing ? 'Saving...' : 'Save preferences'}
-                  </button>
                 </div>
-              </div>
-            </ManagementSection>
+              </ManagementSection>
+            </div>
           ) : (
             <ManagementEmptyState>
               Join this chapter to manage notification preferences.
