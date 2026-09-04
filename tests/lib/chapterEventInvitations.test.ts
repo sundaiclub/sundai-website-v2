@@ -25,6 +25,9 @@ describe('chapter event invitation content', () => {
     expect(defaults.emailBody).toContain('Location: Build Lab');
     expect(defaults.smsBody).toContain('Time: Saturday, September 5, 2026');
     expect(defaults.smsBody).toContain('Location: Build Lab');
+    expect(defaults.smsBody).toMatch(
+      /AI <Build> Night\.\nTime:.*\nLocation: Build Lab/
+    );
   });
 
   it('identifies an event location that is not announced', () => {
@@ -60,6 +63,8 @@ describe('chapter event invitation content', () => {
     expect(result.html).toContain('VIEW EVENT + RSVP');
     expect(result.html).not.toContain('<script>');
     expect(result.sms).toContain('/events/boston/ai-build-night');
+    expect(result.sms).toContain('\n\nView event:');
+    expect(result.sms).toContain('\n\nUnsubscribe:');
     expect(result.sms).toContain('Unsubscribe:');
     expect(result.sms).toContain(
       '/chapters/boston?tab=preferences#notification-preferences'

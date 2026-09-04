@@ -49,7 +49,7 @@ export function chapterEventInvitationDefaults(
   return {
     subject: `You're invited to ${event.title}`,
     emailBody: `Join ${event.chapter.name} for ${event.title}.\n\n${eventDetails}`,
-    smsBody: `${event.chapter.name}: You're invited to ${event.title}. Time: ${when}. Location: ${location ?? 'To be announced'}.`,
+    smsBody: `${event.chapter.name}: You're invited to ${event.title}.\nTime: ${when}\nLocation: ${location ?? 'To be announced'}`,
   };
 }
 
@@ -144,6 +144,6 @@ export function chapterEventInvitationDelivery(
   return {
     text,
     html,
-    sms: `${body.trim()} ${eventUrl} Unsubscribe: ${preferencesUrl}`,
+    sms: `${body.trim()}\n\nView event: ${eventUrl}\n\nUnsubscribe: ${preferencesUrl}`,
   };
 }
