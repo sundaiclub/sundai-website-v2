@@ -23,6 +23,10 @@ const buildContext = (overrides: Record<string, unknown> = {}) => ({
     confirmationMessage: 'Bring your laptop and photo ID.',
     waitlistMessage: 'We will contact you if a spot opens.',
     declineMessage: 'We cannot accommodate this application.',
+    approvedDetailsJson: {
+      address: '42 Private Lane, Boston, MA',
+      details: 'Use the side entrance and ask for Grace.',
+    },
     slug: 'ai-build-night',
     chapter: {
       id: 'chapter-boston',
@@ -72,11 +76,38 @@ describe('event decision notifications', () => {
     expect(sendEmail.mock.calls[0][0].text).toContain(
       'https://events.example.com/events/boston/ai-build-night'
     );
+    expect(sendEmail.mock.calls[0][0].text).toContain(
+      'Address: 42 Private Lane, Boston, MA'
+    );
+    expect(sendEmail.mock.calls[0][0].text).toContain(
+      'Approved-only details: Use the side entrance and ask for Grace.'
+    );
+    expect(sendEmail.mock.calls[0][0].html).toContain(
+      '>Address</p>'
+    );
+    expect(sendEmail.mock.calls[0][0].html).toContain(
+      '42 Private Lane, Boston, MA'
+    );
+    expect(sendEmail.mock.calls[0][0].html).toContain(
+      '>Approved-only details</p>'
+    );
+    expect(sendEmail.mock.calls[0][0].html).toContain(
+      'Use the side entrance and ask for Grace.'
+    );
+    expect(sendEmail.mock.calls[0][0].html).toContain('<!doctype html>');
+    expect(sendEmail.mock.calls[0][0].html).toContain('SUNDAI CLUB');
+    expect(sendEmail.mock.calls[0][0].html).toContain(
+      'background-color:#151c3f'
+    );
     expect(sendSms).toHaveBeenCalledWith({
       to: '+16175550123',
-      body: expect.stringContaining(
-        'Your application for “Boston AI Build Night” has been approved.'
-      ),
+      body: [
+        'Sundai: Your application for “Boston AI Build Night” has been approved.',
+        'Bring your laptop and photo ID.',
+        'Address: 42 Private Lane, Boston, MA',
+        'Approved-only details: Use the side entrance and ask for Grace.',
+        'View event:\nhttps://events.example.com/events/boston/ai-build-night',
+      ].join('\n\n'),
     });
   });
 
@@ -154,6 +185,8 @@ describe('event decision notifications', () => {
         'Your application for “Boston AI Build Night” has been waitlisted.'
       ),
     });
+    expect(sendEmail.mock.calls[0][0].text).not.toContain('42 Private Lane');
+    expect(sendSms.mock.calls[0][0].body).not.toContain('42 Private Lane');
   });
 
   it('honors the master notification preference', async () => {

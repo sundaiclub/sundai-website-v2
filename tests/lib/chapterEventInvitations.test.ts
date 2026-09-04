@@ -26,7 +26,7 @@ describe('chapter event invitation content', () => {
     expect(defaults.smsBody).toContain('Time: Saturday, September 5, 2026');
     expect(defaults.smsBody).toContain('Location: Build Lab');
     expect(defaults.smsBody).toMatch(
-      /AI <Build> Night\.\nTime:.*\nLocation: Build Lab/
+      /AI <Build> Night\.\n\nTime:.*\n\nLocation: Build Lab/
     );
   });
 

@@ -49,7 +49,7 @@ export function chapterEventInvitationDefaults(
   return {
     subject: `You're invited to ${event.title}`,
     emailBody: `Join ${event.chapter.name} for ${event.title}.\n\n${eventDetails}`,
-    smsBody: `${event.chapter.name}: You're invited to ${event.title}.\nTime: ${when}\nLocation: ${location ?? 'To be announced'}`,
+    smsBody: `${event.chapter.name}: You're invited to ${event.title}.\n\nTime: ${when}\n\nLocation: ${location ?? 'To be announced'}`,
   };
 }
 

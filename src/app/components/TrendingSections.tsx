@@ -152,7 +152,7 @@ export default function TrendingSections({
                 className="scroll-item w-80 flex-shrink-0"
               >
                 <EventSummaryCard
-                  className="h-[360px]"
+                  className="min-h-[360px]"
                   event={event}
                   eyebrow={event.chapterName}
                   href={`/events/${event.chapterSlug}/${event.slug}`}

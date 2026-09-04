@@ -307,9 +307,11 @@ describe('/chapters/[chapterSlug] public chapter page', () => {
       )
     ).toBeInTheDocument();
     expect(
-      within(demoNight).getByText('18 people applied')
-    ).toBeInTheDocument();
-    expect(within(agentJam).getByText('1 person applied')).toBeInTheDocument();
+      within(demoNight).queryByText(/people applied|person applied/)
+    ).not.toBeInTheDocument();
+    expect(
+      within(agentJam).queryByText(/people applied|person applied/)
+    ).not.toBeInTheDocument();
     expect(demoNight.closest('div.grid')).toHaveClass(
       'sm:grid-cols-2',
       'lg:grid-cols-3'
