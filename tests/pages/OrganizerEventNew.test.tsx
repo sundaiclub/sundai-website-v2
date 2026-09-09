@@ -245,7 +245,7 @@ function addCustomQuestion(label: string, type = 'TEXT', required = false) {
   changeControl(/custom question label/i, label);
   changeControl(/custom question type/i, type);
   if (required) {
-    fireEvent.click(screen.getByLabelText(/required custom question/i));
+    fireEvent.click(screen.getByLabelText(/custom question required/i));
   }
   fireEvent.click(screen.getByRole('button', { name: /add custom question/i }));
 }
@@ -448,7 +448,7 @@ describe('/organizer/events/new', () => {
     expect(screen.getAllByText(/email/i).length).toBeGreaterThan(0);
     expect(screen.getByLabelText(/custom question label/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/custom question type/i)).toBeInTheDocument();
-    expect(screen.getByRole('option', { name: /checkbox/i })).toHaveValue(
+    expect(screen.getByRole('option', { name: /^checkbox$/i })).toHaveValue(
       'CHECKBOX'
     );
     expect(
@@ -765,7 +765,11 @@ describe('/organizer/events/new', () => {
     addCustomQuestion('What do you want to build?', 'TEXTAREA', true);
     addCustomQuestion('Anything else we should know?');
 
-    expect(screen.getByText('Required')).toBeInTheDocument();
+    expect(
+      screen.getByLabelText(
+        /drag application question what do you want to build/i
+      )
+    ).toHaveTextContent('Required');
     expect(screen.getByText('Optional')).toBeInTheDocument();
 
     fireEvent.click(
@@ -816,13 +820,59 @@ describe('/organizer/events/new', () => {
     });
   });
 
+  it.each(['SELECT', 'MULTI_SELECT'])(
+    'saves a %s custom checkbox group with options',
+    async type => {
+      await renderNewEventPage();
+      fillRequiredEventFields();
+      changeControl(/custom question label/i, 'Interests');
+      changeControl(/custom question type/i, type);
+      const addButton = screen.getByRole('button', {
+        name: /add custom question/i,
+      });
+      expect(addButton).toBeDisabled();
+      changeControl(/custom question options/i, 'Design\nDesign');
+      expect(addButton).toBeDisabled();
+      expect(
+        screen.getByText('Each option must be unique.')
+      ).toBeInTheDocument();
+      changeControl(/custom question options/i, ' Design \n\nCode');
+      fireEvent.click(addButton);
+      expect(
+        screen.getByLabelText(/drag application question interests/i)
+      ).toHaveTextContent(
+        type === 'SELECT'
+          ? 'Checkbox group — select one'
+          : 'Checkbox group — select multiple'
+      );
+      expect(
+        screen.queryByLabelText(/custom question options/i)
+      ).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: /save draft/i }));
+      await waitFor(() => {
+        expect(latestFetchBody().applicationQuestionsJson).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({
+              label: 'Interests',
+              type,
+              options: [
+                { label: 'Design', value: 'Design' },
+                { label: 'Code', value: 'Code' },
+              ],
+            }),
+          ])
+        );
+      });
+    }
+  );
+
   it('lets custom questions opt into reusing a previous answer', async () => {
     await renderNewEventPage();
 
     fillRequiredEventFields();
     changeControl(/custom question label/i, 'What do you want to build?');
     fireEvent.click(
-      screen.getByLabelText(/reuse previous answer for custom question/i)
+      screen.getByLabelText(/custom question reuse previous answer/i)
     );
     fireEvent.click(
       screen.getByRole('button', { name: /add custom question/i })

@@ -1,5 +1,11 @@
 'use client';
 
+import { ApplicationQuestionEditor } from '../../components/ApplicationQuestionEditor';
+import {
+  applicationQuestionTypeLabel,
+  applicationQuestionOptionsError,
+} from '@/lib/applicationTemplates';
+
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -103,10 +109,6 @@ function uniqueFields(fields: TemplateFieldDefinition[]) {
     seen.add(field.id);
     return true;
   });
-}
-
-function applicationQuestionTypeLabel(type: TemplateFieldDefinition['type']) {
-  return type === 'CHECKBOX' ? 'Checkbox' : type;
 }
 
 function formatClock(value: string) {
@@ -215,12 +217,22 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
   const [isCoMcModalOpen, setIsCoMcModalOpen] = useState(false);
   const [mcSearchTerm, setMcSearchTerm] = useState('');
   const [coMcSearchTerm, setCoMcSearchTerm] = useState('');
-  const [questionLabel, setQuestionLabel] = useState('');
-  const [questionType, setQuestionType] =
-    useState<TemplateFieldDefinition['type']>('TEXT');
-  const [questionRequired, setQuestionRequired] = useState(false);
-  const [questionReusePreviousAnswer, setQuestionReusePreviousAnswer] =
-    useState(false);
+  const [questionDraft, setQuestionDraft] = useState<TemplateFieldDefinition>({
+    id: 'custom-question',
+    label: '',
+    type: 'TEXT',
+    required: false,
+  });
+  const questionOptionsError = applicationQuestionOptionsError(questionDraft);
+  const hasQuestionDraft = Boolean(
+    questionDraft.label.trim() ||
+      questionDraft.type !== 'TEXT' ||
+      questionDraft.required ||
+      questionDraft.reusePreviousAnswer ||
+      questionDraft.placeholder?.trim() ||
+      questionDraft.helpText?.trim() ||
+      questionDraft.options?.length
+  );
   const [customQuestions, setCustomQuestions] = useState<
     TemplateFieldDefinition[]
   >([]);
@@ -672,11 +684,12 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
     setDraggedQuestionId(null);
   }
 
-  function addCustomQuestion() {
-    const label = questionLabel.trim();
-    if (!label) return;
+  function buildCustomQuestion(): TemplateFieldDefinition | null {
+    const label = questionDraft.label.trim();
+    if (!label || questionOptionsError) return null;
 
     const existingIds = new Set([
+      ...siteRequiredFields.map(field => field.id),
       ...selectedChapterTemplateFields.map(field => field.id),
       ...customQuestions.map(field => field.id),
     ]);
@@ -688,21 +701,22 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
       suffix += 1;
     }
 
-    const field: TemplateFieldDefinition = {
-      id,
-      label,
-      type: questionType,
-      required: questionRequired,
-      reusePreviousAnswer: questionReusePreviousAnswer,
-    };
-    setCustomQuestions(current => [...current, field]);
-    setQuestionLabel('');
-    setQuestionType('TEXT');
-    setQuestionRequired(false);
-    setQuestionReusePreviousAnswer(false);
+    return { ...questionDraft, id, label };
   }
 
-  function buildEventPayload() {
+  function addCustomQuestion() {
+    const field = buildCustomQuestion();
+    if (!field) return;
+    setCustomQuestions(current => [...current, field]);
+    setQuestionDraft({
+      id: 'custom-question',
+      label: '',
+      type: 'TEXT',
+      required: false,
+    });
+  }
+
+  function buildEventPayload(draftQuestion = buildCustomQuestion()) {
     const staff = [
       ...selectedMcs.map(staffMember => ({
         hackerId: staffMember.id,
@@ -713,12 +727,13 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
         role: 'CO_MC' as const,
       })),
     ];
-    const applicationQuestionsJson = orderedApplicationQuestions.map(
-      (field, index) => ({
-        ...field,
-        order: index,
-      })
-    );
+    const applicationQuestionsJson = [
+      ...orderedApplicationQuestions,
+      ...(draftQuestion ? [draftQuestion] : []),
+    ].map((field, index) => ({
+      ...field,
+      order: index,
+    }));
 
     return {
       chapterId,
@@ -773,7 +788,8 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
   const hasUnsavedChanges = Boolean(
     isEditing &&
       savedSettingsFingerprint &&
-      currentSettingsFingerprint !== savedSettingsFingerprint
+      (hasQuestionDraft ||
+        currentSettingsFingerprint !== savedSettingsFingerprint)
   );
 
   useEffect(() => {
@@ -790,9 +806,23 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
   async function saveEvent(shouldPublish: boolean) {
     setMessage('');
     setSavedEventId(null);
+    if (
+      hasQuestionDraft &&
+      (!questionDraft.label.trim() || questionOptionsError)
+    ) {
+      setMessage(
+        `Unable to save event settings. ${
+          !questionDraft.label.trim()
+            ? 'Enter a label for the custom question.'
+            : questionOptionsError
+        }`
+      );
+      return;
+    }
     setSavingAction(shouldPublish ? 'publish' : 'draft');
     try {
-      const eventPayload = buildEventPayload();
+      const draftQuestion = buildCustomQuestion();
+      const eventPayload = buildEventPayload(draftQuestion);
       const savedFingerprint = settingsFingerprint(eventPayload, null);
       const response = await fetch(
         isEditing ? `/api/events/${eventId}` : '/api/events',
@@ -820,6 +850,19 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
       }
 
       const savedEvent = await response.json().catch(() => null);
+      if (draftQuestion) {
+        setCustomQuestions(current => [...current, draftQuestion]);
+        setQuestionDraft(current =>
+          current === questionDraft
+            ? {
+                id: 'custom-question',
+                label: '',
+                type: 'TEXT',
+                required: false,
+              }
+            : current
+        );
+      }
       if (eventImageFile && savedEvent?.id) {
         const imageFormData = new FormData();
         imageFormData.append('image', eventImageFile);
@@ -1524,69 +1567,20 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
                 )}
               </div>
             </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <label className="grid gap-2">
-                <span className="text-sm font-semibold">
-                  Custom question label
-                </span>
-                <input
-                  aria-label="Custom question label"
-                  className={classes.input}
-                  onChange={event => setQuestionLabel(event.target.value)}
-                  value={questionLabel}
-                />
-              </label>
-              <label className="grid gap-2">
-                <span className="text-sm font-semibold">
-                  Custom question type
-                </span>
-                <select
-                  aria-label="Custom question type"
-                  className={classes.input}
-                  onChange={event =>
-                    setQuestionType(
-                      event.target.value as TemplateFieldDefinition['type']
-                    )
-                  }
-                  value={questionType}
-                >
-                  <option value="TEXT">TEXT</option>
-                  <option value="TEXTAREA">TEXTAREA</option>
-                  <option value="EMAIL">EMAIL</option>
-                  <option value="URL">URL</option>
-                  <option value="CHECKBOX">Checkbox</option>
-                </select>
-              </label>
-              <label className="flex items-center gap-2">
-                <input
-                  aria-label="Required custom question"
-                  checked={questionRequired}
-                  className={classes.checkbox}
-                  onChange={event => setQuestionRequired(event.target.checked)}
-                  type="checkbox"
-                />
-                <span className="text-sm font-semibold">
-                  Required custom question
-                </span>
-              </label>
-              <label className="flex items-center gap-2">
-                <input
-                  aria-label="Reuse previous answer for custom question"
-                  checked={questionReusePreviousAnswer}
-                  className={classes.checkbox}
-                  onChange={event =>
-                    setQuestionReusePreviousAnswer(event.target.checked)
-                  }
-                  type="checkbox"
-                />
-                <span className="text-sm font-semibold">
-                  Reuse answer from a previous application
-                </span>
-              </label>
+            <div className="grid gap-4">
+              <ApplicationQuestionEditor
+                field={questionDraft}
+                labelPrefix="Custom question"
+                onChange={updates =>
+                  setQuestionDraft(current => ({ ...current, ...updates }))
+                }
+              />
               <div className="sm:col-span-2">
                 <button
                   className={classes.secondaryButton}
-                  disabled={!questionLabel.trim()}
+                  disabled={
+                    !questionDraft.label.trim() || Boolean(questionOptionsError)
+                  }
                   onClick={addCustomQuestion}
                   type="button"
                 >

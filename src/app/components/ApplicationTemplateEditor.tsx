@@ -3,10 +3,14 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { v4 as uuidv4 } from 'uuid';
+import { ApplicationQuestionEditor } from './ApplicationQuestionEditor';
+import {
+  TEMPLATE_FIELD_TYPES,
+  applicationQuestionOptionsError,
+} from '@/lib/applicationTemplates';
 import type {
   ApplicationTemplateListItem,
   TemplateFieldDefinition,
-  TemplateFieldOption,
   TemplateFieldType,
 } from '@/types/event-management';
 import {
@@ -15,20 +19,6 @@ import {
   useManagementClasses,
 } from './ManagementSurface';
 
-const FIELD_TYPES: TemplateFieldType[] = [
-  'TEXT',
-  'TEXTAREA',
-  'EMAIL',
-  'PHONE',
-  'URL',
-  'NUMBER',
-  'CHECKBOX',
-  'SELECT',
-  'MULTI_SELECT',
-  'DATE',
-  'DATETIME',
-];
-
 type EditableTemplate = ApplicationTemplateListItem & {
   fieldsJson?: TemplateFieldDefinition[];
 };
@@ -36,35 +26,8 @@ type EditableTemplate = ApplicationTemplateListItem & {
 function isFieldType(value: unknown): value is TemplateFieldType {
   return (
     typeof value === 'string' &&
-    FIELD_TYPES.includes(value as TemplateFieldType)
+    TEMPLATE_FIELD_TYPES.includes(value as TemplateFieldType)
   );
-}
-
-function optionText(options?: TemplateFieldOption[]) {
-  return (options ?? [])
-    .map(option => `${option.label}=${option.value}`)
-    .join('\n');
-}
-
-function parseOptions(value: string): TemplateFieldOption[] | undefined {
-  const options = value
-    .split('\n')
-    .map(line => line.trim())
-    .filter(Boolean)
-    .map(line => {
-      const separatorIndex = line.indexOf('=');
-      if (separatorIndex < 0) {
-        return { label: line, value: line };
-      }
-
-      return {
-        label: line.slice(0, separatorIndex).trim(),
-        value: line.slice(separatorIndex + 1).trim(),
-      };
-    })
-    .filter(option => option.label && option.value);
-
-  return options.length > 0 ? options : undefined;
 }
 
 function templateFields(template: EditableTemplate): TemplateFieldDefinition[] {
@@ -204,6 +167,13 @@ export function ApplicationTemplateEditor({
     event.preventDefault();
     if (!canEdit) return;
 
+    const optionsError = fields
+      .map(applicationQuestionOptionsError)
+      .find(Boolean);
+    if (optionsError) {
+      setErrorMessage(optionsError);
+      return;
+    }
     setIsSaving(true);
     setStatusMessage('');
     setErrorMessage('');
@@ -324,155 +294,18 @@ export function ApplicationTemplateEditor({
 
       <div className="mt-5 grid gap-3">
         {fields.map((field, index) => {
-          const supportsOptions =
-            field.type === 'SELECT' || field.type === 'MULTI_SELECT';
-
           return (
             <div
               key={`${field.id}-${index}`}
               className={`grid gap-3 border-t pt-4 ${classes.isDarkMode ? 'border-gray-800' : 'border-gray-200'}`}
             >
-              <div className="grid gap-3 md:grid-cols-[minmax(0,1.4fr)_minmax(0,0.8fr)]">
-                <label className="block">
-                  <span className="text-xs font-semibold uppercase tracking-wide">
-                    Label
-                  </span>
-                  <input
-                    aria-label={`${template.name} field ${index + 1} label`}
-                    className={`${classes.input} mt-1 w-full`}
-                    disabled={!canEdit}
-                    value={field.label}
-                    onChange={event =>
-                      updateField(index, { label: event.target.value })
-                    }
-                  />
-                </label>
-                <label className="block">
-                  <span className="text-xs font-semibold uppercase tracking-wide">
-                    Type
-                  </span>
-                  <select
-                    aria-label={`${template.name} field ${index + 1} type`}
-                    className={`${classes.input} mt-1 w-full`}
-                    disabled={!canEdit}
-                    value={field.type}
-                    onChange={event =>
-                      updateField(index, {
-                        type: event.target.value as TemplateFieldType,
-                        options:
-                          event.target.value === 'SELECT' ||
-                          event.target.value === 'MULTI_SELECT'
-                            ? field.options
-                            : undefined,
-                      })
-                    }
-                  >
-                    {FIELD_TYPES.map(type => (
-                      <option key={type} value={type}>
-                        {type}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-
-              <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] md:items-start">
-                <label className="block">
-                  <span className="text-xs font-semibold uppercase tracking-wide">
-                    Placeholder
-                  </span>
-                  <input
-                    aria-label={`${template.name} field ${index + 1} placeholder`}
-                    className={`${classes.input} mt-1 w-full`}
-                    disabled={!canEdit}
-                    value={field.placeholder ?? ''}
-                    onChange={event =>
-                      updateField(index, { placeholder: event.target.value })
-                    }
-                  />
-                </label>
-                <label className="block">
-                  <span className="text-xs font-semibold uppercase tracking-wide">
-                    Help text
-                  </span>
-                  <input
-                    aria-label={`${template.name} field ${index + 1} help text`}
-                    className={`${classes.input} mt-1 w-full`}
-                    disabled={!canEdit}
-                    value={field.helpText ?? ''}
-                    onChange={event =>
-                      updateField(index, { helpText: event.target.value })
-                    }
-                  />
-                </label>
-                <div className="flex flex-wrap gap-4 pt-1 md:pt-7">
-                  <label className="flex items-center gap-2 text-sm font-semibold">
-                    <input
-                      className={classes.checkbox}
-                      checked={field.required}
-                      disabled={!canEdit}
-                      type="checkbox"
-                      onChange={event =>
-                        updateField(index, { required: event.target.checked })
-                      }
-                    />
-                    Required
-                  </label>
-                  <label className="flex items-center gap-2 text-sm font-semibold">
-                    <input
-                      aria-label={`${template.name} field ${index + 1} reuse previous answer`}
-                      className={classes.checkbox}
-                      checked={field.reusePreviousAnswer === true}
-                      disabled={!canEdit}
-                      type="checkbox"
-                      onChange={event =>
-                        updateField(index, {
-                          reusePreviousAnswer: event.target.checked,
-                        })
-                      }
-                    />
-                    Reuse previous answer
-                  </label>
-                  {template.scope === 'SITE' && (
-                    <label className="flex items-center gap-2 text-sm font-semibold">
-                      <input
-                        className={classes.checkbox}
-                        checked={field.siteRequired === true}
-                        disabled={!canEdit}
-                        type="checkbox"
-                        onChange={event =>
-                          updateField(index, {
-                            siteRequired: event.target.checked,
-                            required: event.target.checked
-                              ? true
-                              : field.required,
-                          })
-                        }
-                      />
-                      Site required
-                    </label>
-                  )}
-                </div>
-              </div>
-
-              {supportsOptions && (
-                <label className="block">
-                  <span className="text-xs font-semibold uppercase tracking-wide">
-                    Options
-                  </span>
-                  <textarea
-                    aria-label={`${template.name} field ${index + 1} options`}
-                    className={`${classes.textarea} mt-1 block min-h-24 w-full`}
-                    disabled={!canEdit}
-                    value={optionText(field.options)}
-                    onChange={event =>
-                      updateField(index, {
-                        options: parseOptions(event.target.value),
-                      })
-                    }
-                  />
-                </label>
-              )}
+              <ApplicationQuestionEditor
+                field={field}
+                labelPrefix={`${template.name} field ${index + 1}`}
+                disabled={!canEdit}
+                allowSiteRequired={template.scope === 'SITE'}
+                onChange={updates => updateField(index, updates)}
+              />
 
               <div>
                 <button

@@ -13,7 +13,7 @@ import type {
   TemplateFieldType,
   TemplateFieldValidation,
 } from '@/types/event-management';
-const TEMPLATE_FIELD_TYPES: readonly TemplateFieldType[] = [
+export const TEMPLATE_FIELD_TYPES: readonly TemplateFieldType[] = [
   'TEXT',
   'TEXTAREA',
   'EMAIL',
@@ -1061,4 +1061,43 @@ function isTemplateFieldType(value: unknown): value is TemplateFieldType {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+export function applicationQuestionTypeLabel(type: TemplateFieldType): string {
+  if (type === 'SELECT') return 'Checkbox group — select one';
+  if (type === 'MULTI_SELECT') return 'Checkbox group — select multiple';
+  return type === 'CHECKBOX' ? 'Checkbox' : type;
+}
+
+export function applicationQuestionOptionsError(
+  field: TemplateFieldDefinition
+): string | null {
+  if (field.type !== 'SELECT' && field.type !== 'MULTI_SELECT') return null;
+  if (
+    !field.options?.length ||
+    field.options.some(option => !option.label.trim() || !option.value.trim())
+  ) {
+    return 'Enter at least one option with a label and value.';
+  }
+  if (
+    new Set(field.options.map(option => option.value)).size !==
+    field.options.length
+  ) {
+    return 'Each option must be unique.';
+  }
+  return null;
+}
+
+export function applicationAnswerLabel(
+  field: TemplateFieldDefinition,
+  value: JsonValue | undefined
+): string | null {
+  if (value === null || value === undefined || value === '') return null;
+  const labelFor = (answer: JsonValue) =>
+    field.options?.find(option => option.value === answer)?.label ??
+    String(answer);
+  if (field.type === 'MULTI_SELECT' && Array.isArray(value))
+    return value.map(labelFor).join(', ') || null;
+  if (field.type === 'SELECT') return labelFor(value);
+  return String(value);
 }
