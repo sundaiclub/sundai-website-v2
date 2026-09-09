@@ -321,6 +321,7 @@ enum EventCommunicationStatus {
 
 enum EventCommunicationAudience {
   ACTIVE_REGISTERED
+  CHAPTER_MEMBERS
   PENDING
   APPROVED
   WAITLISTED
@@ -726,8 +727,8 @@ model EventCommunicationRecipient {
   communicationId   String
   hacker            Hacker                            @relation("EventCommunicationRecipientHacker", fields: [hackerId], references: [id])
   hackerId          String
-  registration      EventRegistration                 @relation(fields: [registrationId], references: [id])
-  registrationId    String
+  registration      EventRegistration?                @relation(fields: [registrationId], references: [id])
+  registrationId    String?
   contactValue      String
   displayName       String
   status            EventCommunicationRecipientStatus @default(PENDING)

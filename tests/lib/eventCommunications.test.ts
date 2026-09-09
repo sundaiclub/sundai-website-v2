@@ -1,5 +1,6 @@
 type AudienceType =
   | 'ACTIVE_REGISTERED'
+  | 'CHAPTER_MEMBERS'
   | 'PENDING'
   | 'APPROVED'
   | 'WAITLISTED'
@@ -20,6 +21,23 @@ type EventCommunicationsModule = {
     recipients: Array<{
       hackerId: string;
       registrationId: string;
+      contactValue: string;
+      displayName: string;
+    }>;
+    exclusions: {
+      cancelled: number;
+      missingContact: number;
+      preferenceDisabled: number;
+      ineligible: number;
+    };
+  };
+  resolveChapterMemberCommunicationAudience: (input: {
+    memberships: any[];
+    channel: 'EMAIL' | 'SMS';
+  }) => {
+    recipients: Array<{
+      hackerId: string;
+      registrationId: string | null;
       contactValue: string;
       displayName: string;
     }>;
@@ -105,6 +123,50 @@ const resolve = (
   } as any);
 
 describe('event communication audience resolution', () => {
+  it('selects active chapter members by their email preference without requiring event registration', () => {
+    const { resolveChapterMemberCommunicationAudience } =
+      loadEventCommunications();
+    const baseMembership = {
+      status: 'ACTIVE',
+      notificationsAllowed: true,
+      emailNotificationsEnabled: true,
+      smsNotificationsEnabled: false,
+      smsConsentAt: null,
+      smsConsentVersion: null,
+      hacker: {
+        id: 'hacker-member',
+        name: 'Chapter Member',
+        email: 'member@example.com',
+        phoneNumber: null,
+        isGloballyBanned: false,
+      },
+    };
+    const audience = resolveChapterMemberCommunicationAudience({
+      memberships: [
+        baseMembership,
+        {
+          ...baseMembership,
+          emailNotificationsEnabled: false,
+          hacker: {
+            ...baseMembership.hacker,
+            id: 'hacker-email-off',
+            email: 'off@example.com',
+          },
+        },
+      ],
+      channel: 'EMAIL',
+    });
+
+    expect(audience.recipients).toEqual([
+      expect.objectContaining({
+        hackerId: 'hacker-member',
+        registrationId: null,
+        contactValue: 'member@example.com',
+      }),
+    ]);
+    expect(audience.exclusions.preferenceDisabled).toBe(1);
+  });
+
   it.each([
     ['PENDING', 'PENDING'],
     ['APPROVED', 'APPROVED'],

@@ -89,7 +89,9 @@ describe('TrendingSections Component', () => {
     expect(
       screen.getByRole('link', { name: 'View Boston Build Night' })
     ).toHaveAttribute('href', '/events/boston/boston-build-night');
-    expect(screen.getByText('12 people applied')).toBeInTheDocument();
+    expect(
+      screen.queryByText(/people applied|person applied/)
+    ).not.toBeInTheDocument();
     expect(
       screen
         .getByRole('link', { name: 'View Boston Build Night' })
@@ -99,7 +101,7 @@ describe('TrendingSections Component', () => {
       screen
         .getByRole('link', { name: 'View Boston Build Night' })
         .closest('article')
-    ).toHaveClass('w-full', 'h-[360px]');
+    ).toHaveClass('w-full', 'min-h-[360px]');
     expect(
       screen.queryByRole('link', { name: 'Edit Boston Build Night' })
     ).not.toBeInTheDocument();

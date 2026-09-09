@@ -19,6 +19,7 @@ type EventEmailInput = {
   to: string;
   subject: string;
   body: string;
+  html?: string;
 };
 
 type EventSmsInput = {
@@ -30,6 +31,7 @@ type RecipientDeliveryInput = {
   channel: 'EMAIL' | 'SMS';
   subject?: string | null;
   body: string;
+  emailHtml?: string;
   recipients: Array<{ recipientId: string; contactValue: string }>;
 };
 
@@ -80,8 +82,7 @@ function environmentConfig(): EventDeliveryConfig {
     sesFromEmail: process.env.AWS_SES_FROM_EMAIL ?? null,
     twilioAccountSid: process.env.TWILIO_ACCOUNT_SID ?? null,
     twilioAuthToken: process.env.TWILIO_AUTH_TOKEN ?? null,
-    twilioMessagingServiceSid:
-      process.env.TWILIO_MESSAGING_SERVICE_SID ?? null,
+    twilioMessagingServiceSid: process.env.TWILIO_MESSAGING_SERVICE_SID ?? null,
   };
 }
 
@@ -117,7 +118,10 @@ export async function sendEventEmail(
 ): Promise<EventDeliveryResult> {
   const config = dependencies.config ?? environmentConfig();
   if (!getEventDeliveryAvailability(config).email) {
-    return failedResult('PROVIDER_UNAVAILABLE', 'Email delivery is unavailable.');
+    return failedResult(
+      'PROVIDER_UNAVAILABLE',
+      'Email delivery is unavailable.'
+    );
   }
 
   const payload = {
@@ -128,11 +132,13 @@ export async function sendEventEmail(
         Text: { Charset: 'UTF-8', Data: input.body },
         Html: {
           Charset: 'UTF-8',
-          Data: `<p>${input.body
-            .replaceAll('&', '&amp;')
-            .replaceAll('<', '&lt;')
-            .replaceAll('>', '&gt;')
-            .replaceAll('\n', '<br>')}</p>`,
+          Data:
+            input.html ??
+            `<p>${input.body
+              .replaceAll('&', '&amp;')
+              .replaceAll('<', '&lt;')
+              .replaceAll('>', '&gt;')
+              .replaceAll('\n', '<br>')}</p>`,
         },
       },
     },
@@ -140,8 +146,9 @@ export async function sendEventEmail(
   };
 
   try {
-    const result = await (dependencies.send ??
-      (value => sendWithSes(value, config)))(payload);
+    const result = await (
+      dependencies.send ?? (value => sendWithSes(value, config))
+    )(payload);
     return {
       status: 'SENT',
       providerMessageId: result.MessageId ?? null,
@@ -193,8 +200,9 @@ export async function sendEventSms(
   };
 
   try {
-    const result = await (dependencies.create ??
-      (value => sendWithTwilio(value, config)))(payload);
+    const result = await (
+      dependencies.create ?? (value => sendWithTwilio(value, config))
+    )(payload);
     return {
       status: 'SENT',
       providerMessageId: result.sid ?? null,
@@ -229,6 +237,7 @@ export async function deliverEventRecipients(
                 to: recipient.contactValue,
                 subject: input.subject ?? '',
                 body: input.body,
+                html: input.emailHtml,
               })
             : await (dependencies.sendSms ?? sendEventSms)({
                 to: recipient.contactValue,
