@@ -144,6 +144,15 @@ export async function PATCH(
         { status: 400 }
       );
     }
+    if (
+      audienceType === 'CHAPTER_MEMBERS' &&
+      access.event!.status !== 'PUBLISHED'
+    ) {
+      return NextResponse.json(
+        { error: 'Publish the event before inviting chapter members.' },
+        { status: 409 }
+      );
+    }
 
     const updated = await prisma.eventCommunication.update({
       where: { id: current.id },
@@ -153,6 +162,7 @@ export async function PATCH(
         body: String(messageBody).trim(),
         audienceType: audienceType as
           | 'ACTIVE_REGISTERED'
+          | 'CHAPTER_MEMBERS'
           | 'PENDING'
           | 'APPROVED'
           | 'WAITLISTED'

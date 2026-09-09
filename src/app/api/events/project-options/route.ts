@@ -39,13 +39,29 @@ export async function GET(request: Request) {
         ...(isSiteAdmin
           ? {}
           : {
-              registrations: {
-                some: {
-                  hackerId: hacker.id,
-                  status: 'APPROVED' as const,
-                  cancelledAt: null,
+              OR: [
+                {
+                  registrations: {
+                    some: {
+                      hackerId: hacker.id,
+                      status: 'APPROVED' as const,
+                      cancelledAt: null,
+                    },
+                  },
                 },
-              },
+                { staff: { some: { hackerId: hacker.id } } },
+                {
+                  chapter: {
+                    memberships: {
+                      some: {
+                        hackerId: hacker.id,
+                        role: 'ADMIN' as const,
+                        status: 'ACTIVE' as const,
+                      },
+                    },
+                  },
+                },
+              ],
             }),
       },
       select: {

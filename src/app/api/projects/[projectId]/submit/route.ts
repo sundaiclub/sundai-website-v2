@@ -33,6 +33,9 @@ export async function PATCH(
     const body = await req.json();
     const status = body?.status as ProjectStatus;
     const eventIds = stringIds(body?.eventIds);
+    const removedEventIds = stringIds(body?.removedEventIds).filter(
+      eventId => !eventIds.includes(eventId)
+    );
     const sourceEventId =
       typeof body?.sourceEventId === 'string' ? body.sourceEventId : null;
 
@@ -74,7 +77,10 @@ export async function PATCH(
       return new NextResponse('Unauthorized', { status: 401 });
     }
 
-    if (eventIds.length === 0 || status !== 'APPROVED') {
+    if (
+      (eventIds.length === 0 && removedEventIds.length === 0) ||
+      status !== 'APPROVED'
+    ) {
       const updatedProject = await prisma.project.update({
         where: { id: params.projectId },
         data: { status },
@@ -83,20 +89,37 @@ export async function PATCH(
       return NextResponse.json(updatedProject);
     }
 
-    const events = await prisma.event.findMany({
+    const requestedEventIds = [...eventIds, ...removedEventIds];
+    const accessibleEvents = await prisma.event.findMany({
       where: {
-        id: { in: eventIds },
+        id: { in: requestedEventIds },
         status: 'PUBLISHED',
         ...(isAdmin
           ? {}
           : {
-              registrations: {
-                some: {
-                  hackerId: currentUser.id,
-                  status: 'APPROVED',
-                  cancelledAt: null,
+              OR: [
+                {
+                  registrations: {
+                    some: {
+                      hackerId: currentUser.id,
+                      status: 'APPROVED' as const,
+                      cancelledAt: null,
+                    },
+                  },
                 },
-              },
+                { staff: { some: { hackerId: currentUser.id } } },
+                {
+                  chapter: {
+                    memberships: {
+                      some: {
+                        hackerId: currentUser.id,
+                        role: 'ADMIN' as const,
+                        status: 'ACTIVE' as const,
+                      },
+                    },
+                  },
+                },
+              ],
             }),
       },
       select: {
@@ -111,12 +134,27 @@ export async function PATCH(
       },
     });
 
-    if (events.length !== eventIds.length) {
+    if (accessibleEvents.length !== requestedEventIds.length) {
       return NextResponse.json(
         { message: 'One or more selected events are not available to you' },
         { status: 403 }
       );
     }
+
+    const events = accessibleEvents.filter(event =>
+      eventIds.includes(event.id)
+    );
+    const pitchEntriesToRemove =
+      removedEventIds.length > 0
+        ? await prisma.pitchProject.findMany({
+            where: {
+              projectId: params.projectId,
+              pitchSession: { eventId: { in: removedEventIds } },
+            },
+            select: { id: true },
+          })
+        : [];
+    const pitchEntryIdsToRemove = pitchEntriesToRemove.map(entry => entry.id);
 
     const now = new Date();
     const sourceEvent = sourceEventId
@@ -173,6 +211,22 @@ export async function PATCH(
                 ...(sourcePitch!.phase === 'PITCHING' && {
                   allottedSec: sourcePitch!.defaultPitchSec,
                 }),
+              },
+            }),
+          ]
+        : []),
+      ...(removedEventIds.length > 0
+        ? [
+            prisma.pitchProjectVote.deleteMany({
+              where: { pitchProjectId: { in: pitchEntryIdsToRemove } },
+            }),
+            prisma.pitchProject.deleteMany({
+              where: { id: { in: pitchEntryIdsToRemove } },
+            }),
+            prisma.eventProject.deleteMany({
+              where: {
+                projectId: params.projectId,
+                eventId: { in: removedEventIds },
               },
             }),
           ]

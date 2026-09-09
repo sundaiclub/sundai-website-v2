@@ -90,7 +90,7 @@ describe('Home Page', () => {
     });
   });
 
-  it('renders current user events as linked rows', async () => {
+  it('renders current user events as shared linked cards', async () => {
     await act(async () => {
       render(<Home />);
     });
@@ -99,9 +99,8 @@ describe('Home Page', () => {
       expect(
         screen.getByRole('link', { name: 'View Live Build' })
       ).toHaveAttribute('href', '/events/boston/live-build');
-      expect(
-        screen.getByText('Sundai Boston · Cambridge, MA')
-      ).toBeInTheDocument();
+      expect(screen.getByText('Sundai Boston')).toBeInTheDocument();
+      expect(screen.getByText(/^Cambridge, MA · /)).toBeInTheDocument();
       expect(screen.getByAltText('Live Build event')).toHaveAttribute(
         'src',
         '/images/logos/sundai_logo_light_horizontal.svg'

@@ -224,10 +224,17 @@ export async function GET(
       viewerIsSignedIn: Boolean(viewer),
     });
 
-    if (!viewerCanViewApprovedDetails) {
+    const pitchPhase = event.pitchSessions?.[0]?.phase ?? null;
+    const viewerCanViewPitch =
+      viewerCanViewApprovedDetails ||
+      Boolean(userId && pitchPhase && pitchPhase !== 'VOTING');
+
+    if (!viewerCanViewPitch) {
       return NextResponse.json({
         ...publicEvent,
         ...(event.meetingUrl ? { meetingUrl: event.meetingUrl } : {}),
+        canViewPitch: false,
+        pitchPhase,
       });
     }
 
@@ -275,6 +282,8 @@ export async function GET(
     return NextResponse.json({
       ...publicEvent,
       ...(event.meetingUrl ? { meetingUrl: event.meetingUrl } : {}),
+      canViewPitch: true,
+      pitchPhase,
       canManagePitch: viewerCanManagePitch,
       staff: pitchEvent?.staff ?? [],
       pitchSessions: pitchEvent?.pitchSessions ?? [],

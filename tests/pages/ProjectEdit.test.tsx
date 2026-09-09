@@ -308,7 +308,7 @@ describe('ProjectEdit', () => {
   it('shows only Publish and returns to pitch for contextual drafts', async () => {
     mockSearchParams.mockReturnValue(
       new URLSearchParams(
-        'eventId=event-1&sourceEventId=event-1&returnTo=%2Fpitch%2Fevent-1'
+        'eventId=event-1&sourceEventId=event-1&returnTo=%2Fevents%2Fboston%2Fbuild-night%3Ftab%3Dpitch'
       )
     );
     const draftProject = { ...mockProject, status: 'DRAFT' };
@@ -354,7 +354,9 @@ describe('ProjectEdit', () => {
     fireEvent.click(publishButtons[0]);
 
     await waitFor(() =>
-      expect(mockPush).toHaveBeenCalledWith('/pitch/event-1')
+      expect(mockPush).toHaveBeenCalledWith(
+        '/events/boston/build-night?tab=pitch'
+      )
     );
     const submitCall = (global.fetch as jest.Mock).mock.calls.find(
       ([url]) => url === '/api/projects/test-project-id/submit'
@@ -362,6 +364,7 @@ describe('ProjectEdit', () => {
     expect(JSON.parse(submitCall[1].body)).toEqual({
       status: 'APPROVED',
       eventIds: ['event-1'],
+      removedEventIds: [],
       sourceEventId: 'event-1',
     });
   });
@@ -436,7 +439,7 @@ describe('ProjectEdit', () => {
       name: /cambridge build night/i,
     });
     expect(existingEvent).toBeChecked();
-    expect(existingEvent).toBeDisabled();
+    expect(existingEvent).toBeEnabled();
     expect(newEvent).not.toBeChecked();
     expect(
       screen.getByRole('img', { name: 'Cambridge Build Night event' })
@@ -456,6 +459,77 @@ describe('ProjectEdit', () => {
       expect(JSON.parse(submitCall[1].body)).toEqual({
         status: 'APPROVED',
         eventIds: ['event-added', 'event-new'],
+        removedEventIds: [],
+        sourceEventId: null,
+      });
+    });
+  });
+
+  it('removes an approved project from an existing event', async () => {
+    const approvedProject = { ...mockProject, status: 'APPROVED' };
+    const fetchMock = global.fetch as jest.Mock;
+    fetchMock.mockImplementation(
+      (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = input.toString();
+        if (url === '/api/projects/test-project-id') {
+          return Promise.resolve({
+            ok: true,
+            json: async () => approvedProject,
+          });
+        }
+        if (url === '/api/events/project-options?projectId=test-project-id') {
+          return Promise.resolve({
+            ok: true,
+            json: async () => [
+              {
+                id: 'event-added',
+                title: 'Boston Build Night',
+                chapterName: 'Sundai Boston',
+                image: null,
+                alreadyAdded: true,
+                selectedByDefault: true,
+              },
+            ],
+          });
+        }
+        if (
+          url === '/api/projects/test-project-id/edit' ||
+          (url === '/api/projects/test-project-id/submit' &&
+            init?.method === 'PATCH')
+        ) {
+          return Promise.resolve({
+            ok: true,
+            json: async () => approvedProject,
+          });
+        }
+        return Promise.resolve({ ok: true, json: async () => [] });
+      }
+    );
+
+    render(
+      <ThemeProvider>
+        <ProjectEdit />
+      </ThemeProvider>
+    );
+
+    const existingEvent = await screen.findByRole('checkbox', {
+      name: /boston build night/i,
+    });
+    await userEvent.click(existingEvent);
+    await userEvent.click(
+      screen.getAllByRole('button', { name: 'Save Changes' })[0]
+    );
+
+    await waitFor(() => {
+      const submitCall = fetchMock.mock.calls.find(
+        ([url, options]) =>
+          url === '/api/projects/test-project-id/submit' &&
+          options?.method === 'PATCH'
+      );
+      expect(JSON.parse(submitCall[1].body)).toEqual({
+        status: 'APPROVED',
+        eventIds: [],
+        removedEventIds: ['event-added'],
         sourceEventId: null,
       });
     });

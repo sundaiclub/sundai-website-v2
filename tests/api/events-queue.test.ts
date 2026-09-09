@@ -45,6 +45,7 @@ describe('queue endpoints', () => {
       status: 'APPROVED',
     });
     prisma.eventStaff.findFirst.mockResolvedValue(null);
+    prisma.pitchProject.findMany.mockResolvedValue([]);
     prisma.pitchSession.findFirst.mockResolvedValue({
       id: 'ps1',
       eventId: 'e1',
@@ -106,6 +107,80 @@ describe('queue endpoints', () => {
       message: 'You must be part of this event to add a project',
     });
     expect(prisma.eventProject.upsert).not.toHaveBeenCalled();
+    expect(prisma.pitchProject.create).not.toHaveBeenCalled();
+  });
+
+  it('allows an active chapter admin to join the queue', async () => {
+    mockAuth.mockReturnValue({ userId: 'clerk-admin' });
+    prisma.hacker.findUnique.mockResolvedValue({
+      id: 'chapter-admin',
+      role: 'HACKER',
+    });
+    prisma.eventRegistration.findFirst.mockResolvedValue(null);
+    prisma.chapterMembership.findFirst.mockResolvedValue({
+      id: 'membership-1',
+    });
+    prisma.project.findUnique.mockResolvedValue({
+      id: 'p1',
+      launchLeadId: 'chapter-admin',
+      participants: [],
+    });
+    prisma.pitchProject.findUnique.mockResolvedValue(null);
+    prisma.pitchProject.findFirst.mockResolvedValue(null);
+    prisma.pitchProject.create.mockResolvedValue({ id: 'pitch-project-1' });
+
+    const request = new NextRequest(
+      'http://localhost:3000/api/events/e1/pitch/queue',
+      { method: 'POST' }
+    );
+    request.json = jest.fn().mockResolvedValue({ projectId: 'p1' });
+
+    const response = await POST_JOIN(
+      request as any,
+      {
+        params: { eventId: 'e1' },
+      } as any
+    );
+
+    expect(response.status).toBe(200);
+    expect(prisma.pitchProject.create).toHaveBeenCalled();
+  });
+
+  it('requires confirmation before adding a project queued in another active event', async () => {
+    mockAuth.mockReturnValue({ userId: 'clerk-1' });
+    prisma.hacker.findUnique.mockResolvedValue({ id: 'h1', role: 'HACKER' });
+    prisma.project.findUnique.mockResolvedValue({
+      id: 'p1',
+      launchLeadId: 'h1',
+      participants: [],
+    });
+    prisma.pitchProject.findMany.mockResolvedValue([
+      {
+        pitchSession: {
+          event: { id: 'event-2', title: 'Cambridge Build Night' },
+        },
+      },
+    ]);
+
+    const request = new NextRequest(
+      'http://localhost:3000/api/events/e1/pitch/queue',
+      { method: 'POST' }
+    );
+    request.json = jest.fn().mockResolvedValue({ projectId: 'p1' });
+
+    const response = await POST_JOIN(
+      request as any,
+      {
+        params: { eventId: 'e1' },
+      } as any
+    );
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({
+      code: 'ACTIVE_EVENT_CONFLICT',
+      message: 'This project is already queued in another active event',
+      events: [{ id: 'event-2', title: 'Cambridge Build Night' }],
+    });
     expect(prisma.pitchProject.create).not.toHaveBeenCalled();
   });
 
