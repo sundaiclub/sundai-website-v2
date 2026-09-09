@@ -124,3 +124,50 @@ describe('ApplicationTemplateEditor', () => {
     );
   });
 });
+
+it.each([
+  ['SELECT', 'Checkbox group — select one'],
+  ['MULTI_SELECT', 'Checkbox group — select multiple'],
+])('saves %s choice fields with their options', async (type, label) => {
+  global.fetch = jest
+    .fn()
+    .mockResolvedValue({ ok: true, json: async () => ({ id: 'choices' }) });
+  render(
+    <ApplicationTemplateEditor
+      template={{
+        id: 'choices',
+        name: 'Choices',
+        scope: 'CHAPTER',
+        isActive: true,
+        fieldsJson: [
+          {
+            id: 'interests',
+            label: 'Interests',
+            type: 'TEXT',
+            required: false,
+          },
+        ],
+      }}
+    />
+  );
+  fireEvent.change(screen.getByLabelText('Choices field 1 type'), {
+    target: { value: type },
+  });
+  expect(screen.getByRole('option', { name: label })).toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText('Choices field 1 options'), {
+    target: { value: 'Design=design\nCode=code' },
+  });
+  fireEvent.click(screen.getByRole('button', { name: /save template/i }));
+  await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(1));
+  expect(
+    JSON.parse((global.fetch as jest.Mock).mock.calls[0][1].body).fieldsJson[0]
+  ).toEqual(
+    expect.objectContaining({
+      type,
+      options: [
+        { label: 'Design', value: 'design' },
+        { label: 'Code', value: 'code' },
+      ],
+    })
+  );
+});

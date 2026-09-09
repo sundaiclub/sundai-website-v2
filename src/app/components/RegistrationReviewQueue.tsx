@@ -11,6 +11,7 @@ import {
   ManagementEmptyState,
   useManagementClasses,
 } from './ManagementSurface';
+import { applicationAnswerLabel } from '@/lib/applicationTemplates';
 import { normalizeHttpsUrl } from '@/lib/httpsUrls';
 
 const REVIEW_STATUSES: RegistrationStatus[] = [
@@ -27,8 +28,7 @@ function answerLabel(
   row: OrganizerRegistrationReviewRow
 ) {
   const value = row.answersJson?.[field.id];
-  if (value === null || value === undefined || value === '') return null;
-  return String(value);
+  return applicationAnswerLabel(field, value);
 }
 
 export function RegistrationReviewTabs({

@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { ApplicationFieldInput } from './ApplicationFieldInput';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import {
@@ -32,14 +33,6 @@ import {
 function jsonObject(value: JsonValue | null | undefined): JsonObject {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
   return value;
-}
-
-function fieldValueToString(value: JsonValue | undefined) {
-  if (value === null || value === undefined) return '';
-  if (typeof value === 'string') return value;
-  if (typeof value === 'number' || typeof value === 'boolean')
-    return String(value);
-  return '';
 }
 
 function formatSubmittedAt(value?: string | Date | null) {
@@ -80,114 +73,6 @@ function initialAnswers(input: {
   }
 
   return answers;
-}
-
-function inputTypeFor(field: TemplateFieldDefinition) {
-  if (field.type === 'EMAIL') return 'email';
-  if (field.type === 'PHONE') return 'tel';
-  if (field.type === 'NUMBER') return 'number';
-  if (field.type === 'DATE') return 'date';
-  if (field.type === 'DATETIME') return 'datetime-local';
-  return 'text';
-}
-
-function normalizeSubmissionValue(
-  field: TemplateFieldDefinition,
-  value: string
-): JsonValue {
-  if (field.type === 'NUMBER') {
-    return value.trim() ? Number(value) : null;
-  }
-
-  return value;
-}
-
-function FieldInput({
-  field,
-  value,
-  error,
-  onChange,
-}: {
-  field: TemplateFieldDefinition;
-  value: JsonValue | undefined;
-  error?: string;
-  onChange: (value: JsonValue) => void;
-}) {
-  const classes = useManagementClasses();
-  const inputId = `application-${field.id}`;
-  const stringValue = fieldValueToString(value);
-
-  if (field.type === 'CHECKBOX') {
-    return (
-      <div className="grid gap-2">
-        <label className="flex items-start gap-3" htmlFor={inputId}>
-          <input
-            checked={value === true}
-            className={`${classes.checkbox} mt-1`}
-            id={inputId}
-            onChange={event => onChange(event.target.checked)}
-            type="checkbox"
-          />
-          <span className="text-sm font-semibold">
-            {field.label}
-            {field.required && <span aria-hidden="true"> *</span>}
-          </span>
-        </label>
-        {field.helpText && (
-          <p className={`text-xs ${classes.mutedText}`}>{field.helpText}</p>
-        )}
-        {error && <p className="text-sm text-red-600">{error}</p>}
-      </div>
-    );
-  }
-
-  return (
-    <div className="grid gap-2">
-      <label className="text-sm font-semibold" htmlFor={inputId}>
-        {field.label}
-        {field.required && <span aria-hidden="true"> *</span>}
-      </label>
-      {field.type === 'TEXTAREA' ? (
-        <textarea
-          className={classes.textarea}
-          id={inputId}
-          onChange={event => onChange(event.target.value)}
-          placeholder={field.placeholder ?? undefined}
-          value={stringValue}
-        />
-      ) : field.type === 'SELECT' ? (
-        <select
-          className={classes.input}
-          id={inputId}
-          onChange={event => onChange(event.target.value)}
-          value={stringValue}
-        >
-          <option value="">Select an option</option>
-          {(field.options ?? []).map(option => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-      ) : (
-        <input
-          className={classes.input}
-          id={inputId}
-          inputMode={field.type === 'URL' ? 'url' : undefined}
-          onChange={event =>
-            onChange(normalizeSubmissionValue(field, event.target.value))
-          }
-          placeholder={field.placeholder ?? undefined}
-          type={inputTypeFor(field)}
-          value={stringValue}
-        />
-      )}
-      {field.helpText && (
-        <p className={`text-xs ${classes.mutedText}`}>{field.helpText}</p>
-      )}
-      {error && <p className="text-sm text-red-600">{error}</p>}
-    </div>
-  );
 }
 
 export function EventApplicationForm({
@@ -405,7 +290,7 @@ export function EventApplicationForm({
         >
           {fields.map(field => (
             <div className="grid gap-3" key={field.id}>
-              <FieldInput
+              <ApplicationFieldInput
                 error={fieldErrors[field.id]}
                 field={field}
                 onChange={value => updateAnswer(field, value)}

@@ -201,6 +201,114 @@ describe('/organizer/events/[eventId]/settings', () => {
     mockEventFetch();
   });
 
+  it.each(['SELECT', 'MULTI_SELECT'])(
+    'adds and saves a %s choice group from event settings',
+    async type => {
+      renderSettingsPage();
+      const label = await screen.findByLabelText('Custom question label');
+      fireEvent.change(label, { target: { value: 'Interests' } });
+      fireEvent.change(screen.getByLabelText('Custom question type'), {
+        target: { value: type },
+      });
+      fireEvent.change(screen.getByLabelText('Custom question options'), {
+        target: { value: 'Design=design\nCode=code' },
+      });
+      fireEvent.click(
+        screen.getByRole('button', { name: /add custom question/i })
+      );
+      fireEvent.click(topSaveSettingsButton()!);
+      await waitFor(() =>
+        expect(patchBodyForEvent()?.applicationQuestionsJson).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({
+              label: 'Interests',
+              type,
+              options: [
+                { label: 'Design', value: 'design' },
+                { label: 'Code', value: 'code' },
+              ],
+            }),
+          ])
+        )
+      );
+    }
+  );
+
+  it.each(['top', 'bottom'])(
+    'saves a completed checkbox draft with the %s Save settings button',
+    async position => {
+      renderSettingsPage();
+      fireEvent.change(await screen.findByLabelText('Custom question label'), {
+        target: { value: 'Interests' },
+      });
+      fireEvent.change(screen.getByLabelText('Custom question type'), {
+        target: { value: 'MULTI_SELECT' },
+      });
+      fireEvent.change(screen.getByLabelText('Custom question options'), {
+        target: { value: 'Design\nCode' },
+      });
+      expect(screen.getByText('You have unsaved changes')).toBeInTheDocument();
+      const save = screen.getAllByRole('button', { name: /save settings/i })[
+        position === 'top' ? 0 : 1
+      ];
+      fireEvent.click(save);
+      await screen.findByText('Event settings saved');
+      expect(patchBodyForEvent()?.applicationQuestionsJson).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            label: 'Interests',
+            type: 'MULTI_SELECT',
+            options: [
+              { label: 'Design', value: 'Design' },
+              { label: 'Code', value: 'Code' },
+            ],
+          }),
+        ])
+      );
+      expect(screen.getByLabelText('Custom question label')).toHaveValue('');
+      expect(
+        screen.getByLabelText('Drag application question Interests')
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByText('You have unsaved changes')
+      ).not.toBeInTheDocument();
+      fireEvent.click(save);
+      await waitFor(() => {
+        const patches = (global.fetch as jest.Mock).mock.calls.filter(
+          ([, init]) => init?.method === 'PATCH'
+        );
+        expect(patches).toHaveLength(2);
+        expect(
+          JSON.parse(patches[1][1].body).applicationQuestionsJson.filter(
+            (field: { label: string }) => field.label === 'Interests'
+          )
+        ).toHaveLength(1);
+      });
+    }
+  );
+
+  it('blocks an incomplete checkbox draft without discarding it', async () => {
+    renderSettingsPage();
+    fireEvent.change(await screen.findByLabelText('Custom question label'), {
+      target: { value: 'Interests' },
+    });
+    fireEvent.change(screen.getByLabelText('Custom question type'), {
+      target: { value: 'MULTI_SELECT' },
+    });
+    fireEvent.click(
+      screen.getAllByRole('button', { name: /save settings/i })[1]
+    );
+    expect(
+      await screen.findByText(
+        /Unable to save event settings.*Enter at least one option/
+      )
+    ).toBeInTheDocument();
+    expect(patchBodyForEvent()).toBeNull();
+    expect(screen.getByLabelText('Custom question label')).toHaveValue(
+      'Interests'
+    );
+  });
+
   it('shows application mode, capacity, waitlist toggle state, and public status for authorized organizers', async () => {
     renderSettingsPage();
 
