@@ -909,3 +909,21 @@ enum PitchTimerPhase {
   RUNNING
   COMPLETED
 }
+
+// Draft content and a send lock only; delivery tracking is outside this feature.
+model WeeklyEmail {
+  id        String   @id @default(uuid())
+  subject   String   @db.VarChar(200)
+  body      String
+  status    WeeklyEmailStatus @default(DRAFT)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, updatedAt])
+}
+
+enum WeeklyEmailStatus {
+  DRAFT
+  SENDING
+  SENT
+}
