@@ -229,3 +229,8 @@ The CI pipeline includes:
 - Unit and integration tests
 - Build verification
 - Security audits
+
+Run `npm run check:cycles` to check runtime imports for circular dependencies.
+The `.madgerc` configuration excludes TypeScript `import type` declarations,
+which are removed during compilation. Runtime import cycles still fail this
+check.
