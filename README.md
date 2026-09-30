@@ -31,7 +31,7 @@ Reach out to @godeva or @arteml0178 on discord with any quesions.
 
 Before starting, ensure you have:
 
-- **Node.js 18+** and npm installed
+- **Node.js 24.x** and npm installed
 - **Docker Desktop** installed AND running (not just installed!)
 - **Git** for version control
 - **Clerk Account** - Sign up at [clerk.com](https://clerk.com) for authentication
@@ -42,8 +42,21 @@ Before starting, ensure you have:
 ```bash
 git clone [your-repo-url]
 cd sundai-website-v2
-npm install
+# If you use nvm, install and select the version from .nvmrc.
+nvm install
+nvm use
+npm ci
 ```
+
+Use Node.js 24.x for development, tests, and deployment. `package.json` sets
+`engines.node` to `24.x`, and `.npmrc` rejects installs with other Node.js major
+versions. All GitHub Actions jobs read the version from `package.json`.
+
+For Vercel, set **Settings → Build and Deployment → Node.js Version** to
+**24.x**. The `engines.node` value overrides that setting for new deployments.
+Deploy the change to Preview, check the app, then deploy to Production. Confirm
+Node.js 24 in the deployment build logs. Existing deployments keep their runtime
+until you deploy again. Vercel manages minor and patch updates within 24.x.
 
 ### 2. Start Docker Desktop
 
