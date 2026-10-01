@@ -143,7 +143,7 @@ export function renderWeeklyEmail(
         .join('')
     : '';
   const projectsHtml = projects.length
-    ? divider('Top projects this week') +
+    ? divider('Top projects this week', 26, '#f7b44f') +
       projects
         .map(project =>
           section(
