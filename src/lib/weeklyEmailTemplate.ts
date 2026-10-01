@@ -180,7 +180,7 @@ export function renderWeeklyEmail(
         </td></tr>
         <tr><td class="email-padding" style="padding:38px 42px 42px;background-color:#151c3f;border:1px solid #30385f;border-top:0;font-family:'Courier New',Courier,monospace;font-size:16px;line-height:1.7;color:#e5e7eb">
           <p style="margin:0 0 14px;font-size:12px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#f7b44f">// Your weekly community update</p>
-          <h1 class="email-title" style="margin:0 0 26px;color:#ffffff;font-size:40px;line-height:1.15;letter-spacing:-1px">${escape(draft.subject)}</h1>
+          <h1 class="email-title" style="margin:0 0 26px;color:#f7b44f;font-size:40px;line-height:1.15;letter-spacing:-1px">${escape(draft.subject)}</h1>
           <div style="height:2px;margin:0 0 26px;background-color:#e268a9;background-image:linear-gradient(90deg,#8fa7df,#e268a9,#f7b44f)"></div>
           <p style="margin:0 0 18px">${escape(greeting)}</p>
           ${renderEmailMarkdown(draft.body)}
