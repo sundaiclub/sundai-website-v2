@@ -35,7 +35,9 @@ it('loads saved drafts, previews Markdown, and saves the current content before 
     .mockResolvedValueOnce(
       response({ id: 'draft', subject: 'Edited', body: 'Saved message' })
     )
-    .mockResolvedValueOnce(response({ sent: 1, failed: 0, test: true }));
+    .mockResolvedValueOnce(
+      response({ queued: 1, batchIds: ['batch-1'], test: true })
+    );
   render(
     <ThemeProvider>
       <WeeklyEmailsPage />
@@ -54,7 +56,7 @@ it('loads saved drafts, previews Markdown, and saves the current content before 
   fireEvent.click(screen.getByRole('button', { name: 'preview' }));
   expect(screen.getByText('Saved message')).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Send test to myself' }));
-  await screen.findByText('Test email sent to your account email address.');
+  await screen.findByText('Test email queued for your account email address.');
   expect(fetchMock.mock.calls[1]).toEqual([
     '/api/admin/weekly-emails/draft',
     expect.objectContaining({
@@ -71,13 +73,13 @@ it('loads saved drafts, previews Markdown, and saves the current content before 
   );
 });
 
-it('clears the editor after a send and shows provider failures without a delivery history', async () => {
+it('clears the editor after queueing without claiming provider acceptance', async () => {
   fetchMock
     .mockResolvedValueOnce(response({ drafts: [] }))
     .mockResolvedValueOnce(
       response({ id: 'new', subject: 'News', body: 'Hello' })
     )
-    .mockResolvedValueOnce(response({ sent: 3, failed: 1 }));
+    .mockResolvedValueOnce(response({ queued: 4, batchIds: ['batch-1'] }));
   render(
     <ThemeProvider>
       <WeeklyEmailsPage />
@@ -95,7 +97,7 @@ it('clears the editor after a send and shows provider failures without a deliver
   );
   fireEvent.click(screen.getByRole('button', { name: 'Send', exact: true }));
   await screen.findByText(
-    'Send complete. 3 emails accepted by the email service. 1 emails could not be sent.'
+    '4 emails queued. You can close this page while they send.'
   );
   expect(screen.getByRole('textbox', { name: 'Subject' })).toHaveValue('');
 });

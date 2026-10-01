@@ -413,6 +413,18 @@ AWS credentials are loaded through the standard AWS SDK credential provider
 chain. The configured identity/domain must be verified in SES and permitted to
 send in the selected region.
 
+All application email sends use Vercel Queues and one SES delivery adapter.
+This includes event blasts, registration decisions, weekly editions, and test
+emails. Templates remain in their feature modules. The worker sends batches
+of up to 10 messages, with a shared database rate limit of one batch per second
+per SES region. The SES client reuses connections and attempts each email once.
+The request returns after queue publication; the mailing can exceed the
+worker function's 60-second allowance because each batch is a separate call.
+
+Apply the email queue migration before deploying this cutover. See
+[Email queue](docs/email-queue.md) for deployment, failure recovery, and local
+verification. No existing failed or interrupted sends are automatically replayed.
+
 Event SMS requires the complete Twilio configuration:
 
 ```bash

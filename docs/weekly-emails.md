@@ -17,10 +17,21 @@ Deploy the Prisma migration `20260917000000_weekly_emails` before using the page
 
 ## Sending behavior
 
-Sending is manual and runs in the request, with at most five concurrent email requests and a route duration of 300 seconds. The host must support that duration. Large audiences may need a durable background worker in a later change.
+Sending is manual and uses the shared [Vercel email queue](email-queue.md).
+Both full editions and self tests are queued. The response confirms queue
+publication, not email delivery. The page polls for accepted and failed counts;
+you can close it while the worker continues.
 
-An atomic draft lock prevents concurrent sends of the same edition. Once an edition has been attempted, it is removed from the draft list. The response reports provider acceptances and failures, not confirmed delivery. There are no delivery records, send history, automated retries, or scheduled jobs.
+An atomic draft lock and batch snapshot prevent concurrent sends of the same
+edition. Once queued, the edition is removed from the draft list. Each batch
+stores its rendered messages and results in Postgres. No failed or uncertain
+email send is retried. Weekly edition status becomes SENT when all batches have
+finished; use the batch results to distinguish provider acceptance from failure.
 
-If the request is interrupted during a send, the edition remains locked to prevent accidental duplicate emails. Do not reset it or resend it without first checking what the provider accepted. Recovery and delivery tracking are outside this change.
+If queue publication fails, the saved work remains pending. A site admin can
+use **Resume queued emails** on the weekly email page. This queues only batches
+that have never started and also recovers pending event and decision emails.
+An interrupted batch is marked with SEND_OUTCOME_UNKNOWN for manual review;
+check the provider before any manual resend.
 
 The shared Markdown editor is used for weekly emails, event descriptions, and project descriptions. It retains formatting controls, image upload, paste/drop support, and Markdown preview.

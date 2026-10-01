@@ -1,5 +1,5 @@
 import {
-  deliverWeeklyEmail,
+  buildWeeklyEmails,
   loadWeeklyEmailContent,
   parseWeeklyEmailDraft,
   WEEK_MS,
@@ -145,36 +145,27 @@ describe('weekly emails', () => {
     expect(html).toContain('<s>old</s>');
   });
 
-  it('sends independently to each member and continues after a provider failure', async () => {
-    const send = jest
-      .fn()
-      .mockRejectedValueOnce(new Error('SES failure'))
-      .mockResolvedValue({ status: 'SENT' });
-    expect(
-      await deliverWeeklyEmail(
-        { subject: 'News', body: 'Hello' },
-        {
-          recipients: [
-            recipient,
-            {
-              ...recipient,
-              id: 'second',
-              email: 'second@example.com',
-              name: 'Pat Smith',
-            },
-          ],
-          projects: [],
-        },
-        send
-      )
-    ).toEqual({ sent: 1, failed: 1 });
-    expect(send).toHaveBeenNthCalledWith(
-      2,
-      expect.objectContaining({
-        to: 'second@example.com',
-        html: expect.stringContaining('Hi Pat,'),
-      })
+  it('builds a separate personalized queued message for each member', () => {
+    const messages = buildWeeklyEmails(
+      { subject: 'News', body: 'Hello' },
+      {
+        recipients: [
+          recipient,
+          {
+            ...recipient,
+            id: 'second',
+            email: 'second@example.com',
+            name: 'Pat Smith',
+          },
+        ],
+        projects: [],
+      }
     );
+    expect(messages).toHaveLength(2);
+    expect(messages[1]).toMatchObject({
+      to: 'second@example.com',
+      html: expect.stringContaining('Hi Pat,'),
+    });
   });
 
   it('limits input and rejects header injection while allowing incomplete drafts', () => {

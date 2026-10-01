@@ -36,6 +36,49 @@ export default function WeeklyEmailsPage() {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [dirty, setDirty] = useState(false);
+  const [queuedSend, setQueuedSend] = useState<{
+    id: string;
+    test: boolean;
+    batches: string[];
+  } | null>(null);
+
+  useEffect(() => {
+    if (!queuedSend) return;
+    let current = true;
+    const timer = setInterval(async () => {
+      try {
+        const result = await readResponse(
+          await fetch(
+            `/api/admin/weekly-emails/${queuedSend.id}${queuedSend.test ? `?batches=${queuedSend.batches.join(',')}` : ''}`
+          )
+        );
+        if (!current) return;
+        if (result.pending) {
+          setNotice(
+            `Sending. ${result.sent} emails accepted; ${result.failed} failed.`
+          );
+        } else {
+          setQueuedSend(null);
+          if (queuedSend.test) {
+            if (result.failed)
+              setError(
+                'The test email could not be sent. Your draft is saved.'
+              );
+            else setNotice('Test email sent to your account email address.');
+          } else
+            setNotice(
+              `Send complete. ${result.sent} emails accepted; ${result.failed} failed.`
+            );
+        }
+      } catch {
+        /* Keep the saved job; the worker continues without this page. */
+      }
+    }, 3000);
+    return () => {
+      current = false;
+      clearInterval(timer);
+    };
+  }, [queuedSend]);
 
   useEffect(() => {
     if (!isAdmin) return;
@@ -106,18 +149,22 @@ export default function WeeklyEmailsPage() {
         })
       );
       if (action === 'test') {
-        if (result.failed)
-          setError('The test email could not be sent. Your draft is saved.');
-        else setNotice('Test email sent to your account email address.');
+        setNotice('Test email queued for your account email address.');
       } else {
         setDrafts(current => current.filter(item => item.id !== saved.id));
         setDraftId('');
         setSubject('');
         setBody('');
         setNotice(
-          `Send complete. ${result.sent} emails accepted by the email service.${result.failed ? ` ${result.failed} emails could not be sent.` : ''}`
+          `${result.queued} emails queued. You can close this page while they send.`
         );
       }
+      setQueuedSend({
+        id: saved.id,
+        test: action === 'test',
+        batches: result.batchIds,
+      });
+      if (result.warning) setError(result.warning);
     } catch (error) {
       setError(
         error instanceof Error
@@ -150,6 +197,37 @@ export default function WeeklyEmailsPage() {
           <ManagementAlert>Loading drafts...</ManagementAlert>
         )}
         <ManagementSection>
+          <p className={`mb-3 text-sm ${classes.mutedText}`}>
+            Emails send in the background. Resume pending work if a queue
+            request failed; emails already attempted will not be sent again.
+          </p>
+          <button
+            className={`${classes.secondaryButton} mb-5`}
+            type="button"
+            disabled={busy}
+            onClick={async () => {
+              setBusy(true);
+              try {
+                const result = await readResponse(
+                  await fetch('/api/admin/email-queue', { method: 'POST' })
+                );
+                setError('');
+                setNotice(
+                  `${result.queuedBatches} pending email batches queued.`
+                );
+              } catch (error) {
+                setError(
+                  error instanceof Error
+                    ? error.message
+                    : 'Unable to resume queued emails.'
+                );
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            Resume queued emails
+          </button>
           <fieldset
             disabled={busy || !ready}
             className="grid min-w-0 gap-5 disabled:opacity-70"
@@ -163,7 +241,9 @@ export default function WeeklyEmailsPage() {
                 onChange={event => selectDraft(event.target.value)}
               >
                 <option value="" disabled>
-                  {drafts.length === 0 ? 'No drafts right now' : 'Select a saved draft'}
+                  {drafts.length === 0
+                    ? 'No drafts right now'
+                    : 'Select a saved draft'}
                 </option>
                 {drafts.map(draft => (
                   <option key={draft.id} value={draft.id}>

@@ -1,4 +1,9 @@
 import { notifyEventDecision } from '../../src/lib/eventDecisionNotifications';
+import { enqueueEmails } from '../../src/lib/emailQueue';
+
+jest.mock('../../src/lib/emailQueue', () => ({
+  enqueueEmails: jest.fn().mockResolvedValue({ queued: 1 }),
+}));
 
 const config = {
   appUrl: 'https://events.example.com/',
@@ -44,6 +49,31 @@ const buildContext = (overrides: Record<string, unknown> = {}) => ({
 });
 
 describe('event decision notifications', () => {
+  it('queues the rendered email through the shared delivery path', async () => {
+    const result = await notifyEventDecision(
+      {
+        eventId: 'event-1',
+        registrationId: 'registration-1',
+        status: 'APPROVED',
+      },
+      {
+        config,
+        loadContext: jest.fn().mockResolvedValue(buildContext()),
+        sendSms: jest.fn().mockResolvedValue(undefined),
+      }
+    );
+
+    expect(result).toEqual({ email: 'queued', sms: 'sent' });
+    expect(enqueueEmails).toHaveBeenCalledWith([
+      expect.objectContaining({
+        to: 'ada@example.com',
+        subject: "You're approved for Boston AI Build Night",
+        body: expect.stringContaining('Bring your laptop and photo ID.'),
+        html: expect.stringContaining('42 Private Lane, Boston, MA'),
+      }),
+    ]);
+  });
+
   it('sends approval email and SMS through enabled channels', async () => {
     const sendEmail = jest.fn().mockResolvedValue(undefined);
     const sendSms = jest.fn().mockResolvedValue(undefined);

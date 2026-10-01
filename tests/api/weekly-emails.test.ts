@@ -2,10 +2,14 @@ import { createJsonRequest } from '../utils/api-auth';
 import { NextResponse } from 'next/server';
 import { requireSiteAdmin } from '@/lib/eventManagementApi';
 import prisma from '@/lib/prisma';
-import { deliverWeeklyEmail, loadWeeklyEmailContent } from '@/lib/weeklyEmails';
+import { buildWeeklyEmails, loadWeeklyEmailContent } from '@/lib/weeklyEmails';
 import { POST, PATCH } from '@/app/api/admin/weekly-emails/[emailId]/route';
 import { GET, POST as CREATE } from '@/app/api/admin/weekly-emails/route';
 
+jest.mock('@/lib/emailQueue', () => ({
+  createEmailBatches: jest.fn().mockResolvedValue(['batch-1']),
+  publishEmailBatches: jest.fn().mockResolvedValue(undefined),
+}));
 jest.mock('@/lib/eventManagementApi', () => ({ requireSiteAdmin: jest.fn() }));
 jest.mock('@/lib/eventDelivery', () => ({
   getEventDeliveryAvailability: () => ({ email: true }),
@@ -13,11 +17,12 @@ jest.mock('@/lib/eventDelivery', () => ({
 jest.mock('@/lib/weeklyEmails', () => ({
   ...jest.requireActual('@/lib/weeklyEmails'),
   loadWeeklyEmailContent: jest.fn(),
-  deliverWeeklyEmail: jest.fn(),
+  buildWeeklyEmails: jest.fn(),
 }));
 jest.mock('@/lib/prisma', () => ({
   __esModule: true,
   default: {
+    $transaction: jest.fn(),
     weeklyEmail: {
       findUnique: jest.fn(),
       findMany: jest.fn(),
@@ -50,13 +55,18 @@ describe('weekly email routes', () => {
       hacker: { id: 'admin', email: 'admin@example.com' },
       response: null,
     });
+    (prisma.$transaction as jest.Mock).mockImplementation(async operation =>
+      operation(prisma)
+    );
     db.findUnique.mockResolvedValue(draft);
     db.updateMany.mockResolvedValue({ count: 1 });
     (loadWeeklyEmailContent as jest.Mock).mockResolvedValue({
       recipients: [{ id: 'user' }],
       projects: [],
     });
-    (deliverWeeklyEmail as jest.Mock).mockResolvedValue({ sent: 1, failed: 0 });
+    (buildWeeklyEmails as jest.Mock).mockReturnValue([
+      { to: 'admin@example.com', subject: 'News', body: 'Welcome' },
+    ]);
   });
 
   it.each([401, 403])(
@@ -75,12 +85,12 @@ describe('weekly email routes', () => {
   );
 
   it('tests only the signed-in admin without claiming or consuming the draft', async () => {
-    expect((await POST(request('test'), context)).status).toBe(200);
+    expect((await POST(request('test'), context)).status).toBe(202);
     expect(loadWeeklyEmailContent).toHaveBeenCalledWith(
       expect.any(Date),
       'admin'
     );
-    expect(deliverWeeklyEmail).toHaveBeenCalledWith(
+    expect(buildWeeklyEmails).toHaveBeenCalledWith(
       expect.objectContaining({ subject: '[Test] News' }),
       expect.anything()
     );
@@ -88,22 +98,26 @@ describe('weekly email routes', () => {
     expect(db.update).not.toHaveBeenCalled();
   });
 
-  it('claims a draft before sending and does not store recipient tracking', async () => {
-    expect((await POST(request('send'), context)).status).toBe(200);
+  it('claims the draft and creates durable batches in the same transaction', async () => {
+    expect((await POST(request('send'), context)).status).toBe(202);
     expect(db.updateMany).toHaveBeenCalledWith({
       where: { id: 'draft', status: 'DRAFT', updatedAt: draft.updatedAt },
       data: { status: 'SENDING' },
     });
-    expect(db.update).toHaveBeenCalledWith({
-      where: { id: 'draft' },
-      data: { status: 'SENT' },
-    });
+    expect(db.update).not.toHaveBeenCalled();
+    expect(require('@/lib/emailQueue').createEmailBatches).toHaveBeenCalledWith(
+      prisma,
+      expect.any(Array),
+      { weeklyEmailId: 'draft' }
+    );
   });
 
   it('does not send when another request already claimed or edited the draft', async () => {
     db.updateMany.mockResolvedValue({ count: 0 });
     expect((await POST(request('send'), context)).status).toBe(409);
-    expect(deliverWeeklyEmail).not.toHaveBeenCalled();
+    expect(
+      require('@/lib/emailQueue').createEmailBatches
+    ).not.toHaveBeenCalled();
   });
 
   it('does not consume a draft when the audience is empty', async () => {
@@ -113,5 +127,13 @@ describe('weekly email routes', () => {
     });
     expect((await POST(request('send'), context)).status).toBe(400);
     expect(db.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('retains saved batches and their IDs when queue publication fails', async () => {
+    require('@/lib/emailQueue').publishEmailBatches.mockRejectedValueOnce(new Error('Queue unavailable'));
+    const response = await POST(request('send'), context);
+    expect(response.status).toBe(202);
+    expect(await response.json()).toMatchObject({ batchIds: ['batch-1'], warning: expect.stringContaining('Resume queued emails') });
+    expect(db.update).not.toHaveBeenCalled();
   });
 });

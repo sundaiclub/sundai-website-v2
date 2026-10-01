@@ -1,5 +1,4 @@
 import prisma from '@/lib/prisma';
-import { sendEventEmail } from '@/lib/eventDelivery';
 import { renderWeeklyEmail } from '@/lib/weeklyEmailTemplate';
 
 export const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
@@ -119,31 +118,13 @@ export type WeeklyEmailContent = Awaited<
   ReturnType<typeof loadWeeklyEmailContent>
 >;
 
-export async function deliverWeeklyEmail(
+export function buildWeeklyEmails(
   draft: { subject: string; body: string },
-  content: WeeklyEmailContent,
-  send = sendEventEmail
+  content: WeeklyEmailContent
 ) {
-  let sent = 0;
-  let failed = 0;
-  // Bound concurrent provider requests. Do not retry an uncertain send.
-  for (let offset = 0; offset < content.recipients.length; offset += 5) {
-    await Promise.all(
-      content.recipients.slice(offset, offset + 5).map(async recipient => {
-        try {
-          const message = renderWeeklyEmail(draft, recipient, content.projects);
-          const result = await send({
-            to: recipient.email!,
-            subject: draft.subject,
-            ...message,
-          });
-          if (result.status === 'SENT') sent += 1;
-          else failed += 1;
-        } catch {
-          failed += 1;
-        }
-      })
-    );
-  }
-  return { sent, failed };
+  return content.recipients.map(recipient => ({
+    to: recipient.email!,
+    subject: draft.subject,
+    ...renderWeeklyEmail(draft, recipient, content.projects),
+  }));
 }

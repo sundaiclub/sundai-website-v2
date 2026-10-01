@@ -715,6 +715,7 @@ model EventCommunication {
   createdAt              DateTime                      @default(now())
   updatedAt              DateTime                      @updatedAt
   recipients             EventCommunicationRecipient[]
+  emailBatches           EmailDeliveryBatch[]
 
   @@index([eventId, createdAt])
   @@index([eventId, status, createdAt])
@@ -910,14 +911,14 @@ enum PitchTimerPhase {
   COMPLETED
 }
 
-// Draft content and a send lock only; delivery tracking is outside this feature.
 model WeeklyEmail {
-  id        String   @id @default(uuid())
-  subject   String   @db.VarChar(200)
-  body      String
-  status    WeeklyEmailStatus @default(DRAFT)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id           String               @id @default(uuid())
+  subject      String               @db.VarChar(200)
+  body         String
+  status       WeeklyEmailStatus    @default(DRAFT)
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+  emailBatches EmailDeliveryBatch[]
 
   @@index([status, updatedAt])
 }
@@ -926,4 +927,38 @@ enum WeeklyEmailStatus {
   DRAFT
   SENDING
   SENT
+}
+
+model EmailDeliveryBatch {
+  id                   String                   @id @default(uuid())
+  eventCommunicationId String?
+  eventCommunication   EventCommunication?      @relation(fields: [eventCommunicationId], references: [id])
+  weeklyEmailId        String?
+  weeklyEmail          WeeklyEmail?             @relation(fields: [weeklyEmailId], references: [id])
+  messages             Json
+  status               EmailDeliveryBatchStatus @default(QUEUED)
+  claimToken           String?
+  claimedAt            DateTime?
+  publishedAt          DateTime?
+  completedAt          DateTime?
+  outcomes             Json?
+  sentCount            Int                      @default(0)
+  failedCount          Int                      @default(0)
+  createdAt            DateTime                 @default(now())
+
+  @@index([eventCommunicationId, status])
+  @@index([weeklyEmailId, status])
+  @@index([status, publishedAt])
+}
+
+enum EmailDeliveryBatchStatus {
+  QUEUED
+  PROCESSING
+  COMPLETED
+}
+
+// A shared rate limit across function instances and deployments.
+model EmailDeliveryRateLimit {
+  region          String   @id
+  nextAvailableAt DateTime @default(now())
 }

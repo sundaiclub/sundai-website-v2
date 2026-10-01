@@ -12,6 +12,8 @@ export const isPublicRoute = createRouteMatcher([
   '/api/projects(.*)',
   '/api/webhooks/clerk',
   '/api/webhooks/twilio(.*)',
+  // Vercel's queue trigger is private and has no Clerk browser session.
+  '/api/queues/email-delivery',
 ]);
 
 export default clerkMiddleware(async (auth, req) => {
