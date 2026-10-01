@@ -17,12 +17,11 @@ export function renderWeeklyEmail(
       url: publicUrl(
         `/events/${encodeURIComponent(chapter.slug)}/${encodeURIComponent(event.slug)}`
       ),
-      date:
-        new Intl.DateTimeFormat('en-US', {
-          dateStyle: 'full',
-          timeStyle: 'short',
-          timeZone: event.timezone,
-        }).format(event.startTime) + ` (${event.timezone})`,
+      date: new Intl.DateTimeFormat('en-US', {
+        dateStyle: 'full',
+        timeStyle: 'short',
+        timeZone: event.timezone,
+      }).format(event.startTime),
       status: !event.applicationsOpen
         ? 'Registration closed'
         : event.capacity !== null &&
@@ -52,7 +51,7 @@ export function renderWeeklyEmail(
           'Top projects this week',
           ...projects.map(
             project =>
-              `${project.title} — ${project._count.likes} likes this week\n${project.preview || ''}\n${projectUrl(project.id)}`
+              `${project.title}\n${project.preview || ''}\n${projectUrl(project.id)}`
           ),
         ]
       : []),
@@ -110,12 +109,12 @@ export function renderWeeklyEmail(
       '" width="576" style="display:block;width:100%;max-width:576px;height:auto;border:0;margin:12px 0">'
     );
   };
-  const divider = (title: string) =>
-    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:40px;border-top:1px solid #596184"><tr><td style="padding:24px 0 0"><h2 style="margin:0;font-family:'Courier New',Courier,monospace;font-size:26px;line-height:1.3;color:#ffffff">${escape(title)}</h2></td></tr></table>`;
+  const divider = (title: string, fontSize = 26, color = '#ffffff') =>
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:40px;border-top:1px solid #596184"><tr><td style="padding:24px 0 0"><h2 style="margin:0;font-family:'Courier New',Courier,monospace;font-size:${fontSize}px;line-height:1.3;color:${color}">${escape(title)}</h2></td></tr></table>`;
   const button = (url: string, label: string) =>
     `<table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin-top:24px"><tr><td align="center" bgcolor="#f7b44f" style="border:2px solid #08090d"><a href="${escape(url)}" style="display:inline-block;padding:15px 24px;color:#151c3f;font-family:'Courier New',Courier,monospace;font-size:15px;font-weight:700;letter-spacing:.5px;text-decoration:none">${escape(label)}</a></td></tr></table>`;
   const eventsHtml = upcoming.length
-    ? divider('Your next events') +
+    ? divider('Your next events', 32, '#f7b44f') +
       chapters
         .map(chapter => {
           const events = upcoming.filter(
@@ -151,7 +150,6 @@ export function renderWeeklyEmail(
             `<h3 style="margin:0 0 18px;font-size:24px;line-height:1.3">${link(projectUrl(project.id), project.title)}</h3>
     ${cardImage(project.thumbnail, project.title, '/images/default_project_thumbnail_email.png')}
     ${project.preview ? renderEmailMarkdown(project.preview) : ''}
-    <p style="margin:12px 0;color:#9ca3af;font-size:14px">${project._count.likes} likes this week</p>
     ${button(projectUrl(project.id), 'VIEW PROJECT →')}`
           )
         )
@@ -177,20 +175,10 @@ export function renderWeeklyEmail(
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="width:100%;background-color:#08090d">
     <tr><td align="center" style="padding:0 12px 40px">
       <table role="presentation" class="email-shell" width="640" cellspacing="0" cellpadding="0" border="0" style="width:640px;max-width:640px">
-        <tr>
-          <td style="height:8px;background-color:#8fa7df"></td>
-          <td style="height:8px;background-color:#b48bca"></td>
-          <td style="height:8px;background-color:#e268a9"></td>
-          <td style="height:8px;background-color:#f58b76"></td>
-          <td style="height:8px;background-color:#f7b44f"></td>
-        </tr>
-        <tr><td colspan="5" class="email-padding" style="padding:26px 32px 22px;background-color:#08090d">
-          <a href="${escape(publicUrl('/'))}" style="font-family:'Courier New',Courier,monospace;font-size:18px;font-weight:700;letter-spacing:2px;color:#ffffff;text-decoration:none">Sundai Club</a>
+        <tr><td class="email-padding" style="padding:24px 32px;background-color:#000000;border:1px solid #25283a;border-bottom:0">
+          <img src="${escape(publicUrl('/images/sundai-weekly-email-banner.png'))}" width="574" alt="Sundai Club" style="display:block;width:100%;max-width:574px;height:auto;border:0">
         </td></tr>
-        <tr><td colspan="5" style="background-color:#000000;border:1px solid #25283a;border-bottom:0">
-          <img src="${escape(publicUrl('/images/sundai-social-card.png'))}" width="638" alt="Sundai Club" style="display:block;width:100%;max-width:638px;height:auto;border:0">
-        </td></tr>
-        <tr><td colspan="5" class="email-padding" style="padding:38px 42px 42px;background-color:#151c3f;border:1px solid #30385f;border-top:0;font-family:'Courier New',Courier,monospace;font-size:16px;line-height:1.7;color:#e5e7eb">
+        <tr><td class="email-padding" style="padding:38px 42px 42px;background-color:#151c3f;border:1px solid #30385f;border-top:0;font-family:'Courier New',Courier,monospace;font-size:16px;line-height:1.7;color:#e5e7eb">
           <p style="margin:0 0 14px;font-size:12px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#f7b44f">// Your weekly community update</p>
           <h1 class="email-title" style="margin:0 0 26px;color:#ffffff;font-size:40px;line-height:1.15;letter-spacing:-1px">${escape(draft.subject)}</h1>
           <div style="height:2px;margin:0 0 26px;background-color:#e268a9;background-image:linear-gradient(90deg,#8fa7df,#e268a9,#f7b44f)"></div>
@@ -199,11 +187,11 @@ export function renderWeeklyEmail(
           ${eventsHtml}
           ${projectsHtml}
         </td></tr>
-        <tr><td colspan="5" class="email-padding" style="padding:24px 32px;background-color:#0e1020;border:1px solid #25283a;border-top:0;font-family:'Courier New',Courier,monospace;font-size:11px;line-height:1.7;color:#9ca3af">
+        <tr><td class="email-padding" style="padding:24px 32px;background-color:#0e1020;border:1px solid #25283a;border-top:0;font-family:'Courier New',Courier,monospace;font-size:11px;line-height:1.7;color:#9ca3af">
           <p style="margin:0 0 10px">You received this email because you enabled chapter email notifications. Manage your preferences or unsubscribe:</p>
           ${chapters.map(chapter => '<p style="margin:0 0 8px">' + link(preferencesUrl(chapter.slug), chapter.name) + '</p>').join('')}
         </td></tr>
-        <tr><td colspan="5" align="center" style="padding:24px 16px;color:#6b7280;font-family:'Courier New',Courier,monospace;font-size:10px;letter-spacing:1px">SUNDAI CLUB · COMMUNITY BUILDS TOGETHER</td></tr>
+        <tr><td align="center" style="padding:24px 16px;color:#6b7280;font-family:'Courier New',Courier,monospace;font-size:10px;letter-spacing:1px">SUNDAI CLUB · COMMUNITY BUILDS TOGETHER</td></tr>
       </table>
     </td></tr>
   </table>
