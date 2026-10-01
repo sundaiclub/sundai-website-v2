@@ -33,7 +33,9 @@ export function renderWeeklyEmail(
   const projectUrl = (id: string) =>
     publicUrl(`/projects/${encodeURIComponent(id)}`);
   const preferencesUrl = (slug: string) =>
-    publicUrl(`/chapters/${encodeURIComponent(slug)}#notification-preferences`);
+    publicUrl(
+      `/chapters/${encodeURIComponent(slug)}?tab=preferences#notification-preferences`
+    );
   const body = [
     greeting,
     draft.body,
@@ -191,7 +193,6 @@ export function renderWeeklyEmail(
           <p style="margin:0 0 10px">You received this email because you enabled chapter email notifications. Manage your preferences or unsubscribe:</p>
           ${chapters.map(chapter => '<p style="margin:0 0 8px">' + link(preferencesUrl(chapter.slug), chapter.name) + '</p>').join('')}
         </td></tr>
-        <tr><td align="center" style="padding:24px 16px;color:#6b7280;font-family:'Courier New',Courier,monospace;font-size:10px;letter-spacing:1px">SUNDAI CLUB · COMMUNITY BUILDS TOGETHER</td></tr>
       </table>
     </td></tr>
   </table>

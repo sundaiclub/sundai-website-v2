@@ -119,6 +119,11 @@ describe('weekly emails', () => {
     expect(result.html).not.toContain('Top projects this week');
     expect(result.html).not.toContain('<strong>empty</strong>');
     expect(result.body).toContain('/events/boston/build');
+    for (const content of [result.html, result.body]) {
+      expect(content).toContain(
+        '/chapters/boston?tab=preferences#notification-preferences'
+      );
+    }
     expect(
       renderWeeklyEmail(
         { subject: 'Hi', body: 'Welcome' },
