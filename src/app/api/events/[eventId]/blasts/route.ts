@@ -60,9 +60,9 @@ export async function GET(
         where: {
           eventId: params.eventId,
           audienceType: 'CHAPTER_MEMBERS',
-          sentAt: { not: null },
+          status: { not: 'DRAFT' },
         },
-        orderBy: [{ sentAt: 'desc' }, { id: 'desc' }],
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
         select: {
           id: true,
           channel: true,

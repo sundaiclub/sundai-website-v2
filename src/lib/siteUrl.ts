@@ -6,5 +6,5 @@ export function publicUrl(pathname: string): string {
 }
 
 export const DEFAULT_SOCIAL_IMAGE_URL = publicUrl(
-  '/images/sundai-social-card.png?v=2'
+  '/images/sundai-social-card.png?v=3'
 );

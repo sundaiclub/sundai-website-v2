@@ -8,6 +8,14 @@ import {
 jest.mock('@clerk/nextjs/server', () =>
   require('../utils/api-auth').mockClerkServerModule()
 );
+jest.mock('@/lib/emailQueue', () => ({
+  createEmailBatches: jest.fn().mockResolvedValue(['batch-1']),
+  publishEmailBatches: jest.fn().mockResolvedValue(undefined),
+}));
+jest.mock('@/lib/eventDelivery', () => ({
+  ...jest.requireActual('@/lib/eventDelivery'),
+  deliverEventSmsRecipients: jest.fn(),
+}));
 
 jest.mock('../../src/lib/prisma', () => ({
   __esModule: true,
@@ -25,6 +33,10 @@ jest.mock('../../src/lib/prisma', () => ({
       findMany: jest.fn(),
       findUnique: jest.fn(),
       update: jest.fn(),
+      updateMany: jest.fn(),
+    },
+    emailDeliveryBatch: {
+      findMany: jest.fn().mockResolvedValue([{ id: 'batch-1' }]),
     },
     eventCommunicationRecipient: {
       createMany: jest.fn(),
@@ -218,7 +230,7 @@ describe('/api/events/[eventId]/blasts', () => {
       expect.objectContaining({
         where: expect.objectContaining({
           audienceType: 'CHAPTER_MEMBERS',
-          sentAt: { not: null },
+          status: { not: 'DRAFT' },
         }),
       })
     );
@@ -458,6 +470,94 @@ describe('/api/events/[eventId]/blasts', () => {
       recipientCount: 2,
       sentCount: 2,
     });
+    expect(
+      prisma.eventCommunicationRecipient.createMany
+    ).not.toHaveBeenCalled();
+  });
+
+  it('snapshots and queues an email blast without sending in the request', async () => {
+    const {
+      fingerprintEventCommunicationAudience,
+      resolveCurrentEventCommunicationAudience,
+    } = require('@/lib/eventCommunications');
+    const audience = await resolveCurrentEventCommunicationAudience({
+      eventId,
+      chapterId: 'chapter-boston',
+      audienceType: 'APPROVED',
+      audienceDefinition: {},
+      channel: 'EMAIL',
+    });
+    const previewFingerprint = fingerprintEventCommunicationAudience({
+      channel: 'EMAIL',
+      audienceType: 'APPROVED',
+      recipients: audience.recipients,
+    });
+    prisma.eventCommunication.updateMany.mockResolvedValue({ count: 1 });
+    prisma.eventCommunication.findUnique
+      .mockResolvedValueOnce(draft)
+      .mockResolvedValueOnce({
+        id: blastId,
+        recipients: [
+          { id: 'recipient-alex', contactValue: 'alex@example.com' },
+        ],
+      })
+      .mockResolvedValueOnce({
+        ...draft,
+        status: 'SENDING',
+        recipientCount: 2,
+      });
+    const { POST } = loadRoute<{ POST: Function }>(
+      '../../src/app/api/events/[eventId]/blasts/[blastId]/send/route'
+    );
+    const response = await POST(
+      createJsonRequest(`/api/events/${eventId}/blasts/${blastId}/send`, {
+        method: 'POST',
+        body: { previewFingerprint },
+      }),
+      createRouteContext({ eventId, blastId })
+    );
+    expect(response.status).toBe(202);
+    expect(await response.json()).toMatchObject({ status: 'SENDING' });
+    expect(require('@/lib/emailQueue').createEmailBatches).toHaveBeenCalledWith(
+      prisma,
+      [
+        expect.objectContaining({
+          to: 'alex@example.com',
+          eventRecipientId: 'recipient-alex',
+          subject: draft.subject,
+        }),
+      ],
+      { eventCommunicationId: blastId }
+    );
+    expect(
+      require('@/lib/emailQueue').publishEmailBatches
+    ).toHaveBeenCalledWith(['batch-1']);
+    expect(
+      require('@/lib/eventDelivery').deliverEventSmsRecipients
+    ).not.toHaveBeenCalled();
+    expect(prisma.eventCommunicationRecipient.update).not.toHaveBeenCalled();
+  });
+
+  it('requeues only never-started batches after a queue publication failure', async () => {
+    prisma.eventCommunication.findUnique.mockResolvedValue({
+      ...draft,
+      status: 'SENDING',
+    });
+    const { POST } = loadRoute<{ POST: Function }>(
+      '../../src/app/api/events/[eventId]/blasts/[blastId]/send/route'
+    );
+    const response = await POST(
+      createJsonRequest(`/api/events/${eventId}/blasts/${blastId}/send`, {
+        method: 'POST',
+      }),
+      createRouteContext({ eventId, blastId })
+    );
+    expect(response.status).toBe(202);
+    expect(prisma.emailDeliveryBatch.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { eventCommunicationId: blastId, status: 'QUEUED' },
+      })
+    );
     expect(
       prisma.eventCommunicationRecipient.createMany
     ).not.toHaveBeenCalled();

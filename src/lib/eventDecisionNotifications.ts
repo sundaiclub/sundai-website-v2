@@ -1,4 +1,5 @@
 import prisma from '@/lib/prisma';
+import { enqueueEmails } from '@/lib/emailQueue';
 import { sanitizeApprovedDetailsJson } from '@/lib/approvedEventDetails';
 import { DEFAULT_EVENT_MESSAGES } from '@/lib/eventMessageDefaults';
 import { normalizeSmsPhoneNumber } from '@/lib/phoneNumbers';
@@ -10,6 +11,7 @@ export type EventDecisionNotificationStatus =
   | 'DECLINED';
 export type EventDecisionNotificationChannelResult =
   | 'sent'
+  | 'queued'
   | 'skipped'
   | 'failed';
 
@@ -136,9 +138,10 @@ function humanizeApprovedDetailKey(key: string): string {
     .replace(/\b\w/g, character => character.toUpperCase());
 }
 
-function getApprovedDetails(
-  value: unknown
-): { address: string | null; details: Array<[string, string]> } {
+function getApprovedDetails(value: unknown): {
+  address: string | null;
+  details: Array<[string, string]>;
+} {
   const sanitized = sanitizeApprovedDetailsJson(value);
   if (!sanitized || typeof sanitized !== 'object' || Array.isArray(sanitized)) {
     return { address: null, details: [] };
@@ -300,8 +303,7 @@ function buildDecisionContent(
     WAITLISTED: DEFAULT_EVENT_MESSAGES.waitlist,
     DECLINED: DEFAULT_EVENT_MESSAGES.decline,
   }[status];
-  const configuredMessage =
-    context.publicSafeMessage ?? eventMessage;
+  const configuredMessage = context.publicSafeMessage ?? eventMessage;
   const publicMessage = configuredMessage?.trim() || defaultMessage;
   const eventUrl = `${normalizeAppUrl(appUrl)}/events/${encodeURIComponent(
     context.event.chapter.slug
@@ -318,9 +320,7 @@ function buildDecisionContent(
       ? getApprovedDetails(context.event.approvedDetailsJson)
       : { address: null, details: [] };
   const approvedDetailLines = [
-    ...(approvedDetails.address
-      ? [`Address: ${approvedDetails.address}`]
-      : []),
+    ...(approvedDetails.address ? [`Address: ${approvedDetails.address}`] : []),
     ...approvedDetails.details.map(([label, value]) => `${label}: ${value}`),
   ];
   const approvedDetailsText =
@@ -408,27 +408,6 @@ async function loadContext(
   };
 }
 
-async function sendEmailWithSes(
-  notification: EmailNotification,
-  config: EventDecisionNotificationConfig
-): Promise<void> {
-  const { SendEmailCommand, SESClient } = await import('@aws-sdk/client-ses');
-  const client = new SESClient({ region: config.awsRegion! });
-  await client.send(
-    new SendEmailCommand({
-      Destination: { ToAddresses: [notification.to] },
-      Message: {
-        Subject: { Charset: 'UTF-8', Data: notification.subject },
-        Body: {
-          Text: { Charset: 'UTF-8', Data: notification.text },
-          Html: { Charset: 'UTF-8', Data: notification.html },
-        },
-      },
-      Source: config.sesFromEmail!,
-    })
-  );
-}
-
 async function sendSmsWithTwilio(
   notification: SmsNotification,
   config: EventDecisionNotificationConfig
@@ -492,7 +471,19 @@ export async function notifyEventDecision(
     ) {
       channels.push('email');
       deliveries.push(
-        (dependencies.sendEmail ?? (email => sendEmailWithSes(email, config)))({
+        (
+          dependencies.sendEmail ??
+          (async email => {
+            await enqueueEmails([
+              {
+                to: email.to,
+                subject: email.subject,
+                body: email.text,
+                html: email.html,
+              },
+            ]);
+          })
+        )({
           to: context.applicant.email,
           subject: content.subject,
           text: content.text,
@@ -523,7 +514,8 @@ export async function notifyEventDecision(
     settled.forEach((delivery, index) => {
       const channel = channels[index];
       if (delivery.status === 'fulfilled') {
-        result[channel] = 'sent';
+        result[channel] =
+          channel === 'email' && !dependencies.sendEmail ? 'queued' : 'sent';
       } else {
         result[channel] = 'failed';
         logError(

@@ -1,4 +1,5 @@
 'use client';
+import MarkdownEditor from '@/app/components/MarkdownEditor';
 
 import { ApplicationQuestionEditor } from '../../components/ApplicationQuestionEditor';
 import {
@@ -1102,26 +1103,10 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
                 value={title}
               />
             </label>
-            <label className="grid gap-2 sm:col-span-2">
-              <span className="flex flex-wrap items-baseline justify-between gap-2 text-sm font-semibold">
-                <span>Public description</span>
-                <a
-                  className={`font-normal underline ${classes.mutedText}`}
-                  href="https://www.markdownguide.org/basic-syntax/"
-                  rel="noopener noreferrer"
-                  target="_blank"
-                >
-                  Markdown supported
-                </a>
-              </span>
-              <textarea
-                aria-label="Public description"
-                className={classes.textarea}
-                onChange={event => setDescription(event.target.value)}
-                required
-                value={description}
-              />
-            </label>
+            <div className="grid gap-2 sm:col-span-2">
+              <span className="text-sm font-semibold">Public description</span>
+              <MarkdownEditor label="Public description" value={description} onChange={setDescription} required rows={8} />
+            </div>
             <div className="grid gap-2 sm:col-span-2">
               <span className="text-sm font-semibold">Event image</span>
               <div className="grid gap-4 sm:grid-cols-[minmax(0,240px)_1fr] sm:items-center">

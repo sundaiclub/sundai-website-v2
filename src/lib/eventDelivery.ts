@@ -1,5 +1,8 @@
 import type { SendEmailCommandInput } from '@aws-sdk/client-ses';
 
+const EMAIL_BATCH_SIZE = 10;
+const sesClients = new Map<string, import('@aws-sdk/client-ses').SESClient>();
+
 export type EventDeliveryConfig = {
   awsRegion: string | null;
   sesFromEmail: string | null;
@@ -28,10 +31,7 @@ type EventSmsInput = {
 };
 
 type RecipientDeliveryInput = {
-  channel: 'EMAIL' | 'SMS';
-  subject?: string | null;
   body: string;
-  emailHtml?: string;
   recipients: Array<{ recipientId: string; contactValue: string }>;
 };
 
@@ -104,7 +104,20 @@ async function sendWithSes(
   config: EventDeliveryConfig
 ) {
   const { SendEmailCommand, SESClient } = await import('@aws-sdk/client-ses');
-  const client = new SESClient({ region: config.awsRegion! });
+  const region = config.awsRegion!;
+  let client = sesClients.get(region);
+  if (!client) {
+    client = new SESClient({
+      region,
+      maxAttempts: 1,
+      requestHandler: {
+        httpsAgent: { maxSockets: EMAIL_BATCH_SIZE },
+        requestTimeout: 10_000,
+        throwOnRequestTimeout: true,
+      },
+    });
+    sesClients.set(region, client);
+  }
   const result = await client.send(new SendEmailCommand(payload));
   return result as { MessageId?: string };
 }
@@ -221,28 +234,19 @@ function twilioStatusCallbackUrl() {
   return `${base.replace(/\/$/, '')}/api/webhooks/twilio/status`;
 }
 
-export async function deliverEventRecipients(
+export async function deliverEventSmsRecipients(
   input: RecipientDeliveryInput,
   dependencies: {
-    sendEmail?: (input: EventEmailInput) => Promise<EventDeliveryResult>;
     sendSms?: (input: EventSmsInput) => Promise<EventDeliveryResult>;
   } = {}
 ): Promise<RecipientDeliveryResult[]> {
   return Promise.all(
     input.recipients.map(async recipient => {
       try {
-        const result =
-          input.channel === 'EMAIL'
-            ? await (dependencies.sendEmail ?? sendEventEmail)({
-                to: recipient.contactValue,
-                subject: input.subject ?? '',
-                body: input.body,
-                html: input.emailHtml,
-              })
-            : await (dependencies.sendSms ?? sendEventSms)({
-                to: recipient.contactValue,
-                body: input.body,
-              });
+        const result = await (dependencies.sendSms ?? sendEventSms)({
+          to: recipient.contactValue,
+          body: input.body,
+        });
         return { recipientId: recipient.recipientId, ...result };
       } catch {
         return { recipientId: recipient.recipientId, ...failedResult() };
