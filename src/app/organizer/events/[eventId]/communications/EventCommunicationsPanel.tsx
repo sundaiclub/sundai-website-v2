@@ -123,6 +123,8 @@ export default function EventCommunicationsPanel({
   const [sending, setSending] = useState(false);
   const [notice, setNotice] = useState('');
   const [detail, setDetail] = useState<CommunicationDetail | null>(null);
+  const hasPendingSend = history.some(item => item.status === 'SENDING') || detail?.status === 'SENDING';
+  const detailId = detail?.id;
 
   useEffect(() => {
     let isCurrent = true;
@@ -161,6 +163,35 @@ export default function EventCommunicationsPanel({
       isCurrent = false;
     };
   }, [eventId]);
+
+  useEffect(() => {
+    if (!hasPendingSend) return;
+    let current = true;
+    const timer = setInterval(async () => {
+      try {
+        const response = await fetch(`/api/events/${eventId}/blasts`);
+        if (!response.ok) return;
+        const payload = await response.json();
+        let updatedDetail: CommunicationDetail | undefined;
+        if (detailId) {
+          const response = await fetch(
+            `/api/events/${eventId}/blasts/${detailId}`
+          );
+          if (response.ok) updatedDetail = await response.json();
+        }
+        if (!current) return;
+        setHistory(payload.items ?? []);
+        setChapterInvitationStatus(payload.chapterInvitationStatus ?? null);
+        if (updatedDetail) setDetail(updatedDetail);
+      } catch {
+        /* Keep the last known progress until the next poll. */
+      }
+    }, 5000);
+    return () => {
+      current = false;
+      clearInterval(timer);
+    };
+  }, [eventId, hasPendingSend, detailId]);
 
   function toggleChannel(channel: EventCommunicationChannel) {
     setChannels(current =>
@@ -355,7 +386,9 @@ export default function EventCommunicationsPanel({
         return;
       }
       if (results.some(result => !result.response.ok)) {
-        setNotice('Message delivery failed. You can retry safely.');
+        setNotice(
+          'The request failed. Check communication history before sending again.'
+        );
         return;
       }
       setHistory(current => [
@@ -369,7 +402,11 @@ export default function EventCommunicationsPanel({
         )[0];
       setChapterInvitationStatus(latestResult ?? null);
       setDraftPreviews([]);
-      setNotice('Communication sent.');
+      setNotice(
+        results.some(result => result.payload.status === 'SENDING')
+          ? 'Email queued. Progress will appear in communication history.'
+          : 'Communication sent.'
+      );
     } finally {
       setSending(false);
     }
@@ -418,7 +455,7 @@ export default function EventCommunicationsPanel({
       }
       if (results.some(result => !result.response.ok)) {
         setInvitationNotice(
-          'Invitation delivery failed. You can retry safely.'
+          'The request failed. Check communication history before sending again.'
         );
         return;
       }
@@ -431,7 +468,11 @@ export default function EventCommunicationsPanel({
       setInvitationContent(null);
       setInvitationPreviews([]);
       setInvitationNotice('');
-      setNotice('Chapter invitation sent.');
+      setNotice(
+        results.some(result => result.payload.status === 'SENDING')
+          ? 'Chapter invitation queued. Progress will appear in communication history.'
+          : 'Chapter invitation sent.'
+      );
     } finally {
       setSending(false);
     }
@@ -465,7 +506,13 @@ export default function EventCommunicationsPanel({
   return (
     <div className="space-y-5">
       {notice && (
-        <ManagementAlert tone={notice.includes('sent') ? 'success' : 'danger'}>
+        <ManagementAlert
+          tone={
+            notice.includes('sent') || notice.includes('queued')
+              ? 'success'
+              : 'danger'
+          }
+        >
           <span role="status">{notice}</span>
         </ManagementAlert>
       )}
@@ -477,16 +524,19 @@ export default function EventCommunicationsPanel({
               tone={
                 chapterInvitationStatus.status === 'SENT'
                   ? 'success'
-                  : chapterInvitationStatus.status === 'PARTIAL'
+                  : chapterInvitationStatus.status === 'PARTIAL' ||
+                      chapterInvitationStatus.status === 'SENDING'
                     ? 'warning'
                     : 'danger'
               }
             >
               {chapterInvitationStatus.status === 'SENT'
                 ? 'Invitation sent'
-                : chapterInvitationStatus.status === 'PARTIAL'
-                  ? 'Partially sent'
-                  : 'Last send failed'}
+                : chapterInvitationStatus.status === 'SENDING'
+                  ? 'Invitation queued or sending'
+                  : chapterInvitationStatus.status === 'PARTIAL'
+                    ? 'Partially sent'
+                    : 'Last send failed'}
             </ManagementBadge>
             <p className={`text-sm ${classes.mutedText}`}>
               {chapterInvitationStatus.sentCount} sent ·{' '}
@@ -727,7 +777,7 @@ export default function EventCommunicationsPanel({
       {detail && (
         <ManagementSection
           title={detail.subject ?? 'SMS message details'}
-          description="Sent content, audience, and recipient outcomes are immutable."
+          description="Saved content and audience are fixed. Recipient results update while messages send."
         >
           <p className="whitespace-pre-wrap">{detail.body}</p>
           <ul className="mt-4 space-y-2">

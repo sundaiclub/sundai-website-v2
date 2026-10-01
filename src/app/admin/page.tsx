@@ -16,6 +16,7 @@ const adminSections = [
   { href: '/admin/application-templates', label: 'Application templates' },
   { href: '/admin/bans', label: 'Global moderation' },
   { href: '/admin/communications', label: 'Communications' },
+  { href: '/admin/weekly-emails', label: 'Weekly emails' },
 ];
 
 export default function AdminConsolePage() {

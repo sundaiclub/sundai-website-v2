@@ -1,5 +1,14 @@
 {
   "functions": {
+    "src/app/api/queues/email-delivery/route.ts": {
+      "experimentalTriggers": [
+        {
+          "type": "queue/v2beta",
+          "topic": "email-delivery",
+          "maxConcurrency": 1
+        }
+      ]
+    },
     "src/app/api/projects/[projectId]/share/route.ts": {
       "maxDuration": 300
     },

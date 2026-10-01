@@ -1,5 +1,12 @@
 type DeliveryModule = typeof import('../../src/lib/eventDelivery');
 
+jest.mock('@aws-sdk/client-ses', () => ({
+  SESClient: jest.fn().mockImplementation(() => ({
+    send: jest.fn().mockResolvedValue({ MessageId: 'shared-client-message' }),
+  })),
+  SendEmailCommand: jest.fn().mockImplementation(input => ({ input })),
+}));
+
 function loadDelivery(): DeliveryModule {
   try {
     return require('../../src/lib/eventDelivery') as DeliveryModule;
@@ -18,6 +25,35 @@ const configuredProviders = {
 };
 
 describe('event delivery provider adapters', () => {
+  it('reuses one SES client for concurrent sends and disables SDK retries', async () => {
+    const { sendEventEmail } = loadDelivery();
+    const { SESClient } = require('@aws-sdk/client-ses');
+    await Promise.all(
+      Array.from({ length: 20 }, (_, index) =>
+        sendEventEmail(
+          {
+            to: `member${index}@example.com`,
+            subject: 'Invite',
+            body: 'Join us.',
+          },
+          { config: configuredProviders }
+        )
+      )
+    );
+
+    expect(SESClient).toHaveBeenCalledTimes(1);
+    expect(SESClient).toHaveBeenCalledWith({
+      region: configuredProviders.awsRegion,
+      maxAttempts: 1,
+      requestHandler: {
+        httpsAgent: { maxSockets: 10 },
+        requestTimeout: 10_000,
+        throwOnRequestTimeout: true,
+      },
+    });
+    expect(SESClient.mock.results[0].value.send).toHaveBeenCalledTimes(20);
+  });
+
   it('reports SES and Twilio availability only when each provider is fully configured', () => {
     const { getEventDeliveryAvailability } = loadDelivery();
 
@@ -197,8 +233,8 @@ describe('event delivery provider adapters', () => {
   });
 
   it('records independent recipient outcomes when one provider operation fails', async () => {
-    const { deliverEventRecipients } = loadDelivery();
-    const sendEmail = jest.fn(async ({ to }: { to: string }) => {
+    const { deliverEventSmsRecipients } = loadDelivery();
+    const sendSms = jest.fn(async ({ to }: { to: string }) => {
       if (to === 'grace@example.com') {
         return {
           status: 'FAILED' as const,
@@ -215,10 +251,8 @@ describe('event delivery provider adapters', () => {
       };
     });
 
-    const outcomes = await deliverEventRecipients(
+    const outcomes = await deliverEventSmsRecipients(
       {
-        channel: 'EMAIL',
-        subject: 'Event update',
         body: 'Doors open at 9:30.',
         recipients: [
           {
@@ -235,7 +269,7 @@ describe('event delivery provider adapters', () => {
           },
         ],
       },
-      { sendEmail }
+      { sendSms }
     );
 
     expect(outcomes).toEqual([
@@ -253,6 +287,6 @@ describe('event delivery provider adapters', () => {
         status: 'SENT',
       }),
     ]);
-    expect(sendEmail).toHaveBeenCalledTimes(3);
+    expect(sendSms).toHaveBeenCalledTimes(3);
   });
 });

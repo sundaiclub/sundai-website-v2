@@ -1,6 +1,7 @@
 import { createHash } from 'crypto';
 import type { PrismaClient } from '@prisma/client';
 import prisma from '@/lib/prisma';
+import { createEmailBatches } from '@/lib/emailQueue';
 import { normalizeSmsPhoneNumber } from '@/lib/phoneNumbers';
 import { SMS_CONSENT_CONFIGURED, SMS_CONSENT_VERSION } from '@/lib/smsConsent';
 import type {
@@ -645,12 +646,14 @@ export async function snapshotEventCommunicationAudience({
   senderId,
   audience,
   previewFingerprint,
+  emailContent,
 }: {
   db?: Pick<PrismaClient, '$transaction'>;
   communicationId: string;
   senderId: string;
   audience: CommunicationAudienceResolution;
   previewFingerprint: string;
+  emailContent?: { subject: string; body: string; html?: string };
 }) {
   return db.$transaction(async tx => {
     const transitioned = await tx.eventCommunication.updateMany({
@@ -676,7 +679,7 @@ export async function snapshotEventCommunicationAudience({
         })),
       });
     }
-    return tx.eventCommunication.findUnique({
+    const snapshot = await tx.eventCommunication.findUnique({
       where: { id: communicationId },
       // Delivery needs every snapshotted recipient, but not their relations or
       // provider/audit metadata. Keep the relation projection narrow.
@@ -688,6 +691,23 @@ export async function snapshotEventCommunicationAudience({
         },
       },
     });
+    if (emailContent && snapshot) {
+      await createEmailBatches(
+        tx,
+        snapshot.recipients.map(recipient => ({
+          ...emailContent,
+          to: recipient.contactValue,
+          eventRecipientId: recipient.id,
+        })),
+        { eventCommunicationId: communicationId }
+      );
+      if (!snapshot.recipients.length)
+        await tx.eventCommunication.update({
+          where: { id: communicationId },
+          data: { status: 'SENT', sentAt: new Date() },
+        });
+    }
+    return snapshot;
   });
 }
 

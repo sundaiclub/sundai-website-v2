@@ -7,8 +7,11 @@ import {
   resolveCurrentEventCommunicationAudience,
   snapshotEventCommunicationAudience,
 } from '@/lib/eventCommunications';
-import { deliverEventRecipients } from '@/lib/eventDelivery';
+import { deliverEventSmsRecipients } from '@/lib/eventDelivery';
 import { chapterEventInvitationDelivery } from '@/lib/chapterEventInvitations';
+import { publishEmailBatches } from '@/lib/emailQueue';
+
+export const runtime = 'nodejs';
 
 export async function POST(
   request: Request,
@@ -28,7 +31,19 @@ export async function POST(
       );
     }
     if (communication.status !== 'DRAFT') {
-      return NextResponse.json(communication);
+      if (
+        communication.channel === 'EMAIL' &&
+        communication.status === 'SENDING'
+      ) {
+        const pending = await prisma.emailDeliveryBatch.findMany({
+          where: { eventCommunicationId: communication.id, status: 'QUEUED' },
+          select: { id: true },
+        });
+        await publishEmailBatches(pending.map(batch => batch.id));
+      }
+      return NextResponse.json(communication, {
+        status: communication.status === 'SENDING' ? 202 : 200,
+      });
     }
     if (
       communication.audienceType === 'CHAPTER_MEMBERS' &&
@@ -85,16 +100,6 @@ export async function POST(
       );
     }
 
-    const snapshot = await snapshotEventCommunicationAudience({
-      communicationId: communication.id,
-      senderId: access.hacker!.id,
-      audience,
-      previewFingerprint: currentFingerprint,
-    });
-    if (!snapshot) {
-      throw new Error('Communication snapshot could not be created.');
-    }
-
     let deliveryBody = communication.body;
     let emailHtml: string | undefined;
     if (communication.audienceType === 'CHAPTER_MEMBERS') {
@@ -112,11 +117,37 @@ export async function POST(
       emailHtml = invitation.html;
     }
 
-    const outcomes = await deliverEventRecipients({
-      channel: communication.channel,
-      subject: communication.subject,
+    const snapshot = await snapshotEventCommunicationAudience({
+      communicationId: communication.id,
+      senderId: access.hacker!.id,
+      audience,
+      previewFingerprint: currentFingerprint,
+      ...(communication.channel === 'EMAIL'
+        ? {
+            emailContent: {
+              subject: communication.subject ?? '',
+              body: deliveryBody,
+              html: emailHtml,
+            },
+          }
+        : {}),
+    });
+    if (!snapshot)
+      throw new Error('Communication snapshot could not be created.');
+    if (communication.channel === 'EMAIL') {
+      const batches = await prisma.emailDeliveryBatch.findMany({
+        where: { eventCommunicationId: communication.id, status: 'QUEUED' },
+        select: { id: true },
+      });
+      await publishEmailBatches(batches.map(batch => batch.id));
+      const queued = await prisma.eventCommunication.findUnique({
+        where: { id: communication.id },
+      });
+      return NextResponse.json(queued, { status: 202 });
+    }
+
+    const outcomes = await deliverEventSmsRecipients({
       body: deliveryBody,
-      emailHtml,
       recipients: snapshot.recipients.map(
         (recipient: { id: string; contactValue: string }) => ({
           recipientId: recipient.id,
