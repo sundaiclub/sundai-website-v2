@@ -8,7 +8,7 @@ import {
 function storageUnavailable(error: unknown) {
   return (
     error instanceof Error &&
-    /GOOGLE_|credential|bucket|signed url/i.test(error.message)
+    /S3_|credential|bucket|signed url|AccessDenied/i.test(error.message)
   );
 }
 

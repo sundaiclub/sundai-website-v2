@@ -360,18 +360,6 @@ jest.mock('@vercel/analytics/react', () => ({
   Analytics: () => null,
 }))
 
-// Mock Google Cloud Storage
-jest.mock('@google-cloud/storage', () => ({
-  Storage: jest.fn().mockImplementation(() => ({
-    bucket: jest.fn().mockReturnValue({
-      file: jest.fn().mockReturnValue({
-        save: jest.fn().mockResolvedValue([{}]),
-        getSignedUrl: jest.fn().mockResolvedValue(['https://example.com/image.jpg']),
-      }),
-    }),
-  })),
-}))
-
 // Mock Replicate
 jest.mock('replicate', () => ({
   Replicate: jest.fn().mockImplementation(() => ({

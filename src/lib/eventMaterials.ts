@@ -8,7 +8,7 @@ import {
   createPrivateMaterialUploadIntent,
   deletePrivateObject,
   inspectPrivateObject,
-} from '@/lib/gcp-storage';
+} from '@/lib/s3-materials';
 import { normalizeHttpsUrl } from '@/lib/httpsUrls';
 
 export const MAX_EVENT_MATERIAL_SIZE = 25 * 1024 * 1024;

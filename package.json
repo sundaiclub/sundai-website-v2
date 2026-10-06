@@ -32,14 +32,15 @@
     "fetch:sundai-boston-images": "node scripts/fetch-sundai-boston-event-images.mjs",
     "db:populate": "./scripts/populate_db.sh",
     "images:copy": "node --no-deprecation scripts/copy-images-to-s3.ts",
-    "images:migrate": "node --no-deprecation scripts/migrate-images-to-s3.ts"
+    "images:migrate": "node --no-deprecation scripts/migrate-images-to-s3.ts",
+    "materials:setup": "node --no-deprecation scripts/setup-private-materials-s3.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1146.0",
     "@aws-sdk/client-ses": "^3.1084.0",
     "@aws-sdk/credential-provider-ini": "^3.973.17",
+    "@aws-sdk/s3-request-presigner": "^3.1146.0",
     "@clerk/nextjs": "^5.7.2",
-    "@google-cloud/storage": "^7.14.0",
     "@headlessui/react": "^2.2.0",
     "@heroicons/react": "^2.1.5",
     "@prisma/client": "^5.21.1",
