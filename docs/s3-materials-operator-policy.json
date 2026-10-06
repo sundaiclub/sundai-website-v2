@@ -1,0 +1,37 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "SetUpPrivateMaterialsBucket",
+      "Effect": "Allow",
+      "Action": [
+        "s3:CreateBucket",
+        "s3:GetBucketLocation",
+        "s3:ListBucket",
+        "s3:GetBucketPublicAccessBlock",
+        "s3:PutBucketPublicAccessBlock",
+        "s3:GetBucketOwnershipControls",
+        "s3:PutBucketOwnershipControls",
+        "s3:GetEncryptionConfiguration",
+        "s3:PutEncryptionConfiguration",
+        "s3:GetBucketVersioning",
+        "s3:PutBucketVersioning",
+        "s3:GetBucketCORS",
+        "s3:PutBucketCORS"
+      ],
+      "Resource": "arn:aws:s3:::sundai-materials-426771917681"
+    },
+    {
+      "Sid": "MigrateAndVerifyPrivateMaterials",
+      "Effect": "Allow",
+      "Action": ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"],
+      "Resource": "arn:aws:s3:::sundai-materials-426771917681/event-materials/*"
+    },
+    {
+      "Sid": "SetUpPrivateMaterialsRuntimeRole",
+      "Effect": "Allow",
+      "Action": ["iam:PutRolePolicy", "iam:GetRolePolicy"],
+      "Resource": "arn:aws:iam::426771917681:role/sundai-images-production"
+    }
+  ]
+}

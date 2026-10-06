@@ -1,5 +1,5 @@
 'use client';
-import { useId, useState } from 'react';
+import { useId, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 import {
   BoldIcon,
@@ -35,6 +35,9 @@ const uploadImage = async (file: File): Promise<string> => {
       );
     }
     const data = (await response.json()) as UploadImageResponse;
+    if (typeof data?.url !== 'string' || !/^https?:\/\//.test(data.url)) {
+      throw new Error('The image upload did not return a valid URL.');
+    }
     return data.url;
   } finally {
     toast.dismiss(loadingToast);
@@ -63,9 +66,44 @@ export default function MarkdownEditor({
   const { isDarkMode } = useTheme();
   const generatedId = useId();
   const textareaId = id ?? generatedId;
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const descriptionRef = useRef(editableDescription);
+  descriptionRef.current = editableDescription;
   const [descriptionView, setDescriptionView] = useState<'write' | 'preview'>(
     'write'
   );
+
+  const insertImage = (url: string, alt = 'Image') => {
+    const textarea = textareaRef.current;
+    const text = descriptionRef.current;
+    const start = textarea?.selectionStart ?? text.length;
+    const safeAlt = alt.replace(/[\\\[\]\r\n]/g, '_');
+    const markdown = `![${safeAlt}](<${url}>)`;
+    const nextText =
+      text.substring(0, start) + markdown + text.substring(start);
+    descriptionRef.current = nextText;
+    setEditableDescription(nextText);
+    setTimeout(() => {
+      const currentTextarea = textareaRef.current;
+      if (!currentTextarea) return;
+      currentTextarea.focus();
+      currentTextarea.setSelectionRange(
+        start + markdown.length,
+        start + markdown.length
+      );
+    }, 0);
+  };
+
+  const uploadAndInsertImage = async (file: File) => {
+    try {
+      insertImage(await uploadImage(file), file.name);
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      toast.error(
+        error instanceof Error ? error.message : 'Failed to upload image'
+      );
+    }
+  };
   return (
     <div>
       <span
@@ -260,35 +298,10 @@ export default function MarkdownEditor({
               className="hidden"
               disabled={descriptionView === 'preview'}
               onChange={async e => {
-                const file = e.target.files?.[0];
-                if (file) {
-                  try {
-                    const imageUrl = await uploadImage(file);
-                    const textarea = document.getElementById(
-                      textareaId
-                    ) as HTMLTextAreaElement;
-                    const start = textarea.selectionStart;
-                    const text = textarea.value;
-                    const imageMarkdown = `![Image](${imageUrl})`;
-                    setEditableDescription(
-                      text.substring(0, start) +
-                        imageMarkdown +
-                        text.substring(start)
-                    );
-                    setTimeout(() => {
-                      textarea.focus();
-                      textarea.selectionStart = textarea.selectionEnd =
-                        start + imageMarkdown.length;
-                    }, 0);
-                  } catch (error) {
-                    console.error('Error uploading image:', error);
-                    toast.error(
-                      error instanceof Error
-                        ? error.message
-                        : 'Failed to upload image'
-                    );
-                  }
-                }
+                const input = e.currentTarget;
+                const file = input.files?.[0];
+                input.value = '';
+                if (file) await uploadAndInsertImage(file);
               }}
             />
           </label>
@@ -319,6 +332,7 @@ export default function MarkdownEditor({
       </div>
       {descriptionView === 'write' ? (
         <textarea
+          ref={textareaRef}
           id={textareaId}
           aria-label={label}
           maxLength={maxLength}
@@ -378,32 +392,7 @@ export default function MarkdownEditor({
             if (imageItem) {
               e.preventDefault();
               const file = imageItem.getAsFile();
-              if (file) {
-                try {
-                  const textarea = e.currentTarget;
-                  const imageUrl = await uploadImage(file);
-                  const start = textarea.selectionStart;
-                  const text = textarea.value;
-                  const imageMarkdown = `![Image](${imageUrl})`;
-                  setEditableDescription(
-                    text.substring(0, start) +
-                      imageMarkdown +
-                      text.substring(start)
-                  );
-                  setTimeout(() => {
-                    textarea.selectionStart = textarea.selectionEnd =
-                      start + imageMarkdown.length;
-                    textarea.focus();
-                  }, 0);
-                } catch (error) {
-                  console.error('Error uploading image:', error);
-                  toast.error(
-                    error instanceof Error
-                      ? error.message
-                      : 'Failed to upload image'
-                  );
-                }
-              }
+              if (file) await uploadAndInsertImage(file);
             }
           }}
           onDragOver={e => {
@@ -422,32 +411,8 @@ export default function MarkdownEditor({
 
             const file = e.dataTransfer.files[0];
             if (file && file.type.startsWith('image/')) {
-              try {
-                const imageUrl = await uploadImage(file);
-                toast.success('Image uploaded successfully');
-
-                const start = textarea.selectionStart || textarea.value.length;
-                const text = textarea.value;
-                const imageMarkdown = `![${file.name}](${imageUrl})`;
-                setEditableDescription(
-                  text.substring(0, start) +
-                    imageMarkdown +
-                    text.substring(start)
-                );
-
-                const newPosition = start + imageMarkdown.length;
-                textarea.selectionStart = newPosition;
-                textarea.selectionEnd = newPosition;
-                return;
-              } catch (error) {
-                console.error('Error uploading image:', error);
-                toast.error(
-                  error instanceof Error
-                    ? error.message
-                    : 'Failed to upload image'
-                );
-                return;
-              }
+              await uploadAndInsertImage(file);
+              return;
             }
 
             const urlData =
@@ -459,19 +424,7 @@ export default function MarkdownEditor({
             ) {
               const isImageUrl = /\.(jpg|jpeg|png|gif|webp)$/i.test(urlData);
               if (isImageUrl) {
-                const start = textarea.selectionStart || textarea.value.length;
-                const text = textarea.value;
-                const filename = urlData.split('/').pop() || 'image';
-                const imageMarkdown = `![${filename}](${urlData})`;
-                setEditableDescription(
-                  text.substring(0, start) +
-                    imageMarkdown +
-                    text.substring(start)
-                );
-
-                const newPosition = start + imageMarkdown.length;
-                textarea.selectionStart = newPosition;
-                textarea.selectionEnd = newPosition;
+                insertImage(urlData, urlData.split('/').pop() || 'image');
               }
             }
           }}

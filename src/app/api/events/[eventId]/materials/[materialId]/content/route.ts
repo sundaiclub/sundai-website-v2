@@ -7,7 +7,7 @@ import {
   getEventStaffForPermissions,
 } from '@/lib/eventManagementAuth';
 import { isEventMaterialAvailable } from '@/lib/eventMaterials';
-import { createSignedMaterialDownloadUrl } from '@/lib/gcp-storage';
+import { createSignedMaterialDownloadUrl } from '@/lib/s3-materials';
 
 function notFound() {
   return NextResponse.json({ error: 'Material not found' }, { status: 404 });

@@ -1,7 +1,6 @@
 import { HackType, Prisma, ProjectStatus } from '@prisma/client';
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import { uploadToGCS } from '@/lib/gcp-storage';
 import prisma from '@/lib/prisma';
 import { getOrCreateCurrentWeek } from '@/lib/weeks';
 

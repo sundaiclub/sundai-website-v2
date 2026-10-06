@@ -1,3 +1,9 @@
+jest.mock('@/lib/s3-materials', () => ({
+  createPrivateMaterialUploadIntent: jest.fn(),
+  inspectPrivateObject: jest.fn(),
+  deletePrivateObject: jest.fn(),
+}));
+
 type EventMaterialsModule = {
   MAX_EVENT_MATERIAL_SIZE: number;
   validateEventMaterialUpload: (input: {

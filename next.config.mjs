@@ -7,18 +7,25 @@ const nextConfig = {
     ignoreDuringBuilds: true,
   },
   images: {
-    // unoptimized: true,
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: process.env.S3_IMAGE_PUBLIC_BASE_URL
+          ? new URL(process.env.S3_IMAGE_PUBLIC_BASE_URL).hostname
+          : 'd10whcg56p8om0.cloudfront.net',
+        pathname: '/**',
+      },
+    ],
     domains: [
-      "img.clerk.com",
-      "images.clerk.dev",
-      "www.gravatar.com",
-      "storage.googleapis.com",
-      "replicate.delivery",
+      'img.clerk.com',
+      'images.clerk.dev',
+      'www.gravatar.com',
+      'replicate.delivery',
     ],
   },
   experimental: {
-    esmExternals: 'loose'
-  }
+    esmExternals: 'loose',
+  },
 };
 
 export default nextConfig;
