@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { requireEventSettingsManager } from '@/lib/eventManagementApi';
-import { uploadToGCS } from '@/lib/gcp-storage';
+import { uploadToS3 } from '@/lib/s3-images';
 import {
   IMAGE_UPLOAD_SIZE_ERROR,
   validateImageUploadSize,
@@ -54,11 +54,11 @@ export async function POST(
       );
     }
 
-    const upload = await uploadToGCS(file, 'events');
+    const upload = await uploadToS3(file, 'events');
     const image = await prisma.image.create({
       data: {
-        key: upload.filename,
-        bucket: process.env.GOOGLE_CLOUD_BUCKET!,
+        key: upload.key,
+        bucket: upload.bucket,
         url: upload.url,
         filename: file.name,
         mimeType: file.type,
@@ -74,9 +74,11 @@ export async function POST(
     });
 
     if (event.imageId) {
-      await prisma.image.delete({ where: { id: event.imageId } }).catch(error => {
-        console.error('[EVENT_IMAGE_CLEANUP]', error);
-      });
+      await prisma.image
+        .delete({ where: { id: event.imageId } })
+        .catch(error => {
+          console.error('[EVENT_IMAGE_CLEANUP]', error);
+        });
     }
 
     return NextResponse.json(updatedEvent.image);

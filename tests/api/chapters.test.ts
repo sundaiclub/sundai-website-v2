@@ -33,8 +33,8 @@ jest.mock('@clerk/nextjs/server', () =>
   require('../utils/api-auth').mockClerkServerModule()
 );
 
-jest.mock('../../src/lib/gcp-storage', () => ({
-  uploadToGCS: jest.fn(),
+jest.mock('../../src/lib/s3-images', () => ({
+  uploadToS3: jest.fn(),
 }));
 
 jest.mock('../../src/lib/prisma', () => ({
@@ -73,7 +73,7 @@ jest.mock('../../src/lib/prisma', () => ({
 }));
 
 const prisma = require('../../src/lib/prisma').default;
-const { uploadToGCS } = require('../../src/lib/gcp-storage');
+const { uploadToS3 } = require('../../src/lib/s3-images');
 
 const mockHackerLookup = (...hackers: HackerFixture[]) => {
   prisma.hacker.findUnique.mockImplementation(async ({ where }: any) => {
@@ -878,9 +878,10 @@ describe('/api/chapters', () => {
         heroImageId: 'image-old',
       });
     prisma.chapterMembership.findFirst.mockResolvedValue(membership);
-    uploadToGCS.mockResolvedValue({
+    uploadToS3.mockResolvedValue({
       url: newImage.url,
-      filename: 'chapters/boston.jpg',
+      key: 'chapters/boston.jpg',
+      bucket: 's3-images',
     });
     prisma.image.create.mockResolvedValue(newImage);
     prisma.image.delete.mockResolvedValue({ id: 'image-old' });
@@ -893,7 +894,7 @@ describe('/api/chapters', () => {
     const body = await response.json();
 
     expect(response.status).toBe(200);
-    expect(uploadToGCS).toHaveBeenCalledWith(expect.any(File), 'chapters');
+    expect(uploadToS3).toHaveBeenCalledWith(expect.any(File), 'chapters');
     expect(prisma.image.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
@@ -939,6 +940,6 @@ describe('/api/chapters', () => {
     expect(await response.json()).toEqual({
       error: 'File too large. Image files must be smaller than 15 MB.',
     });
-    expect(uploadToGCS).not.toHaveBeenCalled();
+    expect(uploadToS3).not.toHaveBeenCalled();
   });
 });

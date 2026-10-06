@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { requireChapterManager } from '@/lib/eventManagementApi';
 import { resolveChapterId } from '@/lib/chapters';
-import { uploadToGCS } from '@/lib/gcp-storage';
+import { uploadToS3 } from '@/lib/s3-images';
 import {
   IMAGE_UPLOAD_SIZE_ERROR,
   validateImageUploadSize,
@@ -28,11 +28,7 @@ const chapterImageSelect = {
 } as const;
 
 function isUploadFile(value: FormDataEntryValue | null): value is File {
-  return (
-    value !== null &&
-    typeof value === 'object' &&
-    'type' in value
-  );
+  return value !== null && typeof value === 'object' && 'type' in value;
 }
 
 export async function POST(
@@ -70,11 +66,11 @@ export async function POST(
     });
     if (!existing) return new NextResponse('Not Found', { status: 404 });
 
-    const uploadResult = await uploadToGCS(file, 'chapters');
+    const uploadResult = await uploadToS3(file, 'chapters');
     const image = await prisma.image.create({
       data: {
-        key: uploadResult.filename,
-        bucket: process.env.GOOGLE_CLOUD_BUCKET!,
+        key: uploadResult.key,
+        bucket: uploadResult.bucket,
         url: uploadResult.url,
         filename: file.name,
         mimeType: file.type || 'application/octet-stream',

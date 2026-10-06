@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { PATCH } from '../../src/app/api/projects/[projectId]/edit/route';
 import prisma from '../../src/lib/prisma';
-import { uploadToGCS } from '../../src/lib/gcp-storage';
+import { uploadToS3 } from '../../src/lib/s3-images';
 
 // Mock dependencies
 jest.mock('../../src/lib/prisma', () => ({
@@ -20,8 +20,8 @@ jest.mock('../../src/lib/prisma', () => ({
   },
 }));
 
-jest.mock('../../src/lib/gcp-storage', () => ({
-  uploadToGCS: jest.fn(),
+jest.mock('../../src/lib/s3-images', () => ({
+  uploadToS3: jest.fn(),
 }));
 
 jest.mock('@clerk/nextjs/server', () => ({
@@ -29,7 +29,7 @@ jest.mock('@clerk/nextjs/server', () => ({
 }));
 
 const mockPrisma = prisma as jest.Mocked<typeof prisma>;
-const mockUploadToGCS = uploadToGCS as jest.MockedFunction<typeof uploadToGCS>;
+const mockUploadToS3 = uploadToS3 as jest.MockedFunction<typeof uploadToS3>;
 
 describe('/api/projects/[projectId]/edit', () => {
   const mockProjectId = 'test-project-id';
@@ -45,12 +45,17 @@ describe('/api/projects/[projectId]/edit', () => {
       const { auth } = require('@clerk/nextjs/server');
       auth.mockReturnValue({ userId: null });
 
-      const request = new NextRequest(`http://localhost:3000/api/projects/${mockProjectId}/edit`, {
-        method: 'PATCH',
-        body: new FormData(),
-      });
+      const request = new NextRequest(
+        `http://localhost:3000/api/projects/${mockProjectId}/edit`,
+        {
+          method: 'PATCH',
+          body: new FormData(),
+        }
+      );
 
-      const response = await PATCH(request, { params: { projectId: mockProjectId } });
+      const response = await PATCH(request, {
+        params: { projectId: mockProjectId },
+      });
       const data = await response.json();
 
       expect(response.status).toBe(401);
@@ -63,12 +68,17 @@ describe('/api/projects/[projectId]/edit', () => {
 
       mockPrisma.project.findUnique.mockResolvedValue(null);
 
-      const request = new NextRequest(`http://localhost:3000/api/projects/${mockProjectId}/edit`, {
-        method: 'PATCH',
-        body: new FormData(),
-      });
+      const request = new NextRequest(
+        `http://localhost:3000/api/projects/${mockProjectId}/edit`,
+        {
+          method: 'PATCH',
+          body: new FormData(),
+        }
+      );
 
-      const response = await PATCH(request, { params: { projectId: mockProjectId } });
+      const response = await PATCH(request, {
+        params: { projectId: mockProjectId },
+      });
       const data = await response.json();
 
       expect(response.status).toBe(404);
@@ -94,12 +104,17 @@ describe('/api/projects/[projectId]/edit', () => {
       mockPrisma.project.findUnique.mockResolvedValue(mockProject as any);
       mockPrisma.hacker.findUnique.mockResolvedValue(mockUser as any);
 
-      const request = new NextRequest(`http://localhost:3000/api/projects/${mockProjectId}/edit`, {
-        method: 'PATCH',
-        body: new FormData(),
-      });
+      const request = new NextRequest(
+        `http://localhost:3000/api/projects/${mockProjectId}/edit`,
+        {
+          method: 'PATCH',
+          body: new FormData(),
+        }
+      );
 
-      const response = await PATCH(request, { params: { projectId: mockProjectId } });
+      const response = await PATCH(request, {
+        params: { projectId: mockProjectId },
+      });
       const data = await response.json();
 
       expect(response.status).toBe(401);
@@ -139,12 +154,17 @@ describe('/api/projects/[projectId]/edit', () => {
       formData.append('githubUrl', 'github.com/sundai-club/example');
       formData.append('demoUrl', 'example.com/demo');
 
-      const request = new NextRequest(`http://localhost:3000/api/projects/${mockProjectId}/edit`, {
-        method: 'PATCH',
-        body: formData,
-      });
+      const request = new NextRequest(
+        `http://localhost:3000/api/projects/${mockProjectId}/edit`,
+        {
+          method: 'PATCH',
+          body: formData,
+        }
+      );
 
-      const response = await PATCH(request, { params: { projectId: mockProjectId } });
+      const response = await PATCH(request, {
+        params: { projectId: mockProjectId },
+      });
       const data = await response.json();
 
       expect(response.status).toBe(200);
@@ -190,12 +210,17 @@ describe('/api/projects/[projectId]/edit', () => {
       formData.append('title', 'Updated Title');
       formData.append('status', 'PENDING');
 
-      const request = new NextRequest(`http://localhost:3000/api/projects/${mockProjectId}/edit`, {
-        method: 'PATCH',
-        body: formData,
-      });
+      const request = new NextRequest(
+        `http://localhost:3000/api/projects/${mockProjectId}/edit`,
+        {
+          method: 'PATCH',
+          body: formData,
+        }
+      );
 
-      const response = await PATCH(request, { params: { projectId: mockProjectId } });
+      const response = await PATCH(request, {
+        params: { projectId: mockProjectId },
+      });
       const data = await response.json();
 
       expect(response.status).toBe(200);
@@ -233,12 +258,17 @@ describe('/api/projects/[projectId]/edit', () => {
       formData.append('title', 'Updated Title');
       formData.append('status', 'PENDING');
 
-      const request = new NextRequest(`http://localhost:3000/api/projects/${mockProjectId}/edit`, {
-        method: 'PATCH',
-        body: formData,
-      });
+      const request = new NextRequest(
+        `http://localhost:3000/api/projects/${mockProjectId}/edit`,
+        {
+          method: 'PATCH',
+          body: formData,
+        }
+      );
 
-      const response = await PATCH(request, { params: { projectId: mockProjectId } });
+      const response = await PATCH(request, {
+        params: { projectId: mockProjectId },
+      });
       const data = await response.json();
 
       expect(response.status).toBe(200);
@@ -268,12 +298,17 @@ describe('/api/projects/[projectId]/edit', () => {
       const formData = new FormData();
       formData.append('status', 'APPROVED');
 
-      const request = new NextRequest(`http://localhost:3000/api/projects/${mockProjectId}/edit`, {
-        method: 'PATCH',
-        body: formData,
-      });
+      const request = new NextRequest(
+        `http://localhost:3000/api/projects/${mockProjectId}/edit`,
+        {
+          method: 'PATCH',
+          body: formData,
+        }
+      );
 
-      const response = await PATCH(request, { params: { projectId: mockProjectId } });
+      const response = await PATCH(request, {
+        params: { projectId: mockProjectId },
+      });
       const data = await response.json();
 
       expect(response.status).toBe(403);
@@ -303,12 +338,17 @@ describe('/api/projects/[projectId]/edit', () => {
       const formData = new FormData();
       formData.append('is_starred', 'true');
 
-      const request = new NextRequest(`http://localhost:3000/api/projects/${mockProjectId}/edit`, {
-        method: 'PATCH',
-        body: formData,
-      });
+      const request = new NextRequest(
+        `http://localhost:3000/api/projects/${mockProjectId}/edit`,
+        {
+          method: 'PATCH',
+          body: formData,
+        }
+      );
 
-      const response = await PATCH(request, { params: { projectId: mockProjectId } });
+      const response = await PATCH(request, {
+        params: { projectId: mockProjectId },
+      });
       const data = await response.json();
 
       expect(response.status).toBe(403);
@@ -333,7 +373,8 @@ describe('/api/projects/[projectId]/edit', () => {
       };
 
       const mockUploadResult = {
-        filename: 'test-image.jpg',
+        key: 'test-image.jpg',
+        bucket: 'test-bucket',
         url: 'https://example.com/test-image.jpg',
       };
 
@@ -351,28 +392,35 @@ describe('/api/projects/[projectId]/edit', () => {
 
       mockPrisma.project.findUnique.mockResolvedValue(mockProject as any);
       mockPrisma.hacker.findUnique.mockResolvedValue(mockUser as any);
-      mockUploadToGCS.mockResolvedValue(mockUploadResult);
+      mockUploadToS3.mockResolvedValue(mockUploadResult);
       mockPrisma.image.create.mockResolvedValue(mockImage as any);
       mockPrisma.project.update.mockResolvedValue(mockUpdatedProject as any);
 
       // Set environment variable for the test
-      process.env.GOOGLE_CLOUD_BUCKET = 'test-bucket';
 
       const formData = new FormData();
       formData.append('title', 'Updated Title');
-      formData.append('thumbnail', new File(['test'], 'test.jpg', { type: 'image/jpeg' }));
+      formData.append(
+        'thumbnail',
+        new File(['test'], 'test.jpg', { type: 'image/jpeg' })
+      );
 
-      const request = new NextRequest(`http://localhost:3000/api/projects/${mockProjectId}/edit`, {
-        method: 'PATCH',
-        body: formData,
+      const request = new NextRequest(
+        `http://localhost:3000/api/projects/${mockProjectId}/edit`,
+        {
+          method: 'PATCH',
+          body: formData,
+        }
+      );
+
+      const response = await PATCH(request, {
+        params: { projectId: mockProjectId },
       });
-
-      const response = await PATCH(request, { params: { projectId: mockProjectId } });
       const data = await response.json();
 
       expect(response.status).toBe(200);
       expect(data).toEqual(mockUpdatedProject);
-      expect(mockUploadToGCS).toHaveBeenCalled();
+      expect(mockUploadToS3).toHaveBeenCalled();
     });
 
     it('should return 413 when the thumbnail is too large', async () => {
@@ -410,7 +458,7 @@ describe('/api/projects/[projectId]/edit', () => {
       expect(await response.json()).toEqual({
         error: 'File too large. Image files must be smaller than 15 MB.',
       });
-      expect(mockUploadToGCS).not.toHaveBeenCalled();
+      expect(mockUploadToS3).not.toHaveBeenCalled();
     });
 
     it('should handle thumbnail deletion', async () => {
@@ -444,12 +492,17 @@ describe('/api/projects/[projectId]/edit', () => {
       formData.append('title', 'Updated Title');
       formData.append('deleteThumbnail', 'true');
 
-      const request = new NextRequest(`http://localhost:3000/api/projects/${mockProjectId}/edit`, {
-        method: 'PATCH',
-        body: formData,
-      });
+      const request = new NextRequest(
+        `http://localhost:3000/api/projects/${mockProjectId}/edit`,
+        {
+          method: 'PATCH',
+          body: formData,
+        }
+      );
 
-      const response = await PATCH(request, { params: { projectId: mockProjectId } });
+      const response = await PATCH(request, {
+        params: { projectId: mockProjectId },
+      });
       const data = await response.json();
 
       expect(response.status).toBe(200);
@@ -481,20 +534,30 @@ describe('/api/projects/[projectId]/edit', () => {
 
       mockPrisma.project.findUnique.mockResolvedValue(mockProject as any);
       mockPrisma.hacker.findUnique.mockResolvedValue(mockUser as any);
-      mockPrisma.projectToParticipant.deleteMany.mockResolvedValue({ count: 0 });
+      mockPrisma.projectToParticipant.deleteMany.mockResolvedValue({
+        count: 0,
+      });
       mockPrisma.project.update.mockResolvedValue(mockUpdatedProject as any);
 
       const formData = new FormData();
       formData.append('title', 'Updated Title');
-      formData.append('participants', JSON.stringify([{ hacker: { id: 'user1' }, role: 'hacker' }]));
+      formData.append(
+        'participants',
+        JSON.stringify([{ hacker: { id: 'user1' }, role: 'hacker' }])
+      );
       formData.append('launchLead', 'new-lead-id');
 
-      const request = new NextRequest(`http://localhost:3000/api/projects/${mockProjectId}/edit`, {
-        method: 'PATCH',
-        body: formData,
-      });
+      const request = new NextRequest(
+        `http://localhost:3000/api/projects/${mockProjectId}/edit`,
+        {
+          method: 'PATCH',
+          body: formData,
+        }
+      );
 
-      const response = await PATCH(request, { params: { projectId: mockProjectId } });
+      const response = await PATCH(request, {
+        params: { projectId: mockProjectId },
+      });
       const data = await response.json();
 
       expect(response.status).toBe(200);
@@ -505,14 +568,21 @@ describe('/api/projects/[projectId]/edit', () => {
       const { auth } = require('@clerk/nextjs/server');
       auth.mockReturnValue({ userId: mockUserId });
 
-      mockPrisma.project.findUnique.mockRejectedValue(new Error('Database error'));
+      mockPrisma.project.findUnique.mockRejectedValue(
+        new Error('Database error')
+      );
 
-      const request = new NextRequest(`http://localhost:3000/api/projects/${mockProjectId}/edit`, {
-        method: 'PATCH',
-        body: new FormData(),
+      const request = new NextRequest(
+        `http://localhost:3000/api/projects/${mockProjectId}/edit`,
+        {
+          method: 'PATCH',
+          body: new FormData(),
+        }
+      );
+
+      const response = await PATCH(request, {
+        params: { projectId: mockProjectId },
       });
-
-      const response = await PATCH(request, { params: { projectId: mockProjectId } });
       const data = await response.json();
 
       expect(response.status).toBe(500);

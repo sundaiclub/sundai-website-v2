@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import { uploadToGCS } from '@/lib/gcp-storage';
+import { uploadToS3 } from '@/lib/s3-images';
+import prisma from '@/lib/prisma';
 import {
   IMAGE_UPLOAD_SIZE_ERROR,
   validateImageUploadSize,
@@ -14,14 +15,14 @@ export async function POST(request: Request) {
     }
 
     const formData = await request.formData();
-    const file = formData.get('file') as File;
-    
+    const file = formData.get('file');
+
     if (!file) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 });
     }
 
     // Validate file type
-    if (!file.type.startsWith('image/')) {
+    if (typeof file === 'string' || !file.type.startsWith('image/')) {
       return NextResponse.json({ error: 'Invalid file type' }, { status: 400 });
     }
 
@@ -32,8 +33,19 @@ export async function POST(request: Request) {
       );
     }
 
-    // Upload to GCS
-    const { url } = await uploadToGCS(file, 'projects');
+    // Upload to S3
+    const { url, key, bucket } = await uploadToS3(file, 'projects');
+    await prisma.image.create({
+      data: {
+        key,
+        bucket,
+        url,
+        filename: file.name,
+        mimeType: file.type,
+        size: file.size,
+        alt: file.name,
+      },
+    });
 
     return NextResponse.json({ url });
   } catch (error) {

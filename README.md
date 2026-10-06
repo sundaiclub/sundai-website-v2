@@ -516,12 +516,14 @@ their short expiry or when current access is removed.
 4. Add webhook endpoint for user sync: `[your-domain]/api/webhooks/clerk`
 5. Configure sign-in/sign-up flows in Clerk dashboard
 
-### Google Cloud Storage Setup (Optional):
+### Google Cloud Storage Setup (Private Event Materials):
 1. Create Google Cloud Project
 2. Enable Cloud Storage API
-3. Create a storage bucket
-4. Set up service account with storage permissions
-5. Download service account key JSON file and add to project
+3. Create a private storage bucket for event materials
+4. Give the service account access to that private bucket
+5. Set `GOOGLE_CLOUD_MATERIALS_BUCKET` and the base64 service-account JSON in `GOOGLE_PRIVATE_KEY`
+
+Public images use S3 and CloudFront. See the public image cutover procedure below.
 
 ### AI Image Generation Setup (Optional):
 1. In Amazon Bedrock, enable access to `openai.gpt-5.6-luna` in a supported region.
@@ -545,3 +547,120 @@ To learn more about the technologies used:
 ---
 
 Built with ❤️ by the Sundai Club team
+
+## Public image cutover to S3
+
+Public project, chapter, event and avatar images use the private S3 bucket
+`sundai-images-426771917681` in `us-east-1`. CloudFront serves them from
+`https://d10whcg56p8om0.cloudfront.net`. Private event materials still use the
+private GCP materials bucket.
+
+Set the four `S3_IMAGE_*` values shown in `.env.example`. Vercel uploads use the
+`sundai-images-production` role through Vercel OIDC. They do not use the static
+credentials used for SES. Local uploads use the AWS SDK credential chain. The
+copy and database tools use the AWS CLI profile selected by `AWS_PROFILE`, or
+`default`. The production role has upload access only. Use the operator's AWS
+profile for migration checks, which require S3 read access as well.
+
+The bucket, CloudFront distribution, OIDC provider and production variables
+were set up before this code cutover. The first copy contained 2,533 objects.
+The local manifest is `.data/image-migration/manifest.json`. It is not committed.
+Run the copy tool again to create a fresh manifest on another computer.
+
+Use Node 24 for these commands. Do not use the normal development database
+backup command for this procedure: it reads the local `.env` file.
+
+1. Install the code and check it:
+
+   ```sh
+   npm ci
+   npm test -- --runInBand tests/lib/s3-images.test.ts tests/lib/imageMigration.test.ts tests/api/uploads.test.ts tests/api/event-image.test.ts tests/api/avatar-image.test.ts tests/api/chapters.test.ts tests/api/projects-projectId-edit.test.ts tests/api/projects.test.ts tests/components/MarkdownEditor.test.tsx
+   npm run lint
+   npm run build
+   ```
+
+2. Prepare `.data/image-cutover.env` from the production database secret
+   `sundai/prod/database-owner` in AWS Secrets Manager, plus the three S3
+   configuration values below. Set file permissions to `600`. The database
+   secret contains the host, port, database, user, password and SSL mode. Use
+   those fields to construct `DIRECT_URL`; do not print credentials or commit
+   this local file. The workspace drive does not enforce Unix permissions.
+   Store the connection file and backup in an owner-only home directory and
+   link them from `.data/`. The prepared files use the protected folder
+   `/home/andrew/.cache/sundai-image-migration/2026-10-06/`; keep that folder
+   until the cutover is accepted.
+
+   ```text
+   DIRECT_URL=<production connection from AWS Secrets Manager>
+   S3_IMAGE_BUCKET=sundai-images-426771917681
+   S3_IMAGE_REGION=us-east-1
+   S3_IMAGE_PUBLIC_BASE_URL=https://d10whcg56p8om0.cloudfront.net
+   ```
+
+   The application's production OIDC role is already configured in Vercel.
+   Set `AWS_PROFILE` if the operator credentials use a named profile. The
+   manual tools use that profile, rather than the application's SES credentials.
+   Your computer must be able to connect to the production database.
+
+3. Save a full local production database backup in `.data/backups/`. Use
+   PostgreSQL custom format and check that `pg_restore` can decode the archive.
+   Record row counts and content hashes before the dry run, then run:
+
+   ```sh
+   node --env-file=.data/image-cutover.env scripts/migrate-images-to-s3.ts
+   ```
+
+   Review `.data/image-migration/db-dry-run.json`, especially the database host,
+   proposed changes, unresolved links and S3 verification errors. Compare
+   database counts and hashes after the dry run: they must be unchanged.
+   This command reads the database and S3; it does not change production records.
+
+4. When ready to apply the cutover, copy final source changes and repeat the
+   dry run:
+
+   ```sh
+   node --env-file=.data/image-cutover.env scripts/copy-images-to-s3.ts
+   node --env-file=.data/image-cutover.env scripts/migrate-images-to-s3.ts
+   ```
+
+   The copy command preserves MIME type and metadata. It checks MD5 hashes and
+   stops if GCP changes during the copy. It does not delete objects. The database
+   tool checks each referenced S3 object. Resolve report errors before apply.
+   No maintenance window or database freeze is required for this inactive-app
+   run. If the checks show new writes, inspect them before continuing.
+
+5. Apply the data migration manually on the operator's computer, then check:
+
+   ```sh
+   node --env-file=.data/image-cutover.env scripts/migrate-images-to-s3.ts --apply
+   node --env-file=.data/image-cutover.env scripts/migrate-images-to-s3.ts
+   ```
+
+   The change runs in one transaction. It keeps Image IDs and keys, sets the S3
+   bucket and CloudFront URL, and changes embedded links in mutable strings
+   and JSON, including Markdown descriptions. It rolls back if a selected
+   field changes during the update. Check unchanged row counts and the expected
+   field changes. The second dry run must report zero remaining changes, no
+   unresolved links and no verification errors. Historical audit records,
+   revisions, submitted form snapshots and sent mail stay unchanged.
+
+6. Push the approved code to `main` through the normal project workflow. Let
+   the existing CI/CD process deploy it to `sundai.club`. The image data tools
+   stay manual; CI/CD runs only its normal Prisma schema migrations. There is
+   no new image schema migration. Wait for the production deployment to finish.
+
+   Between the database update and the new deployment, the old application can
+   reject CloudFront image URLs. Old code also still writes new uploads to GCP.
+   Keep these steps close together and check for writes during that interval.
+
+7. Check existing project, chapter, event and avatar images on `sundai.club`.
+   Upload and reload an image for each. In a Markdown description, test the file
+   button, paste and drag/drop; save and reload. Check the returned CloudFront
+   URL and the rendered image. Confirm no new 502 or S3 access errors. Private
+   event material upload and download must still work. Keep the GCP source and
+   database backup until these checks pass and the cutover is accepted. Remove
+   the local production environment file when it is no longer needed.
+
+There is no dual-write mode. A rollback must restore the database backup and its
+matching deployment together. Images uploaded after the cutover need separate
+handling before a restore. Neither migration tool deletes the GCP source.
