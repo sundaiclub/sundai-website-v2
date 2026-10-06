@@ -4,8 +4,8 @@ jest.mock('../../src/lib/eventManagementApi', () => ({
   requireEventSettingsManager: jest.fn(),
 }));
 
-jest.mock('../../src/lib/gcp-storage', () => ({
-  uploadToGCS: jest.fn(),
+jest.mock('../../src/lib/s3-images', () => ({
+  uploadToS3: jest.fn(),
 }));
 
 jest.mock('../../src/lib/prisma', () => ({
@@ -23,8 +23,10 @@ jest.mock('../../src/lib/prisma', () => ({
 }));
 
 const prisma = require('../../src/lib/prisma').default;
-const { requireEventSettingsManager } = require('../../src/lib/eventManagementApi');
-const { uploadToGCS } = require('../../src/lib/gcp-storage');
+const {
+  requireEventSettingsManager,
+} = require('../../src/lib/eventManagementApi');
+const { uploadToS3 } = require('../../src/lib/s3-images');
 
 function imageRequest(file: File, prompt?: string) {
   const formData = new FormData();
@@ -48,8 +50,9 @@ describe('/api/events/[eventId]/image', () => {
   });
 
   it('uploads and connects an event image', async () => {
-    uploadToGCS.mockResolvedValue({
-      filename: 'events/generated-demo.webp',
+    uploadToS3.mockResolvedValue({
+      key: 'events/generated-demo.webp',
+      bucket: 's3-images',
       url: 'https://cdn.example.com/generated-demo.webp',
     });
     prisma.image.create.mockResolvedValue({ id: 'image-1' });
@@ -70,7 +73,7 @@ describe('/api/events/[eventId]/image', () => {
     );
 
     expect(response.status).toBe(200);
-    expect(uploadToGCS).toHaveBeenCalledWith(expect.any(File), 'events');
+    expect(uploadToS3).toHaveBeenCalledWith(expect.any(File), 'events');
     expect(prisma.image.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         key: 'events/generated-demo.webp',
@@ -94,7 +97,7 @@ describe('/api/events/[eventId]/image', () => {
     );
 
     expect(response.status).toBe(400);
-    expect(uploadToGCS).not.toHaveBeenCalled();
+    expect(uploadToS3).not.toHaveBeenCalled();
     expect(prisma.image.create).not.toHaveBeenCalled();
   });
 
@@ -110,6 +113,6 @@ describe('/api/events/[eventId]/image', () => {
     expect(await response.json()).toEqual({
       message: 'File too large. Image files must be smaller than 15 MB.',
     });
-    expect(uploadToGCS).not.toHaveBeenCalled();
+    expect(uploadToS3).not.toHaveBeenCalled();
   });
 });

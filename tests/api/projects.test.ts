@@ -30,8 +30,8 @@ jest.mock('@clerk/nextjs/server', () => ({
 }));
 
 // Mock GCP storage
-jest.mock('../../src/lib/gcp-storage', () => ({
-  uploadToGCS: jest.fn(),
+jest.mock('../../src/lib/s3-images', () => ({
+  uploadToS3: jest.fn(),
 }));
 
 // Get the mocked Prisma

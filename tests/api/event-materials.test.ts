@@ -11,7 +11,7 @@ jest.mock('@clerk/nextjs/server', () =>
   require('../utils/api-auth').mockClerkServerModule()
 );
 
-jest.mock('../../src/lib/gcp-storage', () => ({
+jest.mock('../../src/lib/s3-materials', () => ({
   __esModule: true,
   createPrivateMaterialUploadIntent: jest.fn(),
   inspectPrivateObject: jest.fn(),
@@ -41,7 +41,7 @@ jest.mock('../../src/lib/prisma', () => ({
 }));
 
 const prisma = require('../../src/lib/prisma').default;
-const storage = require('../../src/lib/gcp-storage');
+const storage = require('../../src/lib/s3-materials');
 const eventId = 'event-ai-build-night';
 const materialId = 'material-sponsor-brief';
 const objectKey = 'event-materials/private-object';

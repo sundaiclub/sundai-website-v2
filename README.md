@@ -35,7 +35,7 @@ Before starting, ensure you have:
 - **Docker Desktop** installed AND running (not just installed!)
 - **Git** for version control
 - **Clerk Account** - Sign up at [clerk.com](https://clerk.com) for authentication
-- **Google Cloud Project** - For file storage (optional for local development)
+- **AWS Account** - S3 for file storage and CloudFront for public images
 
 ### 1. Clone & Install Dependencies
 
@@ -111,11 +111,9 @@ npm run db:reset
 **Now your profile should work!** Visit `/me` or click on your profile to see your hacker profile page.
 
 
-**Google Cloud Storage** (Optional for local development):
-1. Create Google Cloud Project
-2. Enable Cloud Storage API
-3. Create a storage bucket
-4. Set up service account with storage permissions
+**AWS storage** (Optional for local development):
+Use separate S3 buckets for public images and private event materials. Public
+images are served through CloudFront. See the storage setup sections below.
 
 #### Create `.env.local` file:
 
@@ -129,8 +127,10 @@ NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY="pk_test_your_actual_key_here"
 CLERK_SECRET_KEY="sk_test_your_actual_secret_here"
 WEBHOOK_SECRET="whsec_your_webhook_secret_here"
 
-# Google Cloud Storage (optional for local development)
-GOOGLE_CLOUD_BUCKET="your-bucket-name"
+# AWS public images (optional for local development)
+S3_IMAGE_REGION="us-east-1"
+S3_IMAGE_BUCKET="sundai-images-426771917681"
+S3_IMAGE_PUBLIC_BASE_URL="https://d10whcg56p8om0.cloudfront.net"
 
 # Amazon Bedrock text generation and AI image generation
 AWS_REGION="us-east-2"
@@ -276,7 +276,7 @@ graph TD
     B --> C[Prisma ORM]
     C --> D[PostgreSQL Database]
     B --> E[Clerk Authentication]
-    B --> F[Google Cloud Storage]
+    B --> F[Amazon S3 and CloudFront]
     A --> H[PostHog Analytics]
 ```
 
@@ -285,7 +285,7 @@ graph TD
 - **Backend**: Next.js API routes with Prisma ORM
 - **Database**: PostgreSQL with Docker for local development
 - **Authentication**: Clerk for user management
-- **File Storage**: Google Cloud Storage for images
+- **File Storage**: private S3 buckets; CloudFront for public images
 - **Analytics**: PostHog for user tracking
 
 ## 🔧 Troubleshooting
@@ -369,36 +369,59 @@ event operations fail.
 
 ### Private event material storage
 
-Event material files use a dedicated private Google Cloud Storage bucket. They
-must not be stored in the public image bucket or made publicly readable. Browsers
-upload through a short-lived signed PUT URL, and downloads always pass through an
-authorization endpoint before receiving a short-lived signed GET URL.
+Event material files use a dedicated private S3 bucket, separate from the image
+bucket. The material bucket has no CloudFront origin or public read policy.
+Browsers upload through a signed PUT URL. Downloads pass through the existing
+authorization endpoint before receiving a signed GET URL.
 
 Configure:
 
 ```bash
-# Base64-encoded Google service-account JSON used by the existing GCS adapter
-GOOGLE_PRIVATE_KEY="base64-encoded-service-account-json"
-
-# Existing public/image storage, when those features are used
-GOOGLE_CLOUD_BUCKET="public-image-bucket"
-
-# Dedicated private bucket for organizer event materials
-GOOGLE_CLOUD_MATERIALS_BUCKET="private-event-materials"
+S3_MATERIALS_REGION=us-east-1
+S3_MATERIALS_BUCKET=sundai-materials-426771917681
+S3_MATERIALS_ROLE_ARN=arn:aws:iam::426771917681:role/sundai-images-production
 ```
 
-The service account needs permission to create, inspect, read, and delete objects
-and to sign URLs in `GOOGLE_CLOUD_MATERIALS_BUCKET`. Keep public access prevention
-enabled on that bucket. If browser uploads originate from a different domain,
-configure bucket CORS for the application origins and the signed `PUT` method.
-Do not persist signed URLs: upload intents expire after 15 minutes and authorized
-download URLs expire after 5 minutes.
+Vercel uses the production OIDC role. Local development uses AWS CLI credentials.
+The role needs PutObject, GetObject (including HEAD), and DeleteObject only for
+`event-materials/*` in the private bucket. The setup script enables all public
+access blocks, disables ACLs, enables encryption and versioning, and configures
+CORS for signed PUT uploads from `https://sundai.club` and
+`https://www.sundai.club`. Add a development origin to a separate development
+bucket if you need local browser uploads; do not add wildcard production origins.
+Upload URLs expire after 15 minutes; download URLs expire after 5 minutes. Do not
+persist these URLs. Uploaded content type is part of the upload signature.
 
 Material uploads are limited to 25 MiB and the passive-file allowlist displayed
-in the organizer UI. A finalized upload is metadata-checked before its database
-record is created. Storage/provider errors should therefore be investigated in
-application logs and bucket IAM/CORS configuration; making the bucket public is
-not a valid workaround.
+in the organizer UI. The API checks the S3 object's size and MIME type before
+creating a material record. Visibility, attendee and organizer access checks
+remain unchanged.
+
+Before deploying this change:
+
+1. Have an AWS admin add the statements in
+   `docs/s3-materials-operator-policy.json` to the operator's permissions.
+   The current user was denied creation of `sundai-materials-426771917681`.
+2. With Node 24 and the operator's AWS profile, run `npm run materials:setup`.
+   This adds the separate runtime policy in
+   `docs/s3-materials-production-policy.json` to the existing OIDC role. It does
+   not replace the image policy or change the production trust policy.
+3. Set the three `S3_MATERIALS_*` variables in Vercel Production.
+4. Deploy through the existing main-branch CI/CD process. Keep the image data
+   migration manual. There are no new Prisma schema migrations for storage.
+5. Test a small private upload, finalization, authorized download, denied
+   unauthorized download, and deletion on `sundai.club`.
+6. After the production checks pass, remove the unused `GOOGLE_PRIVATE_KEY`,
+   `GOOGLE_CLOUD_BUCKET`, `GOOGLE_CLOUD_MATERIALS_BUCKET` and `GEMINI_API_KEY`
+   Vercel variables. They are not used by this cutover code. Old deployments
+   still need their previous configuration until the cutover is complete.
+
+The production database has zero EventMaterial records, and Production did not
+configure a private GCP materials bucket at the audit. There is no material data
+migration to apply for that state. Recheck before cutover; if files are added in
+GCP, copy and verify them before changing their bucket references. The application
+contains no GCP storage adapter or fallback.
+
 
 ### Email and SMS provider availability
 
@@ -516,12 +539,11 @@ their short expiry or when current access is removed.
 4. Add webhook endpoint for user sync: `[your-domain]/api/webhooks/clerk`
 5. Configure sign-in/sign-up flows in Clerk dashboard
 
-### Google Cloud Storage Setup (Optional):
-1. Create Google Cloud Project
-2. Enable Cloud Storage API
-3. Create a storage bucket
-4. Set up service account with storage permissions
-5. Download service account key JSON file and add to project
+### AWS Storage Setup:
+
+Use the private-material setup procedure above. Configure public images with
+the `S3_IMAGE_*` values in `.env.example`. The application no longer uses GCP
+services.
 
 ### AI Image Generation Setup (Optional):
 1. In Amazon Bedrock, enable access to `openai.gpt-5.6-luna` in a supported region.
@@ -545,3 +567,25 @@ To learn more about the technologies used:
 ---
 
 Built with ❤️ by the Sundai Club team
+
+## Remaining GCP resource audit
+
+The code no longer uses GCP at runtime. One-time copy tools still read the GCP
+source until the cutover is complete. The Sundai project audit found:
+
+| Resource | State | Data to review before closing GCP |
+| --- | --- | --- |
+| `club-site-images` | Public image source | Images copied to S3; keep until cutover checks pass |
+| `database_exports_sundai` | One object, about 1.9 MiB | Archive the existing database export if it must be retained |
+| `runapps_default-vjzzzj` | Eight objects, about 89 KiB | Old app artifacts, last changed in October 2024; confirm their owner and archive needs |
+| `tutu-files` | 77 objects, about 11 GiB | Not referenced by this website; confirm its owner and archive needs |
+| Cloud SQL | Six stopped instances | `quizme-db`, `iap2025`, `prod-clone-for-v3`, `club-site-main`, `sundai-v3`, `sundai-dev`; check which data must be retained |
+| Compute Engine | No instances found | No VM migration found in this check |
+
+The current production website database is already in AWS RDS. Stopped Cloud SQL
+instances are not empty databases. Preserve required data before any deletion.
+No GCP bucket or instance was deleted. Cloud Run listing and the full Cloud Asset
+inventory were denied; this is a partial service inventory. An admin must grant
+read-only Cloud Run and Cloud Asset access, plus `serviceusage.services.use`, to
+complete it. Enabled APIs alone do not prove that resources exist. Other GCP
+projects visible to the account were outside this Sundai project audit.

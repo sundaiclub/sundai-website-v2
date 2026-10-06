@@ -2,7 +2,12 @@ export {};
 
 const fs = require('node:fs/promises');
 const path = require('node:path');
-const { Storage } = require('@google-cloud/storage');
+const {
+  S3Client,
+  HeadObjectCommand,
+  PutObjectCommand,
+} = require('@aws-sdk/client-s3');
+const { fromIni } = require('@aws-sdk/credential-provider-ini');
 const {
   EventApplicationMode,
   EventProjectCardStatus,
@@ -128,15 +133,19 @@ function localDayBounds(date: Date, timezone: string) {
 }
 
 async function loadBucket() {
-  const encodedCredentials = process.env.GOOGLE_PRIVATE_KEY;
-  const bucketName = process.env.GOOGLE_CLOUD_BUCKET;
-  if (!encodedCredentials) throw new Error('Missing GOOGLE_PRIVATE_KEY');
-  if (!bucketName) throw new Error('Missing GOOGLE_CLOUD_BUCKET');
-
-  const credentials = JSON.parse(
-    Buffer.from(encodedCredentials, 'base64').toString('utf8')
-  );
-  return new Storage({ credentials }).bucket(bucketName);
+  const name = process.env.S3_IMAGE_BUCKET;
+  const region = process.env.S3_IMAGE_REGION;
+  const baseUrl = process.env.S3_IMAGE_PUBLIC_BASE_URL;
+  if (!name || !region || !baseUrl)
+    throw new Error('Missing S3 image configuration');
+  return {
+    name,
+    baseUrl,
+    client: new S3Client({
+      region,
+      credentials: fromIni({ profile: process.env.AWS_PROFILE || 'default' }),
+    }),
+  };
 }
 
 async function loadEvents(): Promise<HistoricalEvent[]> {
@@ -209,21 +218,29 @@ async function assetFor(sourceId: string, filenames: string[]) {
 
 async function uploadAsset(bucket: any, sourceId: string, asset: any) {
   const objectKey = `${IMAGE_FOLDER}/${sourceId}${asset.extension}`;
-  const object = bucket.file(objectKey);
-  const [exists] = await object.exists();
+  let exists = false;
+  try {
+    await bucket.client.send(
+      new HeadObjectCommand({ Bucket: bucket.name, Key: objectKey })
+    );
+    exists = true;
+  } catch (error: any) {
+    if (error.$metadata?.httpStatusCode !== 404) throw error;
+  }
   if (!exists) {
-    await bucket.upload(asset.localPath, {
-      destination: objectKey,
-      resumable: false,
-      metadata: {
-        contentType: asset.contentType,
-        cacheControl: 'public, max-age=31536000, immutable',
-      },
-    });
+    await bucket.client.send(
+      new PutObjectCommand({
+        Bucket: bucket.name,
+        Key: objectKey,
+        Body: await fs.readFile(asset.localPath),
+        ContentType: asset.contentType,
+        CacheControl: 'public, max-age=31536000, immutable',
+      })
+    );
   }
   return {
     objectKey,
-    url: `https://storage.googleapis.com/${bucket.name}/${objectKey}`,
+    url: `${bucket.baseUrl.replace(/\/$/, '')}/${objectKey}`,
   };
 }
 
@@ -256,7 +273,7 @@ async function importEvent({
       create: {
         id: imageId,
         key: uploaded.objectKey,
-        bucket: process.env.GOOGLE_CLOUD_BUCKET,
+        bucket: process.env.S3_IMAGE_BUCKET,
         url: uploaded.url,
         filename: event.image.name || asset.filename,
         mimeType: asset.contentType,
@@ -267,7 +284,7 @@ async function importEvent({
       },
       update: {
         key: uploaded.objectKey,
-        bucket: process.env.GOOGLE_CLOUD_BUCKET,
+        bucket: process.env.S3_IMAGE_BUCKET,
         url: uploaded.url,
         filename: event.image.name || asset.filename,
         mimeType: asset.contentType,
