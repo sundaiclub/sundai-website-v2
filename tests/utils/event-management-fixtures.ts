@@ -235,8 +235,7 @@ export type EventFixture = {
   applicationsClosedAt: Date | null;
   applicationsClosedById: string | null;
   applicationsCloseReason: string | null;
-  checkInOpensAt: Date | null;
-  checkInClosesAt: Date | null;
+  trackAttendance: boolean;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -257,6 +256,9 @@ export type EventRegistrationFixture = {
   cancelledAt: Date | null;
   cancelledById: string | null;
   waitlistedAt: Date | null;
+  checkInToken: string;
+  checkedInAt: Date | null;
+  checkedInById: string | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -576,8 +578,7 @@ export const buildEvent = (
   applicationsClosedAt: null,
   applicationsClosedById: null,
   applicationsCloseReason: null,
-  checkInOpensAt: null,
-  checkInClosesAt: null,
+  trackAttendance: false,
   createdAt: fixtureNow(),
   updatedAt: fixtureNow(),
   ...overrides,
@@ -777,6 +778,9 @@ export const buildEventRegistration = (
   cancelledAt: null,
   cancelledById: null,
   waitlistedAt: null,
+  checkInToken: '7d4f3c2a-1b0e-4a9d-8c7b-6e5f4d3c2b1a',
+  checkedInAt: null,
+  checkedInById: null,
   createdAt: fixtureSubmittedAt(),
   updatedAt: fixtureSubmittedAt(),
   ...overrides,

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import type {
+  JsonObject,
   OrganizerRegistrationReviewRow,
   RegistrationStatus,
   TemplateFieldDefinition,
@@ -23,12 +24,46 @@ const REVIEW_STATUSES: RegistrationStatus[] = [
   'BLOCKED',
 ];
 
-function answerLabel(
-  field: TemplateFieldDefinition,
-  row: OrganizerRegistrationReviewRow
-) {
-  const value = row.answersJson?.[field.id];
-  return applicationAnswerLabel(field, value);
+export function RegistrationAnswers({
+  answersJson,
+  templateSnapshotJson,
+}: {
+  answersJson?: JsonObject | null;
+  templateSnapshotJson?: TemplateFieldDefinition[] | null;
+}) {
+  const classes = useManagementClasses();
+
+  return (
+    <dl className="mt-4 grid gap-3">
+      {(templateSnapshotJson ?? []).map(field => {
+        if (field.id === 'name' || field.id === 'email') return null;
+        const value = applicationAnswerLabel(field, answersJson?.[field.id]);
+        if (!value) return null;
+        const url = field.type === 'URL' ? normalizeHttpsUrl(value) : null;
+        return (
+          <div key={field.id}>
+            <dt className={`text-xs font-bold uppercase ${classes.mutedText}`}>
+              {field.label}
+            </dt>
+            <dd className="mt-1 whitespace-pre-wrap text-sm">
+              {url?.valid ? (
+                <a
+                  className="break-all underline underline-offset-2"
+                  href={url.normalizedUrl}
+                  rel="noopener noreferrer"
+                  target="_blank"
+                >
+                  {value}
+                </a>
+              ) : (
+                value
+              )}
+            </dd>
+          </div>
+        );
+      })}
+    </dl>
+  );
 }
 
 export function RegistrationReviewTabs({
@@ -130,37 +165,10 @@ function RegistrationReviewRow({
         </div>
       )}
 
-      <dl className="mt-4 grid gap-3">
-        {(row.templateSnapshotJson ?? []).map(field => {
-          if (field.id === 'name' || field.id === 'email') return null;
-          const value = answerLabel(field, row);
-          if (!value) return null;
-          const url = field.type === 'URL' ? normalizeHttpsUrl(value) : null;
-          return (
-            <div key={field.id}>
-              <dt
-                className={`text-xs font-bold uppercase ${classes.mutedText}`}
-              >
-                {field.label}
-              </dt>
-              <dd className="mt-1 whitespace-pre-wrap text-sm">
-                {url?.valid ? (
-                  <a
-                    className="break-all underline underline-offset-2"
-                    href={url.normalizedUrl}
-                    rel="noopener noreferrer"
-                    target="_blank"
-                  >
-                    {value}
-                  </a>
-                ) : (
-                  value
-                )}
-              </dd>
-            </div>
-          );
-        })}
-      </dl>
+      <RegistrationAnswers
+        answersJson={row.answersJson}
+        templateSnapshotJson={row.templateSnapshotJson}
+      />
 
       {row.organizerNoteBody && (
         <p className={`mt-4 text-sm ${classes.mutedText}`}>

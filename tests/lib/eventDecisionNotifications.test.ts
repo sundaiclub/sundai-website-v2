@@ -1,4 +1,7 @@
-import { notifyEventDecision } from '../../src/lib/eventDecisionNotifications';
+import {
+  buildCheckInTicketContent,
+  notifyEventDecision,
+} from '../../src/lib/eventDecisionNotifications';
 import { enqueueEmails } from '../../src/lib/emailQueue';
 
 jest.mock('../../src/lib/emailQueue', () => ({
@@ -14,8 +17,11 @@ const config = {
   twilioMessagingServiceSid: 'MG123',
 };
 
+const checkInToken = '7d4f3c2a-1b0e-4a9d-8c7b-6e5f4d3c2b1a';
+
 const buildContext = (overrides: Record<string, unknown> = {}) => ({
   publicSafeMessage: null,
+  checkInToken,
   applicant: {
     name: 'Ada Lovelace',
     email: 'ada@example.com',
@@ -32,6 +38,7 @@ const buildContext = (overrides: Record<string, unknown> = {}) => ({
       address: '42 Private Lane, Boston, MA',
       details: 'Use the side entrance and ask for Grace.',
     },
+    trackAttendance: false,
     slug: 'ai-build-night',
     chapter: {
       id: 'chapter-boston',
@@ -112,9 +119,7 @@ describe('event decision notifications', () => {
     expect(sendEmail.mock.calls[0][0].text).toContain(
       'Approved-only details: Use the side entrance and ask for Grace.'
     );
-    expect(sendEmail.mock.calls[0][0].html).toContain(
-      '>Address</p>'
-    );
+    expect(sendEmail.mock.calls[0][0].html).toContain('>Address</p>');
     expect(sendEmail.mock.calls[0][0].html).toContain(
       '42 Private Lane, Boston, MA'
     );
@@ -204,9 +209,7 @@ describe('event decision notifications', () => {
         text: expect.stringContaining(
           'Your application for “Boston AI Build Night” has been waitlisted.'
         ),
-        html: expect.stringContaining(
-          'We will contact you if a spot opens.'
-        ),
+        html: expect.stringContaining('We will contact you if a spot opens.'),
       })
     );
     expect(sendSms).toHaveBeenCalledWith({
@@ -336,5 +339,120 @@ describe('event decision notifications', () => {
 
     expect(result).toEqual({ email: 'skipped', sms: 'skipped' });
     expect(loadContext).not.toHaveBeenCalled();
+  });
+
+  it('leaves check-in QR codes out of approvals when attendance is not tracked', async () => {
+    const sendEmail = jest.fn().mockResolvedValue(undefined);
+    const sendSms = jest.fn().mockResolvedValue(undefined);
+
+    await notifyEventDecision(
+      {
+        eventId: 'event-1',
+        registrationId: 'registration-1',
+        status: 'APPROVED',
+      },
+      {
+        config,
+        loadContext: jest.fn().mockResolvedValue(buildContext()),
+        sendEmail,
+        sendSms,
+      }
+    );
+
+    expect(sendEmail.mock.calls[0][0].html).not.toContain('/api/qr/check-in/');
+    expect(sendEmail.mock.calls[0][0].text).not.toContain('?tab=ticket');
+    expect(sendSms.mock.calls[0][0].body).not.toContain('?tab=ticket');
+  });
+
+  it('includes the check-in QR code and ticket link in tracked approvals', async () => {
+    const sendEmail = jest.fn().mockResolvedValue(undefined);
+    const sendSms = jest.fn().mockResolvedValue(undefined);
+    const context = buildContext();
+
+    await notifyEventDecision(
+      {
+        eventId: 'event-1',
+        registrationId: 'registration-1',
+        status: 'APPROVED',
+      },
+      {
+        config,
+        loadContext: jest.fn().mockResolvedValue({
+          ...context,
+          event: { ...context.event, trackAttendance: true },
+        }),
+        sendEmail,
+        sendSms,
+      }
+    );
+
+    const ticketUrl =
+      'https://events.example.com/events/boston/ai-build-night?tab=ticket';
+    const email = sendEmail.mock.calls[0][0];
+    expect(email.html).toContain(
+      `src="https://events.example.com/api/qr/check-in/${checkInToken}"`
+    );
+    expect(email.html).toContain(`href="${ticketUrl}"`);
+    expect(email.text).toContain(
+      `Show your check-in QR code when you arrive: ${ticketUrl}`
+    );
+    expect(sendSms.mock.calls[0][0].body).toContain(
+      `Your check-in QR code:\n${ticketUrl}`
+    );
+  });
+
+  it('does not attach check-in codes to waitlist or decline notices', async () => {
+    const sendEmail = jest.fn().mockResolvedValue(undefined);
+    const context = buildContext();
+
+    await notifyEventDecision(
+      {
+        eventId: 'event-1',
+        registrationId: 'registration-1',
+        status: 'WAITLISTED',
+      },
+      {
+        config,
+        loadContext: jest.fn().mockResolvedValue({
+          ...context,
+          event: { ...context.event, trackAttendance: true },
+        }),
+        sendEmail,
+        sendSms: jest.fn().mockResolvedValue(undefined),
+      }
+    );
+
+    expect(sendEmail.mock.calls[0][0].html).not.toContain('/api/qr/check-in/');
+  });
+});
+
+describe('buildCheckInTicketContent', () => {
+  it('embeds the attendee QR code in the email and links the ticket tab in SMS', () => {
+    const content = buildCheckInTicketContent(
+      {
+        applicantName: 'Ada Lovelace',
+        checkInToken,
+        event: buildContext().event,
+      },
+      'https://events.example.com'
+    );
+    const ticketUrl =
+      'https://events.example.com/events/boston/ai-build-night?tab=ticket';
+
+    expect(content.subject).toBe(
+      'Your check-in QR code for Boston AI Build Night'
+    );
+    expect(content.text).toContain('Hi Ada Lovelace,');
+    expect(content.html).toContain(
+      `src="https://events.example.com/api/qr/check-in/${checkInToken}"`
+    );
+    expect(content.html).toContain('42 Private Lane, Boston, MA');
+    expect(content.sms).toBe(
+      [
+        'Sundai: Check-in is now enabled for “Boston AI Build Night”.',
+        'Show your check-in QR code to an organizer when you arrive.',
+        `Your check-in QR code:\n${ticketUrl}`,
+      ].join('\n\n')
+    );
   });
 });

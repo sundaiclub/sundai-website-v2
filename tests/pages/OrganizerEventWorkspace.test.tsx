@@ -42,6 +42,7 @@ const workspace = {
     applicationMode: 'REQUIRES_APPROVAL',
     applicationsOpen: true,
     autoPromoteWaitlist: false,
+    trackAttendance: false,
     publicUrl: '/events/boston/ai-build-night',
     hasApprovedOnlyDetails: true,
   },
@@ -80,6 +81,7 @@ const workspace = {
       declined: 3,
       cancelled: 2,
     },
+    checkIn: null,
     projects: { total: 12, submittedCards: 9 },
     pitch: { queued: 8, pitched: 4, highlighted: 2 },
     materials: 6,
@@ -95,7 +97,7 @@ const workspace = {
     'notes',
     'reporting',
   ],
-  unavailable: ['checkIn', 'attendance', 'noShows'],
+  unavailable: ['attendance', 'noShows'],
 };
 
 function jsonResponse(data: unknown, status = 200) {
@@ -292,7 +294,7 @@ describe('/organizer/events/[eventId] workspace', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('does not expose check-in, attendance, or no-show controls', async () => {
+  it('hides check-in controls when attendance tracking is off', async () => {
     const Overview = loadOverview();
     renderWorkspace(<Overview params={{ eventId }} />);
     await screen.findByText('AI Build Night');
@@ -303,7 +305,36 @@ describe('/organizer/events/[eventId] workspace', () => {
     expect(
       screen.queryByRole('button', { name: /check[ -]?in/i })
     ).not.toBeInTheDocument();
-    expect(screen.queryByText(/attendance/i)).not.toBeInTheDocument();
+    expect(screen.getByText('Not tracked')).toBeInTheDocument();
     expect(screen.queryByText(/no[ -]?shows?/i)).not.toBeInTheDocument();
+  });
+
+  it('shows check-in navigation and progress when attendance is tracked', async () => {
+    mockWorkspaceFetch({
+      ...workspace,
+      event: { ...workspace.event, trackAttendance: true },
+      counts: {
+        ...workspace.counts,
+        checkIn: { approved: 42, checkedIn: 17 },
+      },
+      availableSections: [
+        'overview',
+        'registrations',
+        'checkIn',
+        'communications',
+      ],
+    });
+    const Overview = loadOverview();
+    renderWorkspace(<Overview params={{ eventId }} />);
+    await screen.findByText('AI Build Night');
+
+    expect(screen.getByRole('link', { name: /^check-in$/i })).toHaveAttribute(
+      'href',
+      `/organizer/events/${eventId}/check-in`
+    );
+    expect(screen.getByText('Tracking check-ins')).toBeInTheDocument();
+    expect(
+      screen.getByText(/17 of 42 approved\s+attendees checked in/)
+    ).toBeInTheDocument();
   });
 });

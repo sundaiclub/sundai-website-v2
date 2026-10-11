@@ -206,6 +206,7 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
   const [applicationMode, setApplicationMode] = useState('REQUIRES_APPROVAL');
   const [applicationRequired, setApplicationRequired] = useState(true);
   const [autoPromoteWaitlist, setAutoPromoteWaitlist] = useState(false);
+  const [trackAttendance, setTrackAttendance] = useState(false);
   const [approvedAddress, setApprovedAddress] = useState('');
   const [approvedDetails, setApprovedDetails] = useState('');
   const [applicationsOpen, setApplicationsOpen] = useState(true);
@@ -364,6 +365,7 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
             eventPayload.applicationsCloseReason ?? ''
           );
           setAutoPromoteWaitlist(Boolean(eventPayload.autoPromoteWaitlist));
+          setTrackAttendance(Boolean(eventPayload.trackAttendance));
           setApprovedAddress(
             typeof approvedDetails?.address === 'string'
               ? approvedDetails.address
@@ -750,6 +752,7 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
       applicationRequired:
         applicationMode !== 'OPEN_RSVP' || applicationRequired,
       autoPromoteWaitlist,
+      trackAttendance,
       approvedDetailsJson: {
         address: approvedAddress,
         details: approvedDetails,
@@ -1105,7 +1108,13 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
             </label>
             <div className="grid gap-2 sm:col-span-2">
               <span className="text-sm font-semibold">Public description</span>
-              <MarkdownEditor label="Public description" value={description} onChange={setDescription} required rows={8} />
+              <MarkdownEditor
+                label="Public description"
+                value={description}
+                onChange={setDescription}
+                required
+                rows={8}
+              />
             </div>
             <div className="grid gap-2 sm:col-span-2">
               <span className="text-sm font-semibold">Event image</span>
@@ -1316,6 +1325,22 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
               />
               <span className="text-sm font-semibold">
                 Auto-promote waitlist
+              </span>
+            </label>
+            <label className="flex items-start gap-2 pt-7">
+              <input
+                aria-label="Track attendance"
+                checked={trackAttendance}
+                className={`${classes.checkbox} mt-0.5`}
+                onChange={event => setTrackAttendance(event.target.checked)}
+                type="checkbox"
+              />
+              <span className="grid gap-1">
+                <span className="text-sm font-semibold">Track attendance</span>
+                <span className={`text-xs ${classes.mutedText}`}>
+                  Approved attendees get a check-in QR code. Turning this on
+                  later sends codes to everyone already approved.
+                </span>
               </span>
             </label>
             {isEditing && canAdminister && (

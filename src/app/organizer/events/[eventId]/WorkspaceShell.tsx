@@ -49,6 +49,7 @@ const sections: Array<{
 }> = [
   { id: 'overview', label: 'Overview', path: '' },
   { id: 'registrations', label: 'RSVPs', path: '/registrations' },
+  { id: 'checkIn', label: 'Check-in', path: '/check-in' },
   {
     id: 'communications',
     label: 'Communications',

@@ -651,6 +651,7 @@ describe('/organizer/events/[eventId]/settings', () => {
         name: /auto-promote waitlist|waitlist auto-promotion/i,
       })
     );
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Track attendance' }));
     fireEvent.change(screen.getByLabelText(/public location/i), {
       target: { value: 'Cambridge, MA' },
     });
@@ -680,6 +681,9 @@ describe('/organizer/events/[eventId]/settings', () => {
       expect.objectContaining({
         body: expect.stringContaining('"autoPromoteWaitlist":true'),
       })
+    );
+    expect(patchBodyForEvent()).toEqual(
+      expect.objectContaining({ trackAttendance: true })
     );
     expect(global.fetch).toHaveBeenCalledWith(
       `/api/events/${eventSettings.id}`,

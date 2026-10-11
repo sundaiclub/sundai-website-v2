@@ -89,8 +89,7 @@ const buildEvent = (overrides: Record<string, unknown> = {}) => ({
   applicationsClosedAt: null,
   applicationsClosedById: null,
   applicationsCloseReason: 'Capacity reached',
-  checkInOpensAt: new Date('2026-06-18T21:30:00.000Z'),
-  checkInClosesAt: new Date('2026-06-18T23:00:00.000Z'),
+  trackAttendance: true,
   projects: [],
   staff: [],
   ...overrides,
@@ -166,8 +165,6 @@ describe('/api/events event-management foundations', () => {
     const startTime = '2026-06-18T18:00';
     const endTime = '2026-06-18T20:00';
     const applicationsClosedAt = '2026-06-01T13:00:00.000Z';
-    const checkInOpensAt = '2026-06-18T21:30:00.000Z';
-    const checkInClosesAt = '2026-06-18T23:00:00.000Z';
     const approvedDetailsJson = {
       arrivalInstructions: 'Use the side entrance after 6pm.',
       doorCode: 'retired access value',
@@ -214,8 +211,7 @@ describe('/api/events event-management foundations', () => {
           applicationsOpen: false,
           applicationsClosedAt,
           applicationsCloseReason: 'Capacity reached',
-          checkInOpensAt,
-          checkInClosesAt,
+          trackAttendance: true,
         },
       }) as any
     );
@@ -250,8 +246,7 @@ describe('/api/events event-management foundations', () => {
           applicationsClosedAt: new Date(applicationsClosedAt),
           applicationsClosedById: siteAdmin.id,
           applicationsCloseReason: 'Capacity reached',
-          checkInOpensAt: new Date(checkInOpensAt),
-          checkInClosesAt: new Date(checkInClosesAt),
+          trackAttendance: true,
         }),
       })
     );

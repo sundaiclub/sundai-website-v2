@@ -12,8 +12,10 @@ import {
 } from '@/app/components/EventDetailSections';
 import { PublicEventHero } from '@/app/components/EventHeroImage';
 import { EventProjectCarousel } from '@/app/components/EventProjectCarousel';
+import { EventCheckInTicket } from '@/app/components/EventCheckInTicket';
 import PitchEventPage from '@/app/components/PitchEventPage';
 import {
+  ManagementAlert,
   ManagementLinkButton,
   ManagementPage,
 } from '@/app/components/ManagementSurface';
@@ -22,6 +24,11 @@ import {
   ViewerRegistrationStatusBadge,
 } from '@/app/components/PublicEventCard';
 import { listVisibleEventMaterials } from '@/lib/eventMaterials';
+import {
+  CHECK_IN_ORGANIZERS_ONLY_NOTICE,
+  checkInQrImageUrl,
+  getViewerCheckInTicket,
+} from '@/lib/eventCheckIn';
 import { listPublicEventProjects } from '@/lib/publicEventProjects';
 import { getPublicEventBySlug } from '@/lib/publicEvents';
 import { getPublicEventSocialMetadata } from '@/lib/eventSocialMetadata';
@@ -37,13 +44,14 @@ const DEFAULT_SOCIAL_IMAGE = {
 
 type EventPageProps = {
   params: { chapterSlug: string; eventSlug: string };
-  searchParams?: { tab?: string | string[] };
+  searchParams?: { tab?: string | string[]; notice?: string | string[] };
 };
 
-type EventTab = 'info' | 'projects' | 'pitch';
+type EventTab = 'info' | 'ticket' | 'projects' | 'pitch';
 
 const eventTabs: Array<{ id: EventTab; label: string }> = [
   { id: 'info', label: 'Info' },
+  { id: 'ticket', label: 'Ticket' },
   { id: 'projects', label: 'Projects' },
   { id: 'pitch', label: 'Pitch' },
 ];
@@ -159,12 +167,20 @@ export default async function PublicEventDetailPage({
 
   if (!event) notFound();
 
+  const ticket = await getViewerCheckInTicket({
+    eventId: event.id,
+    clerkId: userId,
+  });
+  const visibleTabs = eventTabs.filter(tab => tab.id !== 'ticket' || ticket);
   const requestedTab = Array.isArray(searchParams?.tab)
     ? searchParams?.tab[0]
     : searchParams?.tab;
-  const activeTab: EventTab = eventTabs.some(tab => tab.id === requestedTab)
+  const activeTab: EventTab = visibleTabs.some(tab => tab.id === requestedTab)
     ? (requestedTab as EventTab)
     : 'info';
+  const notice = Array.isArray(searchParams?.notice)
+    ? searchParams?.notice[0]
+    : searchParams?.notice;
   const eventPath = `/events/${encodeURIComponent(event.chapterSlug)}/${encodeURIComponent(event.slug)}`;
 
   const [visibleMaterials, eventProjects] = await Promise.all([
@@ -240,9 +256,19 @@ export default async function PublicEventDetailPage({
         )}
       </div>
 
+      {notice === CHECK_IN_ORGANIZERS_ONLY_NOTICE && (
+        <div className="mb-4">
+          <ManagementAlert tone="warning">
+            <span role="status">
+              Only event organizers can check attendees in.
+            </span>
+          </ManagementAlert>
+        </div>
+      )}
+
       <nav aria-label="Event sections" className="mb-5 overflow-x-auto">
         <ul className="flex min-w-max gap-1 border-b" role="list">
-          {eventTabs.map(tab => {
+          {visibleTabs.map(tab => {
             const href =
               tab.id === 'info' ? eventPath : `${eventPath}?tab=${tab.id}`;
             const isCurrent = activeTab === tab.id;
@@ -296,6 +322,18 @@ export default async function PublicEventDetailPage({
             <EventMaterialsSection materials={materialLinks} />
           </div>
         </>
+      )}
+
+      {activeTab === 'ticket' && ticket && (
+        <div className="mx-auto max-w-md">
+          <EventCheckInTicket
+            attendeeName={ticket.attendeeName}
+            checkedInAt={ticket.checkedInAt?.toISOString() ?? null}
+            eventTitle={event.title}
+            qrImageUrl={checkInQrImageUrl(ticket.token, '')}
+            timezone={event.timezone}
+          />
+        </div>
       )}
 
       {activeTab === 'projects' && (

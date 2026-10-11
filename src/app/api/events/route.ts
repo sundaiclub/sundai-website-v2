@@ -197,8 +197,7 @@ export async function POST(req: Request) {
       applicationsClosedAt,
       applicationsClosedById,
       applicationsCloseReason,
-      checkInOpensAt,
-      checkInClosesAt,
+      trackAttendance,
       staff = [],
       mcIds = [],
       audienceCanReorder = true,
@@ -297,16 +296,6 @@ export async function POST(req: Request) {
       timezone,
       'endTime'
     );
-    const parsedCheckInOpensAt = parseOptionalEventDateTimeInput(
-      checkInOpensAt,
-      timezone,
-      'checkInOpensAt'
-    );
-    const parsedCheckInClosesAt = parseOptionalEventDateTimeInput(
-      checkInClosesAt,
-      timezone,
-      'checkInClosesAt'
-    );
     const parsedVotingEndTime = parseOptionalEventDateTimeInput(
       votingEndTime,
       timezone,
@@ -394,11 +383,8 @@ export async function POST(req: Request) {
           applicationsCloseReason: parsedApplicationsOpen
             ? null
             : applicationsCloseReason || null,
-          ...(checkInOpensAt !== undefined && {
-            checkInOpensAt: parsedCheckInOpensAt,
-          }),
-          ...(checkInClosesAt !== undefined && {
-            checkInClosesAt: parsedCheckInClosesAt,
+          ...(trackAttendance !== undefined && {
+            trackAttendance: Boolean(trackAttendance),
           }),
           staff: {
             create:

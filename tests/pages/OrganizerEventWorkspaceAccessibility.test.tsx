@@ -30,6 +30,7 @@ const workspace = {
     applicationMode: 'REQUIRES_APPROVAL',
     applicationsOpen: true,
     autoPromoteWaitlist: false,
+    trackAttendance: false,
     publicUrl: '/events/boston/accessible-build-night',
     hasApprovedOnlyDetails: true,
   },
@@ -55,6 +56,7 @@ const workspace = {
       declined: 0,
       cancelled: 0,
     },
+    checkIn: null,
     projects: { total: 0, submittedCards: 0 },
     pitch: { queued: 0, pitched: 0, highlighted: 0 },
     materials: 1,
@@ -70,7 +72,7 @@ const workspace = {
     'notes',
     'reporting',
   ] as const,
-  unavailable: ['checkIn', 'attendance', 'noShows'] as const,
+  unavailable: ['attendance', 'noShows'] as const,
 };
 
 const material = {

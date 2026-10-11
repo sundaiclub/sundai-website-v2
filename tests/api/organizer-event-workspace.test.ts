@@ -54,6 +54,7 @@ const event = {
   applicationMode: 'REQUIRES_APPROVAL',
   applicationsOpen: true,
   autoPromoteWaitlist: false,
+  trackAttendance: false,
   publicUrl: '/events/boston/boston-ai-build-night',
   hasApprovedOnlyDetails: true,
 };
@@ -79,6 +80,7 @@ const counts = {
     declined: 3,
     cancelled: 2,
   },
+  checkIn: null,
   projects: { total: 12, submittedCards: 9 },
   pitch: { queued: 8, pitched: 4, highlighted: 2 },
   materials: 6,
@@ -90,7 +92,7 @@ const workspace = (overrides: Record<string, unknown> = {}) => ({
   capabilities: operationalCapabilities,
   counts,
   staff: [],
-  unavailable: ['checkIn', 'attendance', 'noShows'],
+  unavailable: ['attendance', 'noShows'],
   ...overrides,
 });
 
@@ -226,6 +228,7 @@ describe('GET /api/events/[eventId]/workspace', () => {
         declined: 0,
         cancelled: 0,
       },
+      checkIn: null,
       projects: { total: 0, submittedCards: 0 },
       pitch: { queued: 0, pitched: 0, highlighted: 0 },
       materials: 0,
@@ -243,13 +246,12 @@ describe('GET /api/events/[eventId]/workspace', () => {
     expect(body.staff).toEqual([]);
   });
 
-  it('marks check-in, attendance, and no-show metrics unavailable instead of zero', async () => {
+  it('marks attendance and no-show metrics unavailable instead of zero', async () => {
     const response = await getWorkspace();
     const body = await response.json();
 
     expect(response.status).toBe(200);
-    expect(body.unavailable).toEqual(['checkIn', 'attendance', 'noShows']);
-    expect(body.counts).not.toHaveProperty('checkIn');
+    expect(body.unavailable).toEqual(['attendance', 'noShows']);
     expect(body.counts).not.toHaveProperty('attendance');
     expect(body.counts).not.toHaveProperty('noShows');
   });

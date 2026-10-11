@@ -81,6 +81,7 @@ const workspaceSummary = {
     applicationMode: 'REQUIRES_APPROVAL',
     applicationsOpen: true,
     autoPromoteWaitlist: true,
+    trackAttendance: false,
     publicUrl: '/events/boston/ai-build-night',
     hasApprovedOnlyDetails: true,
   },
@@ -105,6 +106,7 @@ const workspaceSummary = {
       declined: 1,
       cancelled: 1,
     },
+    checkIn: null,
     projects: { total: 0, submittedCards: 0 },
     pitch: { queued: 0, pitched: 0, highlighted: 0 },
     materials: 0,
@@ -120,7 +122,7 @@ const workspaceSummary = {
     'notes',
     'reporting',
   ],
-  unavailable: ['checkIn', 'attendance', 'noShows'],
+  unavailable: ['attendance', 'noShows'],
 };
 
 const decisionCapabilities: OrganizerRegistrationReviewCapabilities = {
