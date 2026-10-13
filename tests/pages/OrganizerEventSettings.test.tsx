@@ -250,10 +250,10 @@ describe('/organizer/events/[eventId]/settings', () => {
         })
       );
       expect(screen.getByLabelText('Edit question options')).toHaveValue(
-        'Design=design'
+        'design=Design'
       );
       fireEvent.change(screen.getByLabelText('Edit question options'), {
-        target: { value: 'Design=design\nCode=code' },
+        target: { value: 'design=Design\ncode=Code' },
       });
       expect(screen.getByText('You have unsaved changes')).toBeInTheDocument();
       fireEvent.click(topSaveSettingsButton()!);
@@ -285,7 +285,7 @@ describe('/organizer/events/[eventId]/settings', () => {
         })
       );
       expect(screen.getByLabelText('Edit question options')).toHaveValue(
-        'Design=design\nCode=code'
+        'design=Design\ncode=Code'
       );
     }
   );
@@ -333,7 +333,7 @@ describe('/organizer/events/[eventId]/settings', () => {
         target: { value: type },
       });
       fireEvent.change(screen.getByLabelText('Custom question options'), {
-        target: { value: 'Design=design\nCode=code' },
+        target: { value: 'design=Design\ncode=Code' },
       });
       fireEvent.click(
         screen.getByRole('button', { name: /add custom question/i })

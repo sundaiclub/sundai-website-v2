@@ -155,7 +155,7 @@ it.each([
   });
   expect(screen.getByRole('option', { name: label })).toBeInTheDocument();
   fireEvent.change(screen.getByLabelText('Choices field 1 options'), {
-    target: { value: 'Design=design\nCode=code' },
+    target: { value: 'design=Design\ncode=Code' },
   });
   fireEvent.click(screen.getByRole('button', { name: /save template/i }));
   await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(1));
