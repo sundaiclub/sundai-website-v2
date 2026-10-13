@@ -1,5 +1,11 @@
 import React from 'react';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 const mockUseTheme = jest.fn();
@@ -141,10 +147,87 @@ describe('organizer event workspace accessibility', () => {
     ).toHaveAttribute('href', workspace.event.publicUrl);
     await user.tab();
     expect(screen.getByRole('link', { name: /view event/i })).toHaveFocus();
+    await user.tab();
+    expect(
+      screen.getByRole('button', { name: /download attendees/i })
+    ).toHaveFocus();
     for (const link of links) {
       await user.tab();
       expect(link).toHaveFocus();
     }
+  });
+
+  it('downloads from the export route and reports a failed download', async () => {
+    const WorkspaceShell =
+      require('../../src/app/organizer/events/[eventId]/WorkspaceShell').default;
+    const originalFetch = global.fetch;
+    const originalCreate = URL.createObjectURL;
+    const originalRevoke = URL.revokeObjectURL;
+    const click = jest
+      .spyOn(HTMLAnchorElement.prototype, 'click')
+      .mockImplementation(() => {});
+    const blob = new Blob(['xlsx']);
+    global.fetch = jest
+      .fn()
+      .mockResolvedValue({
+        ok: true,
+        blob: async () => blob,
+        headers: new Headers({
+          'Content-Disposition':
+            'attachment; filename="event-accepted-attendees.xlsx"',
+        }),
+      });
+    URL.createObjectURL = jest.fn().mockReturnValue('blob:attendees');
+    URL.revokeObjectURL = jest.fn();
+    try {
+      render(
+        <WorkspaceShell eventId={eventId} initialWorkspace={workspace}>
+          <p>Content</p>
+        </WorkspaceShell>
+      );
+      fireEvent.click(
+        screen.getByRole('button', { name: /download attendees/i })
+      );
+      await waitFor(() => expect(click).toHaveBeenCalled());
+      expect(global.fetch).toHaveBeenCalledWith(
+        `/api/events/${eventId}/registrations/export`,
+        { cache: 'no-store' }
+      );
+      expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:attendees');
+      await waitFor(() =>
+        expect(
+          screen.getByRole('button', { name: /download attendees/i })
+        ).toBeEnabled()
+      );
+      (global.fetch as jest.Mock).mockResolvedValue({ ok: false });
+      fireEvent.click(
+        screen.getByRole('button', { name: /download attendees/i })
+      );
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        'Could not download attendees'
+      );
+    } finally {
+      global.fetch = originalFetch;
+      URL.createObjectURL = originalCreate;
+      URL.revokeObjectURL = originalRevoke;
+      click.mockRestore();
+    }
+  });
+
+  it('hides attendee download when the workspace does not include RSVP access', () => {
+    const WorkspaceShell =
+      require('../../src/app/organizer/events/[eventId]/WorkspaceShell').default;
+    render(
+      <WorkspaceShell
+        eventId={eventId}
+        initialWorkspace={{ ...workspace, availableSections: ['overview'] }}
+      >
+        <p>Content</p>
+      </WorkspaceShell>
+    );
+    expect(
+      screen.queryByRole('button', { name: /download attendees/i })
+    ).not.toBeInTheDocument();
   });
 
   it('announces loading and permission failures through live status semantics', async () => {

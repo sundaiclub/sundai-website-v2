@@ -11,6 +11,7 @@ import {
   canManageEventOperationsWithContext,
   canManageEventPitchWithContext,
   canManagePitchWithContext,
+  canManageRegistrationsWithContext,
   canManageChapterMembers,
   canManageChapterSettings,
   canManageEventSettings,
@@ -171,6 +172,13 @@ export function requireEventWorkspaceAccess(eventId: string) {
   return requireCurrentEventCapability(
     eventId,
     canAccessEventWorkspaceWithContext
+  );
+}
+
+export function requireEventRegistrationManager(eventId: string) {
+  return requireCurrentEventCapability(
+    eventId,
+    canManageRegistrationsWithContext
   );
 }
 

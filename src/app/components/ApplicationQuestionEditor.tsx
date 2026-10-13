@@ -13,7 +13,7 @@ import {
 import { useManagementClasses } from './ManagementSurface';
 function optionText(options?: TemplateFieldOption[]) {
   return (options ?? [])
-    .map(option => `${option.label}=${option.value}`)
+    .map(option => `${option.value}=${option.label}`)
     .join('\n');
 }
 
@@ -29,8 +29,8 @@ function parseOptions(value: string): TemplateFieldOption[] | undefined {
       }
 
       return {
-        label: line.slice(0, separatorIndex).trim(),
-        value: line.slice(separatorIndex + 1).trim(),
+        value: line.slice(0, separatorIndex).trim(),
+        label: line.slice(separatorIndex + 1).trim(),
       };
     });
 
@@ -206,6 +206,12 @@ export function ApplicationQuestionEditor({
       {supportsOptions && (
         <p id={optionsHelpId} className={classes.mutedText}>
           {optionsError ?? 'Enter one option per line.'}
+          <span className="mt-1 block">
+            Options appear as original value=new name when you edit them. To
+            rename an option, change the name after the equals sign (=). Keep
+            the original value before it the same so existing answers stay
+            linked to the option.
+          </span>
         </p>
       )}
     </div>

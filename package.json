@@ -48,6 +48,7 @@
     "@vercel/oidc-aws-credentials-provider": "^3.3.11",
     "@vercel/queue": "^0.7.0",
     "date-fns": "^4.1.0",
+    "exceljs": "^4.4.0",
     "framer-motion": "^11.11.1",
     "markdown-it": "^15.0.2",
     "next": "14.2.33",
