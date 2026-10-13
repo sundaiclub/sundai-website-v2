@@ -4,7 +4,7 @@ import { EmailQueueBusy, processEmailBatch } from '@/lib/emailQueue';
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
-export const POST = handleCallback<{ batchId: string }>(
+const handleEmailDelivery = handleCallback<{ batchId: string }>(
   async message => {
     await processEmailBatch(message.batchId);
   },
@@ -16,3 +16,7 @@ export const POST = handleCallback<{ batchId: string }>(
     }),
   }
 );
+
+export async function POST(request: Request): Promise<Response> {
+  return handleEmailDelivery(request);
+}

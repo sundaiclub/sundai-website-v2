@@ -239,6 +239,9 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
     TemplateFieldDefinition[]
   >([]);
   const [questionOrder, setQuestionOrder] = useState<string[]>([]);
+  const [editingQuestionId, setEditingQuestionId] = useState<string | null>(
+    null
+  );
   const [draggedQuestionId, setDraggedQuestionId] = useState<string | null>(
     null
   );
@@ -503,7 +506,10 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
   );
   const orderedApplicationQuestions = useMemo(() => {
     const fields = uniqueFields([
-      ...selectedChapterTemplateFields,
+      ...selectedChapterTemplateFields.map(
+        field =>
+          customQuestions.find(question => question.id === field.id) ?? field
+      ),
       ...customQuestions,
     ]);
     const fieldsById = new Map(fields.map(field => [field.id, field]));
@@ -656,12 +662,28 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
   }
 
   function removeCustomQuestion(questionId: string) {
+    if (editingQuestionId === questionId) setEditingQuestionId(null);
     setCustomQuestions(current =>
       current.filter(question => question.id !== questionId)
     );
     setQuestionOrder(current =>
       current.filter(fieldId => fieldId !== questionId)
     );
+  }
+
+  function updateApplicationQuestion(
+    field: TemplateFieldDefinition,
+    updates: Partial<TemplateFieldDefinition>
+  ) {
+    setCustomQuestions(current => {
+      const existing = current.find(question => question.id === field.id);
+      const updated = { ...(existing ?? field), ...updates, id: field.id };
+      return existing
+        ? current.map(question =>
+            question.id === field.id ? updated : question
+          )
+        : [...current, updated];
+    });
   }
 
   function moveApplicationQuestion(targetQuestionId: string) {
@@ -810,6 +832,15 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
   async function saveEvent(shouldPublish: boolean) {
     setMessage('');
     setSavedEventId(null);
+    for (const field of orderedApplicationQuestions) {
+      const error = !field.label.trim()
+        ? 'Enter a label for each application question.'
+        : applicationQuestionOptionsError(field);
+      if (error) {
+        setMessage(`Unable to save event settings. ${error}`);
+        return;
+      }
+    }
     if (
       hasQuestionDraft &&
       (!questionDraft.label.trim() || questionOptionsError)
@@ -1519,7 +1550,7 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
                     className={`grid gap-2 rounded-md border px-3 py-2 text-sm sm:grid-cols-[auto_minmax(0,1fr)_auto_auto] sm:items-center ${
                       classes.isDarkMode ? 'border-gray-700' : 'border-gray-200'
                     }`}
-                    draggable
+                    draggable={editingQuestionId !== field.id}
                     key={field.id}
                     role="button"
                     tabIndex={0}
@@ -1554,19 +1585,51 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
                         {applicationQuestionTypeLabel(field.type)}
                       </ManagementBadge>
                     </span>
-                    {customQuestions.some(
-                      question => question.id === field.id
-                    ) ? (
+                    <div className="flex gap-2">
                       <button
-                        aria-label={`Remove custom question ${field.label}`}
-                        className={classes.ghostButton}
-                        onClick={() => removeCustomQuestion(field.id)}
+                        aria-label={`Edit application question ${field.label}`}
+                        aria-expanded={editingQuestionId === field.id}
+                        className={classes.secondaryButton}
+                        onClick={() =>
+                          setEditingQuestionId(current =>
+                            current === field.id ? null : field.id
+                          )
+                        }
                         type="button"
                       >
-                        x
+                        {editingQuestionId === field.id
+                          ? 'Close editor'
+                          : 'Edit'}
                       </button>
-                    ) : (
-                      <span aria-hidden="true" />
+                      {customQuestions.some(
+                        question => question.id === field.id
+                      ) ? (
+                        <button
+                          aria-label={`Remove custom question ${field.label}`}
+                          className={classes.ghostButton}
+                          onClick={() => removeCustomQuestion(field.id)}
+                          type="button"
+                        >
+                          x
+                        </button>
+                      ) : (
+                        <span aria-hidden="true" />
+                      )}
+                    </div>
+                    {editingQuestionId === field.id && (
+                      <div className="sm:col-span-4">
+                        <ApplicationQuestionEditor
+                          field={field}
+                          labelPrefix="Edit question"
+                          onChange={updates =>
+                            updateApplicationQuestion(field, updates)
+                          }
+                        />
+                        <p className={`mt-2 text-sm ${classes.mutedText}`}>
+                          Use Save settings to save these changes for this
+                          event.
+                        </p>
+                      </div>
                     )}
                   </div>
                 ))}

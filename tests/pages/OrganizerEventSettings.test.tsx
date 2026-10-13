@@ -201,6 +201,128 @@ describe('/organizer/events/[eventId]/settings', () => {
     mockEventFetch();
   });
 
+  it.each(['admin', 'MC'])(
+    'lets an %s add options to a saved checkbox group without changing its ID',
+    async role => {
+      const field = {
+        id: 'interests',
+        label: 'Interests',
+        type: 'MULTI_SELECT',
+        required: false,
+        order: 0,
+        options: [{ label: 'Design', value: 'design' }],
+      };
+      global.fetch = jest.fn((input: RequestInfo | URL) => {
+        const url = requestUrl(input);
+        if (url.endsWith('/workspace')) {
+          return jsonResponse({
+            capabilities: {
+              administerEvent: role === 'admin',
+              editEventSettings: true,
+            },
+          });
+        }
+        if (url.endsWith('?management=true')) {
+          return jsonResponse({
+            ...eventSettings,
+            canAdminister: role === 'admin',
+            applicationQuestionsJson: [field],
+          });
+        }
+        // A saved event copy must take precedence over its chapter template.
+        if (url.includes('/api/application-templates')) {
+          return jsonResponse([
+            {
+              id: 'chapter-template',
+              name: 'Chapter',
+              scope: 'CHAPTER',
+              isActive: true,
+              fields: [field],
+            },
+          ]);
+        }
+        return jsonResponse({});
+      }) as jest.Mock;
+      renderSettingsPage();
+      fireEvent.click(
+        await screen.findByRole('button', {
+          name: 'Edit application question Interests',
+        })
+      );
+      expect(screen.getByLabelText('Edit question options')).toHaveValue(
+        'design=Design'
+      );
+      fireEvent.change(screen.getByLabelText('Edit question options'), {
+        target: { value: 'design=Design\ncode=Code' },
+      });
+      expect(screen.getByText('You have unsaved changes')).toBeInTheDocument();
+      fireEvent.click(topSaveSettingsButton()!);
+      await screen.findByText('Event settings saved');
+      expect(patchBodyForEvent()?.applicationQuestionsJson).toEqual([
+        {
+          ...field,
+          helpText: null,
+          placeholder: null,
+          options: [
+            { label: 'Design', value: 'design' },
+            { label: 'Code', value: 'code' },
+          ],
+        },
+      ]);
+      if (role === 'MC')
+        expect(patchBodyForEvent()).not.toHaveProperty('staff');
+      expect(
+        screen.queryByText('You have unsaved changes')
+      ).not.toBeInTheDocument();
+      fireEvent.click(
+        screen.getByRole('button', {
+          name: 'Edit application question Interests',
+        })
+      );
+      fireEvent.click(
+        screen.getByRole('button', {
+          name: 'Edit application question Interests',
+        })
+      );
+      expect(screen.getByLabelText('Edit question options')).toHaveValue(
+        'design=Design\ncode=Code'
+      );
+    }
+  );
+
+  it('blocks invalid options in a saved checkbox group and keeps the edit', async () => {
+    mockEventFetch({
+      ...eventSettings,
+      applicationQuestionsJson: [
+        {
+          id: 'interests',
+          label: 'Interests',
+          type: 'MULTI_SELECT',
+          required: false,
+          order: 0,
+          options: [{ label: 'Design', value: 'design' }],
+        },
+      ],
+    } as typeof eventSettings);
+    renderSettingsPage();
+    fireEvent.click(
+      await screen.findByRole('button', {
+        name: 'Edit application question Interests',
+      })
+    );
+    fireEvent.change(screen.getByLabelText('Edit question options'), {
+      target: { value: '' },
+    });
+    fireEvent.click(topSaveSettingsButton()!);
+    expect(
+      await screen.findByText(
+        /Unable to save event settings.*Enter at least one option/
+      )
+    ).toBeInTheDocument();
+    expect(patchBodyForEvent()).toBeNull();
+    expect(screen.getByLabelText('Edit question options')).toHaveValue('');
+  });
+
   it.each(['SELECT', 'MULTI_SELECT'])(
     'adds and saves a %s choice group from event settings',
     async type => {
@@ -211,7 +333,7 @@ describe('/organizer/events/[eventId]/settings', () => {
         target: { value: type },
       });
       fireEvent.change(screen.getByLabelText('Custom question options'), {
-        target: { value: 'Design=design\nCode=code' },
+        target: { value: 'design=Design\ncode=Code' },
       });
       fireEvent.click(
         screen.getByRole('button', { name: /add custom question/i })

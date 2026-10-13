@@ -153,12 +153,42 @@ function WorkspaceContent({
   const pathname = usePathname();
   const classes = useManagementClasses();
   const event = workspace.event;
+  const [downloading, setDownloading] = useState(false);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
   const hasPublicEvent = event.status !== 'DRAFT';
   const availableSections = new Set(
     workspace.availableSections?.length
       ? workspace.availableSections
       : sections.map(section => section.id)
   );
+
+  async function downloadAttendees() {
+    setDownloading(true);
+    setDownloadError(null);
+    try {
+      const response = await fetch(
+        `/api/events/${eventId}/registrations/export`,
+        { cache: 'no-store' }
+      );
+      if (!response.ok) throw new Error('Download failed');
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download =
+        response.headers
+          .get('Content-Disposition')
+          ?.match(/filename="([^"]+)"/)?.[1] ?? 'accepted-attendees.xlsx';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      setDownloadError('Could not download attendees. Please try again.');
+    } finally {
+      setDownloading(false);
+    }
+  }
 
   return (
     <ManagementPage maxWidth="max-w-7xl">
@@ -192,16 +222,36 @@ function WorkspaceContent({
               </ManagementBadge>
             </div>
           </div>
-          {hasPublicEvent && (
-            <Link
-              className={classes.secondaryButton}
-              href={event.publicUrl}
-              target="_blank"
-            >
-              View event
-            </Link>
-          )}
+          <div className="flex shrink-0 flex-wrap gap-2">
+            {hasPublicEvent && (
+              <Link
+                className={classes.secondaryButton}
+                href={event.publicUrl}
+                target="_blank"
+              >
+                View event
+              </Link>
+            )}
+            {availableSections.has('registrations') && (
+              <button
+                className={classes.secondaryButton}
+                type="button"
+                disabled={downloading}
+                onClick={downloadAttendees}
+              >
+                {downloading ? 'Downloading attendees…' : 'Download attendees'}
+              </button>
+            )}
+          </div>
         </div>
+
+        {downloadError && (
+          <div className="mt-3">
+            <ManagementAlert tone="danger">
+              <span role="alert">{downloadError}</span>
+            </ManagementAlert>
+          </div>
+        )}
 
         <nav aria-label="Event workspace" className="mt-5 overflow-x-auto">
           <ul className="flex min-w-max gap-1 border-b" role="list">

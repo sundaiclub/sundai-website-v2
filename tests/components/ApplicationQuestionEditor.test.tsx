@@ -66,6 +66,51 @@ it('uses the same full field menu for each editor', () => {
       .map(option => (option as HTMLOptionElement).value)
   ).toEqual(TEMPLATE_FIELD_TYPES);
 });
+it.each(['SELECT', 'MULTI_SELECT'] as const)(
+  'renames a saved %s option on the right and keeps its stored value',
+  type => {
+    const field: TemplateFieldDefinition = {
+      ...initial,
+      type,
+      options: [{ value: 'design', label: 'Design' }],
+    };
+    const onChange = jest.fn();
+    const { rerender } = render(
+      <ApplicationQuestionEditor
+        field={field}
+        labelPrefix="Question"
+        onChange={onChange}
+      />
+    );
+    expect(screen.getByLabelText('Question options')).toHaveValue(
+      'design=Design'
+    );
+    fireEvent.change(screen.getByLabelText('Question options'), {
+      target: { value: 'design=Product design' },
+    });
+    const updates = onChange.mock.calls[0][0];
+    expect(updates.options).toEqual([
+      { value: 'design', label: 'Product design' },
+    ]);
+    const savedField = { ...field, ...updates };
+    expect(
+      applicationAnswerLabel(
+        savedField,
+        type === 'SELECT' ? 'design' : ['design']
+      )
+    ).toBe('Product design');
+    rerender(
+      <ApplicationQuestionEditor
+        field={savedField}
+        labelPrefix="Question"
+        onChange={onChange}
+      />
+    );
+    expect(screen.getByLabelText('Question options')).toHaveValue(
+      'design=Product design'
+    );
+  }
+);
 it.each(TEMPLATE_FIELD_TYPES)(
   'renders %s consistently in the live input and preview',
   type => {
