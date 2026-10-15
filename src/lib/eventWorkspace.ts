@@ -1,5 +1,6 @@
 import type { Hacker, Prisma } from '@prisma/client';
 import prisma from '@/lib/prisma';
+import { countEventCheckIns } from '@/lib/eventCheckIn';
 import {
   canAccessEventWorkspaceWithContext,
   canAdministerEventWithContext,
@@ -24,6 +25,7 @@ const MAX_WORKSPACE_STAFF = 100;
 const AVAILABLE_SECTIONS: EventWorkspaceOverview['availableSections'] = [
   'overview',
   'registrations',
+  'checkIn',
   'communications',
   'materials',
   'projects',
@@ -33,15 +35,17 @@ const AVAILABLE_SECTIONS: EventWorkspaceOverview['availableSections'] = [
 ];
 
 export function getAvailableWorkspaceSections(
-  canReviewRsvps: boolean
+  canReviewRsvps: boolean,
+  trackAttendance: boolean
 ): EventWorkspaceOverview['availableSections'] {
-  return canReviewRsvps
-    ? [...AVAILABLE_SECTIONS]
-    : AVAILABLE_SECTIONS.filter(section => section !== 'registrations');
+  return AVAILABLE_SECTIONS.filter(
+    section =>
+      (canReviewRsvps || section !== 'registrations') &&
+      (trackAttendance || section !== 'checkIn')
+  );
 }
 
 const WORKSPACE_UNAVAILABLE_METRICS: EventWorkspaceOverview['unavailable'] = [
-  'checkIn',
   'attendance',
   'noShows',
 ];
@@ -123,6 +127,7 @@ export async function loadEventWorkspace(
       applicationMode: true,
       applicationsOpen: true,
       autoPromoteWaitlist: true,
+      trackAttendance: true,
       approvedDetailsJson: true,
       slug: true,
       chapterId: true,
@@ -213,6 +218,9 @@ export async function loadEventWorkspace(
     prisma.eventMaterial.count({ where: { eventId } }),
     prisma.eventCommunication.count({ where: { eventId } }),
   ]);
+  const checkInCounts = event.trackAttendance
+    ? await countEventCheckIns(eventId, actor)
+    : null;
 
   return {
     event: {
@@ -227,6 +235,7 @@ export async function loadEventWorkspace(
       applicationMode: event.applicationMode,
       applicationsOpen: event.applicationsOpen,
       autoPromoteWaitlist: event.autoPromoteWaitlist,
+      trackAttendance: event.trackAttendance,
       publicUrl: `/events/${event.chapter.slug}/${event.slug}`,
       hasApprovedOnlyDetails: event.approvedDetailsJson !== null,
     },
@@ -239,6 +248,7 @@ export async function loadEventWorkspace(
     })),
     counts: {
       registrations: registrationCounts(registrationGroups),
+      checkIn: checkInCounts,
       projects: { total: projectTotal, submittedCards },
       pitch: {
         queued: queuedProjects,
@@ -249,7 +259,8 @@ export async function loadEventWorkspace(
       communications: communicationCount,
     },
     availableSections: getAvailableWorkspaceSections(
-      canDecideEventApplicantsWithContext(permissionContext)
+      canDecideEventApplicantsWithContext(permissionContext),
+      event.trackAttendance
     ),
     unavailable: [...WORKSPACE_UNAVAILABLE_METRICS],
   };

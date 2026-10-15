@@ -691,6 +691,7 @@ describe('/organizer/events/new', () => {
         capacity: 100,
         applicationMode: 'REQUIRES_APPROVAL',
         autoPromoteWaitlist: false,
+        trackAttendance: false,
         approvedDetailsJson: expect.objectContaining({
           address: '42 Private Lane',
           details: 'Use the side door and bring a laptop.',

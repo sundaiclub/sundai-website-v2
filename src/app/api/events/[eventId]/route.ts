@@ -26,6 +26,7 @@ import {
 import { requireEventSettingsManager } from '@/lib/eventManagementApi';
 import { HttpsUrlInputError, normalizeOptionalHttpsUrl } from '@/lib/httpsUrls';
 import { approveEventStaffRegistrations } from '@/lib/eventStaffRegistrations';
+import { sendCheckInTickets } from '@/lib/eventCheckInTickets';
 import {
   EventDateTimeInputError,
   parseEventDateTimeInput,
@@ -308,6 +309,7 @@ export async function PATCH(
       select: {
         chapterId: true,
         applicationMode: true,
+        trackAttendance: true,
       },
     });
     if (!existingEvent) return new NextResponse('Not Found', { status: 404 });
@@ -344,8 +346,7 @@ export async function PATCH(
       applicationsClosedAt,
       applicationsClosedById,
       applicationsCloseReason,
-      checkInOpensAt,
-      checkInClosesAt,
+      trackAttendance,
       staff,
       mcIds,
       votingEndTime,
@@ -390,6 +391,13 @@ export async function PATCH(
       );
     }
 
+    if (trackAttendance !== undefined && typeof trackAttendance !== 'boolean') {
+      return NextResponse.json(
+        { message: 'trackAttendance must be a boolean' },
+        { status: 400 }
+      );
+    }
+
     const nextApplicationMode =
       parsedApplicationMode ?? existingEvent.applicationMode;
     const nextApplicationRequired =
@@ -422,16 +430,6 @@ export async function PATCH(
       endTime,
       timezone,
       'endTime'
-    );
-    const parsedCheckInOpensAt = parseOptionalEventDateTimeInput(
-      checkInOpensAt,
-      timezone,
-      'checkInOpensAt'
-    );
-    const parsedCheckInClosesAt = parseOptionalEventDateTimeInput(
-      checkInClosesAt,
-      timezone,
-      'checkInClosesAt'
     );
     const parsedVotingEndTime = parseOptionalEventDateTimeInput(
       votingEndTime,
@@ -556,11 +554,8 @@ export async function PATCH(
           applicationsCloseReason !== undefined && {
             applicationsCloseReason: applicationsCloseReason || null,
           }),
-        ...(checkInOpensAt !== undefined && {
-          checkInOpensAt: parsedCheckInOpensAt,
-        }),
-        ...(checkInClosesAt !== undefined && {
-          checkInClosesAt: parsedCheckInClosesAt,
+        ...(trackAttendance !== undefined && {
+          trackAttendance,
         }),
       },
     });
@@ -690,6 +685,10 @@ export async function PATCH(
         },
       },
     });
+
+    if (event && trackAttendance === true && !existingEvent.trackAttendance) {
+      await sendCheckInTickets({ eventId: event.id, actorId: user.id });
+    }
 
     return NextResponse.json(event);
   } catch (error) {

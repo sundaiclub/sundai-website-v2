@@ -11,6 +11,7 @@ import { getPublicEventBySlug } from '@/lib/publicEvents';
 import { listVisibleEventMaterials } from '@/lib/eventMaterials';
 import { listPublicEventProjects } from '@/lib/publicEventProjects';
 import { getPublicEventSocialMetadata } from '@/lib/eventSocialMetadata';
+import { getViewerCheckInTicket } from '@/lib/eventCheckIn';
 import { DEFAULT_SOCIAL_IMAGE_URL, publicUrl } from '@/lib/siteUrl';
 import { mockProject } from '../utils/test-utils';
 
@@ -77,6 +78,12 @@ jest.mock('@/lib/publicEventProjects', () => ({
   listPublicEventProjects: jest.fn(),
 }));
 
+jest.mock('@/lib/eventCheckIn', () => ({
+  CHECK_IN_ORGANIZERS_ONLY_NOTICE: 'check-in-organizers-only',
+  checkInQrImageUrl: (token: string) => `/api/qr/check-in/${token}`,
+  getViewerCheckInTicket: jest.fn(),
+}));
+
 jest.mock('@/app/components/PitchEventPage', () => ({
   __esModule: true,
   default: ({ eventId }: { eventId: string }) => (
@@ -94,6 +101,7 @@ const mockGetPublicEventSocialMetadata =
   getPublicEventSocialMetadata as jest.Mock;
 const mockListVisibleEventMaterials = listVisibleEventMaterials as jest.Mock;
 const mockListPublicEventProjects = listPublicEventProjects as jest.Mock;
+const mockGetViewerCheckInTicket = getViewerCheckInTicket as jest.Mock;
 const routeParams = { chapterSlug: 'boston', eventSlug: 'ai-build-night' };
 const eventFixture = publicCalendarPayloadFixture.event;
 const approvedOnlyDetails = {
@@ -449,7 +457,8 @@ function mockEventFetches(event: PublicEventDetail | null) {
 
 async function renderDetailPage(
   event: PublicEventDetail | null,
-  tab?: 'projects' | 'pitch'
+  tab?: 'projects' | 'pitch' | 'ticket',
+  extraSearchParams: { notice?: string } = {}
 ) {
   mockGetPublicEventBySlug.mockResolvedValue(event);
   mockListVisibleEventMaterials.mockResolvedValue(
@@ -468,9 +477,12 @@ async function renderDetailPage(
     const element = await (
       EventDetailPage as unknown as (props: {
         params: typeof routeParams;
-        searchParams?: { tab?: string };
+        searchParams?: { tab?: string; notice?: string };
       }) => Promise<React.ReactElement>
-    )({ params: routeParams, searchParams: tab ? { tab } : undefined });
+    )({
+      params: routeParams,
+      searchParams: { ...(tab && { tab }), ...extraSearchParams },
+    });
     render(element);
     return;
   }
@@ -505,7 +517,53 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
     jest.clearAllMocks();
     mockUseTheme.mockReturnValue({ isDarkMode: false });
     mockListPublicEventProjects.mockResolvedValue([]);
+    mockGetViewerCheckInTicket.mockResolvedValue(null);
     mockSignedOut();
+  });
+
+  it('hides the ticket tab when the viewer has no check-in ticket', async () => {
+    await renderDetailPage(buildEventDetail(), 'ticket');
+
+    expect(
+      screen.queryByRole('link', { name: /^ticket$/i })
+    ).not.toBeInTheDocument();
+    expect(screen.queryByAltText(/check-in qr code/i)).not.toBeInTheDocument();
+  });
+
+  it('shows approved attendees their check-in QR code on the ticket tab', async () => {
+    mockSignedIn();
+    mockGetViewerCheckInTicket.mockResolvedValue({
+      token: 'ticket-token',
+      attendeeName: 'Ada Lovelace',
+      checkedInAt: null,
+    });
+
+    await renderDetailPage(buildEventDetail(), 'ticket');
+
+    const tabs = screen
+      .getAllByRole('link')
+      .map(link => link.textContent)
+      .filter(label =>
+        ['Info', 'Ticket', 'Projects', 'Pitch'].includes(label!)
+      );
+    expect(tabs).toEqual(['Info', 'Ticket', 'Projects', 'Pitch']);
+    expect(screen.getByRole('link', { name: /^ticket$/i })).toHaveAttribute(
+      'aria-current',
+      'page'
+    );
+    expect(
+      screen.getByAltText('Check-in QR code for Ada Lovelace')
+    ).toHaveAttribute('src', '/api/qr/check-in/ticket-token');
+  });
+
+  it('tells non-organizers who scan a QR code that only organizers can check in', async () => {
+    await renderDetailPage(buildEventDetail(), undefined, {
+      notice: 'check-in-organizers-only',
+    });
+
+    expect(
+      screen.getByText('Only event organizers can check attendees in.')
+    ).toBeInTheDocument();
   });
 
   afterEach(() => {
