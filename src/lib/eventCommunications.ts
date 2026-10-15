@@ -640,6 +640,19 @@ export function aggregateCommunicationFinalState(
   return { status, recipientCount: outcomes.length, sentCount, failedCount };
 }
 
+type CommunicationEmailContent = {
+  subject: string;
+  body: string;
+  html?: string;
+};
+
+export type SnapshotCommunicationRecipient = {
+  id: string;
+  contactValue: string;
+  registrationId: string | null;
+  displayName: string;
+};
+
 export async function snapshotEventCommunicationAudience({
   db = prisma,
   communicationId,
@@ -653,7 +666,12 @@ export async function snapshotEventCommunicationAudience({
   senderId: string;
   audience: CommunicationAudienceResolution;
   previewFingerprint: string;
-  emailContent?: { subject: string; body: string; html?: string };
+  // Pass a function to personalize each recipient's email.
+  emailContent?:
+    | CommunicationEmailContent
+    | ((
+        recipient: SnapshotCommunicationRecipient
+      ) => CommunicationEmailContent);
 }) {
   return db.$transaction(async tx => {
     const transitioned = await tx.eventCommunication.updateMany({
@@ -686,7 +704,12 @@ export async function snapshotEventCommunicationAudience({
       select: {
         id: true,
         recipients: {
-          select: { id: true, contactValue: true },
+          select: {
+            id: true,
+            contactValue: true,
+            registrationId: true,
+            displayName: true,
+          },
           orderBy: { hackerId: 'asc' },
         },
       },
@@ -695,7 +718,9 @@ export async function snapshotEventCommunicationAudience({
       await createEmailBatches(
         tx,
         snapshot.recipients.map(recipient => ({
-          ...emailContent,
+          ...(typeof emailContent === 'function'
+            ? emailContent(recipient)
+            : emailContent),
           to: recipient.contactValue,
           eventRecipientId: recipient.id,
         })),

@@ -13,6 +13,8 @@ export const isPublicRoute = createRouteMatcher([
   '/api/projects(.*)',
   '/api/webhooks/clerk',
   '/api/webhooks/twilio(.*)',
+  // Check-in QR images are embedded in emails and load without a session.
+  '/api/qr/check-in/(.*)',
   // Vercel's queue trigger is private and has no Clerk browser session.
   '/api/queues/email-delivery',
 ]);

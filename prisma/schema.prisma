@@ -57,6 +57,7 @@ model Hacker {
   eventRegistrations        EventRegistration[]           @relation("EventRegistrationHacker")
   decidedRegistrations      EventRegistration[]           @relation("EventRegistrationDecider")
   cancelledRegistrations    EventRegistration[]           @relation("EventRegistrationCanceller")
+  checkedInRegistrations    EventRegistration[]           @relation("EventRegistrationCheckIn")
   applicationsClosedEvents  Event[]                       @relation("EventApplicationsClosedBy")
   registrationAudits        EventRegistrationAudit[]      @relation("RegistrationAuditActor")
   createdUserBans           UserBan[]                     @relation("UserBanCreator")
@@ -440,8 +441,7 @@ model Event {
   applicationsClosedBy        Hacker?                  @relation("EventApplicationsClosedBy", fields: [applicationsClosedById], references: [id])
   applicationsClosedById      String?
   applicationsCloseReason     String?
-  checkInOpensAt              DateTime?
-  checkInClosesAt             DateTime?
+  trackAttendance             Boolean                  @default(false)
   image                       Image?                   @relation("EventImage", fields: [imageId], references: [id])
   imageId                     String?                  @unique
   staff                       EventStaff[]
@@ -619,6 +619,10 @@ model EventRegistration {
   cancelledById           String?
   cancelledAt             DateTime?
   waitlistedAt            DateTime?
+  checkInToken            String                        @unique @default(uuid())
+  checkedInAt             DateTime?
+  checkedInBy             Hacker?                       @relation("EventRegistrationCheckIn", fields: [checkedInById], references: [id])
+  checkedInById           String?
   createdAt               DateTime                      @default(now())
   updatedAt               DateTime                      @updatedAt
   audits                  EventRegistrationAudit[]
@@ -626,6 +630,7 @@ model EventRegistration {
 
   @@unique([eventId, hackerId])
   @@index([eventId, status])
+  @@index([eventId, status, checkedInAt])
   @@index([eventId, status, cancelledAt])
   @@index([eventId, status, waitlistedAt])
   @@index([hackerId, status])

@@ -4,6 +4,7 @@ import { sanitizeApprovedDetailsJson } from '@/lib/approvedEventDetails';
 import { DEFAULT_EVENT_MESSAGES } from '@/lib/eventMessageDefaults';
 import { normalizeSmsPhoneNumber } from '@/lib/phoneNumbers';
 import { SMS_CONSENT_CONFIGURED, SMS_CONSENT_VERSION } from '@/lib/smsConsent';
+import { checkInQrImageUrl, eventTicketUrl } from '@/lib/eventCheckIn';
 
 export type EventDecisionNotificationStatus =
   | 'APPROVED'
@@ -22,6 +23,7 @@ export type EventDecisionNotificationResult = {
 
 type EventDecisionNotificationContext = {
   publicSafeMessage: string | null;
+  checkInToken: string;
   applicant: {
     name: string;
     email: string | null;
@@ -35,6 +37,7 @@ type EventDecisionNotificationContext = {
     waitlistMessage: string | null;
     declineMessage: string | null;
     approvedDetailsJson?: unknown;
+    trackAttendance: boolean;
     slug: string;
     chapter: {
       id: string;
@@ -60,6 +63,18 @@ type EmailNotification = {
 type SmsNotification = {
   to: string;
   body: string;
+};
+
+type CheckInTicketLinks = {
+  qrImageUrl: string;
+  ticketUrl: string;
+};
+
+type NotificationContent = {
+  subject: string;
+  text: string;
+  html: string;
+  sms: string;
 };
 
 type EventDecisionNotificationConfig = {
@@ -171,25 +186,22 @@ function getApprovedDetails(value: unknown): {
   return { address, details };
 }
 
-function buildDecisionHtml(input: {
+function buildNotificationHtml(input: {
   applicantName: string;
   eventTitle: string;
   eventUrl: string;
   publicMessage: string;
-  status: EventDecisionNotificationStatus;
+  statusLabel: string;
   statusSentence: string;
   approvedDetails: {
     address: string | null;
     details: Array<[string, string]>;
   };
+  checkIn: CheckInTicketLinks | null;
   appUrl: string;
 }): string {
   const brandImageUrl = `${normalizeAppUrl(input.appUrl)}/images/sundai-social-card.png`;
-  const statusLabel = {
-    APPROVED: 'Application approved',
-    WAITLISTED: 'Application waitlisted',
-    DECLINED: 'Application update',
-  }[input.status];
+  const statusLabel = input.statusLabel;
   const approvedDetailRows = [
     ...(input.approvedDetails.address
       ? [['Address', input.approvedDetails.address] as [string, string]]
@@ -211,6 +223,18 @@ function buildDecisionHtml(input: {
           </tr>
         </table>`
       : '';
+  const checkInHtml = input.checkIn
+    ? `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:28px 0 0;background-color:#0e1020;border:1px solid #30385f">
+          <tr>
+            <td align="center" style="padding:24px">
+              <p style="margin:0 0 8px;color:#f7b44f;font-family:'Courier New',Courier,monospace;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase">Check-in QR code</p>
+              <p style="margin:0 0 18px;color:#e5e7eb;font-family:'Courier New',Courier,monospace;font-size:14px;line-height:1.6">Show this code to an organizer when you arrive.</p>
+              <img src="${escapeHtml(input.checkIn.qrImageUrl)}" width="240" height="240" alt="Check-in QR code" style="display:block;width:240px;height:240px;border:0;background-color:#ffffff">
+              <p style="margin:18px 0 0;font-family:'Courier New',Courier,monospace;font-size:14px;line-height:1.6"><a href="${escapeHtml(input.checkIn.ticketUrl)}" style="color:#f7b44f">Image not loading? View your ticket →</a></p>
+            </td>
+          </tr>
+        </table>`
+    : '';
 
   return `<!doctype html>
 <html lang="en">
@@ -258,6 +282,7 @@ function buildDecisionHtml(input: {
               <p style="margin:0 0 18px;color:#ffffff;font-family:'Courier New',Courier,monospace;font-size:18px;font-weight:700;line-height:1.6">${escapeHtml(input.statusSentence)}</p>
               <p style="margin:0;color:#e5e7eb;font-family:'Courier New',Courier,monospace;font-size:16px;line-height:1.7">${escapeHtml(input.publicMessage).replaceAll('\n', '<br>')}</p>
               ${approvedDetailsHtml}
+              ${checkInHtml}
               <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin-top:30px">
                 <tr>
                   <td align="center" bgcolor="#f7b44f" style="border:2px solid #08090d">
@@ -278,16 +303,45 @@ function buildDecisionHtml(input: {
 </html>`;
 }
 
+type NotificationEvent = {
+  title: string;
+  slug: string;
+  approvedDetailsJson?: unknown;
+  chapter: { slug: string };
+};
+
+function eventPageUrl(event: NotificationEvent, appUrl: string): string {
+  return `${normalizeAppUrl(appUrl)}/events/${encodeURIComponent(
+    event.chapter.slug
+  )}/${encodeURIComponent(event.slug)}`;
+}
+
+function checkInTicketLinks(
+  event: NotificationEvent,
+  checkInToken: string,
+  appUrl: string
+): CheckInTicketLinks {
+  return {
+    qrImageUrl: checkInQrImageUrl(checkInToken, appUrl),
+    ticketUrl: eventTicketUrl(event, appUrl),
+  };
+}
+
+function approvedDetailLines(approvedDetails: {
+  address: string | null;
+  details: Array<[string, string]>;
+}): string[] {
+  return [
+    ...(approvedDetails.address ? [`Address: ${approvedDetails.address}`] : []),
+    ...approvedDetails.details.map(([label, value]) => `${label}: ${value}`),
+  ];
+}
+
 function buildDecisionContent(
   context: EventDecisionNotificationContext,
   status: EventDecisionNotificationStatus,
   appUrl: string
-): {
-  subject: string;
-  text: string;
-  html: string;
-  sms: string;
-} {
+): NotificationContent {
   const statusLabel = {
     APPROVED: 'approved',
     WAITLISTED: 'waitlisted',
@@ -305,9 +359,7 @@ function buildDecisionContent(
   }[status];
   const configuredMessage = context.publicSafeMessage ?? eventMessage;
   const publicMessage = configuredMessage?.trim() || defaultMessage;
-  const eventUrl = `${normalizeAppUrl(appUrl)}/events/${encodeURIComponent(
-    context.event.chapter.slug
-  )}/${encodeURIComponent(context.event.slug)}`;
+  const eventUrl = eventPageUrl(context.event, appUrl);
   const statusSentence = `Your application for “${context.event.title}” has been ${statusLabel}.`;
   const subject =
     status === 'APPROVED'
@@ -319,29 +371,37 @@ function buildDecisionContent(
     status === 'APPROVED'
       ? getApprovedDetails(context.event.approvedDetailsJson)
       : { address: null, details: [] };
-  const approvedDetailLines = [
-    ...(approvedDetails.address ? [`Address: ${approvedDetails.address}`] : []),
-    ...approvedDetails.details.map(([label, value]) => `${label}: ${value}`),
-  ];
+  const checkIn =
+    status === 'APPROVED' && context.event.trackAttendance
+      ? checkInTicketLinks(context.event, context.checkInToken, appUrl)
+      : null;
+  const detailLines = approvedDetailLines(approvedDetails);
   const approvedDetailsText =
-    approvedDetailLines.length > 0
-      ? `\n\n${approvedDetailLines.join('\n\n')}`
-      : '';
-  const text = `Hi ${context.applicant.name},\n\n${statusSentence}\n\n${publicMessage}${approvedDetailsText}\n\nView event: ${eventUrl}\n\nSundai`;
-  const html = buildDecisionHtml({
+    detailLines.length > 0 ? `\n\n${detailLines.join('\n\n')}` : '';
+  const checkInText = checkIn
+    ? `\n\nShow your check-in QR code when you arrive: ${checkIn.ticketUrl}`
+    : '';
+  const text = `Hi ${context.applicant.name},\n\n${statusSentence}\n\n${publicMessage}${approvedDetailsText}${checkInText}\n\nView event: ${eventUrl}\n\nSundai`;
+  const html = buildNotificationHtml({
     applicantName: context.applicant.name,
     eventTitle: context.event.title,
     eventUrl,
     publicMessage,
-    status,
+    statusLabel: {
+      APPROVED: 'Application approved',
+      WAITLISTED: 'Application waitlisted',
+      DECLINED: 'Application update',
+    }[status],
     statusSentence,
     approvedDetails,
+    checkIn,
     appUrl,
   });
   const smsSections = [
     `Sundai: ${statusSentence}`,
     publicMessage,
-    ...approvedDetailLines,
+    ...detailLines,
+    ...(checkIn ? [`Your check-in QR code:\n${checkIn.ticketUrl}`] : []),
     `View event:\n${eventUrl}`,
   ];
   const sms = smsSections.join('\n\n');
@@ -349,38 +409,95 @@ function buildDecisionContent(
   return { subject, text, html, sms };
 }
 
+/**
+ * Content for the message sent to already-approved attendees when attendance
+ * tracking is turned on. The email embeds the attendee's own QR code; the SMS
+ * links to the ticket tab, which is the same for every attendee.
+ */
+export function buildCheckInTicketContent(
+  input: {
+    applicantName: string;
+    checkInToken: string;
+    event: NotificationEvent;
+  },
+  appUrl = getConfig().appUrl
+): NotificationContent {
+  const eventUrl = eventPageUrl(input.event, appUrl);
+  const checkIn = checkInTicketLinks(input.event, input.checkInToken, appUrl);
+  const statusSentence = `Check-in is now enabled for “${input.event.title}”.`;
+  const publicMessage =
+    'Show your check-in QR code to an organizer when you arrive.';
+  const approvedDetails = getApprovedDetails(input.event.approvedDetailsJson);
+  const html = buildNotificationHtml({
+    applicantName: input.applicantName,
+    eventTitle: input.event.title,
+    eventUrl,
+    publicMessage,
+    statusLabel: 'Your check-in code',
+    statusSentence,
+    approvedDetails,
+    checkIn,
+    appUrl,
+  });
+
+  return {
+    subject: `Your check-in QR code for ${input.event.title}`,
+    text: `Hi ${input.applicantName},\n\n${statusSentence}\n\n${publicMessage}\n\nYour check-in QR code: ${checkIn.ticketUrl}\n\nView event: ${eventUrl}\n\nSundai`,
+    html,
+    sms: [
+      `Sundai: ${statusSentence}`,
+      publicMessage,
+      `Your check-in QR code:\n${checkIn.ticketUrl}`,
+    ].join('\n\n'),
+  };
+}
+
+const notificationRegistrationSelect = {
+  id: true,
+  publicSafeMessage: true,
+  checkInToken: true,
+  hacker: {
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      phoneNumber: true,
+      smsConsentAt: true,
+      smsConsentVersion: true,
+    },
+  },
+  event: {
+    select: {
+      title: true,
+      confirmationMessage: true,
+      waitlistMessage: true,
+      declineMessage: true,
+      approvedDetailsJson: true,
+      trackAttendance: true,
+      slug: true,
+      chapter: {
+        select: { id: true, slug: true },
+      },
+    },
+  },
+} as const;
+
+const notificationPreferenceSelect = {
+  hackerId: true,
+  notificationsAllowed: true,
+  emailNotificationsEnabled: true,
+  smsNotificationsEnabled: true,
+  smsConsentAt: true,
+  smsConsentVersion: true,
+} as const;
+
 async function loadContext(
   eventId: string,
   registrationId: string
 ): Promise<EventDecisionNotificationContext | null> {
   const registration = await prisma.eventRegistration.findFirst({
     where: { id: registrationId, eventId },
-    select: {
-      publicSafeMessage: true,
-      hacker: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          phoneNumber: true,
-          smsConsentAt: true,
-          smsConsentVersion: true,
-        },
-      },
-      event: {
-        select: {
-          title: true,
-          confirmationMessage: true,
-          waitlistMessage: true,
-          declineMessage: true,
-          approvedDetailsJson: true,
-          slug: true,
-          chapter: {
-            select: { id: true, slug: true },
-          },
-        },
-      },
-    },
+    select: notificationRegistrationSelect,
   });
 
   if (!registration) return null;
@@ -391,17 +508,12 @@ async function loadContext(
       hackerId: registration.hacker.id,
       status: 'ACTIVE',
     },
-    select: {
-      notificationsAllowed: true,
-      emailNotificationsEnabled: true,
-      smsNotificationsEnabled: true,
-      smsConsentAt: true,
-      smsConsentVersion: true,
-    },
+    select: notificationPreferenceSelect,
   });
 
   return {
     publicSafeMessage: registration.publicSafeMessage,
+    checkInToken: registration.checkInToken,
     applicant: registration.hacker,
     event: registration.event,
     preferences,
@@ -427,6 +539,32 @@ async function sendSmsWithTwilio(
         }
       : {}),
   });
+}
+
+function notificationTargets(
+  context: EventDecisionNotificationContext,
+  config: EventDecisionNotificationConfig
+): { email: string | null; sms: string | null } {
+  const smsPhoneNumber = normalizeSmsPhoneNumber(context.applicant.phoneNumber);
+  return {
+    email:
+      isEmailConfigured(config) &&
+      context.preferences?.notificationsAllowed &&
+      context.preferences.emailNotificationsEnabled &&
+      isSendableEmail(context.applicant.email)
+        ? context.applicant.email
+        : null,
+    sms:
+      isSmsConfigured(config) &&
+      SMS_CONSENT_CONFIGURED &&
+      context.preferences?.notificationsAllowed === true &&
+      context.preferences.smsNotificationsEnabled === true &&
+      context.preferences.smsConsentAt &&
+      context.preferences.smsConsentVersion === SMS_CONSENT_VERSION &&
+      smsPhoneNumber
+        ? smsPhoneNumber
+        : null,
+  };
 }
 
 export async function notifyEventDecision(
@@ -456,19 +594,12 @@ export async function notifyEventDecision(
     if (!context) return skippedResult();
 
     const content = buildDecisionContent(context, input.status, config.appUrl);
-    const smsPhoneNumber = normalizeSmsPhoneNumber(
-      context.applicant.phoneNumber
-    );
+    const targets = notificationTargets(context, config);
     const result = skippedResult();
     const deliveries: Promise<void>[] = [];
     const channels: Array<'email' | 'sms'> = [];
 
-    if (
-      emailConfigured &&
-      context.preferences?.notificationsAllowed &&
-      context.preferences.emailNotificationsEnabled &&
-      isSendableEmail(context.applicant.email)
-    ) {
+    if (targets.email) {
       channels.push('email');
       deliveries.push(
         (
@@ -484,7 +615,7 @@ export async function notifyEventDecision(
             ]);
           })
         )({
-          to: context.applicant.email,
+          to: targets.email,
           subject: content.subject,
           text: content.text,
           html: content.html,
@@ -492,19 +623,11 @@ export async function notifyEventDecision(
       );
     }
 
-    if (
-      smsConfigured &&
-      SMS_CONSENT_CONFIGURED &&
-      context.preferences?.notificationsAllowed === true &&
-      context.preferences.smsNotificationsEnabled === true &&
-      context.preferences.smsConsentAt &&
-      context.preferences.smsConsentVersion === SMS_CONSENT_VERSION &&
-      smsPhoneNumber
-    ) {
+    if (targets.sms) {
       channels.push('sms');
       deliveries.push(
         (dependencies.sendSms ?? (sms => sendSmsWithTwilio(sms, config)))({
-          to: smsPhoneNumber,
+          to: targets.sms,
           body: content.sms,
         })
       );

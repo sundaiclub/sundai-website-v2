@@ -68,7 +68,13 @@ jest.mock('@clerk/nextjs/server', () => ({
   auth: jest.fn(),
 }));
 
+jest.mock('../../src/lib/eventCheckInTickets', () => ({
+  sendCheckInTickets: jest.fn(),
+}));
+
 const prisma = require('../../src/lib/prisma').default;
+const mockSendCheckInTickets = require('../../src/lib/eventCheckInTickets')
+  .sendCheckInTickets as jest.Mock;
 const mockAuth = require('@clerk/nextjs/server').auth as jest.Mock;
 
 function buildPublicEvent(overrides: Record<string, unknown> = {}) {
@@ -365,9 +371,7 @@ describe('/api/events/[eventId]', () => {
     );
     prisma.event.findUnique.mockResolvedValue({
       staff: [],
-      pitchSessions: [
-        { id: 'pitch-1', phase: 'PITCHING', projects: [] },
-      ],
+      pitchSessions: [{ id: 'pitch-1', phase: 'PITCHING', projects: [] }],
     });
 
     const response = await GET_EVENT(
@@ -712,6 +716,77 @@ describe('/api/events/[eventId]', () => {
       }
     }
   );
+
+  describe('attendance tracking', () => {
+    const startTime = new Date('2026-07-18T14:00:00.000Z');
+    const endTime = new Date('2026-07-18T22:00:00.000Z');
+
+    function mockMcEvent(trackAttendance: boolean) {
+      mockAuth.mockReturnValue({ userId: 'clerk-mc' });
+      prisma.hacker.findUnique.mockResolvedValue({
+        id: 'hacker-event-mc',
+        role: 'HACKER',
+      });
+      prisma.event.findUnique.mockResolvedValue({
+        id: 'evt-1',
+        chapterId: 'chapter-boston',
+        trackAttendance,
+        startTime,
+        endTime,
+      });
+      prisma.eventStaff.findFirst.mockResolvedValue({
+        id: 'staff-mc',
+        eventId: 'evt-1',
+        hackerId: 'hacker-event-mc',
+        role: 'MC',
+      });
+    }
+
+    const patchTracking = (trackAttendance: unknown) =>
+      PATCH_EVENT(
+        new NextRequest('http://localhost:3000/api/events/evt-1', {
+          method: 'PATCH',
+          body: JSON.stringify({ trackAttendance }),
+          headers: { 'content-type': 'application/json' },
+        }) as any,
+        { params: { eventId: 'evt-1' } } as any
+      );
+
+    it('sends approved attendees their QR codes when tracking is turned on', async () => {
+      mockMcEvent(false);
+
+      const response = await patchTracking(true);
+
+      expect(response.status).toBe(200);
+      expect(prisma.event.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ trackAttendance: true }),
+        })
+      );
+      expect(mockSendCheckInTickets).toHaveBeenCalledWith({
+        eventId: 'evt-1',
+        actorId: 'hacker-event-mc',
+      });
+    });
+
+    it('does not resend QR codes when tracking was already on', async () => {
+      mockMcEvent(true);
+
+      const response = await patchTracking(true);
+
+      expect(response.status).toBe(200);
+      expect(mockSendCheckInTickets).not.toHaveBeenCalled();
+    });
+
+    it('rejects a non-boolean tracking value', async () => {
+      mockMcEvent(false);
+
+      const response = await patchTracking('yes');
+
+      expect(response.status).toBe(400);
+      expect(prisma.event.update).not.toHaveBeenCalled();
+    });
+  });
 
   it('denies an assigned MC administrative fields through the settings endpoint', async () => {
     mockAuth.mockReturnValue({ userId: 'clerk-mc' });

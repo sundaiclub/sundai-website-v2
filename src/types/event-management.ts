@@ -423,6 +423,7 @@ export type OrganizerEventSettings = {
   capacity?: number | null;
   approvedCount?: number;
   autoPromoteWaitlist?: boolean;
+  trackAttendance?: boolean;
   approvedDetailsJson?: JsonObject | null;
   applicationQuestionsJson?: JsonValue | null;
   hideChapterDefaultQuestions?: boolean;

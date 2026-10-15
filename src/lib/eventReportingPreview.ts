@@ -8,7 +8,11 @@ import prisma from '@/lib/prisma';
 
 type EventReportingPrisma = Pick<
   PrismaClient,
-  'eventRegistration' | 'eventProject' | 'pitchProject' | 'eventMaterial' | 'eventCommunication'
+  | 'eventRegistration'
+  | 'eventProject'
+  | 'pitchProject'
+  | 'eventMaterial'
+  | 'eventCommunication'
 >;
 
 const REGISTRATION_FUNNEL_STATUSES = [
@@ -26,10 +30,7 @@ const PROJECT_CARD_STATUSES = [
   'APPROVED',
 ] as const satisfies readonly EventProjectCardStatus[];
 
-export type ReportingUnavailableMetric =
-  | 'checkIn'
-  | 'attendance'
-  | 'noShows';
+export type ReportingUnavailableMetric = 'attendance' | 'noShows';
 
 export interface ReportingUnavailableDescriptor {
   metric: ReportingUnavailableMetric;
@@ -69,11 +70,6 @@ export interface EventReportingPreview {
 }
 
 const REPORTING_UNAVAILABLE_METRICS: ReportingUnavailableDescriptor[] = [
-  {
-    metric: 'checkIn',
-    label: 'Check-in',
-    reason: 'Event-native check-in is deferred and unavailable.',
-  },
   {
     metric: 'attendance',
     label: 'Attendance',
@@ -167,8 +163,8 @@ export async function getEventReportingPreview(
   const cardStatus = Object.fromEntries(
     PROJECT_CARD_STATUSES.map(status => [
       status.toLowerCase(),
-      cardStatusGroups.find(group => group.cardStatus === status)?._count._all ??
-        0,
+      cardStatusGroups.find(group => group.cardStatus === status)?._count
+        ._all ?? 0,
     ])
   ) as EventReportingPreview['projects']['cardStatus'];
 

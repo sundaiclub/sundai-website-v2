@@ -61,6 +61,16 @@ function Counts({ workspace }: { workspace: EventWorkspacePayload }) {
         )}
       </div>
 
+      {counts.checkIn && (
+        <div className={`${classes.subtlePanel} p-4`}>
+          <h3 className="font-bold">Check-in</h3>
+          <p className={`mt-2 text-sm ${classes.mutedText}`}>
+            {counts.checkIn.checkedIn} of {counts.checkIn.approved} approved
+            attendees checked in
+          </p>
+        </div>
+      )}
+
       <div className={`${classes.subtlePanel} p-4`}>
         <h3 className="font-bold">Projects</h3>
         {counts.projects.total === 0 ? (
@@ -171,6 +181,12 @@ export default function OrganizerEventOverviewPage({
             <dt className={`text-sm ${classes.mutedText}`}>Waitlist</dt>
             <dd className="mt-1 font-semibold">
               Auto-promote {event.autoPromoteWaitlist ? 'on' : 'off'}
+            </dd>
+          </div>
+          <div className={classes.subtlePanel + ' p-4'}>
+            <dt className={`text-sm ${classes.mutedText}`}>Attendance</dt>
+            <dd className="mt-1 font-semibold">
+              {event.trackAttendance ? 'Tracking check-ins' : 'Not tracked'}
             </dd>
           </div>
           <div className={classes.subtlePanel + ' p-4'}>

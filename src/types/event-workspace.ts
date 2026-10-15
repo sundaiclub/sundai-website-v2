@@ -10,6 +10,7 @@ import type {
 export type WorkspaceSection =
   | 'overview'
   | 'registrations'
+  | 'checkIn'
   | 'communications'
   | 'materials'
   | 'projects'
@@ -17,7 +18,7 @@ export type WorkspaceSection =
   | 'notes'
   | 'reporting';
 
-export type WorkspaceUnavailableMetric = 'checkIn' | 'attendance' | 'noShows';
+export type WorkspaceUnavailableMetric = 'attendance' | 'noShows';
 
 export interface EventWorkspaceCapabilities {
   administerEvent: boolean;
@@ -51,6 +52,7 @@ export interface EventWorkspaceEvent {
   applicationMode: EventApplicationMode;
   applicationsOpen: boolean;
   autoPromoteWaitlist: boolean;
+  trackAttendance: boolean;
   publicUrl: string;
   hasApprovedOnlyDetails: boolean;
 }
@@ -78,8 +80,31 @@ export interface WorkspacePitchCounts {
   highlighted: number;
 }
 
+export interface WorkspaceCheckInCounts {
+  approved: number;
+  checkedIn: number;
+}
+
+export interface EventCheckInRow {
+  registrationId: EntityId;
+  hackerId: EntityId;
+  name: string;
+  username: string | null;
+  email: string | null;
+  checkedInAt: string | null;
+  checkedInBy: string | null;
+}
+
+export interface EventCheckInList {
+  trackAttendance: boolean;
+  counts: WorkspaceCheckInCounts;
+  rows: EventCheckInRow[];
+  hasMore: boolean;
+}
+
 export interface EventWorkspaceCounts {
   registrations: WorkspaceRegistrationCounts;
+  checkIn: WorkspaceCheckInCounts | null;
   projects: WorkspaceProjectCounts;
   pitch: WorkspacePitchCounts;
   materials: number;

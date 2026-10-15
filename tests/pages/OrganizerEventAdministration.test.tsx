@@ -45,6 +45,7 @@ const adminWorkspace = {
     applicationMode: 'REQUIRES_APPROVAL',
     applicationsOpen: true,
     autoPromoteWaitlist: false,
+    trackAttendance: false,
     publicUrl: '/events/boston/ai-build-night',
     hasApprovedOnlyDetails: true,
   },
@@ -72,6 +73,7 @@ const adminWorkspace = {
       declined: 0,
       cancelled: 0,
     },
+    checkIn: null,
     projects: { total: 0, submittedCards: 0 },
     pitch: { queued: 0, pitched: 0, highlighted: 0 },
     materials: 0,
@@ -87,7 +89,7 @@ const adminWorkspace = {
     'notes',
     'reporting',
   ],
-  unavailable: ['checkIn', 'attendance', 'noShows'],
+  unavailable: ['attendance', 'noShows'],
 };
 
 function jsonResponse(data: unknown, status = 200) {
