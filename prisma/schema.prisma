@@ -78,6 +78,9 @@ model Hacker {
   smsPreferenceEvents       SmsPreferenceEvent[]          @relation("SmsPreferenceEventHacker")
   staffAuditSubjects        EventStaffAudit[]             @relation("EventStaffAuditSubject")
   staffAuditActions         EventStaffAudit[]             @relation("EventStaffAuditActor")
+  judgeAssignments          EventJudge[]                  @relation("EventJudgeHacker")
+  invitedJudges             EventJudge[]                  @relation("EventJudgeInviter")
+  judgingSubmissions        JudgingSubmission[]           @relation("JudgingSubmissionSubmitter")
 
   @@index([clerkId])
 }
@@ -134,6 +137,7 @@ model Project {
   // Pitch queue entries linking this project to events
   pitchEntries        PitchProject[]
   eventParticipations EventProject[]
+  judgingSubmissions  JudgingSubmission[]
 
   @@index([launchLeadId])
 }
@@ -442,6 +446,11 @@ model Event {
   applicationsClosedById      String?
   applicationsCloseReason     String?
   trackAttendance             Boolean                  @default(false)
+  // Judging: submissions default to the event window unless overridden.
+  judgingEnabled              Boolean                  @default(false)
+  judgingOpen                 Boolean                  @default(true)
+  judgingSubmissionsOpenAt    DateTime?
+  judgingSubmissionsCloseAt   DateTime?
   image                       Image?                   @relation("EventImage", fields: [imageId], references: [id])
   imageId                     String?                  @unique
   staff                       EventStaff[]
@@ -453,6 +462,10 @@ model Event {
   materialAudits              EventMaterialAudit[]
   communications              EventCommunication[]
   staffAudits                 EventStaffAudit[]
+  judgingTracks               JudgingTrack[]
+  judgingCriteria             JudgingCriterion[]
+  judges                      EventJudge[]
+  judgingSubmissions          JudgingSubmission[]
   createdAt                   DateTime                 @default(now())
   updatedAt                   DateTime                 @updatedAt
 
@@ -966,4 +979,124 @@ enum EmailDeliveryBatchStatus {
 model EmailDeliveryRateLimit {
   region          String   @id
   nextAvailableAt DateTime @default(now())
+}
+
+// Judging
+
+model JudgingTrack {
+  id            String              @id @default(uuid())
+  event         Event               @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  eventId       String
+  name          String
+  description   String?
+  position      Int                 @default(0)
+  // [{ id, prompt, required }]; answers are keyed by question id.
+  questionsJson Json                @default("[]")
+  criteria      JudgingCriterion[]
+  judges        EventJudgeTrack[]
+  submissions   JudgingSubmission[]
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  @@index([eventId, position])
+}
+
+// A criterion without a track applies to every track in the event.
+model JudgingCriterion {
+  id          String               @id @default(uuid())
+  event       Event                @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  eventId     String
+  track       JudgingTrack?        @relation(fields: [trackId], references: [id], onDelete: Cascade)
+  trackId     String?
+  name        String
+  description String?
+  weight      Float                @default(1)
+  position    Int                  @default(0)
+  scores      JudgingReviewScore[]
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+
+  @@index([eventId, trackId, position])
+}
+
+model EventJudge {
+  id          String            @id @default(uuid())
+  event       Event             @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  eventId     String
+  email       String
+  name        String?
+  hacker      Hacker?           @relation("EventJudgeHacker", fields: [hackerId], references: [id])
+  hackerId    String?
+  // SHA-256 of the magic-link token; the raw token only lives in the email and cookie.
+  tokenHash   String            @unique
+  invitedBy   Hacker            @relation("EventJudgeInviter", fields: [invitedById], references: [id])
+  invitedById String
+  invitedAt   DateTime          @default(now())
+  lastSentAt  DateTime?
+  lastSeenAt  DateTime?
+  // Revoking keeps the judge's reviews but invalidates their link and access.
+  revokedAt   DateTime?
+  tracks      EventJudgeTrack[]
+  reviews     JudgingReview[]
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@unique([eventId, email])
+  @@index([hackerId])
+}
+
+model EventJudgeTrack {
+  judge   EventJudge   @relation(fields: [judgeId], references: [id], onDelete: Cascade)
+  judgeId String
+  track   JudgingTrack @relation(fields: [trackId], references: [id], onDelete: Cascade)
+  trackId String
+
+  @@id([judgeId, trackId])
+  @@index([trackId])
+}
+
+model JudgingSubmission {
+  id            String          @id @default(uuid())
+  event         Event           @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  eventId       String
+  project       Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId     String
+  track         JudgingTrack    @relation(fields: [trackId], references: [id])
+  trackId       String
+  // { [questionId]: answer, additionalInfo: string }
+  answersJson   Json
+  submittedBy   Hacker          @relation("JudgingSubmissionSubmitter", fields: [submittedById], references: [id])
+  submittedById String
+  reviews       JudgingReview[]
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  @@unique([eventId, projectId])
+  @@index([trackId])
+}
+
+model JudgingReview {
+  id           String               @id @default(uuid())
+  judge        EventJudge           @relation(fields: [judgeId], references: [id], onDelete: Cascade)
+  judgeId      String
+  submission   JudgingSubmission    @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  submissionId String
+  comment      String?
+  scores       JudgingReviewScore[]
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+
+  @@unique([judgeId, submissionId])
+  @@index([submissionId])
+}
+
+model JudgingReviewScore {
+  review      JudgingReview    @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  reviewId    String
+  criterion   JudgingCriterion @relation(fields: [criterionId], references: [id], onDelete: Cascade)
+  criterionId String
+  score       Int
+
+  @@id([reviewId, criterionId])
+  @@index([criterionId])
 }

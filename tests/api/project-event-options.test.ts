@@ -11,6 +11,8 @@ jest.mock('@/lib/prisma', () => ({
     hacker: { findUnique: jest.fn() },
     project: { findUnique: jest.fn() },
     event: { findMany: jest.fn() },
+    judgingTrack: { findMany: jest.fn() },
+    judgingSubmission: { findMany: jest.fn() },
   },
 }));
 
@@ -24,6 +26,8 @@ describe('GET /api/events/project-options', () => {
     resetClerkMocks();
     jest.useFakeTimers().setSystemTime(now);
     mockAuthenticatedClerk({ userId: 'clerk-user' });
+    prisma.judgingTrack.findMany.mockResolvedValue([]);
+    prisma.judgingSubmission.findMany.mockResolvedValue([]);
   });
 
   afterEach(() => jest.useRealTimers());
@@ -53,8 +57,17 @@ describe('GET /api/events/project-options', () => {
       expect.objectContaining({
         where: expect.objectContaining({
           status: 'PUBLISHED',
-          startTime: { lte: now },
-          endTime: { gte: now },
+          AND: [
+            {
+              OR: expect.arrayContaining([
+                {
+                  judgingEnabled: false,
+                  startTime: { lte: now },
+                  endTime: { gte: now },
+                },
+              ]),
+            },
+          ],
           OR: expect.arrayContaining([
             {
               registrations: {
@@ -85,6 +98,79 @@ describe('GET /api/events/project-options', () => {
         id: 'event-1',
         chapterName: 'Sundai Boston',
         selectedByDefault: true,
+        judging: null,
+      }),
+    ]);
+  });
+
+  it('offers judging events in their submission window with tracks and saved answers', async () => {
+    prisma.hacker.findUnique.mockResolvedValue({
+      id: 'hacker-1',
+      role: 'HACKER',
+    });
+    prisma.project.findUnique.mockResolvedValue({
+      launchLeadId: 'hacker-1',
+      participants: [],
+    });
+    prisma.event.findMany.mockResolvedValue([
+      {
+        id: 'event-judged',
+        title: 'Demo Day',
+        startTime: now,
+        endTime: null,
+        image: null,
+        chapter: { id: 'chapter-1', name: 'Sundai Boston', slug: 'boston' },
+        projects: [{ id: 'event-project-1' }],
+      },
+    ]);
+    prisma.judgingTrack.findMany.mockResolvedValue([
+      {
+        id: 'track-ai',
+        eventId: 'event-judged',
+        name: 'AI',
+        description: null,
+        questionsJson: [
+          { id: 'q1', prompt: 'What did you build?', required: true },
+        ],
+      },
+    ]);
+    prisma.judgingSubmission.findMany.mockResolvedValue([
+      {
+        eventId: 'event-judged',
+        trackId: 'track-ai',
+        answersJson: { q1: 'A robot', additionalInfo: '' },
+      },
+    ]);
+
+    const response = await GET(
+      new Request(
+        'http://localhost/api/events/project-options?projectId=project-1'
+      )
+    );
+
+    const query = prisma.event.findMany.mock.calls[0][0];
+    expect(query.where.AND[0].OR).toContainEqual(
+      expect.objectContaining({ judgingEnabled: true })
+    );
+    await expect(response.json()).resolves.toEqual([
+      expect.objectContaining({
+        id: 'event-judged',
+        judging: {
+          tracks: [
+            {
+              id: 'track-ai',
+              name: 'AI',
+              description: null,
+              questions: [
+                { id: 'q1', prompt: 'What did you build?', required: true },
+              ],
+            },
+          ],
+          submission: {
+            trackId: 'track-ai',
+            answers: { q1: 'A robot', additionalInfo: '' },
+          },
+        },
       }),
     ]);
   });

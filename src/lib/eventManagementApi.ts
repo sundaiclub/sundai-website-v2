@@ -6,6 +6,7 @@ import {
   canAccessEventWorkspaceWithContext,
   canAdministerEventWithContext,
   canManageEventCommunicationsWithContext,
+  canManageEventJudgingWithContext,
   canManageEventMaterialsWithContext,
   canManageEventNotesWithContext,
   canManageEventOperationsWithContext,
@@ -209,6 +210,13 @@ export function requireEventMaterialsManager(eventId: string) {
 
 export function requireEventNotesManager(eventId: string) {
   return requireCurrentEventCapability(eventId, canManageEventNotesWithContext);
+}
+
+export function requireEventJudgingManager(eventId: string) {
+  return requireCurrentEventCapability(
+    eventId,
+    canManageEventJudgingWithContext
+  );
 }
 
 export function requireEventPitchAccess(eventId: string) {

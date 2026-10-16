@@ -14,6 +14,7 @@ import { PublicEventHero } from '@/app/components/EventHeroImage';
 import { EventProjectCarousel } from '@/app/components/EventProjectCarousel';
 import { EventCheckInTicket } from '@/app/components/EventCheckInTicket';
 import PitchEventPage from '@/app/components/PitchEventPage';
+import EventJudgingPanel from '@/app/components/EventJudgingPanel';
 import {
   ManagementAlert,
   ManagementLinkButton,
@@ -30,6 +31,8 @@ import {
   getViewerCheckInTicket,
 } from '@/lib/eventCheckIn';
 import { listPublicEventProjects } from '@/lib/publicEventProjects';
+import { findViewerJudgedEvent } from '@/lib/judgingAccess';
+import { JUDGE_TOKEN_PARAM } from '@/types/judging';
 import { getPublicEventBySlug } from '@/lib/publicEvents';
 import { getPublicEventSocialMetadata } from '@/lib/eventSocialMetadata';
 import { DEFAULT_SOCIAL_IMAGE_URL, publicUrl } from '@/lib/siteUrl';
@@ -44,28 +47,54 @@ const DEFAULT_SOCIAL_IMAGE = {
 
 type EventPageProps = {
   params: { chapterSlug: string; eventSlug: string };
-  searchParams?: { tab?: string | string[]; notice?: string | string[] };
+  searchParams?: {
+    tab?: string | string[];
+    notice?: string | string[];
+    judge?: string | string[];
+  };
 };
 
-type EventTab = 'info' | 'ticket' | 'projects' | 'pitch';
+function firstParam(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+type EventTab = 'info' | 'ticket' | 'projects' | 'pitch' | 'judging';
 
 const eventTabs: Array<{ id: EventTab; label: string }> = [
   { id: 'info', label: 'Info' },
   { id: 'ticket', label: 'Ticket' },
   { id: 'projects', label: 'Projects' },
   { id: 'pitch', label: 'Pitch' },
+  { id: 'judging', label: 'Judging' },
 ];
 
 export async function generateMetadata({
   params,
+  searchParams,
 }: EventPageProps): Promise<Metadata> {
+  const judgeToken = firstParam(searchParams?.judge);
+  // Keep a judge's magic-link token out of Referer headers sent to other sites.
+  const judgeLinkMetadata: Metadata = judgeToken
+    ? { referrer: 'no-referrer' }
+    : {};
   const event = await getPublicEventSocialMetadata({
     chapterSlug: params.chapterSlug,
     eventSlug: params.eventSlug,
   });
 
   if (!event) {
-    return { title: 'Event Not Found | Sundai Club' };
+    const judgedEvent = await findViewerJudgedEvent(
+      params.chapterSlug,
+      params.eventSlug,
+      judgeToken
+    );
+    return judgedEvent
+      ? {
+          ...judgeLinkMetadata,
+          title: `Judging: ${judgedEvent.title} | Sundai Club`,
+          robots: { index: false, follow: false },
+        }
+      : { title: 'Event Not Found | Sundai Club' };
   }
 
   const title = `${event.title} | Sundai Club`;
@@ -79,6 +108,7 @@ export async function generateMetadata({
   );
 
   return {
+    ...judgeLinkMetadata,
     title,
     description,
     alternates: { canonical: pageUrl },
@@ -158,6 +188,7 @@ export default async function PublicEventDetailPage({
   searchParams,
 }: EventPageProps) {
   const { userId } = auth();
+  const judgeToken = firstParam(searchParams?.judge) ?? null;
   const event = await getPublicEventBySlug({
     chapterSlug: params.chapterSlug,
     eventSlug: params.eventSlug,
@@ -165,13 +196,36 @@ export default async function PublicEventDetailPage({
     includeApprovedCalendarDetails: true,
   });
 
-  if (!event) notFound();
+  if (!event) {
+    const judgedEvent = await findViewerJudgedEvent(
+      params.chapterSlug,
+      params.eventSlug,
+      judgeToken
+    );
+    if (!judgedEvent) notFound();
+    return (
+      <ManagementPage maxWidth="max-w-6xl">
+        <header className="mb-5">
+          <p className="text-sm font-semibold opacity-70">
+            {judgedEvent.chapter.name}
+          </p>
+          <h1 className="text-2xl font-bold sm:text-3xl">
+            {judgedEvent.title}
+          </h1>
+        </header>
+        <EventJudgingPanel eventId={judgedEvent.id} judgeToken={judgeToken} />
+      </ManagementPage>
+    );
+  }
 
-  const ticket = await getViewerCheckInTicket({
-    eventId: event.id,
-    clerkId: userId,
-  });
-  const visibleTabs = eventTabs.filter(tab => tab.id !== 'ticket' || ticket);
+  const [ticket, judgedEvent] = await Promise.all([
+    getViewerCheckInTicket({ eventId: event.id, clerkId: userId }),
+    findViewerJudgedEvent(event.chapterSlug, event.slug, judgeToken),
+  ]);
+  const visibleTabs = eventTabs.filter(
+    tab =>
+      (tab.id !== 'ticket' || ticket) && (tab.id !== 'judging' || judgedEvent)
+  );
   const requestedTab = Array.isArray(searchParams?.tab)
     ? searchParams?.tab[0]
     : searchParams?.tab;
@@ -269,8 +323,17 @@ export default async function PublicEventDetailPage({
       <nav aria-label="Event sections" className="mb-5 overflow-x-auto">
         <ul className="flex min-w-max gap-1 border-b" role="list">
           {visibleTabs.map(tab => {
-            const href =
-              tab.id === 'info' ? eventPath : `${eventPath}?tab=${tab.id}`;
+            const query = new URLSearchParams(
+              tab.id === 'info' ? {} : { tab: tab.id }
+            );
+            // A judge who arrived by magic link keeps access while switching tabs.
+            if (judgedEvent && judgeToken) {
+              query.set(JUDGE_TOKEN_PARAM, judgeToken);
+            }
+            const queryString = query.toString();
+            const href = queryString
+              ? `${eventPath}?${queryString}`
+              : eventPath;
             const isCurrent = activeTab === tab.id;
             return (
               <li key={tab.id}>
@@ -347,6 +410,10 @@ export default async function PublicEventDetailPage({
       )}
 
       {activeTab === 'pitch' && <PitchEventPage eventId={event.id} />}
+
+      {activeTab === 'judging' && (
+        <EventJudgingPanel eventId={event.id} judgeToken={judgeToken} />
+      )}
     </ManagementPage>
   );
 }

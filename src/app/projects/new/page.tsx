@@ -9,6 +9,7 @@ import toast from 'react-hot-toast';
 import { useTheme } from '../../contexts/ThemeContext';
 import { HackerSelector, ProjectRoles } from '../../components/HackerSelector';
 import type { HackerSelectionOption, HackerTeamMember } from '@/types/hacker';
+import { limitToOneJudgingEvent, selectProjectEvent } from '@/lib/judging';
 
 const MAX_PREVIEW_LENGTH = 100;
 const MAX_TITLE_LENGTH = 32;
@@ -19,6 +20,7 @@ type ProjectEventOption = {
   chapterName: string;
   image?: { url: string; alt?: string | null } | null;
   selectedByDefault: boolean;
+  judging: unknown | null;
 };
 
 export default function NewProject() {
@@ -67,13 +69,16 @@ export default function NewProject() {
       .then(events => {
         setEventOptions(events);
         setSelectedEventIds(
-          events
-            .filter(event =>
-              sourceEventId
-                ? event.id === sourceEventId
-                : event.selectedByDefault
-            )
-            .map(event => event.id)
+          limitToOneJudgingEvent(
+            events
+              .filter(event =>
+                sourceEventId
+                  ? event.id === sourceEventId
+                  : event.selectedByDefault
+              )
+              .map(event => event.id),
+            events
+          )
         );
       })
       .catch(error => console.error('Error fetching project events:', error));
@@ -321,7 +326,9 @@ export default function NewProject() {
                 maxLength={MAX_PREVIEW_LENGTH}
                 rows={2}
                 value={project.preview}
-                onChange={preview => setProject(current => ({ ...current, preview }))}
+                onChange={preview =>
+                  setProject(current => ({ ...current, preview }))
+                }
                 placeholder="Brief description of your project"
               />
             </div>
@@ -417,9 +424,12 @@ export default function NewProject() {
                       checked={selectedEventIds.includes(event.id)}
                       onChange={change =>
                         setSelectedEventIds(current =>
-                          change.target.checked
-                            ? [...current, event.id]
-                            : current.filter(id => id !== event.id)
+                          selectProjectEvent(
+                            current,
+                            eventOptions,
+                            event.id,
+                            change.target.checked
+                          )
                         )
                       }
                       type="checkbox"
@@ -453,6 +463,7 @@ export default function NewProject() {
                         }`}
                       >
                         {event.chapterName}
+                        {event.judging ? ' · Judged' : ''}
                       </span>
                     </span>
                   </label>

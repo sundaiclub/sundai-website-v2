@@ -68,6 +68,7 @@ const operationalCapabilities = {
   sendCommunications: true,
   manageMaterials: true,
   managePitch: true,
+  manageJudging: true,
   editNotes: true,
   viewNoteHistory: false,
 };
@@ -148,6 +149,7 @@ describe('GET /api/events/[eventId]/workspace', () => {
           sendCommunications: true,
           manageMaterials: true,
           managePitch: true,
+          manageJudging: true,
           editNotes: true,
           viewNoteHistory: true,
         },
@@ -167,6 +169,7 @@ describe('GET /api/events/[eventId]/workspace', () => {
       sendCommunications: true,
       manageMaterials: true,
       managePitch: true,
+      manageJudging: true,
       editNotes: true,
       viewNoteHistory: true,
     });
@@ -202,6 +205,7 @@ describe('GET /api/events/[eventId]/workspace', () => {
         sendCommunications: true,
         manageMaterials: true,
         managePitch: true,
+        manageJudging: true,
         editNotes: true,
         viewNoteHistory: false,
       });
