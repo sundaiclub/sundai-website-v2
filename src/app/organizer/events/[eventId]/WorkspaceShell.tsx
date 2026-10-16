@@ -58,6 +58,7 @@ const sections: Array<{
   { id: 'materials', label: 'Materials', path: '/materials' },
   { id: 'projects', label: 'Projects', path: '/projects' },
   { id: 'pitch', label: 'Pitch', path: '/pitch' },
+  { id: 'judging', label: 'Judging', path: '/judging' },
   { id: 'notes', label: 'Notes', path: '/notes' },
   { id: 'reporting', label: 'Reporting preview', path: '/reporting' },
 ];

@@ -3,6 +3,7 @@ import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
 export const isPublicRoute = createRouteMatcher([
   '/',
   '/guide',
+  '/join',
   '/privacy',
   '/terms',
   '/events(.*)',
@@ -15,6 +16,8 @@ export const isPublicRoute = createRouteMatcher([
   '/api/webhooks/twilio(.*)',
   // Check-in QR images are embedded in emails and load without a session.
   '/api/qr/check-in/(.*)',
+  // Judges score with a magic-link token and no Clerk account.
+  '/api/judging/(.*)',
   // Vercel's queue trigger is private and has no Clerk browser session.
   '/api/queues/email-delivery',
 ]);

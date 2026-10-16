@@ -2,13 +2,13 @@ import { getAvailableWorkspaceSections } from '../../src/lib/eventWorkspace';
 
 describe('event workspace sections', () => {
   it('includes RSVPs for admins and MCs with applicant-review access', () => {
-    expect(getAvailableWorkspaceSections(true, false)).toContain(
+    expect(getAvailableWorkspaceSections(true, false, true)).toContain(
       'registrations'
     );
   });
 
-  it('omits only RSVPs for co-MCs without applicant-review access', () => {
-    expect(getAvailableWorkspaceSections(false, false)).toEqual([
+  it('omits RSVPs and judging for co-MCs', () => {
+    expect(getAvailableWorkspaceSections(false, false, false)).toEqual([
       'overview',
       'communications',
       'materials',
@@ -19,11 +19,25 @@ describe('event workspace sections', () => {
     ]);
   });
 
+  it('includes judging for admins and MCs', () => {
+    expect(getAvailableWorkspaceSections(true, false, true)).toEqual([
+      'overview',
+      'registrations',
+      'communications',
+      'materials',
+      'projects',
+      'pitch',
+      'judging',
+      'notes',
+      'reporting',
+    ]);
+  });
+
   it('includes check-in only when the event tracks attendance', () => {
-    expect(getAvailableWorkspaceSections(false, false)).not.toContain(
+    expect(getAvailableWorkspaceSections(false, false, false)).not.toContain(
       'checkIn'
     );
-    expect(getAvailableWorkspaceSections(false, true)).toEqual([
+    expect(getAvailableWorkspaceSections(false, true, false)).toEqual([
       'overview',
       'checkIn',
       'communications',

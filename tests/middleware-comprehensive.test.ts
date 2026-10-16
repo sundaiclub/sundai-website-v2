@@ -45,6 +45,15 @@ describe('middleware', () => {
     );
   });
 
+  it('keeps the join page public', () => {
+    require('../src/middleware');
+    const { createRouteMatcher } = require('@clerk/nextjs/server');
+
+    expect(createRouteMatcher).toHaveBeenCalledWith(
+      expect.arrayContaining(['/join'])
+    );
+  });
+
   it('protects routes that are not public', async () => {
     const middleware = require('../src/middleware').default;
     const protect = jest.fn();

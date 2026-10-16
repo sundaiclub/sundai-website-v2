@@ -12,6 +12,7 @@ import { listVisibleEventMaterials } from '@/lib/eventMaterials';
 import { listPublicEventProjects } from '@/lib/publicEventProjects';
 import { getPublicEventSocialMetadata } from '@/lib/eventSocialMetadata';
 import { getViewerCheckInTicket } from '@/lib/eventCheckIn';
+import { findViewerJudgedEvent } from '@/lib/judgingAccess';
 import { DEFAULT_SOCIAL_IMAGE_URL, publicUrl } from '@/lib/siteUrl';
 import { mockProject } from '../utils/test-utils';
 
@@ -51,9 +52,7 @@ jest.mock('next/navigation', () => ({
 jest.mock('@clerk/nextjs', () => ({
   useUser: () => mockUseUser(),
   useAuth: () => mockUseAuth(),
-  SignInButton: ({ children }: { children: React.ReactNode }) => (
-    <button type="button">{children}</button>
-  ),
+  useClerk: () => ({ openSignIn: jest.fn() }),
   UserButton: () => <div>User Button</div>,
 }));
 
@@ -84,6 +83,25 @@ jest.mock('@/lib/eventCheckIn', () => ({
   getViewerCheckInTicket: jest.fn(),
 }));
 
+jest.mock('@/lib/judgingAccess', () => ({
+  findViewerJudgedEvent: jest.fn(),
+}));
+
+jest.mock('@/app/components/EventJudgingPanel', () => ({
+  __esModule: true,
+  default: ({
+    eventId,
+    judgeToken,
+  }: {
+    eventId: string;
+    judgeToken: string | null;
+  }) => (
+    <div data-testid="event-judging-panel">
+      Judging panel {eventId} token {judgeToken ?? 'none'}
+    </div>
+  ),
+}));
+
 jest.mock('@/app/components/PitchEventPage', () => ({
   __esModule: true,
   default: ({ eventId }: { eventId: string }) => (
@@ -102,6 +120,7 @@ const mockGetPublicEventSocialMetadata =
 const mockListVisibleEventMaterials = listVisibleEventMaterials as jest.Mock;
 const mockListPublicEventProjects = listPublicEventProjects as jest.Mock;
 const mockGetViewerCheckInTicket = getViewerCheckInTicket as jest.Mock;
+const mockFindViewerJudgedEvent = findViewerJudgedEvent as jest.Mock;
 const routeParams = { chapterSlug: 'boston', eventSlug: 'ai-build-night' };
 const eventFixture = publicCalendarPayloadFixture.event;
 const approvedOnlyDetails = {
@@ -457,8 +476,8 @@ function mockEventFetches(event: PublicEventDetail | null) {
 
 async function renderDetailPage(
   event: PublicEventDetail | null,
-  tab?: 'projects' | 'pitch' | 'ticket',
-  extraSearchParams: { notice?: string } = {}
+  tab?: 'projects' | 'pitch' | 'ticket' | 'judging',
+  extraSearchParams: { notice?: string; judge?: string } = {}
 ) {
   mockGetPublicEventBySlug.mockResolvedValue(event);
   mockListVisibleEventMaterials.mockResolvedValue(
@@ -518,7 +537,106 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
     mockUseTheme.mockReturnValue({ isDarkMode: false });
     mockListPublicEventProjects.mockResolvedValue([]);
     mockGetViewerCheckInTicket.mockResolvedValue(null);
+    mockFindViewerJudgedEvent.mockResolvedValue(null);
     mockSignedOut();
+  });
+
+  it('hides the judging tab from viewers who are not judges', async () => {
+    await renderDetailPage(buildEventDetail(), 'judging');
+
+    expect(
+      screen.queryByRole('link', { name: /^judging$/i })
+    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId('event-judging-panel')).not.toBeInTheDocument();
+  });
+
+  it('ignores an invalid judge token in the URL', async () => {
+    await renderDetailPage(buildEventDetail(), 'judging', { judge: 'forged' });
+
+    expect(mockFindViewerJudgedEvent).toHaveBeenCalledWith(
+      'boston',
+      'ai-build-night',
+      'forged'
+    );
+    expect(
+      screen.queryByRole('link', { name: /^judging$/i })
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Info' })).toHaveAttribute(
+      'href',
+      '/events/boston/ai-build-night'
+    );
+  });
+
+  it('opens the judging panel for judges arriving from their invite link', async () => {
+    mockFindViewerJudgedEvent.mockResolvedValue({
+      id: eventFixture.id,
+      title: eventFixture.title,
+      chapter: { name: 'Boston' },
+    });
+
+    await renderDetailPage(buildEventDetail(), 'judging', { judge: 'secret' });
+
+    expect(mockFindViewerJudgedEvent).toHaveBeenCalledWith(
+      'boston',
+      'ai-build-night',
+      'secret'
+    );
+    expect(screen.getByRole('link', { name: /^judging$/i })).toHaveAttribute(
+      'aria-current',
+      'page'
+    );
+    expect(screen.getByTestId('event-judging-panel')).toHaveTextContent(
+      `Judging panel ${eventFixture.id} token secret`
+    );
+    // Switching tabs keeps the magic-link token so the judge can come back.
+    expect(screen.getByRole('link', { name: 'Info' })).toHaveAttribute(
+      'href',
+      '/events/boston/ai-build-night?judge=secret'
+    );
+    expect(screen.getByRole('link', { name: /^judging$/i })).toHaveAttribute(
+      'href',
+      '/events/boston/ai-build-night?tab=judging&judge=secret'
+    );
+  });
+
+  it('shows the judging tab to invited accounts without a link token', async () => {
+    mockSignedIn();
+    mockFindViewerJudgedEvent.mockResolvedValue({
+      id: eventFixture.id,
+      title: eventFixture.title,
+      chapter: { name: 'Boston' },
+    });
+
+    await renderDetailPage(buildEventDetail(), 'judging');
+
+    expect(screen.getByRole('link', { name: /^judging$/i })).toHaveAttribute(
+      'href',
+      '/events/boston/ai-build-night?tab=judging'
+    );
+    expect(screen.getByTestId('event-judging-panel')).toHaveTextContent(
+      'token none'
+    );
+  });
+
+  it('shows judges only the judging panel for events they cannot otherwise view', async () => {
+    mockFindViewerJudgedEvent.mockResolvedValue({
+      id: 'private-event',
+      title: 'Private Demo Day',
+      chapter: { name: 'Boston' },
+    });
+
+    await renderDetailPage(null, undefined, { judge: 'secret' });
+
+    expect(mockNotFound).not.toHaveBeenCalled();
+    expect(
+      screen.getByRole('heading', { name: 'Private Demo Day' })
+    ).toBeInTheDocument();
+    expect(screen.getByTestId('event-judging-panel')).toHaveTextContent(
+      'Judging panel private-event token secret'
+    );
+    expect(
+      screen.queryByRole('link', { name: 'Info' })
+    ).not.toBeInTheDocument();
   });
 
   it('hides the ticket tab when the viewer has no check-in ticket', async () => {
@@ -621,6 +739,34 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
       },
     ]);
     expect(metadata.twitter?.images).toEqual([DEFAULT_SOCIAL_IMAGE_URL]);
+  });
+
+  it('titles unlisted events for judges without indexing them', async () => {
+    mockGetPublicEventSocialMetadata.mockResolvedValue(null);
+    mockFindViewerJudgedEvent.mockResolvedValue({
+      id: 'private-event',
+      title: 'Private Demo Day',
+      chapter: { name: 'Boston' },
+    });
+    const {
+      generateMetadata,
+    } = require('../../src/app/events/[chapterSlug]/[eventSlug]/page');
+
+    await expect(
+      generateMetadata({
+        params: routeParams,
+        searchParams: { judge: 'secret' },
+      })
+    ).resolves.toEqual({
+      referrer: 'no-referrer',
+      title: 'Judging: Private Demo Day | Sundai Club',
+      robots: { index: false, follow: false },
+    });
+    expect(mockFindViewerJudgedEvent).toHaveBeenCalledWith(
+      'boston',
+      'ai-build-night',
+      'secret'
+    );
   });
 
   it('renders published public event fields for anonymous visitors', async () => {

@@ -1,14 +1,19 @@
 'use client';
 
-import { SignInButton } from '@clerk/nextjs';
+import { useOpenSignIn } from '../hooks/useOpenSignIn';
 import { useManagementClasses } from './ManagementSurface';
 
 export function SignInAction({ label = 'Sign in' }: { label?: string }) {
   const classes = useManagementClasses();
+  const openSignIn = useOpenSignIn();
 
   return (
-    <SignInButton mode="modal">
-      <span className={classes.primaryButton}>{label}</span>
-    </SignInButton>
+    <button
+      className={classes.primaryButton}
+      onClick={() => openSignIn()}
+      type="button"
+    >
+      {label}
+    </button>
   );
 }

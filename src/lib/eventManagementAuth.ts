@@ -189,6 +189,13 @@ export function canManageEventSettingsWithContext({
   );
 }
 
+// Judging setup and scores are limited to admins and MCs; co-MCs cannot see scores.
+export function canManageEventJudgingWithContext(
+  context: EventPermissionContext
+): boolean {
+  return canManageEventSettingsWithContext(context);
+}
+
 export function canAdministerEventWithContext({
   actor,
   chapterMembership,
