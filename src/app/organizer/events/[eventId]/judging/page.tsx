@@ -1,0 +1,128 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import {
+  ManagementAlert,
+  ManagementBadge,
+  useManagementClasses,
+} from '../../../../components/ManagementSurface';
+import { useEventWorkspace } from '../WorkspaceShell';
+import JudgesManager from './JudgesManager';
+import JudgingResultsView from './JudgingResultsView';
+import JudgingSetupEditor from './JudgingSetupEditor';
+import type { EventJudgingConfig } from '@/types/judging';
+
+type JudgingView = 'setup' | 'judges' | 'results';
+
+const views: Array<{ id: JudgingView; label: string }> = [
+  { id: 'setup', label: 'Setup' },
+  { id: 'judges', label: 'Judges' },
+  { id: 'results', label: 'Results' },
+];
+
+export default function OrganizerEventJudgingPage({
+  params,
+}: {
+  params: { eventId: string };
+}) {
+  const classes = useManagementClasses();
+  const { capabilities } = useEventWorkspace();
+  const [config, setConfig] = useState<EventJudgingConfig | null>(null);
+  const [error, setError] = useState('');
+  const [view, setView] = useState<JudgingView>('setup');
+
+  useEffect(() => {
+    let current = true;
+    fetch(`/api/events/${params.eventId}/judging`, { cache: 'no-store' })
+      .then(async response => {
+        if (!response.ok) throw new Error();
+        return (await response.json()) as EventJudgingConfig;
+      })
+      .then(payload => {
+        if (current) setConfig(payload);
+      })
+      .catch(() => {
+        if (current) setError('Unable to load judging.');
+      });
+    return () => {
+      current = false;
+    };
+  }, [params.eventId]);
+
+  if (!capabilities.manageJudging) {
+    return (
+      <ManagementAlert tone="danger">
+        <span role="alert">Only MCs and admins can manage judging.</span>
+      </ManagementAlert>
+    );
+  }
+  if (error) {
+    return (
+      <ManagementAlert tone="danger">
+        <span role="alert">{error}</span>
+      </ManagementAlert>
+    );
+  }
+  if (!config) {
+    return (
+      <ManagementAlert>
+        <span role="status">Loading judging…</span>
+      </ManagementAlert>
+    );
+  }
+
+  return (
+    <div className="grid gap-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div
+          aria-label="Judging sections"
+          className="flex flex-wrap gap-2"
+          role="tablist"
+        >
+          {views.map(item => (
+            <button
+              aria-selected={view === item.id}
+              className={
+                view === item.id
+                  ? classes.primaryButton
+                  : classes.secondaryButton
+              }
+              key={item.id}
+              onClick={() => setView(item.id)}
+              role="tab"
+              type="button"
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <ManagementBadge tone={config.judgingEnabled ? 'success' : 'default'}>
+            {config.judgingEnabled ? 'Judging enabled' : 'Judging off'}
+          </ManagementBadge>
+          {config.judgingEnabled && (
+            <ManagementBadge tone={config.judgingOpen ? 'success' : 'warning'}>
+              {config.judgingOpen ? 'Scoring open' : 'Scoring closed'}
+            </ManagementBadge>
+          )}
+        </div>
+      </div>
+
+      {view === 'setup' && (
+        <JudgingSetupEditor
+          config={config}
+          eventId={params.eventId}
+          onSaved={setConfig}
+        />
+      )}
+      {view === 'judges' && (
+        <JudgesManager
+          config={config}
+          eventId={params.eventId}
+          onChanged={setConfig}
+        />
+      )}
+      {view === 'results' && <JudgingResultsView eventId={params.eventId} />}
+    </div>
+  );
+}

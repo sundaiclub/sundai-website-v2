@@ -19,9 +19,7 @@ jest.mock('@clerk/nextjs', () => ({
   ClerkProvider: ({ children }: { children: React.ReactNode }) => (
     <div data-testid="mock-clerk-provider">{children}</div>
   ),
-  SignInButton: ({ children }: { children: React.ReactNode }) => (
-    <button data-testid="mock-signin-button">{children}</button>
-  ),
+  useClerk: () => ({ openSignIn: jest.fn() }),
   UserButton: () => <div data-testid="mock-user-button"></div>,
 }))
 

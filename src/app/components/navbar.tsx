@@ -2,17 +2,19 @@
 
 import Link from "next/link";
 import { useState, useEffect } from "react";
-import { UserButton, SignInButton, useUser } from "@clerk/nextjs";
+import { UserButton, useUser } from "@clerk/nextjs";
 import { usePathname } from "next/navigation";
 import Image from "next/image";
 
 import { useTheme } from '../contexts/ThemeContext';
+import { useOpenSignIn } from '../hooks/useOpenSignIn';
 
 const Navbar = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const { isSignedIn, user } = useUser();
   const [hackerId, setHackerId] = useState<string | null>(null);
   const pathname = usePathname();
+  const openSignIn = useOpenSignIn();
   const { isDarkMode } = useTheme();
   const isPWA =
     typeof window !== "undefined" &&
@@ -163,7 +165,7 @@ const Navbar = () => {
                   }}
                 />
               ) : (
-                <SignInButton mode="modal">
+                <button onClick={() => openSignIn()} type="button">
                   <span
                     className={`
                     text-sm bg-indigo-600 text-white rounded-full hover:bg-indigo-700 
@@ -173,7 +175,7 @@ const Navbar = () => {
                   >
                     Log In
                   </span>
-                </SignInButton>
+                </button>
               )}
             </div>
           </div>
@@ -253,11 +255,11 @@ const Navbar = () => {
                 }}
               />
             ) : (
-              <SignInButton mode="modal">
+              <button onClick={() => openSignIn()} type="button">
                 <span className="text-sm bg-indigo-600 text-white rounded-full hover:bg-indigo-700 transition duration-300 cursor-pointer px-4 py-2">
                   Log In
                 </span>
-              </SignInButton>
+              </button>
             )}
           </div>
         </div>

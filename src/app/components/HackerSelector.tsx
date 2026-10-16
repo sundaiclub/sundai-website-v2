@@ -15,6 +15,9 @@ export const ProjectRoles = [
 interface HackerSelectorProps {
   showModal: boolean;
   setShowModal: (show: boolean) => void;
+  /** Renders the search and list embedded in the page instead of as a modal. */
+  inline?: boolean;
+  searchPlaceholder?: string;
   isDarkMode: boolean;
   searchTerm: string;
   setSearchTerm: (term: string) => void;
@@ -40,6 +43,8 @@ export function HackerSelector({
   selectedIds = [],
   showRoleSelector = false,
   onAddMemberWithRole,
+  inline = false,
+  searchPlaceholder = "Search members...",
 }: HackerSelectorProps) {
   const [selectedRole, setSelectedRole] = useState(ProjectRoles[0].id);
 
@@ -49,18 +54,16 @@ export function HackerSelector({
     } else if (handleAddMember) {
       handleAddMember(hacker);
     }
-    if (!singleSelect) {
+    if (!singleSelect && !inline) {
       setShowModal(false);
     }
   };
 
-  if (!showModal) return null;
+  if (!showModal && !inline) return null;
 
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className={`rounded-lg p-6 w-full max-w-md m-4 ${
-        isDarkMode ? 'bg-gray-800' : 'bg-white'
-      }`}>
+  const content = (
+    <>
+      {!inline && (
         <div className="flex justify-between items-center mb-4">
           <h2 className={`text-xl font-semibold font-space-mono ${
             isDarkMode ? 'text-gray-100' : 'text-gray-900'
@@ -76,10 +79,12 @@ export function HackerSelector({
             <XMarkIcon className="h-6 w-6" />
           </button>
         </div>
+      )}
 
         <input
           type="text"
-          placeholder="Search members..."
+          aria-label={inline ? title : undefined}
+          placeholder={searchPlaceholder}
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           className={`w-full px-3 py-2 rounded-md shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 ${
@@ -123,6 +128,8 @@ export function HackerSelector({
             return (
               <button
                 key={hacker.id}
+                type="button"
+                aria-pressed={inline ? isSelected : undefined}
                 onClick={() => handleHackerClick(hacker)}
                 className={`w-full text-left px-4 py-2 rounded-md flex items-center justify-between group ${
                   isDarkMode 
@@ -161,6 +168,7 @@ export function HackerSelector({
           )}
         </div>
 
+      {!inline && (
         <div className="mt-4 flex justify-end">
           <button
             onClick={() => setShowModal(false)}
@@ -173,6 +181,18 @@ export function HackerSelector({
             Done
           </button>
         </div>
+      )}
+    </>
+  );
+
+  if (inline) return <div>{content}</div>;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className={`rounded-lg p-6 w-full max-w-md m-4 ${
+        isDarkMode ? 'bg-gray-800' : 'bg-white'
+      }`}>
+        {content}
       </div>
     </div>
   );

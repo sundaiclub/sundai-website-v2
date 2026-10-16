@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getCurrentHacker, unauthorized } from '@/lib/eventManagementApi';
+import {
+  judgingSubmissionWindowWhere,
+  loadProjectJudgingOptions,
+} from '@/lib/judgingData';
 
 export const dynamic = 'force-dynamic';
 
@@ -34,8 +38,19 @@ export async function GET(request: Request) {
     const events = await prisma.event.findMany({
       where: {
         status: 'PUBLISHED',
-        startTime: { lte: now },
-        endTime: { gte: now },
+        AND: [
+          {
+            // Judging events may override the window projects are accepted in.
+            OR: [
+              {
+                judgingEnabled: false,
+                startTime: { lte: now },
+                endTime: { gte: now },
+              },
+              judgingSubmissionWindowWhere(now),
+            ],
+          },
+        ],
         ...(isSiteAdmin
           ? {}
           : {
@@ -84,6 +99,11 @@ export async function GET(request: Request) {
       orderBy: [{ startTime: 'asc' }, { title: 'asc' }],
     });
 
+    const judgingOptions = await loadProjectJudgingOptions(
+      events.map(event => event.id),
+      projectId
+    );
+
     return NextResponse.json(
       events.map(event => {
         const alreadyAdded = Boolean(
@@ -96,6 +116,7 @@ export async function GET(request: Request) {
           chapterSlug: event.chapter.slug,
           alreadyAdded,
           selectedByDefault: projectId ? alreadyAdded : !isSiteAdmin,
+          judging: judgingOptions.get(event.id) ?? null,
         };
       })
     );

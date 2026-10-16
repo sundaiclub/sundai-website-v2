@@ -25,6 +25,14 @@ import type { HackerSelectionOption } from '@/types/hacker';
 import { swapFirstLetters } from '../../../utils/nameUtils';
 import ImageGenerationModal from '../../../components/ImageGenerationModal';
 import MarkdownEditor from '../../../components/MarkdownEditor';
+import JudgingSubmissionFields from '../../../components/JudgingSubmissionFields';
+import {
+  composeJudgingDescription,
+  limitToOneJudgingEvent,
+  missingRequiredJudgingAnswers,
+  selectProjectEvent,
+} from '@/lib/judging';
+import type { JudgingAnswers, ProjectJudgingOption } from '@/types/judging';
 import {
   getImageUploadError,
   validateImageUploadSize,
@@ -46,8 +54,8 @@ type ProjectEventOption = {
   image: { url: string; alt?: string | null } | null;
   selectedByDefault: boolean;
   alreadyAdded: boolean;
+  judging: ProjectJudgingOption | null;
 };
-
 
 function ButtonPanel({
   params,
@@ -170,6 +178,8 @@ export default function ProjectEditPage() {
   const [editableGithubUrl, setEditableGithubUrl] = useState('');
   const [editableDemoUrl, setEditableDemoUrl] = useState('');
   const [editableBlogUrl, setEditableBlogUrl] = useState('');
+  const [judgingTrackId, setJudgingTrackId] = useState('');
+  const [judgingAnswers, setJudgingAnswers] = useState<JudgingAnswers>({});
 
   const [saving, setSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
@@ -286,7 +296,7 @@ export default function ProjectEditPage() {
         const contextualIds = new Set(
           contextualEventIdsKey ? contextualEventIdsKey.split(',') : []
         );
-        setSelectedEventIds(
+        const selectedIds = limitToOneJudgingEvent(
           Array.from(
             new Set([
               ...Array.from(contextualIds),
@@ -294,18 +304,75 @@ export default function ProjectEditPage() {
                 .filter(event => event.selectedByDefault)
                 .map(event => event.id),
             ])
-          )
+          ),
+          events
         );
+        setSelectedEventIds(selectedIds);
+        const submission = events.find(
+          event => selectedIds.includes(event.id) && event.judging?.submission
+        )?.judging?.submission;
+        if (submission) {
+          setJudgingTrackId(submission.trackId);
+          setJudgingAnswers(submission.answers);
+        }
       })
       .catch(error => console.error('Error fetching current events:', error));
   }, [contextualEventIdsKey, params?.projectId]);
 
   const handleEventSelection = (eventId: string, selected: boolean) => {
     setSelectedEventIds(current =>
-      selected
-        ? Array.from(new Set([...current, eventId]))
-        : current.filter(id => id !== eventId)
+      selectProjectEvent(current, eventOptions, eventId, selected)
     );
+    const judging = eventOptions.find(event => event.id === eventId)?.judging;
+    if (selected && judging) {
+      setJudgingTrackId(judging.submission?.trackId ?? '');
+      setJudgingAnswers(judging.submission?.answers ?? {});
+    }
+  };
+
+  const judgingEvent = eventOptions.find(
+    event => event.judging && selectedEventIds.includes(event.id)
+  );
+  const judgingQuestions =
+    judgingEvent?.judging?.tracks.find(track => track.id === judgingTrackId)
+      ?.questions ?? [];
+
+  /** Validates judging answers and returns the description to save, or null to abort. */
+  const descriptionForSave = (): string | null => {
+    if (!judgingEvent) return editableDescription;
+    if (!judgingTrackId) {
+      toast.error(`Choose a track for ${judgingEvent.title}`);
+      return null;
+    }
+    const missing = missingRequiredJudgingAnswers(
+      judgingQuestions,
+      judgingAnswers
+    );
+    if (missing.length > 0) {
+      toast.error(`Answer "${missing[0].prompt}"`);
+      return null;
+    }
+    return composeJudgingDescription(judgingQuestions, judgingAnswers);
+  };
+
+  const saveJudgingSubmission = async () => {
+    if (!judgingEvent) return;
+    const response = await fetch(`/api/projects/${params?.projectId}/judging`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        eventId: judgingEvent.id,
+        trackId: judgingTrackId,
+        answers: judgingAnswers,
+      }),
+    });
+    if (!response.ok) {
+      const body = await response.json().catch(() => null);
+      throw new Error(
+        body?.message ??
+          'The project was saved, but its judging answers were not'
+      );
+    }
   };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -373,6 +440,8 @@ export default function ProjectEditPage() {
       formRef.current.reportValidity();
       return;
     }
+    const description = descriptionForSave();
+    if (description === null) return;
 
     setSaving(true);
     try {
@@ -384,7 +453,7 @@ export default function ProjectEditPage() {
       if (thumbnailPrompt) {
         formData.append('thumbnailPrompt', thumbnailPrompt);
       }
-      formData.append('description', editableDescription);
+      formData.append('description', description);
       formData.append('preview', editablePreview);
       formData.append('startDate', editableStartDate.toISOString());
       project.techTags.forEach(tag => {
@@ -448,6 +517,7 @@ export default function ProjectEditPage() {
           );
         }
       }
+      await saveJudgingSubmission();
 
       toast.success('Changes saved successfully!');
       router.push(`/projects/${params?.projectId}`);
@@ -468,6 +538,8 @@ export default function ProjectEditPage() {
       formRef.current.reportValidity();
       return;
     }
+    const description = descriptionForSave();
+    if (description === null) return;
 
     setPublishing(true);
     try {
@@ -479,7 +551,7 @@ export default function ProjectEditPage() {
       if (thumbnailPrompt) {
         formData.append('thumbnailPrompt', thumbnailPrompt);
       }
-      formData.append('description', editableDescription);
+      formData.append('description', description);
       formData.append('preview', editablePreview);
       formData.append('startDate', editableStartDate.toISOString());
       project.techTags.forEach(tag => {
@@ -534,6 +606,7 @@ export default function ProjectEditPage() {
       if (!publishResponse.ok) {
         throw new Error('Failed to publish project');
       }
+      await saveJudgingSubmission();
 
       toast.success('Project published!');
       router.push(
@@ -822,6 +895,7 @@ export default function ProjectEditPage() {
                         }`}
                       >
                         {event.chapterName}
+                        {event.judging ? ' · Judged' : ''}
                         {event.alreadyAdded ? ' · Already added' : ''}
                       </span>
                     </span>
@@ -954,7 +1028,13 @@ export default function ProjectEditPage() {
             >
               One Sentence Description
             </label>
-            <MarkdownEditor label="One Sentence Description" value={editablePreview} onChange={setEditablePreview} maxLength={MAX_PREVIEW_LENGTH} rows={2} />
+            <MarkdownEditor
+              label="One Sentence Description"
+              value={editablePreview}
+              onChange={setEditablePreview}
+              maxLength={MAX_PREVIEW_LENGTH}
+              rows={2}
+            />
             <span
               className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}
             >
@@ -1192,14 +1272,32 @@ export default function ProjectEditPage() {
               Recommended: 1200x800px or larger, 3:2 ratio
             </p>
           </div>
-          <div>
-            <label
-              className={`block font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}
-            >
-              Full Description
-            </label>
-            <MarkdownEditor label="Full Description" value={editableDescription} onChange={setEditableDescription} />
-          </div>
+          {judgingEvent?.judging ? (
+            <JudgingSubmissionFields
+              eventTitle={judgingEvent.title}
+              judging={judgingEvent.judging}
+              trackId={judgingTrackId}
+              answers={judgingAnswers}
+              onTrackChange={setJudgingTrackId}
+              onAnswerChange={(key, value) =>
+                setJudgingAnswers(current => ({ ...current, [key]: value }))
+              }
+              isDarkMode={isDarkMode}
+            />
+          ) : (
+            <div>
+              <label
+                className={`block font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}
+              >
+                Full Description
+              </label>
+              <MarkdownEditor
+                label="Full Description"
+                value={editableDescription}
+                onChange={setEditableDescription}
+              />
+            </div>
+          )}
           <ButtonPanel
             params={params}
             router={router}

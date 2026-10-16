@@ -15,6 +15,7 @@ export type WorkspaceSection =
   | 'materials'
   | 'projects'
   | 'pitch'
+  | 'judging'
   | 'notes'
   | 'reporting';
 
@@ -29,6 +30,7 @@ export interface EventWorkspaceCapabilities {
   sendCommunications: boolean;
   manageMaterials: boolean;
   managePitch: boolean;
+  manageJudging: boolean;
   editNotes: boolean;
   viewNoteHistory: boolean;
 }

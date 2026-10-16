@@ -6,6 +6,7 @@ import {
   canAdministerEventWithContext,
   canDecideEventApplicantsWithContext,
   canManageEventCommunicationsWithContext,
+  canManageEventJudgingWithContext,
   canManageEventMaterialsWithContext,
   canManageEventNotesWithContext,
   canManageEventOperationsWithContext,
@@ -30,18 +31,21 @@ const AVAILABLE_SECTIONS: EventWorkspaceOverview['availableSections'] = [
   'materials',
   'projects',
   'pitch',
+  'judging',
   'notes',
   'reporting',
 ];
 
 export function getAvailableWorkspaceSections(
   canReviewRsvps: boolean,
-  trackAttendance: boolean
+  trackAttendance: boolean,
+  canManageJudging: boolean
 ): EventWorkspaceOverview['availableSections'] {
   return AVAILABLE_SECTIONS.filter(
     section =>
       (canReviewRsvps || section !== 'registrations') &&
-      (trackAttendance || section !== 'checkIn')
+      (trackAttendance || section !== 'checkIn') &&
+      (canManageJudging || section !== 'judging')
   );
 }
 
@@ -70,6 +74,7 @@ function projectCapabilities(
     sendCommunications: canManageEventCommunicationsWithContext(context),
     manageMaterials: canManageEventMaterialsWithContext(context),
     managePitch: canManageEventPitchWithContext(context),
+    manageJudging: canManageEventJudgingWithContext(context),
     editNotes: canManageEventNotesWithContext(context),
     viewNoteHistory: administerEvent,
   };
@@ -260,7 +265,8 @@ export async function loadEventWorkspace(
     },
     availableSections: getAvailableWorkspaceSections(
       canDecideEventApplicantsWithContext(permissionContext),
-      event.trackAttendance
+      event.trackAttendance,
+      canManageEventJudgingWithContext(permissionContext)
     ),
     unavailable: [...WORKSPACE_UNAVAILABLE_METRICS],
   };
