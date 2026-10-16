@@ -1,6 +1,5 @@
 'use client';
 
-import { useClerk } from '@clerk/nextjs';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -13,6 +12,7 @@ import {
   useManagementClasses,
 } from '../components/ManagementSurface';
 import { useUserContext } from '../contexts/UserContext';
+import { useOpenSignIn } from '../hooks/useOpenSignIn';
 import { normalizeSmsPhoneNumber } from '@/lib/phoneNumbers';
 import {
   SMS_CONSENT_CONFIGURED,
@@ -41,7 +41,7 @@ function wait(ms: number) {
 
 export default function JoinPage() {
   const classes = useManagementClasses();
-  const { openSignIn } = useClerk();
+  const openSignIn = useOpenSignIn();
   const { userInfo, loading: userLoading } = useUserContext();
   const [chapters, setChapters] = useState<ChapterDirectoryItem[]>([]);
   const [chaptersLoaded, setChaptersLoaded] = useState(false);
@@ -129,11 +129,9 @@ export default function JoinPage() {
 
   function handleJoin(chapter: ChapterDirectoryItem) {
     if (!userInfo) {
-      const redirectUrl = `/join?${PENDING_CHAPTER_PARAM}=${encodeURIComponent(chapter.id)}`;
-      openSignIn({
-        forceRedirectUrl: redirectUrl,
-        signUpForceRedirectUrl: redirectUrl,
-      });
+      openSignIn(
+        `/join?${PENDING_CHAPTER_PARAM}=${encodeURIComponent(chapter.id)}`
+      );
       return;
     }
     void join(chapter);

@@ -18,7 +18,7 @@ jest.mock('@clerk/nextjs', () => ({
     },
   }),
   UserButton: () => <div data-testid="user-button">User Button</div>,
-  SignInButton: () => <div data-testid="sign-in-button">Sign In Button</div>,
+  useClerk: () => ({ openSignIn: jest.fn() }),
 }))
 
 jest.mock('next/navigation', () => ({
