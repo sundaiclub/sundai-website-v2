@@ -355,8 +355,8 @@ export default async function PublicEventDetailPage({
       </nav>
 
       {activeTab === 'info' && (
-        <>
-          <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+        <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+          <div className="grid min-w-0 gap-5">
             <PublicEventHero
               event={heroEvent}
               chapterActions={
@@ -379,12 +379,10 @@ export default async function PublicEventDetailPage({
                 </>
               }
             />
-            <EventNarrativeColumn event={event} />
-          </div>
-          <div className="mt-6 grid min-w-0 gap-5">
             <EventMaterialsSection materials={materialLinks} />
           </div>
-        </>
+          <EventNarrativeColumn event={event} />
+        </div>
       )}
 
       {activeTab === 'ticket' && ticket && (

@@ -556,7 +556,7 @@ export function EventMaterialsSection({
       description="Useful links and files for this event."
       size="large"
     >
-      <ul className="grid gap-3 sm:grid-cols-2">
+      <ul className="grid gap-3">
         {materials.map(material => (
           <li className={`${classes.subtlePanel} p-4`} key={material.id}>
             <div className="flex items-start justify-between gap-3">
@@ -574,7 +574,9 @@ export function EventMaterialsSection({
                     : {})}
                 >
                   {material.title}
-                  <span aria-hidden="true">↗</span>
+                  <span aria-hidden="true">
+                    {material.kind === 'FILE' ? '↓' : '↗'}
+                  </span>
                 </a>
               </div>
             </div>
