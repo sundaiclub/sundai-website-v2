@@ -259,65 +259,46 @@ jest.mock('@clerk/nextjs', () => ({
   UserButton: () => <div>User Button</div>,
 }))
 
-// Mock framer-motion
-jest.mock('framer-motion', () => ({
-  motion: {
-    div: ({ children, ...props }) => {
-      // Filter out framer-motion specific props to avoid warnings
-      const { whileHover, whileTap, initial, animate, exit, ...restProps } = props
-      return <div {...restProps}>{children}</div>
-    },
-    span: ({ children, ...props }) => {
-      const { whileHover, whileTap, initial, animate, exit, ...restProps } = props
-      return <span {...restProps}>{children}</span>
-    },
-    button: ({ children, ...props }) => {
-      const { whileHover, whileTap, initial, animate, exit, ...restProps } = props
-      return <button {...restProps}>{children}</button>
-    },
-    img: ({ children, ...props }) => {
-      const { whileHover, whileTap, initial, animate, exit, ...restProps } = props
-      return <img {...restProps}>{children}</img>
-    },
-    section: ({ children, ...props }) => {
-      const { whileHover, whileTap, initial, animate, exit, ...restProps } = props
-      return <section {...restProps}>{children}</section>
-    },
-    footer: ({ children, ...props }) => {
-      const { whileHover, whileTap, initial, animate, exit, ...restProps } = props
-      return <footer {...restProps}>{children}</footer>
-    },
-    h1: ({ children, ...props }) => {
-      const { whileHover, whileTap, initial, animate, exit, ...restProps } = props
-      return <h1 {...restProps}>{children}</h1>
-    },
-    h2: ({ children, ...props }) => {
-      const { whileHover, whileTap, initial, animate, exit, ...restProps } = props
-      return <h2 {...restProps}>{children}</h2>
-    },
-    h3: ({ children, ...props }) => {
-      const { whileHover, whileTap, initial, animate, exit, ...restProps } = props
-      return <h3 {...restProps}>{children}</h3>
-    },
-    p: ({ children, ...props }) => {
-      const { whileHover, whileTap, initial, animate, exit, ...restProps } = props
-      return <p {...restProps}>{children}</p>
-    },
-    ul: ({ children, ...props }) => {
-      const { whileHover, whileTap, initial, animate, exit, ...restProps } = props
-      return <ul {...restProps}>{children}</ul>
-    },
-    li: ({ children, ...props }) => {
-      const { whileHover, whileTap, initial, animate, exit, ...restProps } = props
-      return <li {...restProps}>{children}</li>
-    },
-    a: ({ children, ...props }) => {
-      const { whileHover, whileTap, initial, animate, exit, ...restProps } = props
-      return <a {...restProps}>{children}</a>
-    },
-  },
-  AnimatePresence: ({ children }) => children,
-}))
+// Mock framer-motion: every motion.<tag> renders the plain element without
+// animation-only props.
+jest.mock('framer-motion', () => {
+  const React = require('react')
+  const motionProps = new Set([
+    'animate',
+    'exit',
+    'initial',
+    'layout',
+    'transition',
+    'variants',
+    'whileHover',
+    'whileInView',
+    'whileTap',
+    'viewport',
+  ])
+  const components = {}
+  const motion = new Proxy(
+    {},
+    {
+      get: (_, tag) => {
+        if (!components[tag]) {
+          components[tag] = React.forwardRef(({ children, ...props }, ref) => {
+            const domProps = Object.fromEntries(
+              Object.entries(props).filter(([key]) => !motionProps.has(key))
+            )
+            return React.createElement(tag, { ...domProps, ref }, children)
+          })
+        }
+        return components[tag]
+      },
+    }
+  )
+
+  return {
+    motion,
+    AnimatePresence: ({ children }) => children,
+    MotionConfig: ({ children }) => children,
+  }
+})
 
 // Mock react-hot-toast
 jest.mock('react-hot-toast', () => ({

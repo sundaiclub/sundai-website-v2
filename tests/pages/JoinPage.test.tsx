@@ -76,7 +76,20 @@ describe('JoinPage', () => {
   it('lists chapters and opens Clerk sign-in when a signed-out visitor joins', async () => {
     mockUseUserContext.mockReturnValue({ userInfo: null, loading: false });
     fetchMock.mockImplementation(() =>
-      jsonResponse([bostonChapter, privateChapter])
+      jsonResponse([
+        {
+          ...bostonChapter,
+          nextEvent: {
+            id: 'event-1',
+            title: 'Agents Sunday',
+            slug: 'agents-sunday',
+            applicationCount: 0,
+            timezone: 'America/New_York',
+            startTime: '2026-10-18T14:00:00.000Z',
+          },
+        },
+        privateChapter,
+      ])
     );
 
     render(<JoinPage />);
@@ -86,6 +99,9 @@ describe('JoinPage', () => {
     ).toBeInTheDocument();
     expect(await screen.findByText('Boston')).toBeInTheDocument();
     expect(screen.getByText('Invite only')).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: /Next up · Sun, Oct 18 · Agents Sunday/ })
+    ).toHaveAttribute('href', '/events/boston/agents-sunday');
 
     fireEvent.click(screen.getByRole('button', { name: 'Join' }));
 
