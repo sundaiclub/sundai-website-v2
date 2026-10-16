@@ -67,6 +67,50 @@ it('signs a private upload for 15 minutes, including the content type', async ()
     requestChecksumCalculation: 'WHEN_REQUIRED',
   });
 });
+it('trims surrounding whitespace from material storage configuration', async () => {
+  process.env.S3_MATERIALS_BUCKET = ' private-materials\r\n';
+  process.env.S3_MATERIALS_REGION = ' us-east-1\n';
+  process.env.VERCEL = '1';
+  process.env.S3_MATERIALS_ROLE_ARN = ' arn:aws:iam::123:role/materials\n';
+
+  const intent = await createPrivateMaterialUploadIntent({
+    contentType: 'application/pdf',
+  });
+
+  expect(intent.bucket).toBe('private-materials');
+  expect(S3Client).toHaveBeenCalledWith({
+    region: 'us-east-1',
+    requestChecksumCalculation: 'WHEN_REQUIRED',
+    credentials: 'oidc',
+  });
+  expect(awsCredentialsProvider).toHaveBeenCalledWith({
+    roleArn: 'arn:aws:iam::123:role/materials',
+  });
+  send.mockResolvedValue({ ContentLength: 1024, ContentType: 'application/pdf' });
+  await inspectPrivateObject({
+    bucket: intent.bucket,
+    objectKey: intent.objectKey,
+  });
+});
+it.each(['S3_MATERIALS_BUCKET', 'S3_MATERIALS_REGION'])(
+  'rejects whitespace-only %s before creating an S3 client',
+  async name => {
+    process.env[name] = ' \r\n\t';
+    await expect(
+      createPrivateMaterialUploadIntent({ contentType: 'application/pdf' })
+    ).rejects.toThrow('Missing S3_MATERIALS_BUCKET or S3_MATERIALS_REGION');
+    expect(S3Client).not.toHaveBeenCalled();
+  }
+);
+it('rejects a whitespace-only role on Vercel', async () => {
+  process.env.VERCEL = '1';
+  process.env.S3_MATERIALS_ROLE_ARN = ' \n';
+  await expect(
+    createPrivateMaterialUploadIntent({ contentType: 'application/pdf' })
+  ).rejects.toThrow('Missing S3_MATERIALS_ROLE_ARN');
+  expect(awsCredentialsProvider).not.toHaveBeenCalled();
+  expect(S3Client).not.toHaveBeenCalled();
+});
 it('uses OIDC on Vercel instead of SES credentials', async () => {
   process.env.VERCEL = '1';
   process.env.S3_MATERIALS_ROLE_ARN = 'arn:aws:iam::123:role/materials';
@@ -86,7 +130,8 @@ it('requires a separate bucket and rejects stored references to other buckets', 
       objectKey: 'event-materials/file',
     })
   ).rejects.toThrow('does not match');
-  process.env.S3_MATERIALS_BUCKET = 'images';
+  process.env.S3_MATERIALS_BUCKET = ' images\n';
+  process.env.S3_IMAGE_BUCKET = ' images\r\n';
   await expect(
     createPrivateMaterialUploadIntent({ contentType: 'application/pdf' })
   ).rejects.toThrow('must differ');
