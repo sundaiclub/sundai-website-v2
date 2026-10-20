@@ -249,6 +249,134 @@ describe('/api/events/[eventId]/materials', () => {
     expect(body).not.toHaveProperty('publicUrl');
   });
 
+  it('rejects public file creation and visibility updates', async () => {
+    mockOrganizer();
+    const { POST } = loadRoute<{ POST: Function }>(
+      '../../src/app/api/events/[eventId]/materials/route'
+    );
+    const created = await POST(
+      createJsonRequest(`/api/events/${eventId}/materials`, {
+        method: 'POST',
+        body: {
+          kind: 'FILE',
+          title: 'Brief',
+          uploadToken,
+          visibility: 'PUBLIC',
+        },
+      }),
+      createRouteContext({ eventId })
+    );
+    expect(created.status).toBe(400);
+    expect(prisma.eventMaterial.create).not.toHaveBeenCalled();
+
+    prisma.eventMaterial.findUnique.mockResolvedValue(fileMaterial);
+    const { PATCH } = loadRoute<{ PATCH: Function }>(
+      '../../src/app/api/events/[eventId]/materials/[materialId]/route'
+    );
+    const updated = await PATCH(
+      createJsonRequest(`/api/events/${eventId}/materials/${materialId}`, {
+        method: 'PATCH',
+        body: { visibility: 'PUBLIC' },
+      }),
+      createRouteContext({ eventId, materialId })
+    );
+    expect(updated.status).toBe(400);
+    expect(prisma.eventMaterial.update).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    null,
+    'PENDING',
+    'WAITLISTED',
+    'DECLINED',
+    'BLOCKED',
+    'CANCELLED',
+    'APPROVED',
+  ])(
+    'requires approval for file listings and downloads (status %s)',
+    async status => {
+      mockAuthenticatedClerk({ userId: 'clerk-attendee' });
+      prisma.hacker.findUnique.mockResolvedValue({
+        id: 'hacker-attendee',
+        role: 'HACKER',
+      });
+      prisma.event.findUnique.mockResolvedValue({
+        id: eventId,
+        chapterId: 'chapter-boston',
+      });
+      prisma.chapterMembership.findFirst.mockResolvedValue(null);
+      prisma.eventStaff.findFirst.mockResolvedValue(null);
+      prisma.eventRegistration.findFirst.mockResolvedValue(
+        status ? { status } : null
+      );
+      // Also guard a public file before the data migration takes effect.
+      const files = ['PUBLIC', 'APPROVED_ATTENDEES', 'ORGANIZERS_ONLY'].map(
+        visibility => ({ ...fileMaterial, id: visibility, visibility })
+      );
+      prisma.eventMaterial.findMany.mockResolvedValue(files);
+      const { GET: list } = loadRoute<{ GET: Function }>(
+        '../../src/app/api/events/[eventId]/materials/route'
+      );
+      const listed = await list(
+        new NextRequest(`http://localhost/api/events/${eventId}/materials`),
+        createRouteContext({ eventId })
+      );
+      expect(
+        (await listed.json()).map((row: { id: string }) => row.id)
+      ).toEqual(status === 'APPROVED' ? ['PUBLIC', 'APPROVED_ATTENDEES'] : []);
+      const { GET: download } = loadRoute<{ GET: Function }>(
+        '../../src/app/api/events/[eventId]/materials/[materialId]/content/route'
+      );
+      for (const file of files) {
+        prisma.eventMaterial.findUnique.mockResolvedValue(file);
+        const response = await download(
+          new NextRequest(
+            `http://localhost/api/events/${eventId}/materials/${materialId}/content`
+          ),
+          createRouteContext({ eventId, materialId })
+        );
+        const allowed =
+          status === 'APPROVED' && file.visibility !== 'ORGANIZERS_ONLY';
+        expect(response.status).toBe(allowed ? 302 : 404);
+        if (allowed)
+          expect(response.headers.get('cache-control')).toBe(
+            'private, no-store'
+          );
+      }
+      expect(storage.createSignedMaterialDownloadUrl).toHaveBeenCalledTimes(
+        status === 'APPROVED' ? 2 : 0
+      );
+    }
+  );
+
+  it('hides public and approved files from signed-out visitors', async () => {
+    mockSignedOutClerk();
+    const { GET: list } = loadRoute<{ GET: Function }>(
+      '../../src/app/api/events/[eventId]/materials/route'
+    );
+    const { GET: download } = loadRoute<{ GET: Function }>(
+      '../../src/app/api/events/[eventId]/materials/[materialId]/content/route'
+    );
+    for (const visibility of ['PUBLIC', 'APPROVED_ATTENDEES']) {
+      const file = { ...fileMaterial, visibility };
+      prisma.eventMaterial.findMany.mockResolvedValue([file]);
+      prisma.eventMaterial.findUnique.mockResolvedValue(file);
+      const listed = await list(
+        new NextRequest(`http://localhost/api/events/${eventId}/materials`),
+        createRouteContext({ eventId })
+      );
+      expect(await listed.json()).toEqual([]);
+      const response = await download(
+        new NextRequest(
+          `http://localhost/api/events/${eventId}/materials/${materialId}/content`
+        ),
+        createRouteContext({ eventId, materialId })
+      );
+      expect(response.status).toBe(404);
+    }
+    expect(storage.createSignedMaterialDownloadUrl).not.toHaveBeenCalled();
+  });
+
   it('updates mutable metadata and writes an audit without replacing file identity', async () => {
     mockOrganizer();
     prisma.eventMaterial.findUnique.mockResolvedValue(fileMaterial);

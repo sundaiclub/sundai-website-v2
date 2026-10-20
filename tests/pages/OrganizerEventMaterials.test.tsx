@@ -190,7 +190,7 @@ describe('/organizer/events/[eventId]/materials', () => {
       within(policy).getByText(/PNG|JPEG|WebP|image/i)
     ).toBeInTheDocument();
     expect(screen.getByText('Public')).toBeInTheDocument();
-    expect(screen.getByText(/approved attendees/i)).toBeInTheDocument();
+    expect(screen.getByText('Approved attendees')).toBeInTheDocument();
     expect(screen.getByText(/organizers only/i)).toBeInTheDocument();
     expect(
       screen.getByText('Unavailable', { selector: 'span' })
@@ -258,6 +258,11 @@ describe('/organizer/events/[eventId]/materials', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /add material/i }));
     fireEvent.click(screen.getByRole('radio', { name: /file/i }));
+    const visibility = screen.getByLabelText(/visibility/i);
+    expect(visibility).toHaveValue('APPROVED_ATTENDEES');
+    expect(
+      within(visibility).queryByRole('option', { name: 'Public' })
+    ).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText(/title/i), {
       target: { value: 'Sponsor brief' },
     });

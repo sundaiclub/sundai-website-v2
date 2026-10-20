@@ -1163,24 +1163,37 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('renders only public material links for anonymous and non-approved viewers', async () => {
-    await renderDetailPage(
-      buildEventDetail({
-        viewerRegistrationStatus: 'PENDING',
-        materials: [publicMaterial],
-      } as any)
-    );
+  it.each([null, 'PENDING', 'WAITLISTED', 'DECLINED', 'BLOCKED', 'CANCELLED'])(
+    'hides uploaded materials from viewers with status %s',
+    async status => {
+      await renderDetailPage(
+        buildEventDetail({
+          viewerRegistrationStatus: status,
+          materials: [
+            publicMaterial,
+            approvedMaterial,
+            {
+              ...approvedMaterial,
+              id: 'public-file',
+              visibility: 'PUBLIC',
+              title: 'Uploaded file',
+            },
+          ],
+        } as any)
+      );
 
-    expect(
-      await screen.findByRole('heading', { name: /event materials/i })
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('link', { name: /public build night guide/i })
-    ).toHaveAttribute('href', publicMaterial.externalUrl);
-    expect(
-      screen.queryByText(/approved attendee brief/i)
-    ).not.toBeInTheDocument();
-  });
+      expect(
+        await screen.findByRole('heading', { name: /event materials/i })
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole('link', { name: /public build night guide/i })
+      ).toHaveAttribute('href', publicMaterial.externalUrl);
+      expect(
+        screen.queryByText(/approved attendee brief/i)
+      ).not.toBeInTheDocument();
+      expect(screen.queryByText('Uploaded file')).not.toBeInTheDocument();
+    }
+  );
 
   it('renders public and approved-attendee materials for an approved viewer', async () => {
     mockSignedIn();
