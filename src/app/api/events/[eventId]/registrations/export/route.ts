@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import {
   isSiteAdmin,
-  requireEventRegistrationManager,
+  requireEventAttendeeExportAccess,
 } from '@/lib/eventManagementApi';
 import {
   attendeeExportFilename,
@@ -18,7 +18,7 @@ export async function GET(
   { params }: { params: { eventId: string } }
 ) {
   try {
-    const access = await requireEventRegistrationManager(params.eventId);
+    const access = await requireEventAttendeeExportAccess(params.eventId);
     if (access.response) return access.response;
     const registrations = await prisma.eventRegistration.findMany({
       where: {

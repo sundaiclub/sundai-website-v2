@@ -1,17 +1,23 @@
 /** @jest-environment-options {"customExportConditions": ["node", "node-addons"]} */
 import ExcelJS from 'exceljs';
-import { NextResponse } from 'next/server';
 import { GET } from '../../src/app/api/events/[eventId]/registrations/export/route';
 
-const mockAccess = jest.fn();
+const mockAuth = jest.fn();
+const mockHacker = jest.fn();
+const mockEvent = jest.fn();
+const mockMembership = jest.fn();
 const mockFindMany = jest.fn();
-jest.mock('../../src/lib/eventManagementApi', () => ({
-  requireEventRegistrationManager: (...args: unknown[]) => mockAccess(...args),
-  isSiteAdmin: (hacker: { role: string }) => hacker.role === 'ADMIN',
+jest.mock('@clerk/nextjs/server', () => ({
+  auth: () => mockAuth(),
 }));
 jest.mock('../../src/lib/prisma', () => ({
   __esModule: true,
   default: {
+    hacker: { findUnique: (...args: unknown[]) => mockHacker(...args) },
+    event: { findUnique: (...args: unknown[]) => mockEvent(...args) },
+    chapterMembership: {
+      findFirst: (...args: unknown[]) => mockMembership(...args),
+    },
     eventRegistration: {
       findMany: (...args: unknown[]) => mockFindMany(...args),
     },
@@ -48,33 +54,72 @@ const context = { params: { eventId: 'event-1' } };
 const request = new Request(
   'https://sundai.club/api/events/event-1/registrations/export'
 );
-const access = (role = 'HACKER') => ({
-  response: null,
-  hacker: { id: 'organizer', role },
-  event: {
-    title: 'Test event',
-    slug: 'test-event',
-    applicationQuestionsJson: [field],
-  },
-});
+const event = {
+  id: 'event-1',
+  chapterId: 'chapter-1',
+  title: 'Test event',
+  slug: 'test-event',
+  applicationQuestionsJson: [field],
+  staff: [{ role: 'MC' }],
+};
 
 describe('accepted attendee download', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockAccess.mockResolvedValue(access());
+    mockAuth.mockReturnValue({ userId: 'clerk-organizer' });
+    mockHacker.mockResolvedValue({ id: 'organizer', role: 'HACKER' });
+    mockEvent.mockResolvedValue(event);
+    mockMembership.mockResolvedValue(null);
     mockFindMany.mockResolvedValue([registration]);
   });
 
-  it.each([401, 403, 404])(
-    'does not query attendees when the access check returns %i',
-    async status => {
-      mockAccess.mockResolvedValue({
-        response: NextResponse.json({ error: 'Denied' }, { status }),
-      });
-      expect((await GET(request, context)).status).toBe(status);
-      expect(mockFindMany).not.toHaveBeenCalled();
-    }
-  );
+  it('blocks signed-out requests before querying attendees', async () => {
+    mockAuth.mockReturnValue({ userId: null });
+    expect((await GET(request, context)).status).toBe(401);
+    expect(mockFindMany).not.toHaveBeenCalled();
+  });
+
+  it('returns 404 for a missing event without querying attendees', async () => {
+    mockEvent.mockResolvedValue(null);
+    expect((await GET(request, context)).status).toBe(404);
+    expect(mockFindMany).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['co-MC', [{ role: 'CO_MC' }], null],
+    ['ordinary attendee', [], null],
+    ['chapter member', [], { role: 'MEMBER', status: 'ACTIVE' }],
+    ['inactive chapter admin', [], { role: 'ADMIN', status: 'INVITED' }],
+  ])('blocks direct downloads by a %s', async (_role, staff, membership) => {
+    mockEvent.mockResolvedValue({ ...event, staff });
+    mockMembership.mockResolvedValue(membership);
+    expect((await GET(request, context)).status).toBe(403);
+    expect(mockFindMany).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['site admin', 'SITE_ADMIN', [], null],
+    ['chapter admin', 'HACKER', [], { role: 'ADMIN', status: 'ACTIVE' }],
+    ['MC', 'HACKER', [{ role: 'MC' }], null],
+  ])('allows downloads by a %s', async (_role, role, staff, membership) => {
+    mockHacker.mockResolvedValue({ id: 'organizer', role });
+    mockEvent.mockResolvedValue({ ...event, staff });
+    mockMembership.mockResolvedValue(membership);
+    expect((await GET(request, context)).status).toBe(200);
+    expect(mockMembership).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { chapterId: event.chapterId, hackerId: 'organizer' },
+      })
+    );
+    expect(mockEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: event.id },
+        include: {
+          staff: { where: { hackerId: 'organizer' }, select: { role: true } },
+        },
+      })
+    );
+  });
 
   it('exports every approved applicant with saved labels, contact fields and dates as a private Excel download', async () => {
     mockFindMany.mockResolvedValue([
@@ -130,7 +175,7 @@ describe('accepted attendee download', () => {
   });
 
   it('keeps site admin ban visibility consistent with registration review', async () => {
-    mockAccess.mockResolvedValue(access('ADMIN'));
+    mockHacker.mockResolvedValue({ id: 'organizer', role: 'SITE_ADMIN' });
     await GET(request, context);
     expect(mockFindMany.mock.calls[0][0].where).not.toHaveProperty('hacker');
   });

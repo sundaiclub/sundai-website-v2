@@ -5,6 +5,7 @@ import prisma from '@/lib/prisma';
 import {
   canAccessEventWorkspaceWithContext,
   canAdministerEventWithContext,
+  canDecideEventApplicantsWithContext,
   canManageEventCommunicationsWithContext,
   canManageEventJudgingWithContext,
   canManageEventMaterialsWithContext,
@@ -12,7 +13,6 @@ import {
   canManageEventOperationsWithContext,
   canManageEventPitchWithContext,
   canManagePitchWithContext,
-  canManageRegistrationsWithContext,
   canManageChapterMembers,
   canManageChapterSettings,
   canManageEventSettings,
@@ -176,10 +176,10 @@ export function requireEventWorkspaceAccess(eventId: string) {
   );
 }
 
-export function requireEventRegistrationManager(eventId: string) {
+export function requireEventAttendeeExportAccess(eventId: string) {
   return requireCurrentEventCapability(
     eventId,
-    canManageRegistrationsWithContext
+    canDecideEventApplicantsWithContext
   );
 }
 
