@@ -6,7 +6,10 @@ import {
   getChapterMembershipForPermissions,
   getEventStaffForPermissions,
 } from '@/lib/eventManagementAuth';
-import { isEventMaterialAvailable } from '@/lib/eventMaterials';
+import {
+  filterVisibleEventMaterials,
+  isEventMaterialAvailable,
+} from '@/lib/eventMaterials';
 import { createSignedMaterialDownloadUrl } from '@/lib/s3-materials';
 
 function notFound() {
@@ -27,11 +30,7 @@ export async function GET(
     });
     if (!material || material.kind !== 'FILE') return notFound();
     if (!isEventMaterialAvailable(material)) return notFound();
-    if (
-      !material.objectKey ||
-      !material.bucket ||
-      !material.originalFilename
-    ) {
+    if (!material.objectKey || !material.bucket || !material.originalFilename) {
       return notFound();
     }
 
@@ -64,10 +63,10 @@ export async function GET(
     }
 
     const canDownload =
-      isOrganizer ||
-      material.visibility === 'PUBLIC' ||
-      (material.visibility === 'APPROVED_ATTENDEES' &&
-        registrationStatus === 'APPROVED');
+      filterVisibleEventMaterials([material], {
+        isOrganizer,
+        registrationStatus,
+      }).length > 0;
     if (!canDownload) return notFound();
 
     const signed = await createSignedMaterialDownloadUrl({
@@ -79,7 +78,7 @@ export async function GET(
 
     return new NextResponse(null, {
       status: 302,
-      headers: { Location: signed.url },
+      headers: { Location: signed.url, 'Cache-Control': 'private, no-store' },
     });
   } catch (error) {
     console.error('[EVENT_MATERIAL_CONTENT_GET]', error);

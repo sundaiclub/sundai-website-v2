@@ -257,7 +257,8 @@ export default function EventMaterialsPanel({ eventId }: { eventId: string }) {
           <p className={`mt-1 text-sm ${classes.mutedText}`}>
             Maximum 25 MiB. Supported files: PDF, plain text, Markdown, CSV,
             PNG, JPEG, WebP, GIF, DOCX, XLSX, and PPTX. Active content,
-            archives, and executables are not accepted.
+            archives, and executables are not accepted. Uploaded files are
+            available only to approved attendees and organizers.
           </p>
         </div>
 
@@ -285,7 +286,11 @@ export default function EventMaterialsPanel({ eventId }: { eventId: string }) {
                   <input
                     checked={kind === 'FILE'}
                     name="material-kind"
-                    onChange={() => setKind('FILE')}
+                    onChange={() => {
+                      setKind('FILE');
+                      if (visibility === 'PUBLIC')
+                        setVisibility('APPROVED_ATTENDEES');
+                    }}
                     type="radio"
                   />
                   File
@@ -339,11 +344,13 @@ export default function EventMaterialsPanel({ eventId }: { eventId: string }) {
                   }
                   value={visibility}
                 >
-                  {Object.entries(visibilityLabels).map(([value, label]) => (
-                    <option key={value} value={value}>
-                      {label}
-                    </option>
-                  ))}
+                  {Object.entries(visibilityLabels)
+                    .filter(([value]) => kind !== 'FILE' || value !== 'PUBLIC')
+                    .map(([value, label]) => (
+                      <option key={value} value={value}>
+                        {label}
+                      </option>
+                    ))}
                 </select>
               </label>
               <label className="block">

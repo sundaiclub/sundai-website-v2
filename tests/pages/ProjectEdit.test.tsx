@@ -535,6 +535,66 @@ describe('ProjectEdit', () => {
     });
   });
 
+  it('carries the initial track to the editor, allows changes, and blocks saving or publishing after clearing it', async () => {
+    mockSearchParams.mockReturnValue(
+      new URLSearchParams(
+        'eventId=event-1&judgingEventId=event-1&judgingTrackId=track-1'
+      )
+    );
+    (global.fetch as jest.Mock).mockImplementation((input: RequestInfo | URL) =>
+      Promise.resolve({
+        ok: true,
+        json: async () =>
+          input === '/api/projects/test-project-id'
+            ? { ...mockProject, status: 'DRAFT' }
+            : input === '/api/events/project-options?projectId=test-project-id'
+              ? [
+                  {
+                    id: 'event-1',
+                    title: 'Judged Event',
+                    chapterName: 'Boston',
+                    selectedByDefault: false,
+                    judging: {
+                      submission: null,
+                      tracks: [
+                        {
+                          id: 'track-1',
+                          name: 'AI',
+                          description: null,
+                          questions: [],
+                        },
+                        {
+                          id: 'track-2',
+                          name: 'Tools',
+                          description: null,
+                          questions: [],
+                        },
+                      ],
+                    },
+                  },
+                ]
+              : [],
+      })
+    );
+    render(
+      <ThemeProvider>
+        <ProjectEdit />
+      </ThemeProvider>
+    );
+    const track = await screen.findByRole('combobox', { name: 'Track *' });
+    expect(track).toHaveValue('track-1');
+    expect(track).toBeRequired();
+    fireEvent.change(track, { target: { value: 'track-2' } });
+    expect(track).toHaveValue('track-2');
+    fireEvent.change(track, { target: { value: '' } });
+    fireEvent.click(screen.getAllByRole('button', { name: 'Save Draft' })[0]);
+    fireEvent.click(screen.getAllByRole('button', { name: 'Publish' })[0]);
+    expect(
+      (global.fetch as jest.Mock).mock.calls.filter(([, init]) => init?.method)
+    ).toEqual([]);
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
   it('should handle missing optional fields gracefully', async () => {
     const projectWithMissingFields = {
       ...mockProject,

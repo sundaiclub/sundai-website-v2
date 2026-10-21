@@ -253,6 +253,86 @@ describe('NewProject', () => {
     );
   });
 
+  it('requires a track before creating a judged project and carries it to the editor', async () => {
+    (global.fetch as jest.Mock).mockImplementation((input: RequestInfo | URL) =>
+      Promise.resolve({
+        ok: true,
+        json: async () =>
+          input === '/api/hackers'
+            ? [{ id: 'hacker-1', name: 'John Doe', email: 'test@example.com' }]
+            : input === '/api/events/project-options'
+              ? [
+                  {
+                    id: 'event-1',
+                    title: 'Judged Event',
+                    chapterName: 'Boston',
+                    selectedByDefault: false,
+                    judging: {
+                      tracks: [
+                        {
+                          id: 'track-1',
+                          name: 'AI',
+                          description: 'Build with AI',
+                          questions: [],
+                        },
+                      ],
+                      submission: null,
+                    },
+                  },
+                  {
+                    id: 'event-2',
+                    title: 'Other Judged Event',
+                    chapterName: 'Boston',
+                    selectedByDefault: false,
+                    judging: {
+                      tracks: [
+                        {
+                          id: 'track-2',
+                          name: 'Tools',
+                          description: null,
+                          questions: [],
+                        },
+                      ],
+                      submission: null,
+                    },
+                  },
+                ]
+              : { id: 'new-project-id' },
+      })
+    );
+    renderWithTheme(<NewProject />);
+    fireEvent.click(
+      await screen.findByRole('checkbox', { name: /^judged event/i })
+    );
+    const track = screen.getByRole('combobox', { name: 'Track *' });
+    expect(track).toBeRequired();
+    fireEvent.click(screen.getByRole('button', { name: 'Create Project' }));
+    expect(mockToast.error).toHaveBeenCalledWith(
+      'Choose a track for Judged Event'
+    );
+    expect(global.fetch).not.toHaveBeenCalledWith(
+      '/api/projects',
+      expect.anything()
+    );
+
+    fireEvent.change(track, { target: { value: 'track-1' } });
+    expect(screen.getByText('Build with AI')).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole('checkbox', { name: /other judged event/i })
+    );
+    expect(screen.getByRole('combobox', { name: 'Track *' })).toHaveValue('');
+    fireEvent.click(screen.getByRole('checkbox', { name: /^judged event/i }));
+    fireEvent.change(screen.getByRole('combobox', { name: 'Track *' }), {
+      target: { value: 'track-1' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Create Project' }));
+    await waitFor(() =>
+      expect(defaultRouter.push).toHaveBeenCalledWith(
+        '/projects/new-project-id/edit?eventId=event-1&judgingEventId=event-1&judgingTrackId=track-1'
+      )
+    );
+  });
+
   it('constrains long event names to the event card', async () => {
     const longTitle =
       'A very long current event title that must stay inside its project form card';

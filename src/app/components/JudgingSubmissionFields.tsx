@@ -1,6 +1,7 @@
 'use client';
 
 import MarkdownEditor from './MarkdownEditor';
+import JudgingTrackSelect from './JudgingTrackSelect';
 import {
   ADDITIONAL_INFO_KEY,
   type JudgingAnswers,
@@ -51,32 +52,12 @@ export default function JudgingSubmissionFields({
         </p>
       </div>
 
-      <div>
-        <label className={labelClass} htmlFor="judging-track">
-          Track *
-        </label>
-        <select
-          id="judging-track"
-          required
-          value={trackId}
-          onChange={event => onTrackChange(event.target.value)}
-          className={`mt-1 block w-full max-w-md rounded-md border p-2 ${
-            isDarkMode
-              ? 'border-gray-600 bg-gray-900 text-gray-100'
-              : 'border-gray-300 bg-white text-gray-900'
-          }`}
-        >
-          <option value="">Choose a track</option>
-          {judging.tracks.map(item => (
-            <option key={item.id} value={item.id}>
-              {item.name}
-            </option>
-          ))}
-        </select>
-        {track?.description && (
-          <p className={`mt-2 ${mutedClass}`}>{track.description}</p>
-        )}
-      </div>
+      <JudgingTrackSelect
+        judging={judging}
+        trackId={trackId}
+        onTrackChange={onTrackChange}
+        isDarkMode={isDarkMode}
+      />
 
       {track && (
         <>

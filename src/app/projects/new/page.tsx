@@ -10,6 +10,8 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { HackerSelector, ProjectRoles } from '../../components/HackerSelector';
 import type { HackerSelectionOption, HackerTeamMember } from '@/types/hacker';
 import { limitToOneJudgingEvent, selectProjectEvent } from '@/lib/judging';
+import type { ProjectJudgingOption } from '@/types/judging';
+import JudgingTrackSelect from '@/app/components/JudgingTrackSelect';
 
 const MAX_PREVIEW_LENGTH = 100;
 const MAX_TITLE_LENGTH = 32;
@@ -20,7 +22,7 @@ type ProjectEventOption = {
   chapterName: string;
   image?: { url: string; alt?: string | null } | null;
   selectedByDefault: boolean;
-  judging: unknown | null;
+  judging: ProjectJudgingOption | null;
 };
 
 export default function NewProject() {
@@ -52,6 +54,10 @@ export default function NewProject() {
   const [leadSearchTerm, setLeadSearchTerm] = useState('');
   const [eventOptions, setEventOptions] = useState<ProjectEventOption[]>([]);
   const [selectedEventIds, setSelectedEventIds] = useState<string[]>([]);
+  const [judgingTrackId, setJudgingTrackId] = useState('');
+  const judgingEvent = eventOptions.find(
+    event => event.judging && selectedEventIds.includes(event.id)
+  );
 
   useEffect(() => {
     fetch('/api/hackers')
@@ -146,6 +152,14 @@ export default function NewProject() {
       return;
     }
 
+    if (
+      judgingEvent &&
+      !judgingEvent.judging?.tracks.some(track => track.id === judgingTrackId)
+    ) {
+      toast.error(`Choose a track for ${judgingEvent.title}`);
+      return;
+    }
+
     setLoading(true);
     try {
       const formData = new FormData();
@@ -184,6 +198,10 @@ export default function NewProject() {
       selectedEventIds.forEach(eventId =>
         editParams.append('eventId', eventId)
       );
+      if (judgingEvent) {
+        editParams.set('judgingEventId', judgingEvent.id);
+        editParams.set('judgingTrackId', judgingTrackId);
+      }
       if (sourceEventId) editParams.set('sourceEventId', sourceEventId);
       if (returnTo) editParams.set('returnTo', returnTo);
       const query = editParams.toString();
@@ -422,7 +440,8 @@ export default function NewProject() {
                   >
                     <input
                       checked={selectedEventIds.includes(event.id)}
-                      onChange={change =>
+                      onChange={change => {
+                        if (event.judging) setJudgingTrackId('');
                         setSelectedEventIds(current =>
                           selectProjectEvent(
                             current,
@@ -430,8 +449,8 @@ export default function NewProject() {
                             event.id,
                             change.target.checked
                           )
-                        )
-                      }
+                        );
+                      }}
                       type="checkbox"
                       className="shrink-0"
                     />
@@ -471,6 +490,15 @@ export default function NewProject() {
               </div>
             )}
           </fieldset>
+
+          {judgingEvent?.judging && (
+            <JudgingTrackSelect
+              judging={judgingEvent.judging}
+              trackId={judgingTrackId}
+              onTrackChange={setJudgingTrackId}
+              isDarkMode={isDarkMode}
+            />
+          )}
 
           <div className="flex justify-end pt-4">
             <button

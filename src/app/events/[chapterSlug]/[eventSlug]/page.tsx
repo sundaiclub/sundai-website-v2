@@ -162,6 +162,7 @@ function publicMaterials(
 ) {
   return materials.filter(material => {
     if (!currentlyAvailable(material, now)) return false;
+    if (material.kind === 'FILE' && !approved) return false;
     if (material.visibility === 'PUBLIC') return true;
     return material.visibility === 'APPROVED_ATTENDEES' && approved;
   });
