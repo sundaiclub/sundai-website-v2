@@ -36,6 +36,7 @@ const VISIBILITIES: ReadonlySet<string> = new Set([
 ]);
 
 type MaterialLike = {
+  kind: string;
   visibility: string;
   isAvailable: boolean;
   availableFrom: Date | string | null;
@@ -157,6 +158,8 @@ export function filterVisibleEventMaterials<T extends MaterialLike>(
   return materials.filter(material => {
     if (!isEventMaterialAvailable(material, now)) return false;
     if (viewer.isOrganizer) return true;
+    if (material.kind === 'FILE' && viewer.registrationStatus !== 'APPROVED')
+      return false;
     if (material.visibility === 'PUBLIC') return true;
     return (
       material.visibility === 'APPROVED_ATTENDEES' &&
@@ -329,6 +332,11 @@ export async function finalizeEventMaterialUpload({
   input: Record<string, unknown>;
 }) {
   const { from, until, title, visibility } = validateCommonInput(input);
+  if (visibility === 'PUBLIC') {
+    throw new Error(
+      'Material files require approved attendees or organizers only.'
+    );
+  }
   if (typeof input.uploadToken !== 'string' || !input.uploadToken) {
     throw new Error('Upload token is required.');
   }
@@ -472,6 +480,18 @@ export async function updateEventMaterial({
   if (input.availableUntil !== undefined) data.availableUntil = until;
 
   return db.$transaction(async tx => {
+    if (data.visibility === 'PUBLIC') {
+      const current = await tx.eventMaterial.findUnique({
+        where: { id: materialId, eventId },
+        select: { kind: true },
+      });
+      if (!current) throw new Error('Material not found.');
+      if (current.kind === 'FILE') {
+        throw new Error(
+          'Material files require approved attendees or organizers only.'
+        );
+      }
+    }
     const material = await tx.eventMaterial.update({
       where: { id: materialId, eventId },
       data,

@@ -153,6 +153,8 @@ export default function ProjectEditPage() {
   const searchParams = useSearchParams();
   const contextualEventIds = searchParams.getAll('eventId');
   const contextualEventIdsKey = contextualEventIds.join(',');
+  const contextualJudgingEventId = searchParams.get('judgingEventId');
+  const contextualJudgingTrackId = searchParams.get('judgingTrackId');
   const sourceEventId = searchParams.get('sourceEventId');
   const requestedReturnTo = searchParams.get('returnTo');
   const returnTo =
@@ -314,10 +316,26 @@ export default function ProjectEditPage() {
         if (submission) {
           setJudgingTrackId(submission.trackId);
           setJudgingAnswers(submission.answers);
+        } else {
+          const contextualTrack = events
+            .find(
+              event =>
+                event.id === contextualJudgingEventId &&
+                selectedIds.includes(event.id)
+            )
+            ?.judging?.tracks.find(
+              track => track.id === contextualJudgingTrackId
+            );
+          setJudgingTrackId(contextualTrack?.id ?? '');
         }
       })
       .catch(error => console.error('Error fetching current events:', error));
-  }, [contextualEventIdsKey, params?.projectId]);
+  }, [
+    contextualEventIdsKey,
+    contextualJudgingEventId,
+    contextualJudgingTrackId,
+    params?.projectId,
+  ]);
 
   const handleEventSelection = (eventId: string, selected: boolean) => {
     setSelectedEventIds(current =>
@@ -340,7 +358,9 @@ export default function ProjectEditPage() {
   /** Validates judging answers and returns the description to save, or null to abort. */
   const descriptionForSave = (): string | null => {
     if (!judgingEvent) return editableDescription;
-    if (!judgingTrackId) {
+    if (
+      !judgingEvent.judging?.tracks.some(track => track.id === judgingTrackId)
+    ) {
       toast.error(`Choose a track for ${judgingEvent.title}`);
       return null;
     }

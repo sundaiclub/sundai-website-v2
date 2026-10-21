@@ -27,15 +27,15 @@ export type PrivateObjectMetadata = {
 };
 
 function storage(bucketOverride?: string) {
-  const bucket = process.env.S3_MATERIALS_BUCKET;
-  const region = process.env.S3_MATERIALS_REGION;
+  const bucket = process.env.S3_MATERIALS_BUCKET?.trim();
+  const region = process.env.S3_MATERIALS_REGION?.trim();
   if (!bucket || !region)
     throw new Error('Missing S3_MATERIALS_BUCKET or S3_MATERIALS_REGION');
-  if (bucket === process.env.S3_IMAGE_BUCKET)
+  if (bucket === process.env.S3_IMAGE_BUCKET?.trim())
     throw new Error('Private material bucket must differ from image bucket');
   if (bucketOverride && bucketOverride !== bucket)
     throw new Error('Material bucket does not match configured private bucket');
-  const roleArn = process.env.S3_MATERIALS_ROLE_ARN;
+  const roleArn = process.env.S3_MATERIALS_ROLE_ARN?.trim();
   const onVercel = process.env.VERCEL === '1';
   if (onVercel && !roleArn) throw new Error('Missing S3_MATERIALS_ROLE_ARN');
   const client = new S3Client({
