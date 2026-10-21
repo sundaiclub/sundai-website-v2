@@ -15,7 +15,7 @@ datasource db {
 
 model Hacker {
   id                   String                 @id @default(uuid())
-  clerkId              String                 @unique
+  clerkId              String?                @unique
   name                 String
   username             String?
   role                 Role?

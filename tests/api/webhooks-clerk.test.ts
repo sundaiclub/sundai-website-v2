@@ -8,6 +8,7 @@ jest.mock('../../src/lib/prisma', () => ({
     create: jest.fn(),
     findUnique: jest.fn(),
     update: jest.fn(),
+    updateMany: jest.fn(),
     upsert: jest.fn(),
   },
   $queryRaw: jest.fn(),
@@ -301,7 +302,7 @@ describe('/api/webhooks/clerk', () => {
       }));
 
       (mockPrisma.$queryRaw as jest.Mock).mockResolvedValue([
-        { id: 'hacker_existing' },
+        { id: 'hacker_existing', clerkId: null },
       ]);
       const existingHacker = {
         id: 'hacker_existing',
@@ -311,7 +312,10 @@ describe('/api/webhooks/clerk', () => {
         username: 'preserved-username',
         role: 'ADMIN',
       };
-      mockPrisma.hacker.update.mockResolvedValue(existingHacker as any);
+      mockPrisma.hacker.updateMany.mockResolvedValue({ count: 1 });
+      mockPrisma.hacker.findUnique
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(existingHacker as any);
 
       const response = await POST(createMockRequest({}));
       const data = await expectJsonResponse(response, 200);
@@ -321,12 +325,87 @@ describe('/api/webhooks/clerk', () => {
         expect.anything(),
         'existing@example.com'
       );
-      expect(mockPrisma.hacker.update).toHaveBeenCalledWith({
-        where: { id: 'hacker_existing' },
+      expect(mockPrisma.hacker.updateMany).toHaveBeenCalledWith({
+        where: { id: 'hacker_existing', clerkId: null },
         data: { clerkId: 'user_new_clerk_id' },
       });
       expect(mockPrisma.hacker.upsert).not.toHaveBeenCalled();
     });
+
+    it('does not replace the Clerk ID of an existing email match', async () => {
+      const { Webhook } = require('svix');
+      Webhook.mockImplementation(() => ({
+        verify: jest.fn().mockReturnValue({
+          type: 'user.created',
+          data: {
+            id: 'user_new',
+            primary_email_address_id: 'email_primary',
+            email_addresses: [
+              {
+                id: 'email_primary',
+                email_address: 'existing@example.com',
+                verification: { status: 'verified' },
+              },
+            ],
+          },
+        }),
+      }));
+      (mockPrisma.$queryRaw as jest.Mock).mockResolvedValue([
+        { id: 'hacker_existing', clerkId: 'user_original' },
+      ]);
+      mockPrisma.hacker.upsert.mockResolvedValue({
+        id: 'hacker_new',
+        clerkId: 'user_new',
+      } as any);
+
+      expect((await POST(createMockRequest({}))).status).toBe(201);
+      expect(mockPrisma.hacker.updateMany).not.toHaveBeenCalled();
+      expect(mockPrisma.hacker.update).not.toHaveBeenCalled();
+      expect(mockPrisma.hacker.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { clerkId: 'user_new' },
+        })
+      );
+    });
+
+    it.each([false, true])(
+      'handles a concurrent profile claim (same account: %s)',
+      async sameAccount => {
+        const { Webhook } = require('svix');
+        Webhook.mockImplementation(() => ({
+          verify: jest.fn().mockReturnValue({
+            type: 'user.created',
+            data: {
+              id: 'user_new',
+              primary_email_address_id: 'email_primary',
+              email_addresses: [
+                {
+                  id: 'email_primary',
+                  email_address: 'existing@example.com',
+                  verification: { status: 'verified' },
+                },
+              ],
+            },
+          }),
+        }));
+        (mockPrisma.$queryRaw as jest.Mock).mockResolvedValue([
+          { id: 'hacker_existing', clerkId: null },
+        ]);
+        mockPrisma.hacker.updateMany.mockResolvedValue({ count: 0 });
+        mockPrisma.hacker.findUnique
+          .mockResolvedValueOnce(null)
+          .mockResolvedValueOnce(
+            sameAccount
+              ? ({ id: 'hacker_existing', clerkId: 'user_new' } as any)
+              : null
+          );
+
+        expect((await POST(createMockRequest({}))).status).toBe(
+          sameAccount ? 200 : 409
+        );
+        expect(mockPrisma.hacker.upsert).not.toHaveBeenCalled();
+      }
+    );
 
     it('should create a new Hacker when an email matches multiple Hackers', async () => {
       const { Webhook } = require('svix');

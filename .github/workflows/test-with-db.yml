@@ -76,6 +76,9 @@ jobs:
     - name: Build application
       run: npm run build
 
+    - name: Test subscriber import
+      run: npm run test:subscriber-import
+
     - name: Upload coverage reports
       uses: codecov/codecov-action@v7
       with:

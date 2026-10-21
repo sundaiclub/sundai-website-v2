@@ -16,6 +16,7 @@
     "test:watch": "node --no-deprecation node_modules/.bin/jest --watch",
     "test:coverage": "node --no-deprecation node_modules/.bin/jest --coverage",
     "test:ci": "node --no-deprecation node_modules/.bin/jest --ci --coverage --watchAll=false",
+    "test:subscriber-import": "node --test tests/data-migrations/boston-subscribers.test.cjs",
     "setup-husky": "./scripts/setup-husky.sh",
     "seed": "ts-node --compiler-options '{\"module\":\"CommonJS\"}' prisma/seed.ts",
     "postinstall": "prisma generate",

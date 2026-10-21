@@ -46,6 +46,9 @@ jobs:
     - name: Run tests
       run: npm run test:ci
 
+    - name: Test subscriber import
+      run: npm run test:subscriber-import
+
     - name: Build application
       run: npm run build
 
