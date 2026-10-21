@@ -121,8 +121,10 @@ async function handler(request: Request) {
         });
       }
 
-      const emailMatches = await prisma.$queryRaw<Array<{ id: string }>>`
-        SELECT id
+      const emailMatches = await prisma.$queryRaw<
+        Array<{ id: string; clerkId: string | null }>
+      >`
+        SELECT id, "clerkId"
         FROM "Hacker"
         WHERE LOWER(BTRIM(email)) = ${normalizedEmail}
         ORDER BY "createdAt" ASC
@@ -140,11 +142,22 @@ async function handler(request: Request) {
         );
       }
 
-      if (emailMatches.length === 1) {
-        const linkedHacker = await prisma.hacker.update({
-          where: { id: emailMatches[0].id },
+      if (emailMatches.length === 1 && emailMatches[0].clerkId === null) {
+        // Claim only an unlinked profile, even if another webhook arrived after
+        // the email lookup. Never replace an existing Clerk account connection.
+        await prisma.hacker.updateMany({
+          where: { id: emailMatches[0].id, clerkId: null },
           data: { clerkId: id },
         });
+        const linkedHacker = await prisma.hacker.findUnique({
+          where: { clerkId: id },
+        });
+
+        if (!linkedHacker) {
+          return new Response('Profile was linked by another account', {
+            status: 409,
+          });
+        }
 
         return new Response(JSON.stringify(linkedHacker), { status: 200 });
       }
