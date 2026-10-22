@@ -24,6 +24,7 @@ beforeAll(() => {
 describe('/api/hackers/[hackerId]', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockAuth.mockReturnValue({ userId: null });
   });
 
   describe('GET', () => {

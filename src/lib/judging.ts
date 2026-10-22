@@ -131,6 +131,16 @@ export function orderForJudge<T extends { submissionId: string }>(
 
 type WeightedCriterion = { id: string; weight: number };
 
+export function isJudgingReviewComplete(
+  criteria: Array<{ id: string }>,
+  scores: Record<string, number>
+): boolean {
+  return (
+    criteria.length > 0 &&
+    criteria.every(criterion => isValidJudgingScore(scores[criterion.id]))
+  );
+}
+
 /** Weighted mean of the scored criteria, or null when nothing is scored. */
 export function weightedReviewScore(
   criteria: WeightedCriterion[],

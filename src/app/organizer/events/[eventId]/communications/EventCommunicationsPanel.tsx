@@ -105,6 +105,12 @@ export default function EventCommunicationsPanel({
   const [selectedAudiences, setSelectedAudiences] = useState<
     RegistrationAudience[]
   >(['APPROVED']);
+  const [locations, setLocations] = useState<
+    Array<{ id: string; name: string }>
+  >([]);
+  const [allLocations, setAllLocations] = useState(true);
+  const [locationIds, setLocationIds] = useState<string[]>([]);
+  const [previewing, setPreviewing] = useState(false);
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
   const [draftPreviews, setDraftPreviews] = useState<DraftPreview[]>([]);
@@ -123,7 +129,9 @@ export default function EventCommunicationsPanel({
   const [sending, setSending] = useState(false);
   const [notice, setNotice] = useState('');
   const [detail, setDetail] = useState<CommunicationDetail | null>(null);
-  const hasPendingSend = history.some(item => item.status === 'SENDING') || detail?.status === 'SENDING';
+  const hasPendingSend =
+    history.some(item => item.status === 'SENDING') ||
+    detail?.status === 'SENDING';
   const detailId = detail?.id;
 
   useEffect(() => {
@@ -133,6 +141,7 @@ export default function EventCommunicationsPanel({
         if (!response.ok) throw new Error('Unable to load communications');
         return response.json() as Promise<{
           items?: CommunicationSummary[];
+          locations?: Array<{ id: string; name: string }>;
           providerAvailability?: {
             email: ProviderState;
             sms: ProviderState;
@@ -143,6 +152,7 @@ export default function EventCommunicationsPanel({
       .then(payload => {
         if (!isCurrent) return;
         setHistory(payload.items ?? []);
+        setLocations(payload.locations ?? []);
         setChapterInvitationStatus(payload.chapterInvitationStatus ?? null);
         if (payload.providerAvailability) {
           setProviders(payload.providerAvailability);
@@ -222,6 +232,8 @@ export default function EventCommunicationsPanel({
 
   async function saveAndPreview() {
     setNotice('');
+    setDraftPreviews([]);
+    setPreviewing(true);
     const audienceType = selectedAudiences[0];
     const previews = await Promise.all(
       channels.map(async channel => {
@@ -233,7 +245,10 @@ export default function EventCommunicationsPanel({
             subject: channel === 'EMAIL' ? subject : null,
             body,
             audienceType,
-            audienceDefinition: { statuses: selectedAudiences },
+            audienceDefinition: {
+              statuses: selectedAudiences,
+              ...(!allLocations ? { locationIds } : {}),
+            },
           }),
         });
         if (!draftResponse.ok) {
@@ -257,6 +272,7 @@ export default function EventCommunicationsPanel({
       return null;
     });
     if (previews) setDraftPreviews(previews);
+    setPreviewing(false);
   }
 
   async function previewChapterInvitation() {
@@ -364,6 +380,17 @@ export default function EventCommunicationsPanel({
           return { draft, response, payload: await response.json() };
         })
       );
+      const invalidSelection = results.find(
+        result => result.response.status === 409 && !result.payload.preview
+      );
+      if (invalidSelection) {
+        setDraftPreviews([]);
+        setNotice(
+          invalidSelection.payload.error ??
+            'Review the location selection and preview again.'
+        );
+        return;
+      }
       const changed = results.filter(result => result.response.status === 409);
       if (changed.length > 0) {
         setDraftPreviews(current =>
@@ -602,7 +629,10 @@ export default function EventCommunicationsPanel({
           </div>
         </div>
 
-        <div className={`${classes.subtlePanel} space-y-5 p-4 sm:p-5`}>
+        <fieldset
+          disabled={previewing || sending}
+          className={`${classes.subtlePanel} space-y-5 p-4 sm:p-5`}
+        >
           <div className="grid gap-5 lg:grid-cols-2">
             <fieldset>
               <legend className="mb-2 text-sm font-bold">Channels</legend>
@@ -659,6 +689,69 @@ export default function EventCommunicationsPanel({
               </div>
             </fieldset>
           </div>
+          <fieldset disabled={previewing || sending}>
+            <legend className="mb-2 text-sm font-bold">Locations</legend>
+            <div className="flex flex-wrap gap-4">
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="radio"
+                  name="event-message-locations"
+                  className={classes.checkbox}
+                  checked={allLocations}
+                  onChange={() => {
+                    setAllLocations(true);
+                    setDraftPreviews([]);
+                  }}
+                />
+                All locations
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="radio"
+                  name="event-message-locations"
+                  className={classes.checkbox}
+                  checked={!allLocations}
+                  disabled={!locations.length}
+                  onChange={() => {
+                    setAllLocations(false);
+                    setDraftPreviews([]);
+                  }}
+                />
+                Specific locations
+              </label>
+            </div>
+            {!allLocations && (
+              <div className="mt-3 flex flex-wrap gap-4">
+                {locations.map(location => (
+                  <label
+                    key={location.id}
+                    className="flex items-center gap-2 text-sm"
+                  >
+                    <input
+                      type="checkbox"
+                      className={classes.checkbox}
+                      checked={locationIds.includes(location.id)}
+                      onChange={event => {
+                        const checked = event.target.checked;
+                        setLocationIds(current =>
+                          checked
+                            ? [...current, location.id]
+                            : current.filter(id => id !== location.id)
+                        );
+                        setDraftPreviews([]);
+                      }}
+                    />
+                    {location.name}
+                  </label>
+                ))}
+              </div>
+            )}
+            <p className={`mt-2 text-sm ${classes.mutedText}`}>
+              {locations.length
+                ? 'All locations includes applicants with no location answer. Specific locations includes only matching application answers.'
+                : 'An event editor can add message locations in event settings.'}
+            </p>
+          </fieldset>
           <label className="block">
             <span className="mb-1 block text-sm font-bold">Subject</span>
             <input
@@ -689,6 +782,9 @@ export default function EventCommunicationsPanel({
           <button
             className={classes.primaryButton}
             disabled={
+              previewing ||
+              sending ||
+              (!allLocations && locationIds.length === 0) ||
               !body.trim() ||
               channels.length === 0 ||
               selectedAudiences.length === 0 ||
@@ -699,11 +795,20 @@ export default function EventCommunicationsPanel({
           >
             Save and preview
           </button>
-        </div>
+        </fieldset>
 
         {draftPreviews.length > 0 && (
           <div className={`${classes.subtlePanel} mt-5 p-4 sm:p-5`}>
             <h3 className="font-bold">Confirm audience</h3>
+            <p className="mt-2 text-sm">
+              Locations:{' '}
+              {allLocations
+                ? 'All locations'
+                : locations
+                    .filter(location => locationIds.includes(location.id))
+                    .map(location => location.name)
+                    .join(', ')}
+            </p>
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
               {draftPreviews.map(({ id, preview }) => (
                 <div className="rounded-md border p-3" key={id}>
@@ -780,6 +885,12 @@ export default function EventCommunicationsPanel({
           description="Saved content and audience are fixed. Recipient results update while messages send."
         >
           <p className="whitespace-pre-wrap">{detail.body}</p>
+          <p className="mt-3 text-sm">
+            Locations:{' '}
+            {Array.isArray(detail.audienceDefinition?.locationNames)
+              ? detail.audienceDefinition.locationNames.join(', ')
+              : 'All locations'}
+          </p>
           <ul className="mt-4 space-y-2">
             {detail.recipients.map(recipient => (
               <li className={`${classes.subtlePanel} p-3`} key={recipient.id}>

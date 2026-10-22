@@ -1,3 +1,5 @@
+import { projectReadAccessWhere } from '@/lib/projectReadAccess';
+import { JUDGE_TOKEN_HEADER } from '@/types/judging';
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import prisma from "@/lib/prisma";
@@ -7,8 +9,14 @@ export async function GET(
   { params }: { params: { projectId: string } }
 ) {
   try {
+    const { userId } = auth();
+    const visibility = await projectReadAccessWhere(
+      userId,
+      new URL(req.url).searchParams.get('event'),
+      req.headers.get(JUDGE_TOKEN_HEADER)
+    );
     const project = await prisma.project.findUnique({
-      where: { id: params.projectId },
+      where: { id: params.projectId, AND: visibility },
       include: {
         thumbnail: true,
         launchLead: {

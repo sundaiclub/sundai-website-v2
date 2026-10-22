@@ -66,6 +66,10 @@ function mockCommunicationFetch({
     if (url === `/api/events/${eventId}/blasts` && !init?.method) {
       return jsonResponse({
         items: [sentCommunication],
+        locations: [
+          { id: 'bu', name: 'Boston University' },
+          { id: 'lowell', name: 'Lowell' },
+        ],
         chapterInvitationStatus,
         providerAvailability: {
           email: { available: true },
@@ -300,6 +304,42 @@ describe('/organizer/events/[eventId]/communications', () => {
     expect(
       screen.queryByRole('button', { name: /new message/i })
     ).not.toBeInTheDocument();
+  });
+
+  it('previews selected locations and clears confirmation after changing them', async () => {
+    renderPage();
+    await composeEmail();
+    expect(screen.getByRole('radio', { name: 'All locations' })).toBeChecked();
+    fireEvent.click(screen.getByRole('radio', { name: 'Specific locations' }));
+    expect(
+      screen.getByRole('button', { name: /save.*preview/i })
+    ).toBeDisabled();
+    fireEvent.click(
+      screen.getByRole('checkbox', { name: 'Boston University' })
+    );
+    fireEvent.click(screen.getByRole('button', { name: /save.*preview/i }));
+    await screen.findByRole('button', { name: /confirm and send/i });
+    const createCall = (global.fetch as jest.Mock).mock.calls.find(
+      ([, init]) => init?.method === 'POST' && init.body
+    );
+    expect(JSON.parse(createCall[1].body).audienceDefinition).toEqual({
+      statuses: ['APPROVED'],
+      locationIds: ['bu'],
+    });
+    expect(screen.getByText('Locations: Boston University')).toBeVisible();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Lowell' }));
+    expect(
+      screen.queryByRole('button', { name: /confirm and send/i })
+    ).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('radio', { name: 'All locations' }));
+    fireEvent.click(screen.getByRole('button', { name: /save.*preview/i }));
+    await screen.findByRole('button', { name: /confirm and send/i });
+    const creates = (global.fetch as jest.Mock).mock.calls.filter(
+      ([, init]) => init?.method === 'POST' && init.body
+    );
+    expect(JSON.parse(creates.at(-1)[1].body).audienceDefinition).toEqual({
+      statuses: ['APPROVED'],
+    });
   });
 
   it('opens a separate modal to review and confirm chapter invitations', async () => {

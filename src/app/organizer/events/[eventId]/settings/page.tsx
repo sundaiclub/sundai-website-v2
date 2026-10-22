@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import EventLocationsPanel from './EventLocationsPanel';
 import { ManagementAlert } from '../../../../components/ManagementSurface';
 import { OrganizerEventForm } from '../../EventForm';
 import type { EventWorkspacePayload } from '../WorkspaceShell';
@@ -57,5 +58,10 @@ export default function OrganizerEventSettingsPage({
       </ManagementAlert>
     );
   }
-  return <OrganizerEventForm eventId={params.eventId} />;
+  return (
+    <div className="grid gap-6">
+      <OrganizerEventForm eventId={params.eventId} />
+      <EventLocationsPanel eventId={params.eventId} />
+    </div>
+  );
 }

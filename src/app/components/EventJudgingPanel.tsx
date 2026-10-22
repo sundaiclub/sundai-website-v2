@@ -8,8 +8,10 @@ import {
   useManagementClasses,
 } from './ManagementSurface';
 import ProjectMarkdown from './ProjectMarkdown';
+import { isJudgingReviewComplete } from '@/lib/judging';
 import {
   JUDGE_TOKEN_HEADER,
+  JUDGE_TOKEN_PARAM,
   type JudgePanelPayload,
   type JudgeProjectView,
 } from '@/types/judging';
@@ -57,31 +59,38 @@ export default function EventJudgingPanel({
 
   useEffect(() => {
     let current = true;
-    fetch(`/api/judging/${eventId}`, {
-      cache: 'no-store',
-      headers: judgeHeaders(judgeToken),
-    })
-      .then(async response => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    async function load() {
+      try {
+        const response = await fetch(`/api/judging/${eventId}`, {
+          cache: 'no-store',
+          headers: judgeHeaders(judgeToken),
+        });
         const body = await response.json().catch(() => null);
-        if (!response.ok) throw new Error(body?.message);
-        return body as JudgePanelPayload;
-      })
-      .then(payload => {
+        if (!response.ok)
+          throw new Error(body?.message || 'Unable to load judging.');
         if (!current) return;
+        const payload = body as JudgePanelPayload;
         setPanel(payload);
-        setTrackId(payload.tracks[0]?.id ?? '');
-      })
-      .catch(error => {
-        if (current) {
-          setLoadError(
-            error instanceof Error && error.message
-              ? error.message
-              : 'Unable to load judging.'
-          );
-        }
-      });
+        setTrackId(
+          payload.tracks.find(track => track.projects.length > 0)?.id ??
+            payload.tracks[0]?.id ??
+            ''
+        );
+        setLoadError('');
+        if (!payload.assignmentsPublished) timer = setTimeout(load, 15000);
+      } catch (error) {
+        if (!current) return;
+        setLoadError(
+          error instanceof Error ? error.message : 'Unable to load judging.'
+        );
+        timer = setTimeout(load, 15000);
+      }
+    }
+    load();
     return () => {
       current = false;
+      clearTimeout(timer);
     };
   }, [eventId, judgeToken]);
 
@@ -95,8 +104,7 @@ export default function EventJudgingPanel({
 
   const isComplete = useCallback(
     (item: JudgeProjectView) =>
-      Boolean(track?.criteria.length) &&
-      track!.criteria.every(criterion => item.review?.scores[criterion.id]),
+      isJudgingReviewComplete(track?.criteria ?? [], item.review?.scores ?? {}),
     [track]
   );
   const completedCount = projects.filter(isComplete).length;
@@ -172,10 +180,8 @@ export default function EventJudgingPanel({
 
   const otherTracks = panel?.tracks.filter(item => item.id !== trackId) ?? [];
   const trackScoredCount = (item: JudgePanelPayload['tracks'][number]) =>
-    item.projects.filter(
-      entry =>
-        item.criteria.length > 0 &&
-        item.criteria.every(criterion => entry.review?.scores[criterion.id])
+    item.projects.filter(entry =>
+      isJudgingReviewComplete(item.criteria, entry.review?.scores ?? {})
     ).length;
   const isLastProject = index === projects.length - 1;
   const hasUnsavedScores = canScore && dirty;
@@ -242,6 +248,17 @@ export default function EventJudgingPanel({
     );
   }
 
+  if (!panel.assignmentsPublished) {
+    return (
+      <ManagementAlert>
+        <span role="status">
+          Judging has not started. Your assigned projects will appear when the
+          organizer opens scoring.
+        </span>
+      </ManagementAlert>
+    );
+  }
+
   return (
     <div className="grid gap-5">
       <section className={`${classes.panel} grid gap-3 p-4 sm:p-5`}>
@@ -263,6 +280,19 @@ export default function EventJudgingPanel({
         ) : (
           <h2 className="text-xl font-bold sm:text-2xl">Judging</h2>
         )}
+        <p className={`text-sm ${classes.mutedText}`}>
+          {panel.tracks.reduce(
+            (count, item) => count + trackScoredCount(item),
+            0
+          )}{' '}
+          of{' '}
+          {panel.tracks.reduce(
+            (count, item) => count + item.projects.length,
+            0
+          )}{' '}
+          assigned projects complete across all tracks. Complete every scoring
+          criterion for a review to count as complete.
+        </p>
         <p className={`text-sm ${classes.mutedText}`}>
           Judging as {panel.judge.name || panel.judge.email}. Scores go from{' '}
           {panel.scoreMin} to {panel.scoreMax}, are only visible to organizers,
@@ -321,7 +351,7 @@ export default function EventJudgingPanel({
       )}
       {track && projects.length === 0 && (
         <ManagementEmptyState>
-          No projects have been submitted to {track.name} yet. Check back soon.
+          You have no assigned projects in {track.name}.
         </ManagementEmptyState>
       )}
 
@@ -367,7 +397,10 @@ export default function EventJudgingPanel({
                       ['GitHub', project.githubUrl],
                       ['Demo', project.demoUrl],
                       ['Blog', project.blogUrl],
-                      ['Project page', `/projects/${project.projectId}`],
+                      [
+                        'Project page',
+                        `/projects/${project.projectId}?event=${encodeURIComponent(eventId)}${judgeToken ? `&${JUDGE_TOKEN_PARAM}=${encodeURIComponent(judgeToken)}` : ''}`,
+                      ],
                     ].map(([label, href]) =>
                       href ? (
                         <a

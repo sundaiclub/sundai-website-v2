@@ -676,3 +676,172 @@ describe('/api/events/[eventId]/blasts', () => {
     );
   });
 });
+
+describe('location-scoped event communications', () => {
+  const config = {
+    questionId: 'venue',
+    locations: [
+      { id: 'boston', name: 'Boston', answerValues: ['BU'] },
+      { id: 'lowell', name: 'Lowell', answerValues: ['Lowell'] },
+    ],
+  };
+  const definition = { locationIds: ['boston'] };
+  const context = createRouteContext({ eventId, blastId });
+  beforeEach(() => {
+    jest.resetAllMocks();
+    resetClerkMocks();
+    mockOrganizer();
+    mockEligibleAudience();
+    prisma.event.findUnique.mockResolvedValue({
+      id: eventId,
+      chapterId: 'chapter-boston',
+      status: 'PUBLISHED',
+      staff: [{ role: 'MC' }],
+      communicationLocationsJson: config,
+    });
+    prisma.eventRegistration.findMany.mockResolvedValue(
+      registrations.map((row, index) => ({
+        ...row,
+        answersJson: { venue: index === 0 ? 'BU' : 'Lowell' },
+      }))
+    );
+    prisma.eventCommunication.findUnique.mockResolvedValue({
+      ...draft,
+      audienceDefinitionJson: definition,
+    });
+    prisma.$transaction.mockImplementation(async (operation: any) =>
+      typeof operation === 'function'
+        ? operation(prisma)
+        : Promise.all(operation)
+    );
+  });
+
+  it('previews only selected locations, combined with registration status', async () => {
+    const {
+      POST,
+    } = require('@/app/api/events/[eventId]/blasts/[blastId]/preview/route');
+    const response = await POST(createJsonRequest('/preview'), context);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ eligibleCount: 1 });
+    expect(prisma.eventRegistration.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { eventId } })
+    );
+  });
+
+  it.each([[], ['foreign-event-location'], null])(
+    'rejects invalid selections at draft creation and update: %j',
+    async locationIds => {
+      const { POST } = require('@/app/api/events/[eventId]/blasts/route');
+      const {
+        PATCH,
+      } = require('@/app/api/events/[eventId]/blasts/[blastId]/route');
+      const body = {
+        channel: 'EMAIL',
+        audienceType: 'APPROVED',
+        subject: 'Venue update',
+        body: 'Room changed',
+        audienceDefinition: { locationIds },
+      };
+      expect(
+        (await POST(createJsonRequest('/blasts', { body }), context)).status
+      ).toBe(400);
+      expect(
+        (
+          await PATCH(
+            createJsonRequest('/blasts/draft', { method: 'PATCH', body }),
+            context
+          )
+        ).status
+      ).toBe(400);
+      expect(prisma.eventCommunication.create).not.toHaveBeenCalled();
+      expect(prisma.eventCommunication.update).not.toHaveBeenCalled();
+    }
+  );
+
+  it('refuses to send after a location is removed', async () => {
+    prisma.event.findUnique.mockResolvedValue({
+      id: eventId,
+      chapterId: 'chapter-boston',
+      staff: [{ role: 'MC' }],
+      communicationLocationsJson: { ...config, locations: [] },
+    });
+    const {
+      POST,
+    } = require('@/app/api/events/[eventId]/blasts/[blastId]/send/route');
+    const response = await POST(
+      createJsonRequest('/send', {
+        body: { previewFingerprint: 'old-preview' },
+      }),
+      context
+    );
+    expect(response.status).toBe(409);
+    expect(
+      prisma.eventCommunicationRecipient.createMany
+    ).not.toHaveBeenCalled();
+  });
+
+  it('requires a new confirmation when an applicant changes location after preview', async () => {
+    const previewRoute = require('@/app/api/events/[eventId]/blasts/[blastId]/preview/route');
+    const sendRoute = require('@/app/api/events/[eventId]/blasts/[blastId]/send/route');
+    const preview = await (
+      await previewRoute.POST(createJsonRequest('/preview'), context)
+    ).json();
+    prisma.eventRegistration.findMany.mockResolvedValue(
+      registrations.map(row => ({ ...row, answersJson: { venue: 'Lowell' } }))
+    );
+    const response = await sendRoute.POST(
+      createJsonRequest('/send', {
+        body: { previewFingerprint: preview.previewFingerprint },
+      }),
+      context
+    );
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({
+      preview: { eligibleCount: 0 },
+    });
+    expect(
+      prisma.eventCommunicationRecipient.createMany
+    ).not.toHaveBeenCalled();
+  });
+
+  it('snapshots and queues only recipients at the selected location', async () => {
+    const previewRoute = require('@/app/api/events/[eventId]/blasts/[blastId]/preview/route');
+    const preview = await (
+      await previewRoute.POST(createJsonRequest('/preview'), context)
+    ).json();
+    prisma.eventCommunication.updateMany.mockResolvedValue({ count: 1 });
+    prisma.eventCommunication.findUnique
+      .mockResolvedValueOnce({ ...draft, audienceDefinitionJson: definition })
+      .mockResolvedValueOnce({
+        id: blastId,
+        recipients: [
+          { id: 'recipient-alex', contactValue: 'alex@example.com' },
+        ],
+      })
+      .mockResolvedValueOnce({
+        ...draft,
+        status: 'SENDING',
+        recipientCount: 1,
+      });
+    require('@/lib/emailQueue').createEmailBatches.mockResolvedValue([
+      'batch-1',
+    ]);
+    prisma.emailDeliveryBatch.findMany.mockResolvedValue([{ id: 'batch-1' }]);
+    const {
+      POST,
+    } = require('@/app/api/events/[eventId]/blasts/[blastId]/send/route');
+    expect(
+      (
+        await POST(
+          createJsonRequest('/send', {
+            body: { previewFingerprint: preview.previewFingerprint },
+          }),
+          context
+        )
+      ).status
+    ).toBe(202);
+    expect(prisma.eventCommunicationRecipient.createMany).toHaveBeenCalledWith({
+      data: [expect.objectContaining({ hackerId: 'hacker-alex' })],
+    });
+  });
+});

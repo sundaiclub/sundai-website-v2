@@ -1,3 +1,8 @@
+import {
+  parseEventLocationConfig,
+  validateEventLocationAudience,
+  selectedEventLocationIds,
+} from '@/lib/eventLocations';
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { requireEventCommunicationsManager } from '@/lib/eventManagementApi';
@@ -41,17 +46,32 @@ export async function POST(
       );
     }
 
+    const locationConfig = parseEventLocationConfig(
+      access.event!.communicationLocationsJson
+    );
+    const locationError = validateEventLocationAudience(
+      communication.audienceDefinitionJson,
+      communication.audienceType,
+      locationConfig
+    );
+    if (locationError)
+      return NextResponse.json({ error: locationError }, { status: 409 });
+
     const resolution = await resolveCurrentEventCommunicationAudience({
       eventId: params.eventId,
       chapterId: access.event!.chapterId,
       audienceType: communication.audienceType,
       audienceDefinition: communication.audienceDefinitionJson,
+      locationConfig,
       channel: communication.channel,
     });
     const previewFingerprint = fingerprintEventCommunicationAudience({
       channel: communication.channel,
       audienceType: communication.audienceType,
       recipients: resolution.recipients,
+      locationIds: selectedEventLocationIds(
+        communication.audienceDefinitionJson
+      ),
     });
 
     return NextResponse.json({

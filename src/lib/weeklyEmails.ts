@@ -1,3 +1,4 @@
+import { visibleProjectsWhere } from '@/lib/projectVisibility';
 import prisma from '@/lib/prisma';
 import { renderWeeklyEmail } from '@/lib/weeklyEmailTemplate';
 
@@ -73,6 +74,7 @@ export async function loadWeeklyEmailContent(now: Date, testHackerId?: string) {
     }),
     prisma.project.findMany({
       where: {
+        AND: visibleProjectsWhere(),
         status: 'APPROVED',
         is_broken: false,
         launchLead: { userBans: { none: { revokedAt: null } } },

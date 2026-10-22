@@ -1,3 +1,6 @@
+export const dynamic = 'force-dynamic';
+
+import { visibleProjectsWhere } from '@/lib/projectVisibility';
 import { NextResponse } from 'next/server';
 import { getOrCreateCurrentWeek } from '@/lib/weeks';
 
@@ -20,6 +23,7 @@ export async function GET() {
         },
       },
       projects: {
+        where: visibleProjectsWhere(),
         include: {
           thumbnail: true,
           launchLead: {

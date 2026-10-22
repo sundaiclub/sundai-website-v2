@@ -1,3 +1,4 @@
+import { visibleProjectsWhere } from '@/lib/projectVisibility';
 export const runtime = 'nodejs';
 export const maxDuration = 300;
 
@@ -54,7 +55,7 @@ export async function POST(
     }
 
     const project = await prisma.project.findUnique({
-      where: { id: params.projectId },
+      where: { id: params.projectId, AND: visibleProjectsWhere(userId) },
       include: {
         launchLead: {
           select: {

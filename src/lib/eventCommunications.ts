@@ -1,3 +1,9 @@
+import {
+  matchesEventLocations,
+  selectedEventLocationIds,
+  validateEventLocationAudience,
+  type EventLocationConfig,
+} from '@/lib/eventLocations';
 import { createHash } from 'crypto';
 import type { PrismaClient } from '@prisma/client';
 import prisma from '@/lib/prisma';
@@ -41,6 +47,7 @@ type AudienceRegistration = {
   id: string;
   status: string;
   cancelledAt?: Date | string | null;
+  answersJson?: unknown;
   hacker: {
     id: string;
     name: string;
@@ -120,18 +127,33 @@ export function resolveEventCommunicationAudience({
   audienceType,
   audienceTypes = [],
   selectedHackerIds = [],
+  locationIds,
+  locationConfig,
   channel,
 }: {
   registrations: AudienceRegistration[];
   audienceType: EventCommunicationAudience;
   audienceTypes?: EventCommunicationAudience[];
   selectedHackerIds?: string[];
+  locationIds?: string[];
+  locationConfig?: EventLocationConfig | null;
   channel: EventCommunicationChannel;
 }): CommunicationAudienceResolution {
   if (!EVENT_COMMUNICATION_AUDIENCES.includes(audienceType)) {
     throw new Error('Unsupported communication audience.');
   }
 
+  if (
+    locationIds &&
+    (!locationConfig ||
+      validateEventLocationAudience(
+        { locationIds },
+        audienceType,
+        locationConfig
+      ))
+  ) {
+    throw new Error('Invalid event location selection.');
+  }
   const selected = new Set(selectedHackerIds);
   const recipients: ResolvedCommunicationRecipient[] = [];
   const exclusions = {
@@ -142,6 +164,15 @@ export function resolveEventCommunicationAudience({
   };
 
   for (const registration of registrations) {
+    if (
+      locationIds &&
+      !matchesEventLocations(
+        registration.answersJson,
+        locationConfig!,
+        locationIds
+      )
+    )
+      continue;
     if (registration.cancelledAt || registration.status === 'CANCELLED') {
       exclusions.cancelled += 1;
       continue;
@@ -296,6 +327,7 @@ export async function resolveCurrentEventCommunicationAudience({
   chapterId,
   audienceType,
   audienceDefinition,
+  locationConfig,
   channel,
 }: {
   db?: CommunicationAudienceDb;
@@ -303,8 +335,16 @@ export async function resolveCurrentEventCommunicationAudience({
   chapterId: string;
   audienceType: EventCommunicationAudience;
   audienceDefinition: unknown;
+  locationConfig?: EventLocationConfig | null;
   channel: EventCommunicationChannel;
 }): Promise<CommunicationAudienceResolution> {
+  const locationError = validateEventLocationAudience(
+    audienceDefinition,
+    audienceType,
+    locationConfig ?? null
+  );
+  if (locationError) throw new Error(locationError);
+  const locationIds = selectedEventLocationIds(audienceDefinition);
   if (audienceType === 'CHAPTER_MEMBERS') {
     const memberships = await db.chapterMembership.findMany({
       where: { chapterId, status: 'ACTIVE' },
@@ -350,6 +390,7 @@ export async function resolveCurrentEventCommunicationAudience({
       hackerId: true,
       status: true,
       cancelledAt: true,
+      answersJson: true,
       hacker: {
         select: {
           id: true,
@@ -416,6 +457,8 @@ export async function resolveCurrentEventCommunicationAudience({
     audienceType,
     audienceTypes,
     selectedHackerIds,
+    locationIds,
+    locationConfig,
     channel,
   });
 }
@@ -424,11 +467,13 @@ export function fingerprintEventCommunicationAudience({
   channel,
   audienceType,
   audienceTypes = [],
+  locationIds,
   recipients,
 }: {
   channel: EventCommunicationChannel;
   audienceType: EventCommunicationAudience;
   audienceTypes?: EventCommunicationAudience[];
+  locationIds?: string[];
   recipients: Array<
     Pick<
       ResolvedCommunicationRecipient,
@@ -453,6 +498,7 @@ export function fingerprintEventCommunicationAudience({
         channel,
         audienceType,
         audienceTypes: [...audienceTypes].sort(),
+        ...(locationIds ? { locationIds: [...locationIds].sort() } : {}),
         recipients: canonical,
       })
     )

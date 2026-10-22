@@ -7,6 +7,7 @@ import {
   GET as getJudgingConfig,
   PUT as putJudgingConfig,
 } from '../../src/app/api/events/[eventId]/judging/route';
+import { GET as getAssignments } from '../../src/app/api/events/[eventId]/judging/assignments/route';
 import { POST as inviteJudge } from '../../src/app/api/events/[eventId]/judging/judges/route';
 import { PUT as putProjectJudging } from '../../src/app/api/projects/[projectId]/judging/route';
 import {
@@ -19,6 +20,7 @@ import {
   JudgingError,
   loadJudgePanel,
   loadJudgingConfig,
+  loadJudgingAssignments,
   saveJudgeReview,
   saveJudgingConfig,
   saveProjectJudgingSubmission,
@@ -50,6 +52,7 @@ jest.mock('../../src/lib/judgingData', () => ({
   ...jest.requireActual('../../src/lib/judgingData'),
   loadJudgePanel: jest.fn(),
   loadJudgingConfig: jest.fn(),
+  loadJudgingAssignments: jest.fn(),
   saveJudgeReview: jest.fn(),
   saveJudgingConfig: jest.fn(),
   saveProjectJudgingSubmission: jest.fn(),
@@ -241,6 +244,36 @@ describe('organizer judging APIs', () => {
     );
     expect(response.status).toBe(403);
     expect(loadJudgingConfig).not.toHaveBeenCalled();
+  });
+
+  it('protects assignment previews with organizer access', async () => {
+    mockRequireEventJudgingManager.mockResolvedValue({
+      response: new NextResponse('Forbidden', { status: 403 }),
+    });
+    const response = await getAssignments(
+      new Request('http://localhost/api/events/event-1/judging/assignments'),
+      createRouteContext({ eventId })
+    );
+    expect(response.status).toBe(403);
+    expect(loadJudgingAssignments).not.toHaveBeenCalled();
+  });
+
+  it('returns the current draft to an organizer', async () => {
+    (loadJudgingAssignments as jest.Mock).mockResolvedValue({
+      published: false,
+      judgesPerProject: 3,
+      shortages: [],
+    });
+    const response = await getAssignments(
+      new Request('http://localhost/api/events/event-1/judging/assignments'),
+      createRouteContext({ eventId })
+    );
+    expect(response.status).toBe(200);
+    expect(loadJudgingAssignments).toHaveBeenCalledWith(eventId);
+    await expect(response.json()).resolves.toMatchObject({
+      published: false,
+      judgesPerProject: 3,
+    });
   });
 
   it('saves the setup and returns the fresh config', async () => {

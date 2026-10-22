@@ -1,3 +1,4 @@
+import { visibleProjectsWhere } from '@/lib/projectVisibility';
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import prisma from '@/lib/prisma';
@@ -256,6 +257,7 @@ export async function GET(
           take: 1,
           include: {
             projects: {
+              where: viewerCanManagePitch ? {} : { project: visibleProjectsWhere(userId) },
               orderBy: { position: 'asc' },
               include: {
                 pitchVotes: {

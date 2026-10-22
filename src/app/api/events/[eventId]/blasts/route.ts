@@ -1,3 +1,8 @@
+import {
+  parseEventLocationConfig,
+  snapshotEventLocationNames,
+  validateEventLocationAudience,
+} from '@/lib/eventLocations';
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { requireEventCommunicationsManager } from '@/lib/eventManagementApi';
@@ -79,6 +84,10 @@ export async function GET(
 
     return NextResponse.json({
       items,
+      locations:
+        parseEventLocationConfig(
+          access.event!.communicationLocationsJson
+        )?.locations.map(({ id, name }) => ({ id, name })) ?? [],
       nextCursor: hasMore ? (items.at(-1)?.id ?? null) : null,
       chapterInvitationStatus,
       providerAvailability: getEventCommunicationProviderAvailability(),
@@ -117,6 +126,13 @@ export async function POST(
       body: body.body,
       audienceDefinition: body.audienceDefinition,
     });
+    const locationError = validateEventLocationAudience(
+      body.audienceDefinition,
+      body.audienceType,
+      parseEventLocationConfig(access.event!.communicationLocationsJson)
+    );
+    if (locationError)
+      return NextResponse.json({ error: locationError }, { status: 400 });
     if (!validation.valid) {
       return NextResponse.json(
         { error: 'Communication draft is invalid.', fields: validation.errors },
@@ -162,7 +178,10 @@ export async function POST(
           | 'WAITLISTED'
           | 'DECLINED'
           | 'SELECTED',
-        audienceDefinitionJson: (body.audienceDefinition ?? {}) as object,
+        audienceDefinitionJson: snapshotEventLocationNames(
+          body.audienceDefinition,
+          parseEventLocationConfig(access.event!.communicationLocationsJson)
+        ),
       },
       select: {
         id: true,

@@ -1,3 +1,4 @@
+import { visibleProjectsWhere } from '@/lib/projectVisibility';
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import prisma from "@/lib/prisma";
@@ -19,6 +20,12 @@ export async function POST(
     if (!hacker) {
       return new NextResponse("Builder not found", { status: 404 });
     }
+
+    const project = await prisma.project.findUnique({
+      where: { id: params.projectId, AND: visibleProjectsWhere(userId) },
+      select: { id: true },
+    });
+    if (!project) return new NextResponse('Project not found', { status: 404 });
 
     const { role } = await request.json();
 

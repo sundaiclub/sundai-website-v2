@@ -40,7 +40,9 @@ type DraftTrack = {
 
 type Draft = {
   judgingEnabled: boolean;
+  projectsHidden: boolean;
   judgingOpen: boolean;
+  judgesPerProject: string;
   opensAt: string;
   closesAt: string;
   criteria: DraftCriterion[];
@@ -75,7 +77,9 @@ function draftFromConfig(config: EventJudgingConfig): Draft {
   const defaults = defaultWindow(config);
   return {
     judgingEnabled: config.judgingEnabled,
+    projectsHidden: config.projectsHidden,
     judgingOpen: config.judgingOpen,
+    judgesPerProject: String(config.judgesPerProject),
     opensAt: config.judgingSubmissionsOpenAt
       ? formatDateTimeLocalValue(
           config.judgingSubmissionsOpenAt,
@@ -121,7 +125,9 @@ function inputFromDraft(
 ): JudgingConfigInput {
   return {
     judgingEnabled: draft.judgingEnabled,
+    projectsHidden: draft.projectsHidden,
     judgingOpen: draft.judgingOpen,
+    judgesPerProject: Number(draft.judgesPerProject),
     judgingSubmissionsOpenAt: windowOverride(draft.opensAt, defaults.opensAt),
     judgingSubmissionsCloseAt: windowOverride(
       draft.closesAt,
@@ -366,10 +372,16 @@ export default function JudgingSetupEditor({
     setSaving(true);
     setNotice(null);
     try {
+      const input = inputFromDraft(draft, defaultWindow(config));
+      if (config.judgingAssignmentsPublishedAt) {
+        // Disabled date controls must retain the stored instants, including seconds.
+        input.judgingSubmissionsOpenAt = config.judgingSubmissionsOpenAt;
+        input.judgingSubmissionsCloseAt = config.judgingSubmissionsCloseAt;
+      }
       const response = await fetch(`/api/events/${eventId}/judging`, {
         method: 'PUT',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(inputFromDraft(draft, defaultWindow(config))),
+        body: JSON.stringify(input),
       });
       const body = await response.json().catch(() => null);
       if (!response.ok) {
@@ -417,6 +429,9 @@ export default function JudgingSetupEditor({
                 setDraft(current => ({
                   ...current,
                   judgingEnabled: event.target.checked,
+                  projectsHidden: event.target.checked
+                    ? true
+                    : current.projectsHidden,
                 }))
               }
               type="checkbox"
@@ -446,15 +461,62 @@ export default function JudgingSetupEditor({
               type="checkbox"
             />
             <span>
-              <span className="font-semibold">Judging open</span>
+              <span className="font-semibold">Open scoring</span>
               <span className={`block text-sm ${classes.mutedText}`}>
                 {draft.judgingEnabled
-                  ? 'Judges can submit and change scores. Close judging to lock scores in.'
+                  ? config.judgingAssignmentsPublishedAt
+                    ? 'Judges can submit and change scores. Closing and reopening scoring keeps the same assignments.'
+                    : 'After submissions close and all judges are added, select this and save to publish assignments and open scoring. Check Assignments for coverage first.'
                   : 'Enable judging to open scoring for judges.'}
               </span>
             </span>
           </label>
-          <fieldset className="grid gap-2">
+          <label className="grid gap-1 text-sm">
+            <span className="font-semibold">Judges per project</span>
+            <input
+              className={`${classes.input} max-w-32`}
+              type="number"
+              min="1"
+              step="1"
+              disabled={Boolean(config.judgingAssignmentsPublishedAt)}
+              value={draft.judgesPerProject}
+              onChange={event =>
+                setDraft(current => ({
+                  ...current,
+                  judgesPerProject: event.target.value,
+                }))
+              }
+            />
+            <span className={classes.mutedText}>
+              Applies to every track. Full project coverage takes priority over
+              equal judge workloads.
+            </span>
+          </label>
+          <label className="flex items-start gap-3">
+            <input
+              checked={draft.projectsHidden}
+              className={`${classes.checkbox} mt-1`}
+              onChange={event =>
+                setDraft(current => ({
+                  ...current,
+                  projectsHidden: event.target.checked,
+                }))
+              }
+              type="checkbox"
+            />
+            <span>
+              <span className="font-semibold">Hide event projects</span>
+              <span className={`block text-sm ${classes.mutedText}`}>
+                Team members can view and edit their projects. Judges and
+                organizers keep access through their event tools. Turn this off
+                to show projects to everyone, then save the judging setup.
+              </span>
+            </span>
+          </label>
+          <fieldset
+            className="grid gap-2"
+            disabled={Boolean(config.judgingAssignmentsPublishedAt)}
+          >
             <legend className="font-semibold">Project submission window</legend>
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className={`text-sm ${classes.mutedText}`}>
@@ -514,135 +576,153 @@ export default function JudgingSetupEditor({
         </div>
       </ManagementSection>
 
-      <ManagementSection
-        title="Event criteria"
-        description={`Every project is scored on these criteria from 1 to 5. Weights control how much each criterion counts toward the total.`}
+      {config.judgingAssignmentsPublishedAt && (
+        <ManagementAlert>
+          Assignments, tracks, criteria, and submission dates are fixed because
+          scoring has started.
+        </ManagementAlert>
+      )}
+      <fieldset
+        className="grid min-w-0 gap-5"
+        disabled={Boolean(config.judgingAssignmentsPublishedAt)}
       >
-        <CriteriaEditor
-          criteria={draft.criteria}
-          label="Event"
-          onChange={criteria => setDraft(current => ({ ...current, criteria }))}
-        />
-      </ManagementSection>
-
-      <ManagementSection
-        title="Tracks"
-        description="Each track has its own submission questions and can add criteria on top of the event criteria."
-        actions={
-          <button
-            className={classes.secondaryButton}
-            onClick={() =>
-              setDraft(current => ({
-                ...current,
-                tracks: [
-                  ...current.tracks,
-                  {
-                    key: newKey(),
-                    name: '',
-                    description: '',
-                    questions: [],
-                    criteria: [],
-                    submissionCount: 0,
-                  },
-                ],
-              }))
+        <ManagementSection
+          title="Event criteria"
+          description={`Every project is scored on these criteria from 1 to 5. Weights control how much each criterion counts toward the total.`}
+        >
+          <CriteriaEditor
+            criteria={draft.criteria}
+            label="Event"
+            onChange={criteria =>
+              setDraft(current => ({ ...current, criteria }))
             }
-            type="button"
-          >
-            Add track
-          </button>
-        }
-      >
-        <div className="grid gap-4">
-          {draft.tracks.length === 0 && (
-            <ManagementEmptyState>
-              Add a track before enabling judging.
-            </ManagementEmptyState>
-          )}
-          {draft.tracks.map((track, index) => (
-            <div
-              className={`${classes.subtlePanel} grid gap-4 p-4`}
-              key={track.key}
-            >
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <h3 className="font-bold">Track {index + 1}</h3>
-                  <ManagementBadge>
-                    {track.submissionCount}{' '}
-                    {track.submissionCount === 1 ? 'submission' : 'submissions'}
-                  </ManagementBadge>
-                </div>
-                <button
-                  className={classes.ghostButton}
-                  disabled={track.submissionCount > 0}
-                  onClick={() =>
-                    setDraft(current => ({
-                      ...current,
-                      tracks: current.tracks.filter(
-                        item => item.key !== track.key
-                      ),
-                    }))
-                  }
-                  title={
-                    track.submissionCount > 0
-                      ? 'Tracks with submissions cannot be deleted'
-                      : undefined
-                  }
-                  type="button"
-                >
-                  Delete track
-                </button>
-              </div>
-              <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
-                <label className="grid gap-1 text-sm">
-                  Name
-                  <input
-                    className={classes.input}
-                    onChange={event =>
-                      updateTrack(track.key, { name: event.target.value })
-                    }
-                    placeholder="e.g. AI for Good"
-                    value={track.name}
-                  />
-                </label>
-                <label className="grid gap-1 text-sm">
-                  Description
-                  <input
-                    className={classes.input}
-                    onChange={event =>
-                      updateTrack(track.key, {
-                        description: event.target.value,
-                      })
-                    }
-                    placeholder="Shown to participants choosing a track (optional)"
-                    value={track.description}
-                  />
-                </label>
-              </div>
-              <div className="grid gap-2">
-                <h4 className="text-sm font-semibold">Submission questions</h4>
-                <QuestionsEditor
-                  questions={track.questions}
-                  onChange={questions => updateTrack(track.key, { questions })}
-                />
-              </div>
-              <div className="grid gap-2">
-                <h4 className="text-sm font-semibold">Track criteria</h4>
-                <p className={`text-xs ${classes.mutedText}`}>
-                  Scored in addition to the event criteria for projects in this
-                  track.
-                </p>
-                <CriteriaEditor
-                  criteria={track.criteria}
-                  label={track.name || `Track ${index + 1}`}
-                  onChange={criteria => updateTrack(track.key, { criteria })}
-                />
-              </div>
-            </div>
-          ))}
-        </div>
-      </ManagementSection>
+          />
+        </ManagementSection>
 
+        <ManagementSection
+          title="Tracks"
+          description="Each track has its own submission questions and can add criteria on top of the event criteria."
+          actions={
+            <button
+              className={classes.secondaryButton}
+              onClick={() =>
+                setDraft(current => ({
+                  ...current,
+                  tracks: [
+                    ...current.tracks,
+                    {
+                      key: newKey(),
+                      name: '',
+                      description: '',
+                      questions: [],
+                      criteria: [],
+                      submissionCount: 0,
+                    },
+                  ],
+                }))
+              }
+              type="button"
+            >
+              Add track
+            </button>
+          }
+        >
+          <div className="grid gap-4">
+            {draft.tracks.length === 0 && (
+              <ManagementEmptyState>
+                Add a track before enabling judging.
+              </ManagementEmptyState>
+            )}
+            {draft.tracks.map((track, index) => (
+              <div
+                className={`${classes.subtlePanel} grid gap-4 p-4`}
+                key={track.key}
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-bold">Track {index + 1}</h3>
+                    <ManagementBadge>
+                      {track.submissionCount}{' '}
+                      {track.submissionCount === 1
+                        ? 'submission'
+                        : 'submissions'}
+                    </ManagementBadge>
+                  </div>
+                  <button
+                    className={classes.ghostButton}
+                    disabled={track.submissionCount > 0}
+                    onClick={() =>
+                      setDraft(current => ({
+                        ...current,
+                        tracks: current.tracks.filter(
+                          item => item.key !== track.key
+                        ),
+                      }))
+                    }
+                    title={
+                      track.submissionCount > 0
+                        ? 'Tracks with submissions cannot be deleted'
+                        : undefined
+                    }
+                    type="button"
+                  >
+                    Delete track
+                  </button>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
+                  <label className="grid gap-1 text-sm">
+                    Name
+                    <input
+                      className={classes.input}
+                      onChange={event =>
+                        updateTrack(track.key, { name: event.target.value })
+                      }
+                      placeholder="e.g. AI for Good"
+                      value={track.name}
+                    />
+                  </label>
+                  <label className="grid gap-1 text-sm">
+                    Description
+                    <input
+                      className={classes.input}
+                      onChange={event =>
+                        updateTrack(track.key, {
+                          description: event.target.value,
+                        })
+                      }
+                      placeholder="Shown to participants choosing a track (optional)"
+                      value={track.description}
+                    />
+                  </label>
+                </div>
+                <div className="grid gap-2">
+                  <h4 className="text-sm font-semibold">
+                    Submission questions
+                  </h4>
+                  <QuestionsEditor
+                    questions={track.questions}
+                    onChange={questions =>
+                      updateTrack(track.key, { questions })
+                    }
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <h4 className="text-sm font-semibold">Track criteria</h4>
+                  <p className={`text-xs ${classes.mutedText}`}>
+                    Scored in addition to the event criteria for projects in
+                    this track.
+                  </p>
+                  <CriteriaEditor
+                    criteria={track.criteria}
+                    label={track.name || `Track ${index + 1}`}
+                    onChange={criteria => updateTrack(track.key, { criteria })}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </ManagementSection>
+      </fieldset>
       {notice && (
         <ManagementAlert tone={notice.tone}>
           <span role="status">{notice.text}</span>

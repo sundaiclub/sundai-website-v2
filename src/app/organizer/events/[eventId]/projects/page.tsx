@@ -179,7 +179,7 @@ export default function OrganizerEventProjectsPage({
                   <h2 className="text-lg font-bold">
                     <Link
                       className="underline underline-offset-4 hover:no-underline"
-                      href={`/projects/${entry.project.id}`}
+                      href={`/projects/${entry.project.id}?event=${encodeURIComponent(params.eventId)}`}
                     >
                       {entry.project.title}
                     </Link>

@@ -553,3 +553,60 @@ describe('event communication material references', () => {
     ]);
   });
 });
+
+describe('location audiences with eligibility rules', () => {
+  const locationConfig = {
+    questionId: 'venue',
+    locations: [
+      { id: 'bu', name: 'Boston', answerValues: ['BU'] },
+      { id: 'lowell', name: 'Lowell', answerValues: ['Lowell'] },
+    ],
+  };
+  it('intersects location and status, excludes missing answers, and preserves opt-outs', () => {
+    const rows = [
+      registration({ id: 'bu', answersJson: { venue: 'BU' } }),
+      registration({ id: 'lowell', answersJson: { venue: 'Lowell' } }),
+      registration({ id: 'none', answersJson: {} }),
+      registration({
+        id: 'declined',
+        answersJson: { venue: 'BU' },
+        status: 'DECLINED',
+      }),
+      registration({
+        id: 'opt-out',
+        answersJson: { venue: 'BU' },
+        membership: { status: 'ACTIVE', notificationsAllowed: false },
+      }),
+      registration({
+        id: 'cancelled',
+        answersJson: { venue: 'BU' },
+        cancelledAt: new Date(),
+      }),
+    ];
+    expect(
+      resolve(rows, { locationIds: ['bu'], locationConfig }).recipients.map(
+        row => row.registrationId
+      )
+    ).toEqual(['bu']);
+    expect(
+      resolve(rows, {
+        locationIds: ['bu', 'lowell'],
+        locationConfig,
+      }).recipients.map(row => row.registrationId)
+    ).toEqual(['bu', 'lowell']);
+    expect(resolve(rows).recipients.map(row => row.registrationId)).toEqual([
+      'bu',
+      'lowell',
+      'none',
+    ]);
+  });
+  it('uses the same location filter for SMS', () => {
+    expect(
+      resolve([registration({ answersJson: { venue: 'Lowell' } })], {
+        channel: 'SMS',
+        locationIds: ['bu'],
+        locationConfig,
+      }).recipients
+    ).toEqual([]);
+  });
+});

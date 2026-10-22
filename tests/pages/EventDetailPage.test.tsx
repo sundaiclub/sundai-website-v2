@@ -923,6 +923,7 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
       screen.queryByRole('heading', { name: /^registration$/i })
     ).not.toBeInTheDocument();
     expect(mockListPublicEventProjects).toHaveBeenCalledWith({
+      clerkId: null,
       eventId: eventFixture.id,
     });
   });
