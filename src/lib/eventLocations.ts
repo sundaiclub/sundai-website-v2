@@ -1,79 +1,23 @@
 export type EventCommunicationLocation = {
   id: string;
   name: string;
-  answerValues: string[];
 };
 
 export type EventLocationConfig = {
-  questionId: string;
   locations: EventCommunicationLocation[];
-};
-
-export type EventLocationQuestion = {
-  id: string;
-  label: string;
-  options: Array<{ value: string; label: string }>;
 };
 
 function record(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === 'object' && !Array.isArray(value);
 }
 
-// Keep old choices: a full venue can be removed from the application while
-// its existing applicants still need messages.
-export function collectEventLocationQuestions(
-  currentFields: unknown,
-  registrations: Array<{ templateSnapshotJson: unknown; answersJson: unknown }>
-): EventLocationQuestion[] {
-  const questions = new Map<string, EventLocationQuestion>();
-  for (const fields of [
-    currentFields,
-    ...registrations.map(row => row.templateSnapshotJson),
-  ]) {
-    if (!Array.isArray(fields)) continue;
-    for (const field of fields) {
-      if (
-        !record(field) ||
-        typeof field.id !== 'string' ||
-        typeof field.label !== 'string' ||
-        !['SELECT', 'MULTI_SELECT'].includes(String(field.type))
-      )
-        continue;
-      const question = questions.get(field.id) ?? {
-        id: field.id,
-        label: field.label,
-        options: [],
-      };
-      for (const option of Array.isArray(field.options) ? field.options : []) {
-        if (
-          record(option) &&
-          typeof option.value === 'string' &&
-          typeof option.label === 'string' &&
-          !question.options.some(item => item.value === option.value)
-        ) {
-          question.options.push({ value: option.value, label: option.label });
-        }
-      }
-      questions.set(field.id, question);
-    }
-  }
-  for (const question of Array.from(questions.values())) {
-    for (const row of registrations) {
-      const answer = record(row.answersJson)
-        ? row.answersJson[question.id]
-        : undefined;
-      for (const value of Array.isArray(answer) ? answer : [answer]) {
-        if (
-          typeof value === 'string' &&
-          value.trim() &&
-          !question.options.some(option => option.value === value)
-        ) {
-          question.options.push({ value, label: value });
-        }
-      }
-    }
-  }
-  return Array.from(questions.values());
+function normalizeLocationName(value: string): string {
+  return value
+    .normalize('NFKC')
+    .trim()
+    .replace(/\s+/g, ' ')
+    .replace(/[‘’]/g, "'")
+    .toLowerCase();
 }
 
 export function parseEventLocationConfig(
@@ -82,16 +26,13 @@ export function parseEventLocationConfig(
   if (value == null) return null;
   if (
     !record(value) ||
-    typeof value.questionId !== 'string' ||
-    !value.questionId.trim() ||
     !Array.isArray(value.locations) ||
     value.locations.length > 100
   ) {
-    throw new Error('Select an application question for the event locations.');
+    throw new Error('Enter a list of up to 100 event locations.');
   }
   const ids = new Set<string>();
   const names = new Set<string>();
-  const answerValues = new Set<string>();
   const locations = value.locations.map(location => {
     if (
       !record(location) ||
@@ -100,38 +41,19 @@ export function parseEventLocationConfig(
       location.id.length > 100 ||
       typeof location.name !== 'string' ||
       !location.name.trim() ||
-      location.name.length > 200 ||
-      !Array.isArray(location.answerValues) ||
-      !location.answerValues.length ||
-      location.answerValues.length > 100 ||
-      location.answerValues.some(
-        answer =>
-          typeof answer !== 'string' || !answer.trim() || answer.length > 1000
-      )
+      location.name.length > 200
     ) {
-      throw new Error(
-        'Each location needs a name and at least one application answer.'
-      );
+      throw new Error('Each location needs a name.');
     }
     const name = location.name.trim();
-    if (ids.has(location.id) || names.has(name.toLowerCase()))
+    const normalizedName = normalizeLocationName(name);
+    if (ids.has(location.id) || names.has(normalizedName))
       throw new Error('Location names and IDs must be unique.');
     ids.add(location.id);
-    names.add(name.toLowerCase());
-    for (const answer of location.answerValues as string[]) {
-      if (answerValues.has(answer))
-        throw new Error(
-          'An application answer can belong to only one location.'
-        );
-      answerValues.add(answer);
-    }
-    return {
-      id: location.id,
-      name,
-      answerValues: location.answerValues as string[],
-    };
+    names.add(normalizedName);
+    return { id: location.id, name };
   });
-  return { questionId: value.questionId, locations };
+  return { locations };
 }
 
 export function selectedEventLocationIds(
@@ -190,19 +112,52 @@ export function validateEventLocationAudience(
   }
 }
 
+// Match saved event-location answers, including labels from the submitted
+// application snapshot. Current application choices do not limit locations.
 export function matchesEventLocations(
   answers: unknown,
   config: EventLocationConfig,
-  ids: string[]
+  ids: string[],
+  templateSnapshot: unknown
 ): boolean {
-  const answer = record(answers) ? answers[config.questionId] : undefined;
-  const values = Array.isArray(answer) ? answer : [answer];
-  return config.locations.some(
-    location =>
-      ids.includes(location.id) &&
-      values.some(
-        value =>
-          typeof value === 'string' && location.answerValues.includes(value)
-      )
+  if (!record(answers)) return false;
+  const names = new Set(
+    config.locations
+      .filter(location => ids.includes(location.id))
+      .map(location => normalizeLocationName(location.name))
   );
+  const fields = Array.isArray(templateSnapshot)
+    ? templateSnapshot.filter(record)
+    : [];
+  const isLocationField = (value: unknown) =>
+    typeof value === 'string' &&
+    /(?:^|[^a-z])(location|venue)(?:[^a-z]|$)/i.test(
+      value.replace(/([a-z])([A-Z])/g, '$1 $2')
+    );
+  const locationFieldIds = new Set([
+    ...Object.keys(answers).filter(isLocationField),
+    ...fields
+      .filter(
+        field => isLocationField(field.id) || isLocationField(field.label)
+      )
+      .map(field => field.id)
+      .filter((id): id is string => typeof id === 'string'),
+  ]);
+  return Array.from(locationFieldIds).some(fieldId => {
+    const answer = answers[fieldId];
+    const values = Array.isArray(answer) ? answer : [answer];
+    const field = fields.find(item => item.id === fieldId);
+    const options = Array.isArray(field?.options)
+      ? field.options.filter(record)
+      : [];
+    return values.some(value => {
+      if (typeof value !== 'string') return false;
+      if (names.has(normalizeLocationName(value))) return true;
+      const option = options.find(item => item.value === value);
+      return (
+        typeof option?.label === 'string' &&
+        names.has(normalizeLocationName(option.label))
+      );
+    });
+  });
 }

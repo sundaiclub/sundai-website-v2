@@ -9,20 +9,16 @@ import {
 import {
   parseEventLocationConfig,
   type EventLocationConfig,
-  type EventLocationQuestion,
 } from '@/lib/eventLocations';
 
 export default function EventLocationsPanel({ eventId }: { eventId: string }) {
   const classes = useManagementClasses();
-  const [questions, setQuestions] = useState<EventLocationQuestion[]>([]);
-  const [config, setConfig] = useState<EventLocationConfig>({
-    questionId: '',
-    locations: [],
-  });
+  const [config, setConfig] = useState<EventLocationConfig>({ locations: [] });
+  const [name, setName] = useState('');
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState('');
-  const question = questions.find(item => item.id === config.questionId);
+  const [dirty, setDirty] = useState(false);
 
   useEffect(() => {
     let current = true;
@@ -34,8 +30,12 @@ export default function EventLocationsPanel({ eventId }: { eventId: string }) {
       })
       .then(payload => {
         if (!current) return;
-        setQuestions(payload.questions);
-        setConfig(payload.config ?? { questionId: '', locations: [] });
+        setConfig(
+          parseEventLocationConfig(payload.config) ?? { locations: [] }
+        );
+        setName('');
+        setDirty(false);
+        setNotice('');
         setState('ready');
       })
       .catch(() => {
@@ -46,20 +46,48 @@ export default function EventLocationsPanel({ eventId }: { eventId: string }) {
     };
   }, [eventId]);
 
+  function withNewLocation() {
+    const next = name.trim()
+      ? {
+          locations: [
+            ...config.locations,
+            { id: crypto.randomUUID(), name: name.trim() },
+          ],
+        }
+      : config;
+    return parseEventLocationConfig(next)!;
+  }
+
+  function addLocation() {
+    if (!name.trim()) return;
+    try {
+      setConfig(withNewLocation());
+      setName('');
+      setDirty(true);
+      setNotice('');
+    } catch (error) {
+      setNotice((error as Error).message);
+    }
+  }
+
   async function save() {
     setNotice('');
     try {
-      parseEventLocationConfig(config);
+      const next = withNewLocation();
+      setConfig(next);
+      setDirty(true);
+      setName('');
       setSaving(true);
       const response = await fetch(`/api/events/${eventId}/locations`, {
         method: 'PATCH',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(config),
+        body: JSON.stringify(next),
       });
       const payload = await response.json();
       if (!response.ok)
         throw new Error(payload.error ?? 'Unable to save locations.');
-      setConfig(payload.config);
+      setConfig(parseEventLocationConfig(payload.config)!);
+      setDirty(false);
       setNotice('Event locations saved.');
     } catch (error) {
       setNotice((error as Error).message);
@@ -71,7 +99,7 @@ export default function EventLocationsPanel({ eventId }: { eventId: string }) {
   return (
     <ManagementSection
       title="Message locations"
-      description="Create locations for event messages. Link each location to existing application answers. This does not change the application."
+      description="Add the location names you want to use for event messages, including locations that are full."
     >
       {state === 'loading' && <p role="status">Loading locations…</p>}
       {state === 'error' && (
@@ -80,177 +108,82 @@ export default function EventLocationsPanel({ eventId }: { eventId: string }) {
         </ManagementAlert>
       )}
       {state === 'ready' && (
-        <fieldset disabled={saving} className="grid gap-4">
-          <label className="grid gap-2">
-            <span className="text-sm font-semibold">
-              Location application question
-            </span>
-            <select
-              className={classes.input}
-              value={config.questionId}
-              onChange={event => {
-                setConfig({ questionId: event.target.value, locations: [] });
-                setNotice('');
-              }}
+        <fieldset disabled={saving} className="min-w-0 grid gap-4">
+          <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-end">
+            <label className="grid min-w-0 flex-1 gap-2">
+              <span className="text-sm font-semibold">Location name</span>
+              <input
+                className={`${classes.input} w-full min-w-0`}
+                value={name}
+                maxLength={200}
+                placeholder="Enter a location name"
+                onChange={event => {
+                  setName(event.target.value);
+                  setNotice('');
+                }}
+                onKeyDown={event => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault();
+                    addLocation();
+                  }
+                }}
+              />
+            </label>
+            <button
+              type="button"
+              className={classes.secondaryButton}
+              disabled={!name.trim()}
+              onClick={addLocation}
             >
-              <option value="">Select the location question</option>
-              {questions.map(item => (
-                <option key={item.id} value={item.id}>
-                  {item.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <p className={classes.mutedText}>
-            Choices include previous application answers, even if a venue is now
-            full. Changing the question clears the location list until you save
-            it again.
+              Add location
+            </button>
+          </div>
+          <p className={`text-sm ${classes.mutedText}`}>
+            For messages, names match saved location answers. Use the same
+            location name that attendees entered.
           </p>
-          {question && (
-            <>
-              <div className="flex flex-wrap gap-3">
-                <button
-                  type="button"
-                  className={classes.secondaryButton}
-                  onClick={() => {
-                    setConfig(current => ({
-                      ...current,
-                      locations: [
-                        ...current.locations,
-                        ...question.options
-                          .filter(
-                            option =>
-                              !current.locations.some(location =>
-                                location.answerValues.includes(option.value)
-                              )
-                          )
-                          .map(option => ({
-                            id: crypto.randomUUID(),
-                            name: option.label,
-                            answerValues: [option.value],
-                          })),
-                      ],
-                    }));
-                    setNotice('');
-                  }}
-                >
-                  Add locations from answers
-                </button>
-                <button
-                  type="button"
-                  className={classes.secondaryButton}
-                  onClick={() => {
-                    setConfig(current => ({
-                      ...current,
-                      locations: [
-                        ...current.locations,
-                        { id: crypto.randomUUID(), name: '', answerValues: [] },
-                      ],
-                    }));
-                    setNotice('');
-                  }}
-                >
-                  Add location
-                </button>
-              </div>
-              {config.locations.map((location, index) => (
-                <div
+          {config.locations.length > 0 && (
+            <ul className="grid min-w-0 gap-2">
+              {config.locations.map(location => (
+                <li
                   key={location.id}
-                  className={`${classes.subtlePanel} grid gap-3 p-4`}
+                  className={`${classes.subtlePanel} flex min-w-0 items-center justify-between gap-3 p-3`}
                 >
-                  <label className="grid gap-2">
-                    <span className="text-sm font-semibold">Location name</span>
-                    <input
-                      aria-label={`Location ${index + 1} name`}
-                      className={classes.input}
-                      value={location.name}
-                      maxLength={200}
-                      onChange={event => {
-                        setConfig(current => ({
-                          ...current,
-                          locations: current.locations.map(item =>
-                            item.id === location.id
-                              ? { ...item, name: event.target.value }
-                              : item
-                          ),
-                        }));
-                        setNotice('');
-                      }}
-                    />
-                  </label>
-                  <fieldset>
-                    <legend className="mb-2 text-sm font-semibold">
-                      Include these application answers
-                    </legend>
-                    <div className="flex flex-wrap gap-4">
-                      {question.options.map(option => (
-                        <label
-                          key={option.value}
-                          className="flex items-center gap-2 text-sm"
-                        >
-                          <input
-                            type="checkbox"
-                            className={classes.checkbox}
-                            checked={location.answerValues.includes(
-                              option.value
-                            )}
-                            disabled={config.locations.some(
-                              item =>
-                                item.id !== location.id &&
-                                item.answerValues.includes(option.value)
-                            )}
-                            onChange={event => {
-                              const checked = event.target.checked;
-                              setConfig(current => ({
-                                ...current,
-                                locations: current.locations.map(item =>
-                                  item.id === location.id
-                                    ? {
-                                        ...item,
-                                        answerValues: checked
-                                          ? [...item.answerValues, option.value]
-                                          : item.answerValues.filter(
-                                              value => value !== option.value
-                                            ),
-                                      }
-                                    : item
-                                ),
-                              }));
-                              setNotice('');
-                            }}
-                          />
-                          {option.label}
-                        </label>
-                      ))}
-                    </div>
-                  </fieldset>
+                  <span className="min-w-0 break-words">{location.name}</span>
                   <button
                     type="button"
-                    className={`${classes.ghostButton} w-fit`}
-                    aria-label={`Remove location ${location.name || index + 1}`}
+                    className={`${classes.ghostButton} shrink-0`}
+                    aria-label={`Remove location ${location.name}`}
                     onClick={() => {
                       setConfig(current => ({
-                        ...current,
                         locations: current.locations.filter(
                           item => item.id !== location.id
                         ),
                       }));
+                      setDirty(true);
                       setNotice('');
                     }}
                   >
-                    Remove location
+                    Remove
                   </button>
-                </div>
+                </li>
               ))}
-              <button
-                type="button"
-                className={`${classes.primaryButton} w-fit`}
-                onClick={save}
-              >
-                {saving ? 'Saving…' : 'Save locations'}
-              </button>
-            </>
+            </ul>
           )}
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              className={`${classes.primaryButton} w-fit`}
+              onClick={save}
+            >
+              {saving ? 'Saving…' : 'Save locations'}
+            </button>
+            {(dirty || name.trim()) && (
+              <span className={`text-sm ${classes.mutedText}`}>
+                You have unsaved location changes.
+              </span>
+            )}
+          </div>
           {notice && <p role="status">{notice}</p>}
         </fieldset>
       )}

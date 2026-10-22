@@ -29,8 +29,7 @@ const fields = [
   },
 ];
 const config = {
-  questionId: 'venue',
-  locations: [{ id: 'bu', name: 'Boston University', answerValues: ['BU'] }],
+  locations: [{ id: 'bu', name: 'Boston University' }],
 };
 const context = createRouteContext({ eventId: 'event-1' });
 const request = (body: unknown) =>
@@ -54,21 +53,14 @@ beforeEach(() => {
   ]);
 });
 
-it('loads current and historical choices for an MC', async () => {
+it('loads independent locations without reading application answers', async () => {
   const response = await GET(
     createJsonRequest('/api/events/event-1/locations'),
     context
   );
   expect(response.status).toBe(200);
-  expect(await response.json()).toMatchObject({
-    config: null,
-    questions: [
-      { id: 'venue', options: [{ value: 'Lowell' }, { value: 'BU' }] },
-    ],
-  });
-  expect(prisma.eventRegistration.findMany).toHaveBeenCalledWith(
-    expect.objectContaining({ where: { eventId: 'event-1' } })
-  );
+  expect(await response.json()).toEqual({ config: null });
+  expect(prisma.eventRegistration.findMany).not.toHaveBeenCalled();
 });
 
 it.each(['MC', 'SITE_ADMIN', 'CHAPTER_ADMIN'])(
@@ -96,44 +88,33 @@ it.each(['CO_MC', null])('denies a non-editor (%s)', async role => {
   expect(prisma.event.update).not.toHaveBeenCalled();
 });
 
-it('rejects a question or answer from another event', async () => {
+it('accepts any location name even when the application has no location choices', async () => {
+  prisma.event.findUnique.mockResolvedValue({
+    id: 'event-1',
+    chapterId: 'chapter-1',
+    applicationQuestionsJson: null,
+  });
+  expect((await PATCH(request(config), context)).status).toBe(200);
+  expect(prisma.eventRegistration.findMany).not.toHaveBeenCalled();
+});
+
+it('rejects blank or duplicate names and accepts removing all locations', async () => {
   expect(
-    (
-      await PATCH(
-        request({ ...config, questionId: 'other-event-question' }),
-        context
-      )
-    ).status
+    (await PATCH(request({ locations: [{ id: 'blank', name: ' ' }] }), context))
+      .status
   ).toBe(400);
   expect(
     (
       await PATCH(
         request({
-          ...config,
           locations: [
-            { ...config.locations[0], answerValues: ['Unknown venue'] },
+            config.locations[0],
+            { id: 'duplicate', name: ' Boston University ' },
           ],
         }),
         context
       )
     ).status
   ).toBe(400);
-  expect(prisma.event.update).not.toHaveBeenCalled();
-});
-
-it('rejects empty mappings and accepts removing all configured locations', async () => {
-  expect(
-    (
-      await PATCH(
-        request({
-          ...config,
-          locations: [{ ...config.locations[0], answerValues: [] }],
-        }),
-        context
-      )
-    ).status
-  ).toBe(400);
-  expect(
-    (await PATCH(request({ ...config, locations: [] }), context)).status
-  ).toBe(200);
+  expect((await PATCH(request({ locations: [] }), context)).status).toBe(200);
 });

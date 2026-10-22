@@ -556,10 +556,9 @@ describe('event communication material references', () => {
 
 describe('location audiences with eligibility rules', () => {
   const locationConfig = {
-    questionId: 'venue',
     locations: [
-      { id: 'bu', name: 'Boston', answerValues: ['BU'] },
-      { id: 'lowell', name: 'Lowell', answerValues: ['Lowell'] },
+      { id: 'bu', name: 'BU' },
+      { id: 'lowell', name: 'Lowell' },
     ],
   };
   it('intersects location and status, excludes missing answers, and preserves opt-outs', () => {

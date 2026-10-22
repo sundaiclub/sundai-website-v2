@@ -1,5 +1,6 @@
 'use client';
 import MarkdownEditor from '@/app/components/MarkdownEditor';
+import EventLocationsPanel from './[eventId]/settings/EventLocationsPanel';
 
 import { ApplicationQuestionEditor } from '../../components/ApplicationQuestionEditor';
 import {
@@ -1663,6 +1664,8 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
             </div>
           </div>
         </ManagementSection>
+
+        {eventId && <EventLocationsPanel eventId={eventId} />}
 
         <ManagementSection title="Messages">
           <div className="grid gap-4">

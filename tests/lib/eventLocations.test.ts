@@ -1,5 +1,4 @@
 import {
-  collectEventLocationQuestions,
   matchesEventLocations,
   parseEventLocationConfig,
   selectedEventLocationIds,
@@ -7,77 +6,112 @@ import {
 } from '@/lib/eventLocations';
 
 const config = {
-  questionId: 'venue',
   locations: [
-    { id: 'boston', name: 'Boston', answerValues: ['BU', 'Boston University'] },
-    { id: 'lowell', name: 'Lowell', answerValues: ['UMass Lowell'] },
+    { id: 'boston', name: 'Boston University (BU)' },
+    { id: 'lowell', name: 'UMass Lowell' },
   ],
 };
 
-describe('event message locations', () => {
-  it('keeps choices removed from the application and observed historical answers', () => {
-    expect(
-      collectEventLocationQuestions(
-        [
-          {
-            id: 'venue',
-            label: 'Location',
-            type: 'SELECT',
-            options: [{ value: 'Lowell', label: 'Lowell campus' }],
-          },
+describe('independent event message locations', () => {
+  it('accepts arbitrary location names without a question or answer mapping', () => {
+    expect(parseEventLocationConfig(config)).toEqual(config);
+    expect(parseEventLocationConfig({ locations: [] })).toEqual({
+      locations: [],
+    });
+    expect(() =>
+      parseEventLocationConfig({ locations: [{ id: 'blank', name: ' ' }] })
+    ).toThrow(/needs a name/);
+    expect(() =>
+      parseEventLocationConfig({
+        locations: [
+          config.locations[0],
+          { id: 'duplicate', name: ' boston   university (BU) ' },
         ],
-        [
-          {
-            templateSnapshotJson: [
-              {
-                id: 'venue',
-                label: 'Old label',
-                type: 'SELECT',
-                options: [{ value: 'BU', label: 'Boston University' }],
-              },
-            ],
-            answersJson: { venue: 'Northeastern' },
-          },
-          {
-            templateSnapshotJson: null,
-            answersJson: { venue: ['BU', 'Lowell'] },
-          },
-        ]
-      )
-    ).toEqual([
-      {
-        id: 'venue',
-        label: 'Location',
-        options: [
-          { value: 'Lowell', label: 'Lowell campus' },
-          { value: 'BU', label: 'Boston University' },
-          { value: 'Northeastern', label: 'Northeastern' },
-        ],
-      },
-    ]);
+      })
+    ).toThrow(/unique/);
   });
 
-  it('matches saved answer values and multiple selected locations without using labels or profile location', () => {
-    expect(matchesEventLocations({ venue: 'BU' }, config, ['boston'])).toBe(
-      true
-    );
+  it('matches full venues using saved answers without consulting current choices', () => {
     expect(
-      matchesEventLocations({ venue: ['Elsewhere', 'UMass Lowell'] }, config, [
-        'boston',
-        'lowell',
-      ])
+      matchesEventLocations(
+        { 'pick-your-hackachusetts-location': 'Boston University (BU)' },
+        config,
+        ['boston'],
+        null
+      )
     ).toBe(true);
-    expect(matchesEventLocations({ venue: 'Boston' }, config, ['boston'])).toBe(
-      false
-    );
-    expect(matchesEventLocations({ location: 'BU' }, config, ['boston'])).toBe(
-      false
-    );
-    expect(matchesEventLocations(null, config, ['boston'])).toBe(false);
+    expect(
+      matchesEventLocations(
+        { venue: ['Elsewhere', 'UMass Lowell'] },
+        config,
+        ['boston', 'lowell'],
+        null
+      )
+    ).toBe(true);
+    expect(
+      matchesEventLocations({ venue: 'UMass Lowell' }, config, ['boston'], null)
+    ).toBe(false);
+    expect(matchesEventLocations(null, config, ['boston'], null)).toBe(false);
+  });
+
+  it('matches a saved option label when the stored value is an ID', () => {
+    const snapshot = [
+      {
+        id: 'question-123',
+        label: 'Pick your event location',
+        options: [{ value: 'bu', label: 'Boston University (BU)' }],
+      },
+    ];
+    expect(
+      matchesEventLocations(
+        { 'question-123': 'bu' },
+        config,
+        ['boston'],
+        snapshot
+      )
+    ).toBe(true);
+    expect(
+      matchesEventLocations(
+        { 'question-123': 'lowell' },
+        config,
+        ['boston'],
+        snapshot
+      )
+    ).toBe(false);
+  });
+
+  it('does not match unrelated application answers or partial location names', () => {
+    expect(
+      matchesEventLocations(
+        { university: 'Boston University (BU)' },
+        config,
+        ['boston'],
+        [{ id: 'university', label: 'University / College' }]
+      )
+    ).toBe(false);
+    expect(
+      matchesEventLocations(
+        { venue: 'Boston University (BU) annex' },
+        config,
+        ['boston'],
+        null
+      )
+    ).toBe(false);
+  });
+
+  it('ignores differences in case, whitespace, and curly apostrophes', () => {
+    expect(
+      matchesEventLocations(
+        { eventLocation: '  MIT’s  The Engine ' },
+        { locations: [{ id: 'mit', name: "MIT's The Engine" }] },
+        ['mit'],
+        null
+      )
+    ).toBe(true);
   });
 
   it.each([[], null, 'boston', ['unknown'], ['boston', 'boston']])(
-    'rejects invalid or unknown location selection %j',
+    'rejects invalid or unknown selections %j',
     locationIds => {
       expect(
         validateEventLocationAudience({ locationIds }, 'APPROVED', config)
@@ -85,7 +119,7 @@ describe('event message locations', () => {
     }
   );
 
-  it('allows all locations, rejects chapter member filters, and rejects missing configuration', () => {
+  it('allows all locations and rejects chapter-member location filters', () => {
     expect(selectedEventLocationIds({})).toBeUndefined();
     expect(validateEventLocationAudience({}, 'APPROVED', null)).toBeNull();
     expect(
@@ -102,33 +136,5 @@ describe('event message locations', () => {
         null
       )
     ).not.toBeNull();
-  });
-
-  it('validates names, answer mappings, and unique groups', () => {
-    expect(parseEventLocationConfig(config)).toEqual(config);
-    expect(() =>
-      parseEventLocationConfig({
-        ...config,
-        locations: [{ id: 'empty', name: 'Empty', answerValues: [] }],
-      })
-    ).toThrow();
-    expect(() =>
-      parseEventLocationConfig({
-        ...config,
-        locations: [
-          config.locations[0],
-          { id: 'other', name: 'Other', answerValues: ['BU'] },
-        ],
-      })
-    ).toThrow(/only one location/);
-    expect(() =>
-      parseEventLocationConfig({
-        ...config,
-        locations: [
-          config.locations[0],
-          { id: 'other', name: 'boston', answerValues: ['Other'] },
-        ],
-      })
-    ).toThrow(/unique/);
   });
 });

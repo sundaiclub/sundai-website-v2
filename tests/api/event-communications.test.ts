@@ -679,10 +679,9 @@ describe('/api/events/[eventId]/blasts', () => {
 
 describe('location-scoped event communications', () => {
   const config = {
-    questionId: 'venue',
     locations: [
-      { id: 'boston', name: 'Boston', answerValues: ['BU'] },
-      { id: 'lowell', name: 'Lowell', answerValues: ['Lowell'] },
+      { id: 'boston', name: 'BU' },
+      { id: 'lowell', name: 'Lowell' },
     ],
   };
   const definition = { locationIds: ['boston'] };

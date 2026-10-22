@@ -48,6 +48,7 @@ type AudienceRegistration = {
   status: string;
   cancelledAt?: Date | string | null;
   answersJson?: unknown;
+  templateSnapshotJson?: unknown;
   hacker: {
     id: string;
     name: string;
@@ -169,7 +170,8 @@ export function resolveEventCommunicationAudience({
       !matchesEventLocations(
         registration.answersJson,
         locationConfig!,
-        locationIds
+        locationIds,
+        registration.templateSnapshotJson
       )
     )
       continue;
@@ -391,6 +393,7 @@ export async function resolveCurrentEventCommunicationAudience({
       status: true,
       cancelledAt: true,
       answersJson: true,
+      templateSnapshotJson: true,
       hacker: {
         select: {
           id: true,

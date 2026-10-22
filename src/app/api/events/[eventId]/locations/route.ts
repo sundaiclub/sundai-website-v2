@@ -1,18 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { requireEventSettingsManager } from '@/lib/eventManagementApi';
-import {
-  collectEventLocationQuestions,
-  parseEventLocationConfig,
-} from '@/lib/eventLocations';
-
-async function questions(eventId: string, fields: unknown) {
-  const rows = await prisma.eventRegistration.findMany({
-    where: { eventId },
-    select: { answersJson: true, templateSnapshotJson: true },
-  });
-  return collectEventLocationQuestions(fields, rows);
-}
+import { parseEventLocationConfig } from '@/lib/eventLocations';
 
 export async function GET(
   _request: Request,
@@ -24,10 +13,6 @@ export async function GET(
     return NextResponse.json({
       config: parseEventLocationConfig(
         access.event!.communicationLocationsJson
-      ),
-      questions: await questions(
-        params.eventId,
-        access.event!.applicationQuestionsJson
       ),
     });
   } catch (error) {
@@ -49,28 +34,10 @@ export async function PATCH(
     let config;
     try {
       config = parseEventLocationConfig(await request.json());
-      if (!config) throw new Error('Select an application question.');
+      if (!config) throw new Error('Enter a list of event locations.');
     } catch (error) {
       return NextResponse.json(
         { error: (error as Error).message },
-        { status: 400 }
-      );
-    }
-    const candidates = await questions(
-      params.eventId,
-      access.event!.applicationQuestionsJson
-    );
-    const question = candidates.find(item => item.id === config.questionId);
-    if (
-      !question ||
-      config.locations.some(location =>
-        location.answerValues.some(
-          value => !question.options.some(option => option.value === value)
-        )
-      )
-    ) {
-      return NextResponse.json(
-        { error: 'Select a question and answers from this event.' },
         { status: 400 }
       );
     }
