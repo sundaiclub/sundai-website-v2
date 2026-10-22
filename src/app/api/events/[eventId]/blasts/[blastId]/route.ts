@@ -1,3 +1,8 @@
+import {
+  parseEventLocationConfig,
+  snapshotEventLocationNames,
+  validateEventLocationAudience,
+} from '@/lib/eventLocations';
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { requireEventCommunicationsManager } from '@/lib/eventManagementApi';
@@ -138,6 +143,13 @@ export async function PATCH(
       audienceType,
       audienceDefinition,
     });
+    const locationError = validateEventLocationAudience(
+      audienceDefinition,
+      audienceType,
+      parseEventLocationConfig(access.event!.communicationLocationsJson)
+    );
+    if (locationError)
+      return NextResponse.json({ error: locationError }, { status: 400 });
     if (!validation.valid) {
       return NextResponse.json(
         { error: 'Communication draft is invalid.', fields: validation.errors },
@@ -168,7 +180,10 @@ export async function PATCH(
           | 'WAITLISTED'
           | 'DECLINED'
           | 'SELECTED',
-        audienceDefinitionJson: audienceDefinition as object,
+        audienceDefinitionJson: snapshotEventLocationNames(
+          audienceDefinition,
+          parseEventLocationConfig(access.event!.communicationLocationsJson)
+        ),
         previewFingerprint: null,
       },
     });

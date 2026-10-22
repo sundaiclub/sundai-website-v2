@@ -4,6 +4,7 @@ import prisma from '../../src/lib/prisma';
 
 // Mock prisma
 jest.mock('../../src/lib/prisma', () => ({
+  project: { findUnique: jest.fn() },
   hacker: {
     findUnique: jest.fn(),
   },
@@ -25,9 +26,21 @@ const mockAuth = require('@clerk/nextjs/server').auth as jest.Mock;
 describe('/api/projects/[projectId]/join', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockPrisma.project.findUnique.mockResolvedValue({ id: "project-1" } as any);
   });
 
   describe('POST', () => {
+    it('does not let a non-member join a hidden project to gain access', async () => {
+      mockAuth.mockReturnValue({ userId: 'outsider' });
+      mockPrisma.hacker.findUnique.mockResolvedValue({ id: 'outsider' } as any);
+      mockPrisma.project.findUnique.mockResolvedValue(null);
+      const response = await POST(new NextRequest('http://localhost/api/projects/project-1/join', {
+        method: 'POST', body: JSON.stringify({ role: 'DEVELOPER' }),
+      }), { params: { projectId: 'project-1' } });
+      expect(response.status).toBe(404);
+      expect(mockPrisma.projectToParticipant.create).not.toHaveBeenCalled();
+    });
+
     it('should join project successfully', async () => {
       const mockHacker = {
         id: 'hacker-1',

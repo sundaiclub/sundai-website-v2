@@ -40,6 +40,7 @@ const mockPrisma = require('../../src/lib/prisma').default;
 describe('/api/projects', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    require('@clerk/nextjs/server').auth.mockReturnValue({ userId: null });
     process.env.IS_RESEARCH_SITE = 'false';
     mockPrisma.event.findMany.mockResolvedValue([]);
   });

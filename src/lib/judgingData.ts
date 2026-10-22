@@ -2,6 +2,7 @@ import { randomUUID } from 'crypto';
 import { NextResponse } from 'next/server';
 import type { Prisma } from '@prisma/client';
 import prisma from '@/lib/prisma';
+import { allocateJudgingAssignments } from '@/lib/judgingAssignments';
 import {
   EventDateTimeInputError,
   parseOptionalEventDateTimeInput,
@@ -14,6 +15,7 @@ import {
 import {
   composeJudgingDescription,
   isJudgingSubmissionWindowOpen,
+  isJudgingReviewComplete,
   isValidJudgingScore,
   judgingAnswerList,
   missingRequiredJudgingAnswers,
@@ -32,6 +34,7 @@ import {
   type EventJudgingConfig,
   type JudgePanelPayload,
   type JudgingAnswers,
+  type JudgingAssignmentPreview,
   type JudgingConfigInput,
   type JudgingCriterionConfig,
   type JudgingLeaderboardRow,
@@ -107,6 +110,169 @@ function iso(value: Date | null) {
   return value ? value.toISOString() : null;
 }
 
+/** Serialize setup, roster changes, submissions, and publication per event. */
+async function withJudgingEventLock<T>(
+  eventId: string,
+  operation: (tx: Prisma.TransactionClient) => Promise<T>
+): Promise<T> {
+  return prisma.$transaction(
+    async tx => {
+      await tx.$queryRaw`SELECT "id" FROM "Event" WHERE "id" = ${eventId} FOR UPDATE`;
+      return operation(tx);
+    },
+    { timeout: 15000 }
+  );
+}
+
+async function requireDraftAssignments(
+  tx: Prisma.TransactionClient,
+  eventId: string
+) {
+  const event = await tx.event.findUnique({
+    where: { id: eventId },
+    select: { judgingAssignmentsPublishedAt: true },
+  });
+  if (!event) throw new JudgingError('Event not found.', 404);
+  if (event.judgingAssignmentsPublishedAt) {
+    throw new JudgingError(
+      'Assignments are fixed because scoring has started.',
+      409
+    );
+  }
+}
+
+async function assignmentState(eventId: string, db: Prisma.TransactionClient) {
+  const event = await db.event.findUnique({
+    where: { id: eventId },
+    select: {
+      judgesPerProject: true,
+      judgingAssignmentsPublishedAt: true,
+      judgingTracks: {
+        orderBy: { position: 'asc' },
+        select: { id: true, name: true },
+      },
+      judgingCriteria: { select: { id: true, trackId: true } },
+      judges: {
+        where: { revokedAt: null },
+        orderBy: { invitedAt: 'asc' },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          tracks: { select: { trackId: true } },
+        },
+      },
+      judgingSubmissions: {
+        where: judgeableSubmissionWhere(eventId),
+        orderBy: { id: 'asc' },
+        select: {
+          id: true,
+          trackId: true,
+          project: { select: { title: true } },
+          assignments: { select: { judgeId: true } },
+          reviews: {
+            select: {
+              judgeId: true,
+              scores: { select: { criterionId: true, score: true } },
+            },
+          },
+        },
+      },
+    },
+  });
+  if (!event) throw new JudgingError('Event not found.', 404);
+  const published = Boolean(event.judgingAssignmentsPublishedAt);
+  const judges = event.judges.map(judge => ({
+    id: judge.id,
+    trackIds: judge.tracks.map(track => track.trackId),
+  }));
+  const assignments = published
+    ? event.judgingSubmissions.flatMap(project =>
+        project.assignments.map(assignment => ({
+          judgeId: assignment.judgeId,
+          submissionId: project.id,
+        }))
+      )
+    : allocateJudgingAssignments(
+        event.judgingSubmissions,
+        judges,
+        event.judgesPerProject
+      );
+  const preview: JudgingAssignmentPreview = {
+    published,
+    judgesPerProject: event.judgesPerProject,
+    tracks: event.judgingTracks,
+    judges: event.judges.map(judge => {
+      const assigned = new Set(
+        assignments
+          .filter(item => item.judgeId === judge.id)
+          .map(item => item.submissionId)
+      );
+      const trackCounts: Record<string, number> = {};
+      for (const project of event.judgingSubmissions) {
+        if (assigned.has(project.id))
+          trackCounts[project.trackId] =
+            (trackCounts[project.trackId] ?? 0) + 1;
+      }
+      return {
+        id: judge.id,
+        name: judge.name || judge.email,
+        total: assigned.size,
+        trackCounts,
+      };
+    }),
+    projects: event.judgingSubmissions.map(project => {
+      const assigned = new Set(
+        assignments
+          .filter(item => item.submissionId === project.id)
+          .map(item => item.judgeId)
+      );
+      const criteria = event.judgingCriteria.filter(
+        item => item.trackId === null || item.trackId === project.trackId
+      );
+      return {
+        id: project.id,
+        title: project.project.title,
+        trackId: project.trackId,
+        assigned: assigned.size,
+        completed: project.reviews.filter(
+          review =>
+            assigned.has(review.judgeId) &&
+            isJudgingReviewComplete(
+              criteria,
+              Object.fromEntries(
+                review.scores.map(score => [score.criterionId, score.score])
+              )
+            )
+        ).length,
+      };
+    }),
+    shortages: event.judgingTracks.flatMap(track => {
+      const eligible = judges.filter(judge =>
+        judge.trackIds.includes(track.id)
+      ).length;
+      return eligible < event.judgesPerProject &&
+        event.judgingSubmissions.some(project => project.trackId === track.id)
+        ? [
+            {
+              trackId: track.id,
+              trackName: track.name,
+              eligible,
+              required: event.judgesPerProject,
+            },
+          ]
+        : [];
+    }),
+  };
+  return { preview, assignments };
+}
+
+export async function loadJudgingAssignments(
+  eventId: string
+): Promise<JudgingAssignmentPreview> {
+  return (await assignmentState(eventId, prisma)).preview;
+}
+
 export async function loadJudgingConfig(
   eventId: string
 ): Promise<EventJudgingConfig | null> {
@@ -117,7 +283,10 @@ export async function loadJudgingConfig(
       endTime: true,
       timezone: true,
       judgingEnabled: true,
+      projectsHidden: true,
       judgingOpen: true,
+      judgesPerProject: true,
+      judgingAssignmentsPublishedAt: true,
       judgingSubmissionsOpenAt: true,
       judgingSubmissionsCloseAt: true,
       judgingCriteria: {
@@ -146,7 +315,12 @@ export async function loadJudgingConfig(
           lastSeenAt: true,
           revokedAt: true,
           tracks: { select: { trackId: true } },
-          _count: { select: { reviews: true } },
+          reviews: {
+            select: {
+              submission: { select: { trackId: true } },
+              scores: { select: { criterionId: true, score: true } },
+            },
+          },
         },
       },
     },
@@ -156,7 +330,10 @@ export async function loadJudgingConfig(
   const criteria = event.judgingCriteria.map(toCriterion);
   return {
     judgingEnabled: event.judgingEnabled,
+    projectsHidden: event.projectsHidden,
     judgingOpen: event.judgingOpen,
+    judgesPerProject: event.judgesPerProject,
+    judgingAssignmentsPublishedAt: iso(event.judgingAssignmentsPublishedAt),
     judgingSubmissionsOpenAt: iso(event.judgingSubmissionsOpenAt),
     judgingSubmissionsCloseAt: iso(event.judgingSubmissionsCloseAt),
     eventStartTime: event.startTime.toISOString(),
@@ -181,7 +358,14 @@ export async function loadJudgingConfig(
       lastSentAt: iso(judge.lastSentAt),
       lastSeenAt: iso(judge.lastSeenAt),
       revokedAt: iso(judge.revokedAt),
-      reviewCount: judge._count.reviews,
+      reviewCount: judge.reviews.filter(review =>
+        isJudgingReviewComplete(
+          applicableCriteria(criteria, review.submission.trackId),
+          Object.fromEntries(
+            review.scores.map(score => [score.criterionId, score.score])
+          )
+        )
+      ).length,
     })),
   };
 }
@@ -263,71 +447,151 @@ export async function saveJudgingConfig(
   eventId: string,
   input: JudgingConfigInput
 ): Promise<void> {
-  const event = await prisma.event.findUnique({
-    where: { id: eventId },
-    select: { timezone: true },
-  });
-  if (!event) throw new JudgingError('Event not found.', 404);
-  const opensAt = optionalDate(
-    input.judgingSubmissionsOpenAt,
-    event.timezone,
-    'Submission start'
-  );
-  const closesAt = optionalDate(
-    input.judgingSubmissionsCloseAt,
-    event.timezone,
-    'Submission end'
-  );
-  if (opensAt && closesAt && closesAt <= opensAt) {
-    throw new JudgingError('Submission end must be after submission start.');
-  }
+  return withJudgingEventLock(eventId, async tx => {
+    const event = await tx.event.findUnique({
+      where: { id: eventId },
+      select: {
+        timezone: true,
+        judgingEnabled: true,
+        projectsHidden: true,
+        judgesPerProject: true,
+        judgingAssignmentsPublishedAt: true,
+        endTime: true,
+        judgingSubmissionsOpenAt: true,
+        judgingSubmissionsCloseAt: true,
+      },
+    });
+    if (!event) throw new JudgingError('Event not found.', 404);
+    if (
+      input.projectsHidden !== undefined &&
+      typeof input.projectsHidden !== 'boolean'
+    ) {
+      throw new JudgingError('Project visibility must be on or off.');
+    }
+    const opensAt = optionalDate(
+      input.judgingSubmissionsOpenAt,
+      event.timezone,
+      'Submission start'
+    );
+    const closesAt = optionalDate(
+      input.judgingSubmissionsCloseAt,
+      event.timezone,
+      'Submission end'
+    );
+    if (opensAt && closesAt && closesAt <= opensAt) {
+      throw new JudgingError('Submission end must be after submission start.');
+    }
+    if (
+      !Number.isSafeInteger(input.judgesPerProject) ||
+      input.judgesPerProject < 1 ||
+      input.judgesPerProject > 2147483647
+    ) {
+      throw new JudgingError(
+        'Judges per project must be a positive whole number.'
+      );
+    }
+    const scoringOpen =
+      input.judgingEnabled === true && input.judgingOpen === true;
+    if (scoringOpen && !event.judgingAssignmentsPublishedAt) {
+      const effectiveClose = closesAt ?? event.endTime;
+      if (!effectiveClose || effectiveClose >= new Date()) {
+        throw new JudgingError(
+          'Close project submissions before opening scoring.',
+          409
+        );
+      }
+    }
 
-  const rawTracks = Array.isArray(input.tracks) ? input.tracks : [];
-  if (rawTracks.length > MAX_TRACKS) {
-    throw new JudgingError(`An event can have at most ${MAX_TRACKS} tracks.`);
-  }
-  const tracks = rawTracks.map((track, index) => {
-    const name = cleanText(track?.name, MAX_NAME_LENGTH);
-    if (!name) throw new JudgingError(`Track ${index + 1} needs a name.`);
-    return {
-      id: typeof track?.id === 'string' && track.id ? track.id : null,
-      name,
-      description:
-        cleanText(track?.description, MAX_DESCRIPTION_LENGTH) || null,
-      questions: cleanQuestions(track?.questions, name),
-      criteria: cleanCriteria(track?.criteria, `"${name}"`),
-    };
-  });
-  const eventCriteria = cleanCriteria(input.criteria, 'Event');
-  const criteriaCount =
-    eventCriteria.length +
-    tracks.reduce((count, track) => count + track.criteria.length, 0);
-  if (criteriaCount > MAX_CRITERIA * (tracks.length + 1)) {
-    throw new JudgingError('Too many judging criteria.');
-  }
-  if (input.judgingEnabled === true && tracks.length === 0) {
-    throw new JudgingError('Add at least one track before enabling judging.');
-  }
+    const rawTracks = Array.isArray(input.tracks) ? input.tracks : [];
+    if (rawTracks.length > MAX_TRACKS) {
+      throw new JudgingError(`An event can have at most ${MAX_TRACKS} tracks.`);
+    }
+    const tracks = rawTracks.map((track, index) => {
+      const name = cleanText(track?.name, MAX_NAME_LENGTH);
+      if (!name) throw new JudgingError(`Track ${index + 1} needs a name.`);
+      return {
+        id: typeof track?.id === 'string' && track.id ? track.id : null,
+        name,
+        description:
+          cleanText(track?.description, MAX_DESCRIPTION_LENGTH) || null,
+        questions: cleanQuestions(track?.questions, name),
+        criteria: cleanCriteria(track?.criteria, `"${name}"`),
+      };
+    });
+    const eventCriteria = cleanCriteria(input.criteria, 'Event');
+    const criteriaCount =
+      eventCriteria.length +
+      tracks.reduce((count, track) => count + track.criteria.length, 0);
+    if (criteriaCount > MAX_CRITERIA * (tracks.length + 1)) {
+      throw new JudgingError('Too many judging criteria.');
+    }
+    if (input.judgingEnabled === true && tracks.length === 0) {
+      throw new JudgingError('Add at least one track before enabling judging.');
+    }
 
-  await prisma.$transaction(async tx => {
     const [existingTracks, existingCriteria] = await Promise.all([
       tx.judgingTrack.findMany({
         where: { eventId },
+        orderBy: { position: 'asc' },
         select: {
           id: true,
           name: true,
+          description: true,
+          questionsJson: true,
           _count: { select: { submissions: true } },
         },
       }),
       tx.judgingCriterion.findMany({
         where: { eventId },
-        select: { id: true },
+        orderBy: { position: 'asc' },
+        select: criterionSelect,
       }),
     ]);
     const trackIds = new Set(existingTracks.map(track => track.id));
     const criterionIds = new Set(
       existingCriteria.map(criterion => criterion.id)
     );
+
+    if (event.judgingAssignmentsPublishedAt) {
+      const currentCriteria = (trackId: string | null) =>
+        existingCriteria
+          .filter(criterion => criterion.trackId === trackId)
+          .map(({ id, name, description, weight }) => ({
+            id,
+            name,
+            description,
+            weight,
+          }));
+      const currentTracks = existingTracks.map(track => ({
+        id: track.id,
+        name: track.name,
+        description: track.description,
+        questions: parseJudgingQuestions(track.questionsJson),
+        criteria: currentCriteria(track.id),
+      }));
+      if (
+        input.judgesPerProject !== event.judgesPerProject ||
+        JSON.stringify(tracks) !== JSON.stringify(currentTracks) ||
+        JSON.stringify(eventCriteria) !==
+          JSON.stringify(currentCriteria(null)) ||
+        iso(opensAt) !== iso(event.judgingSubmissionsOpenAt) ||
+        iso(closesAt) !== iso(event.judgingSubmissionsCloseAt)
+      ) {
+        throw new JudgingError(
+          'Assignments, tracks, criteria, and submission dates are fixed because scoring has started.',
+          409
+        );
+      }
+      await tx.event.update({
+        where: { id: eventId },
+        data: {
+          judgingEnabled: input.judgingEnabled === true,
+          judgingOpen: scoringOpen,
+          projectsHidden: input.projectsHidden ?? event.projectsHidden,
+        },
+      });
+      return;
+    }
 
     for (const track of tracks) {
       if (track.id && !trackIds.has(track.id)) {
@@ -353,7 +617,13 @@ export async function saveJudgingConfig(
       where: { id: eventId },
       data: {
         judgingEnabled: input.judgingEnabled === true,
-        judgingOpen: input.judgingOpen !== false,
+        projectsHidden:
+          input.projectsHidden ??
+          (input.judgingEnabled === true && !event.judgingEnabled
+            ? true
+            : event.projectsHidden),
+        judgingOpen: scoringOpen,
+        judgesPerProject: input.judgesPerProject,
         judgingSubmissionsOpenAt: opensAt,
         judgingSubmissionsCloseAt: closesAt,
       },
@@ -420,6 +690,50 @@ export async function saveJudgingConfig(
         await tx.judgingCriterion.create({ data: { ...data, eventId } });
       }
     }
+    if (scoringOpen) {
+      const { preview, assignments } = await assignmentState(eventId, tx);
+      if (preview.projects.length === 0) {
+        throw new JudgingError(
+          'Add project submissions before opening scoring.',
+          409
+        );
+      }
+      if (preview.shortages.length) {
+        throw new JudgingError(
+          preview.shortages
+            .map(
+              track =>
+                `${track.trackName} needs ${track.required} judges but has ${track.eligible}.`
+            )
+            .join(' '),
+          409
+        );
+      }
+      const criteria = await tx.judgingCriterion.findMany({
+        where: { eventId },
+        select: { trackId: true },
+      });
+      if (
+        preview.projects.some(
+          project =>
+            !criteria.some(
+              criterion =>
+                criterion.trackId === null ||
+                criterion.trackId === project.trackId
+            )
+        )
+      ) {
+        throw new JudgingError(
+          'Add scoring criteria for every track with projects before opening scoring.',
+          409
+        );
+      }
+      await tx.judgingAssignment.createMany({ data: assignments });
+      await tx.event.update({
+        where: { id: eventId },
+        data: { judgingAssignmentsPublishedAt: new Date() },
+      });
+    }
   });
 }
 
@@ -432,8 +746,11 @@ function applicableCriteria(
   );
 }
 
-async function loadEventCriteria(eventId: string) {
-  const rows = await prisma.judgingCriterion.findMany({
+async function loadEventCriteria(
+  eventId: string,
+  db: Prisma.TransactionClient = prisma
+) {
+  const rows = await db.judgingCriterion.findMany({
     where: { eventId },
     orderBy: [
       { trackId: { sort: 'asc', nulls: 'first' } },
@@ -449,13 +766,19 @@ export async function loadJudgePanel(
   judgeId: string
 ): Promise<JudgePanelPayload | null> {
   const judge = await prisma.eventJudge.update({
-    where: { id: judgeId },
+    where: { id: judgeId, eventId, revokedAt: null },
     data: { lastSeenAt: new Date() },
     select: {
       id: true,
       name: true,
       email: true,
-      event: { select: { judgingOpen: true, judgingEnabled: true } },
+      event: {
+        select: {
+          judgingOpen: true,
+          judgingEnabled: true,
+          judgingAssignmentsPublishedAt: true,
+        },
+      },
       tracks: {
         orderBy: { track: { position: 'asc' } },
         select: {
@@ -476,43 +799,49 @@ export async function loadJudgePanel(
   const trackIds = judge.tracks.map(({ track }) => track.id);
   const [criteria, submissions] = await Promise.all([
     loadEventCriteria(eventId),
-    prisma.judgingSubmission.findMany({
-      where: {
-        ...judgeableSubmissionWhere(eventId),
-        trackId: { in: trackIds },
-      },
-      select: {
-        id: true,
-        trackId: true,
-        answersJson: true,
-        project: {
+    judge.event.judgingAssignmentsPublishedAt
+      ? prisma.judgingSubmission.findMany({
+          where: {
+            ...judgeableSubmissionWhere(eventId),
+            trackId: { in: trackIds },
+            assignments: { some: { judgeId } },
+          },
           select: {
             id: true,
-            title: true,
-            preview: true,
-            githubUrl: true,
-            demoUrl: true,
-            blogUrl: true,
-            thumbnail: { select: { url: true } },
-            launchLead: { select: { name: true } },
-            participants: { select: { hacker: { select: { name: true } } } },
+            trackId: true,
+            answersJson: true,
+            project: {
+              select: {
+                id: true,
+                title: true,
+                preview: true,
+                githubUrl: true,
+                demoUrl: true,
+                blogUrl: true,
+                thumbnail: { select: { url: true } },
+                launchLead: { select: { name: true } },
+                participants: {
+                  select: { hacker: { select: { name: true } } },
+                },
+              },
+            },
+            reviews: {
+              where: { judgeId },
+              select: {
+                comment: true,
+                updatedAt: true,
+                scores: { select: { criterionId: true, score: true } },
+              },
+            },
           },
-        },
-        reviews: {
-          where: { judgeId },
-          select: {
-            comment: true,
-            updatedAt: true,
-            scores: { select: { criterionId: true, score: true } },
-          },
-        },
-      },
-    }),
+        })
+      : Promise.resolve([]),
   ]);
 
   return {
     judge: { id: judge.id, name: judge.name, email: judge.email },
     judgingOpen: judge.event.judgingOpen,
+    assignmentsPublished: Boolean(judge.event.judgingAssignmentsPublishedAt),
     scoreMin: JUDGING_SCORE_MIN,
     scoreMax: JUDGING_SCORE_MAX,
     tracks: judge.tracks.map(({ track }) => {
@@ -572,50 +901,60 @@ export async function saveJudgeReview(input: {
   scores: unknown;
   comment: unknown;
 }) {
-  const event = await prisma.event.findUnique({
-    where: { id: input.eventId },
-    select: { judgingEnabled: true, judgingOpen: true },
-  });
-  if (!event?.judgingEnabled)
-    throw new JudgingError('Judging is not enabled.', 404);
-  if (!event.judgingOpen) throw new JudgingError('Judging is closed.', 409);
+  return withJudgingEventLock(input.eventId, async tx => {
+    const event = await tx.event.findUnique({
+      where: { id: input.eventId },
+      select: {
+        judgingEnabled: true,
+        judgingOpen: true,
+        judgingAssignmentsPublishedAt: true,
+      },
+    });
+    if (!event?.judgingEnabled)
+      throw new JudgingError('Judging is not enabled.', 404);
+    if (!event.judgingOpen || !event.judgingAssignmentsPublishedAt)
+      throw new JudgingError('Judging is closed.', 409);
 
-  const submission = await prisma.judgingSubmission.findFirst({
-    where: {
-      ...judgeableSubmissionWhere(input.eventId),
-      id: input.submissionId,
-      track: { judges: { some: { judgeId: input.judgeId } } },
-    },
-    select: { id: true, trackId: true },
-  });
-  if (!submission) throw new JudgingError('Project not found.', 404);
+    const submission = await tx.judgingSubmission.findFirst({
+      where: {
+        ...judgeableSubmissionWhere(input.eventId),
+        id: input.submissionId,
+        assignments: {
+          some: {
+            judgeId: input.judgeId,
+            judge: { eventId: input.eventId, revokedAt: null },
+          },
+        },
+      },
+      select: { id: true, trackId: true },
+    });
+    if (!submission) throw new JudgingError('Project not found.', 404);
 
-  const criteria = applicableCriteria(
-    await loadEventCriteria(input.eventId),
-    submission.trackId
-  );
-  const rawScores =
-    input.scores &&
-    typeof input.scores === 'object' &&
-    !Array.isArray(input.scores)
-      ? (input.scores as Record<string, unknown>)
-      : {};
-  const scores: Array<{ criterionId: string; score: number }> = [];
-  for (const [criterionId, score] of Object.entries(rawScores)) {
-    if (score === null) continue;
-    if (!criteria.some(criterion => criterion.id === criterionId)) {
-      throw new JudgingError('Unknown judging criterion.');
+    const criteria = applicableCriteria(
+      await loadEventCriteria(input.eventId, tx),
+      submission.trackId
+    );
+    const rawScores =
+      input.scores &&
+      typeof input.scores === 'object' &&
+      !Array.isArray(input.scores)
+        ? (input.scores as Record<string, unknown>)
+        : {};
+    const scores: Array<{ criterionId: string; score: number }> = [];
+    for (const [criterionId, score] of Object.entries(rawScores)) {
+      if (score === null) continue;
+      if (!criteria.some(criterion => criterion.id === criterionId)) {
+        throw new JudgingError('Unknown judging criterion.');
+      }
+      if (!isValidJudgingScore(score)) {
+        throw new JudgingError(
+          `Scores must be whole numbers from ${JUDGING_SCORE_MIN} to ${JUDGING_SCORE_MAX}.`
+        );
+      }
+      scores.push({ criterionId, score });
     }
-    if (!isValidJudgingScore(score)) {
-      throw new JudgingError(
-        `Scores must be whole numbers from ${JUDGING_SCORE_MIN} to ${JUDGING_SCORE_MAX}.`
-      );
-    }
-    scores.push({ criterionId, score });
-  }
-  const comment = cleanText(input.comment, MAX_COMMENT_LENGTH) || null;
+    const comment = cleanText(input.comment, MAX_COMMENT_LENGTH) || null;
 
-  return prisma.$transaction(async tx => {
     const review = await tx.judgingReview.upsert({
       where: {
         judgeId_submissionId: {
@@ -652,7 +991,7 @@ function average(values: number[]) {
 export async function loadJudgingResults(
   eventId: string
 ): Promise<JudgingResults> {
-  const [tracks, criteria, submissions, judgeTracks] = await Promise.all([
+  const [tracks, criteria, submissions, event] = await Promise.all([
     prisma.judgingTrack.findMany({
       where: { eventId },
       orderBy: [{ position: 'asc' }, { createdAt: 'asc' }],
@@ -665,6 +1004,7 @@ export async function loadJudgingResults(
         id: true,
         trackId: true,
         project: { select: { id: true, title: true } },
+        _count: { select: { assignments: true } },
         reviews: {
           select: {
             judgeId: true,
@@ -675,16 +1015,13 @@ export async function loadJudgingResults(
         },
       },
     }),
-    prisma.eventJudgeTrack.findMany({
-      where: { track: { eventId }, judge: { revokedAt: null } },
-      select: { trackId: true },
+    prisma.event.findUnique({
+      where: { id: eventId },
+      select: { judgesPerProject: true },
     }),
   ]);
 
-  const assignedJudges = new Map<string, number>();
-  for (const { trackId } of judgeTracks) {
-    assignedJudges.set(trackId, (assignedJudges.get(trackId) ?? 0) + 1);
-  }
+  if (!event) throw new JudgingError('Event not found.', 404);
   const trackNames = new Map(tracks.map(track => [track.id, track.name]));
 
   const scoredReviews: ScoredReview[] = [];
@@ -694,7 +1031,9 @@ export async function loadJudgingResults(
       const scores = Object.fromEntries(
         review.scores.map(score => [score.criterionId, score.score])
       );
-      const score = weightedReviewScore(trackCriteria, scores);
+      const score = isJudgingReviewComplete(trackCriteria, scores)
+        ? weightedReviewScore(trackCriteria, scores)
+        : null;
       const scored =
         score === null
           ? null
@@ -712,7 +1051,7 @@ export async function loadJudgingResults(
     for (const criterion of applicableCriteria(criteria, submission.trackId)) {
       const value = average(
         reviews.flatMap(item =>
-          item.scores[criterion.id] === undefined
+          item.score === null || item.scores[criterion.id] === undefined
             ? []
             : [item.scores[criterion.id]]
         )
@@ -726,7 +1065,8 @@ export async function loadJudgingResults(
       trackId: submission.trackId,
       trackName: trackNames.get(submission.trackId) ?? '',
       judgeCount: scored.length,
-      assignedJudgeCount: assignedJudges.get(submission.trackId) ?? 0,
+      assignedJudgeCount: submission._count.assignments,
+      requiredJudgeCount: event.judgesPerProject,
       rawScore: roundScore(average(scored.map(review => review.score))),
       normalizedScore: roundScore(
         average(scored.map(review => normalized.get(review)!))
@@ -830,6 +1170,7 @@ export function judgingSubmissionWindowWhere(
 ): Prisma.EventWhereInput {
   return {
     judgingEnabled: true,
+    judgingAssignmentsPublishedAt: null,
     OR: [
       { judgingSubmissionsOpenAt: { lte: now } },
       { judgingSubmissionsOpenAt: null, startTime: { lte: now } },
@@ -858,56 +1199,64 @@ export async function saveProjectJudgingSubmission(input: {
   actorId: string;
   bypassWindow: boolean;
 }): Promise<{ description: string }> {
-  const [event, otherSubmission] = await Promise.all([
-    prisma.event.findUnique({
-      where: { id: input.eventId },
-      select: {
-        ...judgingEventSelect,
-        judgingTracks: {
-          select: { id: true, questionsJson: true },
+  return withJudgingEventLock(input.eventId, async tx => {
+    const [event, otherSubmission] = await Promise.all([
+      tx.event.findUnique({
+        where: { id: input.eventId },
+        select: {
+          ...judgingEventSelect,
+          judgingAssignmentsPublishedAt: true,
+          judgingTracks: {
+            select: { id: true, questionsJson: true },
+          },
         },
-      },
-    }),
-    prisma.judgingSubmission.findFirst({
-      where: {
-        projectId: input.projectId,
-        eventId: { not: input.eventId },
-        event: {
-          judgingEnabled: true,
-          projects: { some: { projectId: input.projectId } },
+      }),
+      tx.judgingSubmission.findFirst({
+        where: {
+          projectId: input.projectId,
+          eventId: { not: input.eventId },
+          event: {
+            judgingEnabled: true,
+            projects: { some: { projectId: input.projectId } },
+          },
         },
-      },
-      select: { event: { select: { title: true } } },
-    }),
-  ]);
-  if (!event?.judgingEnabled) {
-    throw new JudgingError('This event is not accepting judged projects.', 404);
-  }
-  if (!input.bypassWindow && !isJudgingSubmissionWindowOpen(event)) {
-    throw new JudgingError('Submissions for this event are closed.', 409);
-  }
-  if (otherSubmission) {
-    throw new JudgingError(
-      `This project is already submitted for judging at ${otherSubmission.event.title}.`,
-      409
+        select: { event: { select: { title: true } } },
+      }),
+    ]);
+    if (!event?.judgingEnabled) {
+      throw new JudgingError(
+        'This event is not accepting judged projects.',
+        404
+      );
+    }
+    if (
+      !input.bypassWindow &&
+      (event.judgingAssignmentsPublishedAt ||
+        !isJudgingSubmissionWindowOpen(event))
+    ) {
+      throw new JudgingError('Submissions for this event are closed.', 409);
+    }
+    if (otherSubmission) {
+      throw new JudgingError(
+        `This project is already submitted for judging at ${otherSubmission.event.title}.`,
+        409
+      );
+    }
+
+    const track = event.judgingTracks.find(item => item.id === input.trackId);
+    if (!track) throw new JudgingError('Choose a track for this project.');
+    const questions = parseJudgingQuestions(track.questionsJson);
+    const answers: JudgingAnswers = normalizeJudgingAnswers(
+      questions,
+      parseJudgingAnswers(input.answers)
     );
-  }
+    const missing = missingRequiredJudgingAnswers(questions, answers);
+    if (missing.length) {
+      throw new JudgingError(`Answer "${missing[0].prompt}" before saving.`);
+    }
 
-  const track = event.judgingTracks.find(item => item.id === input.trackId);
-  if (!track) throw new JudgingError('Choose a track for this project.');
-  const questions = parseJudgingQuestions(track.questionsJson);
-  const answers: JudgingAnswers = normalizeJudgingAnswers(
-    questions,
-    parseJudgingAnswers(input.answers)
-  );
-  const missing = missingRequiredJudgingAnswers(questions, answers);
-  if (missing.length) {
-    throw new JudgingError(`Answer "${missing[0].prompt}" before saving.`);
-  }
-
-  const description = composeJudgingDescription(questions, answers);
-  const answersJson = answers as Prisma.InputJsonValue;
-  await prisma.$transaction(async tx => {
+    const description = composeJudgingDescription(questions, answers);
+    const answersJson = answers as Prisma.InputJsonValue;
     const existing = await tx.judgingSubmission.findUnique({
       where: {
         eventId_projectId: {
@@ -917,6 +1266,15 @@ export async function saveProjectJudgingSubmission(input: {
       },
       select: { id: true, trackId: true },
     });
+    if (
+      event.judgingAssignmentsPublishedAt &&
+      (!existing || existing.trackId !== track.id)
+    ) {
+      throw new JudgingError(
+        'Project assignments are fixed because scoring has started.',
+        409
+      );
+    }
     if (existing && existing.trackId !== track.id) {
       // Scores from the previous track's judges no longer apply.
       await tx.judgingReview.deleteMany({
@@ -943,13 +1301,14 @@ export async function saveProjectJudgingSubmission(input: {
       where: { id: input.projectId },
       data: { description },
     });
+    return { description };
   });
-  return { description };
 }
 
 async function eventTrackIds(
   eventId: string,
-  value: unknown
+  value: unknown,
+  tx: Prisma.TransactionClient
 ): Promise<string[]> {
   if (!Array.isArray(value))
     throw new JudgingError('Choose at least one track.');
@@ -958,7 +1317,7 @@ async function eventTrackIds(
   );
   if (requested.length === 0)
     throw new JudgingError('Choose at least one track.');
-  const tracks = await prisma.judgingTrack.findMany({
+  const tracks = await tx.judgingTrack.findMany({
     where: { eventId, id: { in: requested } },
     select: { id: true },
   });
@@ -980,40 +1339,44 @@ export async function upsertEventJudge(input: {
   name: unknown;
   trackIds: unknown;
 }): Promise<string> {
-  let email =
-    typeof input.email === 'string' ? normalizeJudgeEmail(input.email) : '';
-  let name = cleanText(input.name, MAX_NAME_LENGTH) || null;
-  let hackerId: string | null = null;
-  if (typeof input.hackerId === 'string' && input.hackerId) {
-    const hacker = await prisma.hacker.findUnique({
-      where: { id: input.hackerId },
-      select: { id: true, name: true, email: true },
-    });
-    if (!hacker) throw new JudgingError('User not found.', 404);
-    if (!hacker.email) {
-      throw new JudgingError(`${hacker.name} has no email address on file.`);
+  return withJudgingEventLock(input.eventId, async tx => {
+    await requireDraftAssignments(tx, input.eventId);
+    let email =
+      typeof input.email === 'string' ? normalizeJudgeEmail(input.email) : '';
+    let name = cleanText(input.name, MAX_NAME_LENGTH) || null;
+    let hackerId: string | null = null;
+    if (typeof input.hackerId === 'string' && input.hackerId) {
+      const hacker = await tx.hacker.findUnique({
+        where: { id: input.hackerId },
+        select: { id: true, name: true, email: true },
+      });
+      if (!hacker) throw new JudgingError('User not found.', 404);
+      if (!hacker.email) {
+        throw new JudgingError(`${hacker.name} has no email address on file.`);
+      }
+      hackerId = hacker.id;
+      email = normalizeJudgeEmail(hacker.email);
+      name = name ?? hacker.name;
     }
-    hackerId = hacker.id;
-    email = normalizeJudgeEmail(hacker.email);
-    name = name ?? hacker.name;
-  }
-  if (!isValidJudgeEmail(email))
-    throw new JudgingError('Enter a valid email address.');
-  const trackIds = await eventTrackIds(input.eventId, input.trackIds);
+    if (!isValidJudgeEmail(email))
+      throw new JudgingError('Enter a valid email address.');
+    const trackIds = await eventTrackIds(input.eventId, input.trackIds, tx);
 
-  const existing = await prisma.eventJudge.findUnique({
-    where: { eventId_email: { eventId: input.eventId, email } },
-    select: { id: true, revokedAt: true },
-  });
-  if (existing && !existing.revokedAt) {
-    throw new JudgingError(`${email} is already a judge for this event.`, 409);
-  }
+    const existing = await tx.eventJudge.findUnique({
+      where: { eventId_email: { eventId: input.eventId, email } },
+      select: { id: true, revokedAt: true },
+    });
+    if (existing && !existing.revokedAt) {
+      throw new JudgingError(
+        `${email} is already a judge for this event.`,
+        409
+      );
+    }
 
-  const tracks = { create: trackIds.map(trackId => ({ trackId })) };
-  if (existing) {
-    await prisma.$transaction([
-      prisma.eventJudgeTrack.deleteMany({ where: { judgeId: existing.id } }),
-      prisma.eventJudge.update({
+    const tracks = { create: trackIds.map(trackId => ({ trackId })) };
+    if (existing) {
+      await tx.eventJudgeTrack.deleteMany({ where: { judgeId: existing.id } });
+      await tx.eventJudge.update({
         where: { id: existing.id },
         data: {
           revokedAt: null,
@@ -1023,25 +1386,25 @@ export async function upsertEventJudge(input: {
           invitedAt: new Date(),
           tracks,
         },
-      }),
-    ]);
-    return existing.id;
-  }
+      });
+      return existing.id;
+    }
 
-  const judge = await prisma.eventJudge.create({
-    data: {
-      eventId: input.eventId,
-      email,
-      name,
-      hackerId,
-      invitedById: input.actorId,
-      // Replaced with a deliverable token when the invite is sent.
-      tokenHash: createJudgeToken().tokenHash,
-      tracks,
-    },
-    select: { id: true },
+    const judge = await tx.eventJudge.create({
+      data: {
+        eventId: input.eventId,
+        email,
+        name,
+        hackerId,
+        invitedById: input.actorId,
+        // Replaced with a deliverable token when the invite is sent.
+        tokenHash: createJudgeToken().tokenHash,
+        tracks,
+      },
+      select: { id: true },
+    });
+    return judge.id;
   });
-  return judge.id;
 }
 
 export async function updateEventJudge(input: {
@@ -1050,41 +1413,41 @@ export async function updateEventJudge(input: {
   name?: unknown;
   trackIds?: unknown;
 }) {
-  const judge = await prisma.eventJudge.findFirst({
-    where: { id: input.judgeId, eventId: input.eventId },
-    select: { id: true },
-  });
-  if (!judge) throw new JudgingError('Judge not found.', 404);
-  const trackIds =
-    input.trackIds === undefined
-      ? null
-      : await eventTrackIds(input.eventId, input.trackIds);
+  return withJudgingEventLock(input.eventId, async tx => {
+    if (input.trackIds !== undefined)
+      await requireDraftAssignments(tx, input.eventId);
+    const judge = await tx.eventJudge.findFirst({
+      where: { id: input.judgeId, eventId: input.eventId },
+      select: { id: true },
+    });
+    if (!judge) throw new JudgingError('Judge not found.', 404);
+    const trackIds =
+      input.trackIds === undefined
+        ? null
+        : await eventTrackIds(input.eventId, input.trackIds, tx);
 
-  await prisma.$transaction([
-    ...(trackIds
-      ? [
-          prisma.eventJudgeTrack.deleteMany({ where: { judgeId: judge.id } }),
-          prisma.eventJudgeTrack.createMany({
-            data: trackIds.map(trackId => ({ judgeId: judge.id, trackId })),
-          }),
-        ]
-      : []),
-    ...(input.name !== undefined
-      ? [
-          prisma.eventJudge.update({
-            where: { id: judge.id },
-            data: { name: cleanText(input.name, MAX_NAME_LENGTH) || null },
-          }),
-        ]
-      : []),
-  ]);
+    if (trackIds) {
+      await tx.eventJudgeTrack.deleteMany({ where: { judgeId: judge.id } });
+      await tx.eventJudgeTrack.createMany({
+        data: trackIds.map(trackId => ({ judgeId: judge.id, trackId })),
+      });
+    }
+    if (input.name !== undefined) {
+      await tx.eventJudge.update({
+        where: { id: judge.id },
+        data: { name: cleanText(input.name, MAX_NAME_LENGTH) || null },
+      });
+    }
+  });
 }
 
 /** Revoking keeps submitted reviews but cuts off the judge's link immediately. */
 export async function revokeEventJudge(eventId: string, judgeId: string) {
-  const result = await prisma.eventJudge.updateMany({
-    where: { id: judgeId, eventId, revokedAt: null },
-    data: { revokedAt: new Date() },
+  return withJudgingEventLock(eventId, async tx => {
+    const result = await tx.eventJudge.updateMany({
+      where: { id: judgeId, eventId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+    if (result.count === 0) throw new JudgingError('Judge not found.', 404);
   });
-  if (result.count === 0) throw new JudgingError('Judge not found.', 404);
 }

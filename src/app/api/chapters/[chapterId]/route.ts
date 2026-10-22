@@ -1,3 +1,4 @@
+import { visibleProjectsWhere } from '@/lib/projectVisibility';
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import {
@@ -50,7 +51,7 @@ function chapterInclude(now: Date) {
           },
         },
         projects: {
-          where: { cardStatus: 'APPROVED' as const },
+          where: { cardStatus: 'APPROVED' as const, project: visibleProjectsWhere() },
           select: {
             project: { select: chapterProjectSelect },
           },
@@ -92,7 +93,7 @@ const publicEventSummarySelect = {
     },
   },
   projects: {
-    where: { cardStatus: 'APPROVED' as const },
+    where: { cardStatus: 'APPROVED' as const, project: visibleProjectsWhere() },
     select: {
       project: { select: chapterProjectSelect },
     },

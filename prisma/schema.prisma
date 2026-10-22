@@ -436,6 +436,7 @@ model Event {
   autoPromoteWaitlist         Boolean                  @default(false)
   approvedDetailsJson         Json?
   applicationQuestionsJson    Json?
+  communicationLocationsJson  Json?
   hideChapterDefaultQuestions Boolean                  @default(false)
   confirmationMessage         String?
   waitlistMessage             String?
@@ -448,7 +449,10 @@ model Event {
   trackAttendance             Boolean                  @default(false)
   // Judging: submissions default to the event window unless overridden.
   judgingEnabled              Boolean                  @default(false)
-  judgingOpen                 Boolean                  @default(true)
+  projectsHidden              Boolean                  @default(false)
+  judgingOpen                 Boolean                  @default(false)
+  judgesPerProject            Int                      @default(3)
+  judgingAssignmentsPublishedAt DateTime?
   judgingSubmissionsOpenAt    DateTime?
   judgingSubmissionsCloseAt   DateTime?
   image                       Image?                   @relation("EventImage", fields: [imageId], references: [id])
@@ -1038,6 +1042,7 @@ model EventJudge {
   revokedAt   DateTime?
   tracks      EventJudgeTrack[]
   reviews     JudgingReview[]
+  assignments JudgingAssignment[]
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
 
@@ -1068,11 +1073,22 @@ model JudgingSubmission {
   submittedBy   Hacker          @relation("JudgingSubmissionSubmitter", fields: [submittedById], references: [id])
   submittedById String
   reviews       JudgingReview[]
+  assignments   JudgingAssignment[]
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
 
   @@unique([eventId, projectId])
   @@index([trackId])
+}
+
+model JudgingAssignment {
+  judge        EventJudge        @relation(fields: [judgeId], references: [id], onDelete: Cascade)
+  judgeId      String
+  submission   JudgingSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  submissionId String
+
+  @@id([judgeId, submissionId])
+  @@index([submissionId])
 }
 
 model JudgingReview {

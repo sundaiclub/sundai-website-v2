@@ -1,6 +1,10 @@
 import {
   JudgingError,
   loadJudgingResults,
+  loadJudgingAssignments,
+  loadJudgePanel,
+  upsertEventJudge,
+  updateEventJudge,
   saveJudgeReview,
   saveJudgingConfig,
   saveProjectJudgingSubmission,
@@ -11,6 +15,14 @@ jest.mock('@clerk/nextjs/server', () => ({ auth: jest.fn() }));
 
 jest.mock('../../src/lib/prisma', () => {
   const client = {
+    $queryRaw: jest.fn(),
+    judgingAssignment: { createMany: jest.fn() },
+    eventJudge: {
+      update: jest.fn(),
+      findUnique: jest.fn(),
+      findFirst: jest.fn(),
+      create: jest.fn(),
+    },
     event: { findUnique: jest.fn(), update: jest.fn() },
     eventProject: { findUnique: jest.fn() },
     judgingTrack: {
@@ -84,6 +96,7 @@ describe('saveJudgeReview', () => {
     prisma.event.findUnique.mockResolvedValue({
       judgingEnabled: true,
       judgingOpen: true,
+      judgingAssignmentsPublishedAt: new Date(),
     });
     prisma.judgingSubmission.findFirst.mockResolvedValue({
       id: 'submission-1',
@@ -109,7 +122,12 @@ describe('saveJudgeReview', () => {
       expect.objectContaining({
         where: expect.objectContaining({
           id: 'submission-1',
-          track: { judges: { some: { judgeId: 'judge-1' } } },
+          assignments: {
+            some: {
+              judgeId: 'judge-1',
+              judge: { eventId: 'event-1', revokedAt: null },
+            },
+          },
         }),
       })
     );
@@ -154,6 +172,7 @@ describe('saveJudgeReview', () => {
 
 describe('loadJudgingResults', () => {
   it('ranks by normalized score and reports judge coverage', async () => {
+    prisma.event.findUnique.mockResolvedValue({ judgesPerProject: 3 });
     prisma.judgingTrack.findMany.mockResolvedValue([
       { id: 'track-ai', name: 'AI' },
     ]);
@@ -172,18 +191,21 @@ describe('loadJudgingResults', () => {
       {
         id: 's-low',
         trackId: 'track-ai',
+        _count: { assignments: 2 },
         project: { id: 'p-low', title: 'Low' },
         reviews: [review('harsh', 1)],
       },
       {
         id: 's-high',
         trackId: 'track-ai',
+        _count: { assignments: 2 },
         project: { id: 'p-high', title: 'High' },
         reviews: [review('harsh', 2), review('kind', 5)],
       },
       {
         id: 's-unscored',
         trackId: 'track-ai',
+        _count: { assignments: 2 },
         project: { id: 'p-none', title: 'Unscored' },
         reviews: [],
       },
@@ -223,7 +245,8 @@ describe('saveJudgingConfig', () => {
     await expect(
       saveJudgingConfig('event-1', {
         judgingEnabled: false,
-        judgingOpen: true,
+        judgingOpen: false,
+        judgesPerProject: 3,
         judgingSubmissionsOpenAt: null,
         judgingSubmissionsCloseAt: null,
         criteria: [],
@@ -237,7 +260,8 @@ describe('saveJudgingConfig', () => {
     prisma.judgingTrack.create.mockResolvedValue({ id: 'track-new' });
     await saveJudgingConfig('event-1', {
       judgingEnabled: true,
-      judgingOpen: true,
+      judgingOpen: false,
+      judgesPerProject: 3,
       judgingSubmissionsOpenAt: '2026-10-10T09:00',
       judgingSubmissionsCloseAt: null,
       criteria: [{ name: 'Idea', description: null, weight: 2 }],
@@ -271,13 +295,77 @@ describe('saveJudgingConfig', () => {
     await expect(
       saveJudgingConfig('event-1', {
         judgingEnabled: true,
-        judgingOpen: true,
+        judgingOpen: false,
+        judgesPerProject: 3,
         judgingSubmissionsOpenAt: null,
         judgingSubmissionsCloseAt: null,
         criteria: [],
         tracks: [],
       })
     ).rejects.toThrow('Add at least one track before enabling judging.');
+  });
+
+  it.each([true, false])(
+    'saves the project visibility choice: %s',
+    async projectsHidden => {
+      prisma.event.findUnique.mockResolvedValue({
+        timezone: 'America/New_York',
+        judgingEnabled: true,
+        projectsHidden: !projectsHidden,
+      });
+      prisma.judgingTrack.findMany.mockResolvedValue([]);
+      prisma.judgingTrack.create.mockResolvedValue({ id: 'track-new' });
+      await saveJudgingConfig('event-1', {
+        judgingEnabled: true,
+        projectsHidden,
+        judgingOpen: false,
+        judgesPerProject: 3,
+        judgingSubmissionsOpenAt: null,
+        judgingSubmissionsCloseAt: null,
+        criteria: [],
+        tracks: [
+          { name: 'General', description: null, questions: [], criteria: [] },
+        ],
+      });
+      expect(prisma.event.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ projectsHidden }),
+        })
+      );
+    }
+  );
+
+  it('hides projects by default when enabling judging without a visibility choice', async () => {
+    prisma.event.findUnique.mockResolvedValue({
+      timezone: 'America/New_York',
+      judgingEnabled: false,
+      projectsHidden: false,
+    });
+    prisma.judgingTrack.findMany.mockResolvedValue([]);
+    prisma.judgingTrack.create.mockResolvedValue({ id: 'track-new' });
+    await saveJudgingConfig('event-1', {
+      judgingEnabled: true,
+      judgingOpen: false,
+      judgesPerProject: 3,
+      judgingSubmissionsOpenAt: null,
+      judgingSubmissionsCloseAt: null,
+      criteria: [],
+      tracks: [
+        { name: 'General', description: null, questions: [], criteria: [] },
+      ],
+    } as Parameters<typeof saveJudgingConfig>[1]);
+    expect(prisma.event.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ projectsHidden: true }),
+      })
+    );
+  });
+
+  it('rejects a non-boolean visibility value', async () => {
+    await expect(
+      saveJudgingConfig('event-1', { projectsHidden: 'false' } as any)
+    ).rejects.toThrow('Project visibility must be on or off.');
+    expect(prisma.event.update).not.toHaveBeenCalled();
   });
 });
 

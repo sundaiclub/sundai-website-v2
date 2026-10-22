@@ -245,7 +245,7 @@ export default async function PublicEventDetailPage({
         registrationStatus: event.viewerRegistrationStatus ?? null,
       },
     }) as Promise<PublicMaterial[]>,
-    listPublicEventProjects({ eventId: event.id }),
+    listPublicEventProjects({ eventId: event.id, clerkId: userId }),
   ]);
   const materials = publicMaterials(
     visibleMaterials.map(material => ({

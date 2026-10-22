@@ -1,3 +1,4 @@
+import { visibleProjectsWhere } from '@/lib/projectVisibility';
 import { HackType, Prisma, ProjectStatus } from '@prisma/client';
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
@@ -42,8 +43,10 @@ export async function GET(req: Request) {
           ] satisfies Prisma.ProjectWhereInput[])
         : [];
 
+    const { userId } = auth();
     const projectWhere: Prisma.ProjectWhereInput = {
       AND: [
+        visibleProjectsWhere(userId),
         status ? { status: status as ProjectStatus } : {},
         { hack_type },
         ...ignoredDomainTagsFilter,

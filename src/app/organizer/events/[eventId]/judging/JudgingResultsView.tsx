@@ -53,7 +53,8 @@ function Leaderboard({
               Normalized
             </th>
             <th className="px-2 py-2">Raw avg</th>
-            <th className="px-2 py-2">Judges</th>
+            <th className="px-2 py-2">Reviews complete / required</th>
+            <th className="px-2 py-2">Judges assigned</th>
             {criteria.map(criterion => (
               <th className="px-2 py-2" key={criterion.id}>
                 {criterion.name}
@@ -84,8 +85,9 @@ function Leaderboard({
                 </td>
                 <td className="px-2 py-2">{formatScore(row.rawScore)}</td>
                 <td className="px-2 py-2">
-                  {row.judgeCount}/{row.assignedJudgeCount}
+                  {row.judgeCount}/{row.requiredJudgeCount}
                 </td>
+                <td className="px-2 py-2">{row.assignedJudgeCount}</td>
                 {criteria.map(criterion => (
                   <td className="px-2 py-2" key={criterion.id}>
                     {formatScore(row.criterionAverages[criterion.id] ?? null)}
@@ -111,7 +113,7 @@ function Leaderboard({
                 <tr>
                   <td
                     className="px-2 pb-4"
-                    colSpan={6 + criteria.length + (showTrack ? 1 : 0)}
+                    colSpan={7 + criteria.length + (showTrack ? 1 : 0)}
                   >
                     <div className="grid gap-2">
                       {row.reviews.map(review => (
@@ -186,7 +188,7 @@ export default function JudgingResultsView({ eventId }: { eventId: string }) {
   return (
     <ManagementSection
       title="Leaderboard"
-      description="Scores are private to organizers. Normalized scores adjust each judge's scores for how harshly or generously they score overall, so judges who saw different projects can be compared fairly. Raw averages are shown for reference."
+      description="Scores are private to organizers. Only complete reviews count toward scores and coverage. Normalized scores adjust for each judge's scoring pattern; small review sets can affect this adjustment. Raw averages are shown for reference."
       actions={
         <>
           <select

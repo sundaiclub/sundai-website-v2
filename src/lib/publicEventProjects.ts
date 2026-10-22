@@ -1,3 +1,4 @@
+import { visibleProjectsWhere } from '@/lib/projectVisibility';
 import prisma from '@/lib/prisma';
 import type { Prisma, PrismaClient } from '@prisma/client';
 import type { PublicEventProject } from '@/types/event-management';
@@ -114,15 +115,18 @@ export function rankPublicEventProjects(
 
 export async function listPublicEventProjects({
   eventId,
+  clerkId,
   db = prisma,
 }: {
   eventId: string;
+  clerkId?: string | null;
   db?: Pick<PrismaClient, 'eventProject'>;
 }): Promise<PublicEventProject[]> {
   const rows = await db.eventProject.findMany({
     where: {
       eventId,
       project: {
+        AND: visibleProjectsWhere(clerkId),
         is_broken: false,
         status: 'APPROVED',
         launchLead: { userBans: { none: { revokedAt: null } } },

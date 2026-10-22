@@ -1,3 +1,6 @@
+export const dynamic = 'force-dynamic';
+
+import { visibleProjectsWhere } from '@/lib/projectVisibility';
 import { Metadata } from "next";
 import prisma from "@/lib/prisma";
 import { DEFAULT_SOCIAL_IMAGE_URL, publicUrl } from "@/lib/siteUrl";
@@ -9,7 +12,7 @@ type Props = {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const project = await prisma.project.findUnique({
-    where: { id: params.projectId },
+    where: { id: params.projectId, AND: visibleProjectsWhere() },
     include: { thumbnail: true },
   });
 

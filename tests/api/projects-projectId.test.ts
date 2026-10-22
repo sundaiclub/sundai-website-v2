@@ -41,6 +41,7 @@ const mockAuth = require('@clerk/nextjs/server').auth as jest.Mock;
 describe('/api/projects/[projectId]', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockAuth.mockReturnValue({ userId: null });
     mockPrisma.pitchProject.findMany.mockResolvedValue([] as never);
   });
 

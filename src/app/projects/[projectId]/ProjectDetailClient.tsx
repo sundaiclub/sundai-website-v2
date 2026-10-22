@@ -14,6 +14,7 @@ import { useAutoLike } from '../../hooks/useAutoLike';
 import { CheckIcon, XMarkIcon } from '@heroicons/react/24/solid';
 import toast from 'react-hot-toast';
 import type { Project } from '@/types/project';
+import { JUDGE_TOKEN_HEADER, JUDGE_TOKEN_PARAM } from '@/types/judging';
 import { swapFirstLetters } from '../../utils/nameUtils';
 import ShareModal from '../../components/ShareModal';
 import ProjectMarkdown from '../../components/ProjectMarkdown';
@@ -131,6 +132,8 @@ export default function ProjectDetailClient() {
   const params = (useParams() || {}) as { projectId?: string };
   const router = useRouter();
   const searchParams = useSearchParams();
+  const eventId = searchParams?.get('event');
+  const judgeToken = searchParams?.get(JUDGE_TOKEN_PARAM);
   const { userInfo } = useUserContext();
   const [project, setProject] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
@@ -154,7 +157,10 @@ export default function ProjectDetailClient() {
   useEffect(() => {
     const fetchProject = async () => {
       try {
-        const response = await fetch(`/api/projects/${params?.projectId}`);
+        const url = `/api/projects/${params?.projectId}${eventId ? `?event=${encodeURIComponent(eventId)}` : ''}`;
+        const response = judgeToken
+          ? await fetch(url, { headers: { [JUDGE_TOKEN_HEADER]: judgeToken } })
+          : await fetch(url);
         if (!response.ok) {
           throw new Error('Project not found');
         }
@@ -187,7 +193,7 @@ export default function ProjectDetailClient() {
     if (params?.projectId) {
       fetchProject();
     }
-  }, [params?.projectId, router]);
+  }, [params?.projectId, router, eventId, judgeToken]);
 
   useEffect(() => {
     if (project) {

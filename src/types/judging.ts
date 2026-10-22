@@ -36,7 +36,9 @@ export interface JudgingTrackConfig {
 
 export interface JudgingSettings {
   judgingEnabled: boolean;
+  projectsHidden: boolean;
   judgingOpen: boolean;
+  judgesPerProject: number;
   judgingSubmissionsOpenAt: string | null;
   judgingSubmissionsCloseAt: string | null;
 }
@@ -55,6 +57,7 @@ export interface EventJudgeSummary {
 }
 
 export interface EventJudgingConfig extends JudgingSettings {
+  judgingAssignmentsPublishedAt: string | null;
   eventStartTime: string;
   eventEndTime: string | null;
   timezone: string;
@@ -113,6 +116,7 @@ export interface JudgeProjectView {
 export interface JudgePanelPayload {
   judge: { id: EntityId; name: string | null; email: string };
   judgingOpen: boolean;
+  assignmentsPublished: boolean;
   scoreMin: number;
   scoreMax: number;
   tracks: Array<{
@@ -132,6 +136,7 @@ export interface JudgingLeaderboardRow {
   trackName: string;
   judgeCount: number;
   assignedJudgeCount: number;
+  requiredJudgeCount: number;
   rawScore: number | null;
   normalizedScore: number | null;
   criterionAverages: Record<EntityId, number>;
@@ -141,6 +146,31 @@ export interface JudgingLeaderboardRow {
     score: number | null;
     scores: Record<EntityId, number>;
     comment: string | null;
+  }>;
+}
+
+export interface JudgingAssignmentPreview {
+  published: boolean;
+  judgesPerProject: number;
+  tracks: Array<{ id: string; name: string }>;
+  judges: Array<{
+    id: string;
+    name: string;
+    total: number;
+    trackCounts: Record<string, number>;
+  }>;
+  projects: Array<{
+    id: string;
+    title: string;
+    trackId: string;
+    assigned: number;
+    completed: number;
+  }>;
+  shortages: Array<{
+    trackId: string;
+    trackName: string;
+    eligible: number;
+    required: number;
   }>;
 }
 

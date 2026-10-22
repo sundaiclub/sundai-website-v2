@@ -1,3 +1,4 @@
+import { visibleProjectsWhere } from '@/lib/projectVisibility';
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import type { Prisma } from "@prisma/client";
@@ -41,11 +42,14 @@ export async function GET(
   { params }: { params: { hackerId: string } }
 ) {
   try {
+    const { userId } = auth();
+    const projectVisibility = visibleProjectsWhere(userId);
     const hacker = await prisma.hacker.findUnique({
       where: { id: params.hackerId },
       include: {
         avatar: true,
         ledProjects: {
+          where: projectVisibility,
           include: {
             thumbnail: true,
             likes: true,
@@ -55,6 +59,7 @@ export async function GET(
           },
         },
         projects: {
+          where: { project: projectVisibility },
           include: {
             project: {
               include: {
@@ -68,6 +73,7 @@ export async function GET(
           },
         },
         likes: {
+          where: { project: projectVisibility },
           include: {
             project: {
               include: {
@@ -156,12 +162,14 @@ export async function PATCH(
       }
     }
 
+    const projectVisibility = visibleProjectsWhere(userId);
     const updatedHacker = await prisma.hacker.update({
       where: { id: params.hackerId },
       data: sanitizedData,
       include: {
         avatar: true,
         ledProjects: {
+          where: projectVisibility,
           include: {
             thumbnail: true,
           },
@@ -170,6 +178,7 @@ export async function PATCH(
           },
         },
         projects: {
+          where: { project: projectVisibility },
           include: {
             project: {
               include: {
@@ -183,6 +192,7 @@ export async function PATCH(
           },
         },
         likes: {
+          where: { project: projectVisibility },
           include: {
             project: {
               include: {

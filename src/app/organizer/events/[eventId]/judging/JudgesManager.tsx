@@ -183,6 +183,7 @@ export default function JudgesManager({
   );
 
   const canInvite =
+    !config.judgingAssignmentsPublishedAt &&
     trackIds.length > 0 &&
     (mode === 'user' ? Boolean(selectedHacker) : email.trim().length > 0);
   const activeJudges = config.judges.filter(judge => !judge.revokedAt);
@@ -200,6 +201,11 @@ export default function JudgesManager({
 
   return (
     <div className="grid gap-5">
+      {config.judgingAssignmentsPublishedAt && (
+        <ManagementAlert>
+          Scoring has started. The judge list and track assignments are fixed.
+        </ManagementAlert>
+      )}
       <ManagementSection
         title="Invite a judge"
         description="Judges get an email with a personal link that opens the judging page. They don't need an account."
@@ -396,7 +402,10 @@ export default function JudgesManager({
                 </div>
                 {!judge.revokedAt && (
                   <TrackCheckboxes
-                    disabled={pending === judge.id}
+                    disabled={
+                      pending === judge.id ||
+                      Boolean(config.judgingAssignmentsPublishedAt)
+                    }
                     labelPrefix={`${label} judges`}
                     onChange={nextTrackIds => {
                       if (nextTrackIds.length === 0) {
