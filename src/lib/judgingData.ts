@@ -14,6 +14,7 @@ import {
 } from '@/lib/judgingAccess';
 import {
   composeJudgingDescription,
+  hasJudgingConcluded,
   isJudgingSubmissionWindowOpen,
   isJudgingReviewComplete,
   isValidJudgingScore,
@@ -1107,6 +1108,7 @@ const judgingEventSelect = {
   startTime: true,
   endTime: true,
   judgingEnabled: true,
+  judgingOpen: true,
   judgingSubmissionsOpenAt: true,
   judgingSubmissionsCloseAt: true,
 } satisfies Prisma.EventSelect;
@@ -1229,8 +1231,16 @@ export async function saveProjectJudgingSubmission(input: {
         404
       );
     }
+    const existing = await tx.judgingSubmission.findUnique({
+      where: {
+        eventId_projectId: { eventId: input.eventId, projectId: input.projectId },
+      },
+      select: { id: true, trackId: true },
+    });
+    const canEditAfterJudging = Boolean(existing) && hasJudgingConcluded(event);
     if (
       !input.bypassWindow &&
+      !canEditAfterJudging &&
       (event.judgingAssignmentsPublishedAt ||
         !isJudgingSubmissionWindowOpen(event))
     ) {
@@ -1257,15 +1267,6 @@ export async function saveProjectJudgingSubmission(input: {
 
     const description = composeJudgingDescription(questions, answers);
     const answersJson = answers as Prisma.InputJsonValue;
-    const existing = await tx.judgingSubmission.findUnique({
-      where: {
-        eventId_projectId: {
-          eventId: input.eventId,
-          projectId: input.projectId,
-        },
-      },
-      select: { id: true, trackId: true },
-    });
     if (
       event.judgingAssignmentsPublishedAt &&
       (!existing || existing.trackId !== track.id)

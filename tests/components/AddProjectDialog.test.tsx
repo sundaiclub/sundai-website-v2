@@ -1,6 +1,12 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { AddProjectDialog } from '@/app/components/AddProjectDialog';
 import { ThemeProvider } from '@/app/contexts/ThemeContext';
+import toast from 'react-hot-toast';
+
+jest.mock('react-hot-toast', () => ({
+  __esModule: true,
+  default: { error: jest.fn() },
+}));
 
 describe('AddProjectDialog', () => {
   beforeEach(() => {
@@ -55,6 +61,42 @@ describe('AddProjectDialog', () => {
           ],
         }),
       });
+  });
+
+  it('shows a pop-up and keeps the chooser open when a GitHub link is required', async () => {
+    const message =
+      'GitHub link is required. Enter a URL that contains github.com.';
+    (global.fetch as jest.Mock)
+      .mockReset()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          projects: [{ id: 'p1', title: 'Missing link', pitchAdded: false }],
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+        json: async () => ({ message }),
+      });
+    const onProjectAdded = jest.fn();
+    render(
+      <ThemeProvider>
+        <AddProjectDialog
+          eventId="event-1"
+          eventTitle="Build Night"
+          open
+          onClose={jest.fn()}
+          onProjectAdded={onProjectAdded}
+        />
+      </ThemeProvider>
+    );
+    fireEvent.click(await screen.findByRole('radio', { name: 'Missing link' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add project' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(message);
+    expect(toast.error).toHaveBeenCalledWith(message);
+    expect(onProjectAdded).not.toHaveBeenCalled();
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
   });
 
   it('shows new project first, marks queue entries, and stays open after adding', async () => {

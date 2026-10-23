@@ -4,6 +4,7 @@ import prisma from '../../src/lib/prisma';
 
 // Mock prisma
 jest.mock('../../src/lib/prisma', () => ({
+  judgingSubmission: { findMany: jest.fn().mockResolvedValue([]) },
   project: {
     findUnique: jest.fn(),
     delete: jest.fn(),
@@ -84,6 +85,7 @@ describe('/api/projects/[projectId]', () => {
       expect(response.status).toBe(200);
       expect(data).toEqual({
         ...mockProject,
+        editLockedForJudging: false,
         likes: [
           { hackerId: 'hacker-1', createdAt: '2023-01-01T00:00:00.000Z' },
           { hackerId: 'hacker-2', createdAt: '2023-01-02T00:00:00.000Z' },

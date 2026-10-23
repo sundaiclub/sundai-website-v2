@@ -53,6 +53,23 @@ describe('ProjectDetail Page - Like Count', () => {
     global.fetch = jest.fn();
   });
 
+  it.each([false, true])('hides locked edit controls except for site admins (admin=%s)', async isAdmin => {
+    mockUseUserContext.mockReturnValue({ userInfo: { id: 'lead-1', role: isAdmin ? 'SITE_ADMIN' : 'HACKER' }, loading: false });
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        id: 'test-project-id', title: 'Locked project', status: 'APPROVED',
+        editLockedForJudging: true, launchLead: { id: 'lead-1', name: 'Lead' },
+        participants: [], techTags: [], domainTags: [], likes: [],
+      }),
+    });
+    render(<ThemeProvider><ProjectDetail /></ThemeProvider>);
+    await screen.findByText('Locked project');
+    expect(screen.getByText('This project is locked for judging. You can edit it after judging ends.')).toBeInTheDocument();
+    if (isAdmin) expect(screen.getByRole('button', { name: 'Edit project' })).toBeInTheDocument();
+    else expect(screen.queryByRole('button', { name: 'Edit project' })).not.toBeInTheDocument();
+  });
+
   it('displays like count from API response', async () => {
     const mockProject = {
       id: 'test-project-id',

@@ -68,6 +68,7 @@ jest.mock('../../src/lib/prisma', () => ({
   __esModule: true,
   default: {
     project: { findUnique: jest.fn() },
+    judgingSubmission: { findMany: jest.fn().mockResolvedValue([]) },
     event: { findFirst: jest.fn() },
     hacker: { findUnique: jest.fn() },
     eventJudge: { findFirst: jest.fn(), update: jest.fn() },
@@ -84,6 +85,7 @@ const organizer = { id: 'hacker-mc', role: null };
 
 beforeEach(() => {
   jest.resetAllMocks();
+  prisma.judgingSubmission.findMany.mockResolvedValue([]);
   (auth as jest.Mock).mockReturnValue({ userId: null });
   mockRequireEventJudgingManager.mockResolvedValue({
     hacker: organizer,

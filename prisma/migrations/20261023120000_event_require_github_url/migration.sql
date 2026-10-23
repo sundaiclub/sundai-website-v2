@@ -1,0 +1,1 @@
+ALTER TABLE "Event" ADD COLUMN "requireGithubUrl" BOOLEAN NOT NULL DEFAULT false;

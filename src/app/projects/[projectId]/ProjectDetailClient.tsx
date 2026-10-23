@@ -1,4 +1,5 @@
 'use client';
+import { PROJECT_JUDGING_LOCK_MESSAGE } from '@/lib/judging';
 import { memo, useEffect, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import NextImage from 'next/image';
@@ -147,6 +148,7 @@ export default function ProjectDetailClient() {
 
   const allowedEdit =
     !!project &&
+    (!project.editLockedForJudging || userInfo?.role === 'SITE_ADMIN') &&
     ((Array.isArray(project.participants) &&
       project.participants.some(
         participant => participant?.hacker?.id === userInfo?.id
@@ -331,6 +333,11 @@ export default function ProjectDetailClient() {
           <span aria-hidden="true">&larr;</span>
           Back to projects
         </ManagementLinkButton>
+        {project.editLockedForJudging && (
+          <p role="status" className={managementClasses.mutedText}>
+            {PROJECT_JUDGING_LOCK_MESSAGE}
+          </p>
+        )}
         {allowedEdit && (
           <div className="flex flex-wrap gap-2">
             <button

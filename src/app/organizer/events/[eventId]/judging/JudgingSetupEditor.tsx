@@ -465,8 +465,8 @@ export default function JudgingSetupEditor({
               <span className={`block text-sm ${classes.mutedText}`}>
                 {draft.judgingEnabled
                   ? config.judgingAssignmentsPublishedAt
-                    ? 'Judges can submit and change scores. Closing and reopening scoring keeps the same assignments.'
-                    : 'After submissions close and all judges are added, select this and save to publish assignments and open scoring. Check Assignments for coverage first.'
+                    ? 'Judges can submit and change scores. Closing scoring ends judging and unlocks project edits. Reopening scoring locks edits again and keeps the same assignments.'
+                    : 'After submissions close and all judges are added, select this and save to publish assignments and open scoring. Submitted projects are locked until scoring is closed after judging. Check Assignments for coverage first.'
                   : 'Enable judging to open scoring for judges.'}
               </span>
             </span>

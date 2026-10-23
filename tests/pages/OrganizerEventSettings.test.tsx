@@ -64,6 +64,7 @@ const eventSettings = {
   approvedCount: 32,
   applicationMode: 'REQUIRES_APPROVAL',
   applicationsOpen: true,
+  requireGithubUrl: false,
   applicationsClosedAt: null,
   applicationsCloseReason: null,
   autoPromoteWaitlist: false,
@@ -202,6 +203,25 @@ describe('/organizer/events/[eventId]/settings', () => {
     mockUseTheme.mockReturnValue({ isDarkMode: false });
     mockEventFetch();
   });
+
+  it.each([false, true])(
+    'loads and changes the GitHub requirement from %s',
+    async requireGithubUrl => {
+      mockEventFetch({ ...eventSettings, requireGithubUrl });
+      renderSettingsPage();
+      const toggle = await screen.findByRole('checkbox', {
+        name: 'Require GitHub URL',
+      });
+      expect(toggle).toHaveProperty('checked', requireGithubUrl);
+      fireEvent.click(toggle);
+      fireEvent.click(topSaveSettingsButton()!);
+      await waitFor(() =>
+        expect(patchBodyForEvent(eventSettings.id)).toEqual(
+          expect.objectContaining({ requireGithubUrl: !requireGithubUrl })
+        )
+      );
+    }
+  );
 
   it.each(['admin', 'MC'])(
     'lets an %s add options to a saved checkbox group without changing its ID',

@@ -4,6 +4,7 @@ import prisma from '../../src/lib/prisma';
 
 // Mock prisma
 jest.mock('../../src/lib/prisma', () => ({
+  judgingSubmission: { findMany: jest.fn().mockResolvedValue([]) },
   project: { findUnique: jest.fn() },
   hacker: {
     findUnique: jest.fn(),

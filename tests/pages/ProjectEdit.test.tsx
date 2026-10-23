@@ -6,18 +6,11 @@ import { useUser } from '@clerk/nextjs';
 import ProjectEdit from '../../src/app/projects/[projectId]/edit/page';
 import { ThemeProvider } from '../../src/app/contexts/ThemeContext';
 
+const mockUseUserContext = jest.fn();
+
 // Mock UserContext to allow editing in tests
 jest.mock('../../src/app/contexts/UserContext', () => ({
-  useUserContext: () => ({
-    isAdmin: true,
-    userInfo: {
-      id: 'current-user-id',
-      name: 'Current User',
-      email: 'current@example.com',
-      role: 'SITE_ADMIN',
-    },
-    loading: false,
-  }),
+  useUserContext: () => mockUseUserContext(),
 }));
 
 // Mock Clerk
@@ -55,6 +48,7 @@ jest.mock('react-hot-toast', () => ({
 }));
 
 const mockUseUser = useUser as jest.MockedFunction<typeof useUser>;
+const mockToast = require('react-hot-toast').default;
 
 describe('ProjectEdit', () => {
   const mockProject = {
@@ -96,6 +90,11 @@ describe('ProjectEdit', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockUseUserContext.mockReturnValue({
+      isAdmin: true,
+      userInfo: { id: 'current-user-id', name: 'Current User', email: 'current@example.com', role: 'SITE_ADMIN' },
+      loading: false,
+    });
     mockSearchParams.mockReturnValue(new URLSearchParams());
     mockUseUser.mockReturnValue({
       isLoaded: true,
@@ -113,6 +112,26 @@ describe('ProjectEdit', () => {
     });
   });
 
+  it.each([false, true])('shows the judging lock to hackers and retains admin edits (admin=%s)', async isAdmin => {
+    mockUseUserContext.mockReturnValue({
+      isAdmin,
+      userInfo: { id: 'launch-lead-id', role: isAdmin ? 'SITE_ADMIN' : 'HACKER' },
+      loading: false,
+    });
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ ...mockProject, editLockedForJudging: true }),
+    });
+    render(<ThemeProvider><ProjectEdit /></ThemeProvider>);
+    if (isAdmin) {
+      expect(await screen.findByDisplayValue('Test Project')).toBeInTheDocument();
+    } else {
+      expect(await screen.findByText('This project is locked for judging. You can edit it after judging ends.')).toBeInTheDocument();
+      expect(screen.queryByDisplayValue('Test Project')).not.toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'View project' })).toHaveAttribute('href', '/projects/test-project-id');
+    }
+  });
+
   it('should render loading state initially', () => {
     (global.fetch as jest.Mock).mockResolvedValueOnce(new Promise(() => {}));
 
@@ -125,6 +144,70 @@ describe('ProjectEdit', () => {
     // Spinner without role; assert presence by class
     expect(document.querySelector('.animate-spin')).toBeInTheDocument();
   });
+
+  it.each([
+    ['DRAFT', 'Publish', '', true],
+    ['DRAFT', 'Publish', 'https://gitlab.com/team/project', true],
+    ['APPROVED', 'Save Changes', '', true],
+    ['DRAFT', 'Save Draft', '', false],
+    ['DRAFT', 'Publish', 'github.com/team', false],
+  ])(
+    'validates the GitHub link when %s uses %s with %s',
+    async (status, action, githubUrl, blocked) => {
+      const project = { ...mockProject, status, githubUrl };
+      (global.fetch as jest.Mock).mockImplementation(
+        (input: RequestInfo | URL) => {
+          const url = input.toString();
+          return Promise.resolve({
+            ok: true,
+            json: async () =>
+              url === '/api/projects/test-project-id'
+                ? project
+                : url.startsWith('/api/events/project-options')
+                  ? [
+                      {
+                        id: 'event-required',
+                        title: 'Required Event',
+                        chapterName: 'Boston',
+                        image: null,
+                        selectedByDefault: true,
+                        alreadyAdded: status === 'APPROVED',
+                        requireGithubUrl: true,
+                        judging: null,
+                      },
+                    ]
+                  : url.endsWith('/edit')
+                    ? project
+                    : [],
+          });
+        }
+      );
+      render(
+        <ThemeProvider>
+          <ProjectEdit />
+        </ThemeProvider>
+      );
+      await screen.findByRole('checkbox', { name: /Required Event/ });
+      expect(
+        screen.getByRole('textbox', { name: 'GitHub URL' })
+      ).toHaveAttribute('aria-required', 'true');
+      fireEvent.click(screen.getAllByRole('button', { name: action })[0]);
+      if (blocked) {
+        expect(mockToast.error).toHaveBeenCalledWith(
+          'GitHub link is required. Enter a URL that contains github.com.'
+        );
+        expect(
+          (global.fetch as jest.Mock).mock.calls.filter(
+            ([, init]) => init?.method
+          )
+        ).toEqual([]);
+        expect(mockPush).not.toHaveBeenCalled();
+      } else {
+        await waitFor(() => expect(mockPush).toHaveBeenCalled());
+        expect(mockToast.error).not.toHaveBeenCalled();
+      }
+    }
+  );
 
   it('should render project edit form when loaded', async () => {
     (global.fetch as jest.Mock)

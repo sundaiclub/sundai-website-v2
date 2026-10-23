@@ -1,3 +1,4 @@
+import { projectEditLockResponse } from '@/lib/projectEditLock';
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getCurrentHacker, unauthorized } from '@/lib/eventManagementApi';
@@ -51,6 +52,9 @@ export async function PUT(
     if (!isSiteAdmin && !onTeam) {
       return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
     }
+
+    const locked = await projectEditLockResponse(params.projectId, isSiteAdmin);
+    if (locked) return locked;
 
     const permissionContext = await getEventPermissionContext(
       prisma,

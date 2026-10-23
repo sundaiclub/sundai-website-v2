@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import toast from 'react-hot-toast';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useManagementClasses } from './ManagementSurface';
@@ -124,11 +125,12 @@ export function AddProjectDialog({
       await loadProjects();
       await onProjectAdded?.();
     } catch (addError) {
-      setError(
+      const errorMessage =
         addError instanceof Error
           ? addError.message
-          : 'Unable to add this project.'
-      );
+          : 'Unable to add this project.';
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setAdding(false);
     }

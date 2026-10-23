@@ -4,7 +4,12 @@ import { useEffect } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
+import {
+  GITHUB_URL_REQUIRED_MESSAGE,
+  meetsGithubUrlRequirement,
+} from '@/lib/projectSubmissionRequirements';
 import Image from 'next/image';
+import Link from 'next/link';
 
 import { useTheme } from '../../../contexts/ThemeContext';
 import { useUserContext } from '../../../contexts/UserContext';
@@ -28,6 +33,7 @@ import MarkdownEditor from '../../../components/MarkdownEditor';
 import JudgingSubmissionFields from '../../../components/JudgingSubmissionFields';
 import {
   composeJudgingDescription,
+  PROJECT_JUDGING_LOCK_MESSAGE,
   limitToOneJudgingEvent,
   missingRequiredJudgingAnswers,
   selectProjectEvent,
@@ -48,6 +54,7 @@ type ProjectRouteParams = {
 type AppRouter = ReturnType<typeof useRouter>;
 
 type ProjectEventOption = {
+  requireGithubUrl: boolean;
   id: string;
   title: string;
   chapterName: string;
@@ -453,8 +460,21 @@ export default function ProjectEditPage() {
     }
   };
 
+  const githubUrlRequired = eventOptions.some(
+    event => selectedEventIds.includes(event.id) && event.requireGithubUrl
+  );
+
+  function validateGithubUrl() {
+    if (githubUrlRequired && !meetsGithubUrlRequirement(editableGithubUrl)) {
+      toast.error(GITHUB_URL_REQUIRED_MESSAGE);
+      return false;
+    }
+    return true;
+  }
+
   const handleSave = async () => {
     if (!project) return;
+    if (project.status === 'APPROVED' && !validateGithubUrl()) return;
 
     if (formRef.current && !formRef.current.checkValidity()) {
       formRef.current.reportValidity();
@@ -533,7 +553,10 @@ export default function ProjectEditPage() {
         );
         if (!eventResponse.ok) {
           throw new Error(
-            'The project was saved, but it was not added to the event'
+            await getImageUploadError(
+              eventResponse,
+              'The project was saved, but it was not added to the event'
+            )
           );
         }
       }
@@ -553,6 +576,7 @@ export default function ProjectEditPage() {
 
   const handlePublish = async () => {
     if (!project) return;
+    if (!validateGithubUrl()) return;
 
     if (formRef.current && !formRef.current.checkValidity()) {
       formRef.current.reportValidity();
@@ -624,7 +648,12 @@ export default function ProjectEditPage() {
       );
 
       if (!publishResponse.ok) {
-        throw new Error('Failed to publish project');
+        throw new Error(
+          await getImageUploadError(
+            publishResponse,
+            'Failed to publish project'
+          )
+        );
       }
       await saveJudgingSubmission();
 
@@ -819,6 +848,17 @@ export default function ProjectEditPage() {
 
   if (!allowedEdit) {
     return <PermissionDenied />;
+  }
+
+  if (project?.editLockedForJudging && !isAdmin) {
+    return (
+      <div className="max-w-3xl mx-auto px-4 py-20">
+        <p role="status">{PROJECT_JUDGING_LOCK_MESSAGE}</p>
+        <Link href={`/projects/${params?.projectId}`} className="underline">
+          View project
+        </Link>
+      </div>
+    );
   }
 
   return (
@@ -1020,10 +1060,20 @@ export default function ProjectEditPage() {
                 type="text"
                 inputMode="url"
                 placeholder="GitHub URL"
+                aria-label="GitHub URL"
+                aria-required={githubUrlRequired}
                 value={editableGithubUrl}
                 onChange={e => setEditableGithubUrl(e.target.value)}
                 className={`block w-3/4 border ${isDarkMode ? 'border-gray-600 bg-gray-800 text-gray-100' : 'border-gray-300 bg-white text-gray-900'} rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 p-2`}
               />
+              {githubUrlRequired && (
+                <p
+                  className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}
+                >
+                  GitHub link is required for the selected event. Enter a URL
+                  that contains github.com.
+                </p>
+              )}
               <input
                 type="text"
                 inputMode="url"

@@ -276,11 +276,49 @@ describe('/api/events', () => {
       })
     );
   });
+
+  it.each([true, false, undefined, 'true', null])(
+    'POST validates and saves the GitHub requirement: %s',
+    async requireGithubUrl => {
+      mockAuth.mockReturnValue({ userId: 'clerk-admin' });
+      prisma.hacker.findUnique.mockResolvedValue({
+        id: 'h-admin',
+        role: 'SITE_ADMIN',
+      });
+      prisma.chapter.findUnique.mockResolvedValue({ id: 'boston' });
+      prisma.event.create.mockResolvedValue({ id: 'evt-1' });
+      const response = await POST_EVENTS(
+        new NextRequest('http://localhost/api/events', {
+          method: 'POST',
+          body: JSON.stringify({
+            title: 'Test',
+            startTime: '2026-10-25T14:00:00Z',
+            requireGithubUrl,
+          }),
+        })
+      );
+      const valid =
+        requireGithubUrl === undefined || typeof requireGithubUrl === 'boolean';
+      expect(response.status).toBe(valid ? 200 : 400);
+      if (valid) {
+        expect(prisma.event.create).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({
+              requireGithubUrl: requireGithubUrl ?? false,
+            }),
+          })
+        );
+      } else {
+        expect(prisma.event.create).not.toHaveBeenCalled();
+      }
+    }
+  );
 });
 
 describe('/api/events/[eventId]', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    prisma.eventStaff.findFirst.mockResolvedValue(null);
     mockAuth.mockReturnValue({ userId: null });
     prisma.chapterMembership.findMany.mockResolvedValue([]);
     prisma.chapterMembership.findFirst.mockResolvedValue(null);
@@ -288,6 +326,45 @@ describe('/api/events/[eventId]', () => {
     prisma.eventRegistration.findMany.mockResolvedValue([]);
     prisma.eventRegistration.findFirst.mockResolvedValue(null);
   });
+
+  it.each([true, false, undefined, 'true', null])(
+    'PATCH validates and saves the GitHub requirement for an MC: %s',
+    async requireGithubUrl => {
+      mockAuth.mockReturnValue({ userId: 'clerk-mc' });
+      prisma.hacker.findUnique.mockResolvedValue({
+        id: 'h-mc',
+        role: 'HACKER',
+      });
+      prisma.event.findUnique.mockResolvedValue({
+        id: 'evt-1',
+        chapterId: 'boston',
+      });
+      prisma.eventStaff.findFirst.mockResolvedValue({
+        role: 'MC',
+        hackerId: 'h-mc',
+      });
+      const response = await PATCH_EVENT(
+        new NextRequest('http://localhost/api/events/evt-1', {
+          method: 'PATCH',
+          body: JSON.stringify({ requireGithubUrl }),
+        }),
+        { params: { eventId: 'evt-1' } }
+      );
+      const valid =
+        requireGithubUrl === undefined || typeof requireGithubUrl === 'boolean';
+      expect(response.status).toBe(valid ? 200 : 400);
+      if (valid) {
+        const data = prisma.event.update.mock.calls[0][0].data;
+        if (requireGithubUrl === undefined) {
+          expect(data).not.toHaveProperty('requireGithubUrl');
+        } else {
+          expect(data.requireGithubUrl).toBe(requireGithubUrl);
+        }
+      } else {
+        expect(prisma.event.update).not.toHaveBeenCalled();
+      }
+    }
+  );
 
   it('GET returns 404 when missing', async () => {
     prisma.event.findFirst.mockResolvedValue(null);
