@@ -62,7 +62,7 @@ Requires workspace access. Returns the current staff list; it no longer permits 
 
 ### `POST /api/events/[eventId]/staff`
 
-Requires site admin or in-scope chapter admin.
+Requires site admin, in-scope chapter admin, or assigned event MC. MCs may only add `CO_MC` assignments and cannot change an existing MC assignment.
 
 ```json
 { "hackerId": "hacker_1", "role": "MC" }
@@ -73,6 +73,14 @@ Creates the assignment or changes its one role. Writes `EventStaffAudit` in the 
 ### `DELETE /api/events/[eventId]/staff/[staffId]`
 
 Requires site admin or in-scope chapter admin. Deletes the assignment and writes a removal audit atomically.
+
+### Email co-MC invites
+
+- `GET /api/events/[eventId]/staff/invitations`: list pending invites; requires a staff manager (site admin, in-scope chapter admin, or assigned MC).
+- `POST /api/events/[eventId]/staff/invitations`: accepts `{ "email": "person@example.com" }`, normalizes the email, saves a 7-day co-MC invite, and sends its link. Sending again renews the invite. Returns the invite and email delivery result, including a shareable link if delivery fails. No account or staff row is created at this point.
+- `DELETE /api/events/[eventId]/staff/invitations/[invitationId]`: cancels a pending invite for that event; requires a staff manager.
+- `POST /api/events/staff-invitations/[invitationId]/accept`: requires a signed-in Clerk account with a verified matching email. Claims a live invite and creates co-MC access, a staff audit, and an approved staff registration in one transaction. Preserves existing MC assignments. Returns `409` while the account webhook is pending, `403` for a wrong or unverified email, and `410` for an unavailable invite. An accepted link cannot restore removed access.
+- `/events/staff-invitations/[invitationId]`: public invite page. Prompts visitors to sign in or create an account, returns them to the invite, and accepts it after sign-in.
 
 ## Materials
 

@@ -511,4 +511,80 @@ describe('/api/events/[eventId]/staff', () => {
     expect(prisma.eventStaff.upsert).not.toHaveBeenCalled();
     expect(prisma.eventStaff.delete).not.toHaveBeenCalled();
   });
+
+  it('allows an assigned MC to add an existing person as a co-MC', async () => {
+    const { hacker: mc, staff } = buildEventStaffFixture();
+    const target = buildHacker({ id: 'new-co-mc' });
+    const event = buildEvent({ id: staff.eventId });
+    mockActor(mc, target);
+    mockMembershipLookup();
+    prisma.event.findUnique.mockResolvedValue(event);
+    prisma.eventStaff.findFirst.mockReset();
+    prisma.eventStaff.findFirst
+      .mockResolvedValueOnce(staff)
+      .mockResolvedValueOnce(null);
+    prisma.eventStaff.upsert.mockResolvedValue({
+      id: 'staff-new',
+      eventId: event.id,
+      hackerId: target.id,
+      role: 'CO_MC',
+    });
+
+    const response = await POST_EVENT_STAFF(
+      createJsonRequest(`/api/events/${event.id}/staff`, {
+        body: { hackerId: target.id, role: 'CO_MC' },
+      }),
+      createRouteContext({ eventId: event.id })
+    );
+
+    expect(response.status).toBe(201);
+    expect(prisma.eventStaff.findFirst).toHaveBeenCalledWith({
+      where: { eventId: event.id, hackerId: mc.id, role: 'MC' },
+    });
+    expect(prisma.eventStaff.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: { eventId: event.id, hackerId: target.id, role: 'CO_MC' },
+        update: {},
+      })
+    );
+  });
+
+  it.each(['MC', 'CO_MC'] as const)(
+    'does not let an MC replace an MC assignment with %s',
+    async role => {
+      const { hacker: mc, staff } = buildEventStaffFixture();
+      const event = buildEvent({ id: staff.eventId });
+      mockActor(mc);
+      mockMembershipLookup();
+      prisma.event.findUnique.mockResolvedValue(event);
+      prisma.eventStaff.findFirst.mockReset();
+      prisma.eventStaff.findFirst.mockResolvedValue(staff);
+      const response = await POST_EVENT_STAFF(
+        createJsonRequest(`/api/events/${event.id}/staff`, {
+          body: { hackerId: mc.id, role },
+        }),
+        createRouteContext({ eventId: event.id })
+      );
+      expect(response.status).toBe(403);
+      expect(prisma.eventStaff.upsert).not.toHaveBeenCalled();
+    }
+  );
+
+  it('does not let a co-MC add staff', async () => {
+    const { hacker: coMc, staff } = buildCoMcFixture();
+    const event = buildEvent({ id: staff.eventId });
+    mockActor(coMc);
+    mockMembershipLookup();
+    prisma.event.findUnique.mockResolvedValue(event);
+    prisma.eventStaff.findFirst.mockReset();
+    prisma.eventStaff.findFirst.mockResolvedValue(staff);
+    const response = await POST_EVENT_STAFF(
+      createJsonRequest(`/api/events/${event.id}/staff`, {
+        body: { hackerId: 'new-staff', role: 'CO_MC' },
+      }),
+      createRouteContext({ eventId: event.id })
+    );
+    expect(response.status).toBe(403);
+    expect(prisma.eventStaff.upsert).not.toHaveBeenCalled();
+  });
 });

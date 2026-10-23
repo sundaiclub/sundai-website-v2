@@ -97,17 +97,19 @@ Organizers can see projects attached to the event, understand project-card readi
 
 ### User Story 6 - Administrators Control Event Staff and Lifecycle Actions (Priority: P2)
 
-Site admins and chapter admins can manage event staff and lifecycle actions within their scope, while MCs and co-MCs retain operational access without receiving administrative authority.
+Site admins and chapter admins can manage event staff and lifecycle actions within their scope. Assigned MCs can add co-MCs for their event, including by email before the recipient creates an account. Co-MCs cannot assign staff.
 
-**Why this priority**: Clear administrative boundaries prevent event-scoped operational roles from silently gaining publishing or staffing power.
+**Why this priority**: Clear role boundaries let MCs add co-MCs while admins retain control of MC roles, staff removal, and event publishing.
 
 **Independent Test**: Can be tested by attempting staff assignment, event detail changes, and publish, unpublish, or cancel actions as each role across in-scope and out-of-scope chapters.
 
 **Acceptance Scenarios**:
 
 1. **Given** a site admin or the event's chapter admin manages an event, **When** they add or remove MCs and co-MCs, **Then** workspace access changes accordingly and the staff list reflects the change.
-2. **Given** an MC or co-MC has event access but no separate admin role, **When** they attempt to assign staff or change the event lifecycle, **Then** the action is denied.
-3. **Given** a chapter admin attempts to manage an event outside their chapter, **When** they request an administrative action, **Then** the action is denied without exposing private workspace information.
+2. **Given** an assigned MC has no separate admin role, **When** they add a co-MC for their event, **Then** the action succeeds. Assigning or changing MC roles, removing staff, and changing the event lifecycle remain denied.
+3. **Given** a co-MC has no separate admin role, **When** they try to assign staff, **Then** the action is denied.
+4. **Given** an MC or admin invites an email address, **When** the recipient opens the invite page, **Then** they must sign in or create an account and verify the invited email address before they get co-MC access. Wrong-email accounts, expired invites, and cancelled invites cannot get access. The sender can resend or cancel pending invites.
+5. **Given** a chapter admin attempts to manage an event outside their chapter, **When** they request an administrative action, **Then** the action is denied without exposing private workspace information.
 
 ---
 
@@ -155,7 +157,7 @@ Approved attendees, event staff, and site administrators can add a published pro
 - **FR-006**: Chapter admins MUST be able to access and administratively manage event workspaces only for their chapters.
 - **FR-007**: Assigned MCs MUST be able to edit event settings and manage event operations, communications, materials, projects, pitch controls, organizer notes, and applicant decisions for their assigned events.
 - **FR-008**: Assigned co-MCs MUST be able to manage event operations, communications, materials, projects, pitch controls, and organizer notes for their assigned events, but MUST NOT approve, waitlist, decline, block, or otherwise decide applicants.
-- **FR-009**: MC and co-MC assignments alone MUST NOT grant staff-assignment, publishing, unpublishing, cancellation, application open/close, or cross-event administrative authority; co-MC assignments alone MUST NOT grant event-settings edit authority.
+- **FR-009**: An MC assignment MUST grant co-MC assignment and email-invite access only for that event. MCs MUST NOT assign or change MC roles or remove staff. Co-MCs MUST NOT assign staff. Neither role alone grants publishing, unpublishing, cancellation, application open/close, or cross-event administrative authority; co-MC assignments alone MUST NOT grant event-settings edit authority.
 - **FR-010**: Site admins and in-scope chapter admins MUST be able to assign and remove event MCs and co-MCs.
 - **FR-011**: All workspace reads and writes MUST verify the organizer's current role and current event or chapter scope at the time of the action.
 - **FR-012**: The workspace MUST integrate the completed registration-review experience so organizer role boundaries and global-ban filtering remain unchanged.

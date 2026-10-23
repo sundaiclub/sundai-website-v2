@@ -215,6 +215,7 @@ export default function OrganizerEventOverviewPage({
 
       <EventStaffPanel
         canAssignStaff={capabilities.assignStaff}
+        canAdministerStaff={capabilities.administerEvent}
         eventId={params.eventId}
         initialStaff={workspace.staff}
       />

@@ -11,11 +11,12 @@ The workspace root. Existing event metadata, chapter, staff, registrations, and 
 - `materials EventMaterial[]`
 - `communications EventCommunication[]`
 - `staffAudits EventStaffAudit[]`
+- `staffInvitations EventStaffInvitation[]`
 
 **Rules**
 
 - Workspace access is evaluated against current site role, active chapter-admin membership, or current event staff assignment.
-- Lifecycle and staff actions remain admin-only.
+- Lifecycle actions, MC role changes, and staff removal remain admin-only. Assigned MCs can add co-MCs for their event.
 - No phase 3 attendance relation is added.
 
 ### EventStaff
@@ -88,6 +89,22 @@ Unchanged physical model: one current note per hacker and immutable revisions.
 - No public, attendee, message, material, project-public, or reporting response includes note data.
 
 ## New Entities
+
+### EventStaffInvitation
+
+A pending co-MC invite for one event and one normalized email address. The invite does not create a Hacker or grant access before account verification.
+
+**Fields**: `id`, `eventId`, `email`, `invitedById`, `acceptedById?`, `acceptedAt?`, `revokedAt?`, `expiresAt`, timestamps.
+
+**Rules**
+
+- Unique on `(eventId, email)`. Email addresses are trimmed and converted to lower case.
+- Site admins, the event's chapter admins, and assigned event MCs can create, resend, or cancel pending invites.
+- Invites expire after 7 days. Resending renews the expiry date and clears prior acceptance or cancellation state.
+- The recipient must sign in with a Clerk account that has verified the invited email address. Hacker email fields alone do not prove ownership.
+- Acceptance claims a live invite and adds event staff, a staff audit, and an approved staff registration in one transaction.
+- Acceptance preserves an existing MC role. Repeated requests do not restore staff access after removal.
+- Event deletion removes its invites. Invite links alone cannot grant access.
 
 ### EventMaterial
 

@@ -31,7 +31,7 @@ Shows:
 - whether approved-only details exist (not their content when unauthorized);
 - safe registration, project-card, pitch, material, and communication counts.
 
-Admin-only actions: edit details, publish/unpublish/cancel when supported, assign/remove staff.
+Admin-only actions: publish/unpublish/cancel when supported, assign/change MC roles, remove staff, and read staff audit history. MCs can edit event details and add co-MCs. MCs and admins can invite co-MCs by email, resend invites, and cancel pending invites. The invite page prompts recipients to sign in or create an account and requires a verified matching email.
 
 All organizers: copy public URL, open permitted sections, open focused pitch controller.
 

@@ -3,14 +3,11 @@ import { auth } from '@clerk/nextjs/server';
 import prisma from '@/lib/prisma';
 import {
   badRequest,
-  forbidden,
-  getCurrentHacker,
-  notFound,
+  requireEventStaffManager,
   requireEventWorkspaceAccess,
   unauthorized,
 } from '@/lib/eventManagementApi';
 import { approveEventStaffRegistrations } from '@/lib/eventStaffRegistrations';
-import { canManageChapterSettings } from '@/lib/eventManagementAuth';
 
 export async function GET(
   _request: Request,
@@ -43,16 +40,10 @@ export async function POST(
   { params }: { params: { eventId: string } }
 ) {
   try {
-    const actor = await getCurrentHacker();
-    if (!actor) return unauthorized();
-    const event = await prisma.event.findUnique({
-      where: { id: params.eventId },
-      select: { id: true, chapterId: true },
-    });
-    if (!event) return notFound();
-    if (!(await canManageChapterSettings(prisma, actor.id, event.chapterId))) {
-      return forbidden();
-    }
+    const access = await requireEventStaffManager(params.eventId);
+    if (access.response) return access.response;
+    const actor = access.hacker!;
+    const event = access.event!;
 
     let body: Record<string, unknown>;
     try {
@@ -68,12 +59,18 @@ export async function POST(
     }
     const hackerId = body.hackerId;
     const role = body.role;
+    if (!access.administrator && role !== 'CO_MC') {
+      return new NextResponse('Only admins can assign MCs.', { status: 403 });
+    }
 
     const result = await prisma.$transaction(async tx => {
       const existing = await tx.eventStaff.findFirst({
         where: { eventId: event.id, hackerId },
         select: { id: true, role: true },
       });
+      if (!access.administrator && existing?.role === 'MC') {
+        throw new Error('MC_ASSIGNMENT_FORBIDDEN');
+      }
       if (existing && existing.role === role) {
         await approveEventStaffRegistrations(tx, {
           eventId: event.id,
@@ -101,11 +98,14 @@ export async function POST(
           hackerId,
           role,
         },
-        update: { role },
+        update: access.administrator ? { role } : {},
         include: {
           hacker: { select: { id: true, name: true, email: true } },
         },
       });
+      if (!access.administrator && staff.role !== 'CO_MC') {
+        throw new Error('MC_ASSIGNMENT_FORBIDDEN');
+      }
       await tx.eventStaffAudit.create({
         data: {
           eventId: event.id,
@@ -128,6 +128,11 @@ export async function POST(
       status: result.created ? 201 : 200,
     });
   } catch (error) {
+    if (error instanceof Error && error.message === 'MC_ASSIGNMENT_FORBIDDEN') {
+      return new NextResponse('Only admins can change MC assignments.', {
+        status: 403,
+      });
+    }
     console.error('[EVENT_STAFF_POST]', error);
     return NextResponse.json(
       { error: 'Internal Server Error' },

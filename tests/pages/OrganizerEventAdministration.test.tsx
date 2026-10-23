@@ -191,7 +191,7 @@ describe('/organizer/events/[eventId] administration', () => {
 
   afterEach(cleanup);
 
-  it('lets MCs edit settings while keeping lifecycle and staff controls admin-only', async () => {
+  it('lets MCs add co-MCs while keeping lifecycle and MC changes admin-only', async () => {
     renderAdministration();
     expect(
       await screen.findByRole('link', { name: /edit event details/i })
@@ -214,15 +214,24 @@ describe('/organizer/events/[eventId] administration', () => {
         ...adminWorkspace.capabilities,
         administerEvent: false,
         editEventSettings: true,
-        assignStaff: false,
+        assignStaff: true,
         viewNoteHistory: false,
       },
     });
     renderAdministration();
     await screen.findByText('AI Build Night');
     expect(
-      screen.queryByRole('button', { name: /add|assign staff/i })
+      screen.getByRole('button', { name: /add|assign staff/i })
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /staff audit history/i })
     ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('combobox', { name: /change assignment/i })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /send co-MC invite/i })
+    ).toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: /publish|unpublish|cancel event/i })
     ).not.toBeInTheDocument();
@@ -246,6 +255,11 @@ describe('/organizer/events/[eventId] administration', () => {
     await screen.findByText('AI Build Night');
     expect(
       screen.queryByRole('link', { name: /edit event details/i })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', {
+        name: /add|assign staff|send co-MC invite/i,
+      })
     ).not.toBeInTheDocument();
   });
 

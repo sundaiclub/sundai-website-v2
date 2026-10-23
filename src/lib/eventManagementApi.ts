@@ -137,6 +137,39 @@ export async function requireEventSettingsManager(eventId: string) {
   return { hacker, event, response: null };
 }
 
+export async function requireEventStaffManager(eventId: string) {
+  const hacker = await getCurrentHacker();
+  if (!hacker)
+    return {
+      hacker: null,
+      event: null,
+      administrator: false,
+      response: unauthorized(),
+    };
+  const event = await prisma.event.findUnique({
+    where: { id: eventId },
+    select: { id: true, chapterId: true, title: true },
+  });
+  if (!event)
+    return { hacker, event: null, administrator: false, response: notFound() };
+  const administrator = await canManageChapterSettings(
+    prisma,
+    hacker.id,
+    event.chapterId
+  );
+  const staff = administrator
+    ? null
+    : await prisma.eventStaff.findFirst({
+        where: { eventId, hackerId: hacker.id, role: 'MC' },
+      });
+  return {
+    hacker,
+    event,
+    administrator,
+    response: administrator || staff?.role === 'MC' ? null : forbidden(),
+  };
+}
+
 async function requireCurrentEventCapability(
   eventId: string,
   canAccess: EventCapabilityCheck

@@ -169,16 +169,14 @@ describe('organizer event workspace accessibility', () => {
       .spyOn(HTMLAnchorElement.prototype, 'click')
       .mockImplementation(() => {});
     const blob = new Blob(['xlsx']);
-    global.fetch = jest
-      .fn()
-      .mockResolvedValue({
-        ok: true,
-        blob: async () => blob,
-        headers: new Headers({
-          'Content-Disposition':
-            'attachment; filename="event-accepted-attendees.xlsx"',
-        }),
-      });
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      blob: async () => blob,
+      headers: new Headers({
+        'Content-Disposition':
+          'attachment; filename="event-accepted-attendees.xlsx"',
+      }),
+    });
     URL.createObjectURL = jest.fn().mockReturnValue('blob:attendees');
     URL.revokeObjectURL = jest.fn();
     try {
@@ -305,7 +303,12 @@ describe('organizer event workspace accessibility', () => {
     const EventStaffPanel =
       require('../../src/app/organizer/events/[eventId]/staff/EventStaffPanel').default;
     render(
-      <EventStaffPanel eventId={eventId} canAssignStaff initialStaff={staff} />
+      <EventStaffPanel
+        eventId={eventId}
+        canAssignStaff
+        canAdministerStaff
+        initialStaff={staff}
+      />
     );
 
     const remove = await screen.findByRole('button', {
