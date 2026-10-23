@@ -11,6 +11,7 @@ import {
 } from '../../../../components/ManagementSurface';
 import type { HackerSelectionOption } from '@/types/hacker';
 import type { EventStaffRole } from '@/types/event-management';
+import AddCoMcByEmail from './AddCoMcByEmail';
 
 type StaffMember = {
   id: string;
@@ -36,10 +37,12 @@ type PendingStaffAssignment = {
 export default function EventStaffPanel({
   eventId,
   canAssignStaff,
+  canAdministerStaff,
   initialStaff = [],
 }: {
   eventId: string;
   canAssignStaff: boolean;
+  canAdministerStaff: boolean;
   initialStaff?: StaffMember[];
 }) {
   const classes = useManagementClasses();
@@ -106,7 +109,9 @@ export default function EventStaffPanel({
       if (!response.ok) throw new Error('Unable to load members');
       const payload = await response.json();
       setStaffCandidates(
-        Array.isArray(payload) ? payload : (payload?.hackers ?? payload?.items ?? [])
+        Array.isArray(payload)
+          ? payload
+          : (payload?.hackers ?? payload?.items ?? [])
       );
       setShowMemberSearch(true);
     } catch {
@@ -134,7 +139,9 @@ export default function EventStaffPanel({
       }
       const saved = (await response.json()) as StaffMember;
       setStaff(current => {
-        const exists = current.some(member => member.hackerId === saved.hackerId);
+        const exists = current.some(
+          member => member.hackerId === saved.hackerId
+        );
         return exists
           ? current.map(member =>
               member.hackerId === saved.hackerId ? saved : member
@@ -203,13 +210,15 @@ export default function EventStaffPanel({
             >
               {loadingCandidates ? 'Loading members…' : 'Assign staff'}
             </button>
-            <button
-              className={classes.secondaryButton}
-              onClick={loadAudits}
-              type="button"
-            >
-              Staff audit history
-            </button>
+            {canAdministerStaff && (
+              <button
+                className={classes.secondaryButton}
+                onClick={loadAudits}
+                type="button"
+              >
+                Staff audit history
+              </button>
+            )}
           </>
         ) : undefined
       }
@@ -253,7 +262,7 @@ export default function EventStaffPanel({
                   }
                   value={pendingAssignment.role}
                 >
-                  <option value="MC">MC role</option>
+                  {canAdministerStaff && <option value="MC">MC role</option>}
                   <option value="CO_MC">Co-MC role</option>
                 </select>
               </label>
@@ -291,7 +300,7 @@ export default function EventStaffPanel({
                   {member.role === 'CO_MC' ? 'Co-MC' : 'MC'}
                 </ManagementBadge>
               </div>
-              {canAssignStaff && (
+              {canAdministerStaff && (
                 <div className="flex flex-wrap gap-2">
                   <label>
                     <select
@@ -329,7 +338,19 @@ export default function EventStaffPanel({
         )}
       </div>
 
-      {canAssignStaff && audits && (
+      {canAssignStaff && (
+        <AddCoMcByEmail
+          eventId={eventId}
+          onAssigned={saved => {
+            setStaff(current => [
+              ...current.filter(member => member.hackerId !== saved.hackerId),
+              saved,
+            ]);
+          }}
+        />
+      )}
+
+      {canAdministerStaff && audits && (
         <div className="mt-5">
           <h3 className="font-bold">Immutable staff audit history</h3>
           <div className="mt-3 grid gap-2">
@@ -371,7 +392,10 @@ export default function EventStaffPanel({
       <HackerSelector
         filteredHackers={filteredStaffCandidates}
         handleAddMember={candidate => {
-          setPendingAssignment({ hacker: candidate, role: 'MC' });
+          setPendingAssignment({
+            hacker: candidate,
+            role: canAdministerStaff ? 'MC' : 'CO_MC',
+          });
           setMemberSearchTerm('');
         }}
         isDarkMode={classes.isDarkMode}

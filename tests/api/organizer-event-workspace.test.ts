@@ -187,6 +187,7 @@ describe('GET /api/events/[eventId]/workspace', () => {
           capabilities: {
             ...operationalCapabilities,
             editEventSettings: role === 'MC',
+            assignStaff: role === 'MC',
             decideApplicants,
           },
         })
@@ -199,7 +200,7 @@ describe('GET /api/events/[eventId]/workspace', () => {
       expect(body.capabilities).toMatchObject({
         administerEvent: false,
         editEventSettings: role === 'MC',
-        assignStaff: false,
+        assignStaff: role === 'MC',
         decideApplicants,
         manageOperations: true,
         sendCommunications: true,

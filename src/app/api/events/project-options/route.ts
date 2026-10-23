@@ -82,6 +82,7 @@ export async function GET(request: Request) {
       select: {
         id: true,
         title: true,
+        requireGithubUrl: true,
         startTime: true,
         endTime: true,
         image: { select: { url: true, alt: true } },

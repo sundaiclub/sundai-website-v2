@@ -321,6 +321,8 @@ function buildEventDetail(
     timezone: eventFixture.chapter.timezone,
     startTime: eventFixture.startTime,
     endTime: eventFixture.endTime,
+    judgingEnabled: false,
+    judgingSubmissionsCloseAt: null,
     publicStatus: 'OPEN',
     viewerRegistrationStatus: null,
     description: publicCalendarPayloadFixture.publicDescription,
@@ -817,7 +819,7 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
     expect(screen.queryByText(/expert mentors/i)).not.toBeInTheDocument();
   });
 
-  it('shows Info, Projects, and Pitch tabs on every event page', async () => {
+  it('shows Info, Projects, and Pitch tabs when judging is disabled', async () => {
     await renderDetailPage(buildEventDetail());
 
     expect(screen.getByRole('link', { name: 'Info' })).toHaveAttribute(
@@ -843,6 +845,107 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
     expect(screen.getByRole('link', { name: 'Pitch' })).toHaveAttribute(
       'aria-current',
       'page'
+    );
+  });
+
+  describe('when judging is enabled', () => {
+    const deadline = '2026-10-23T18:00:00.000Z';
+
+    beforeEach(() => {
+      jest.spyOn(Date, 'now').mockReturnValue(new Date(deadline).getTime());
+    });
+
+    afterEach(() => {
+      jest.restoreAllMocks();
+    });
+
+    it.each([
+      '2026-10-23T17:59:59.999Z',
+      deadline,
+      '2026-10-23T18:00:00.001Z',
+      null,
+    ])(
+      'hides Pitch with submission deadline %s and blocks its URL',
+      async closesAt => {
+        await renderDetailPage(
+          buildEventDetail({
+            judgingEnabled: true,
+            judgingSubmissionsCloseAt: closesAt,
+            viewerCanManageEvent: true,
+          }),
+          'pitch'
+        );
+
+        expect(
+          screen.queryByRole('link', { name: 'Pitch' })
+        ).not.toBeInTheDocument();
+        expect(
+          screen.queryByTestId('event-pitch-controller')
+        ).not.toBeInTheDocument();
+        expect(screen.getByRole('link', { name: 'Info' })).toHaveAttribute(
+          'aria-current',
+          'page'
+        );
+      }
+    );
+
+    it.each([
+      ['before the deadline', '2026-10-23T18:00:00.001Z', null, false],
+      ['at the deadline', deadline, null, false],
+      ['after the deadline', '2026-10-23T17:59:59.999Z', null, true],
+      [
+        'before event end without a deadline',
+        null,
+        '2026-10-23T18:00:00.001Z',
+        false,
+      ],
+      [
+        'after event end without a deadline',
+        null,
+        '2026-10-23T17:59:59.999Z',
+        true,
+      ],
+      ['without a deadline or event end', null, null, false],
+      [
+        'with a deadline after event end',
+        '2026-10-23T18:00:00.001Z',
+        '2026-10-23T17:00:00.000Z',
+        false,
+      ],
+    ] as const)(
+      'shows Projects only after submissions close: %s',
+      async (_label, closesAt, endTime, visible) => {
+        await renderDetailPage(
+          buildEventDetail({
+            judgingEnabled: true,
+            judgingSubmissionsCloseAt: closesAt,
+            endTime,
+          }),
+          'projects'
+        );
+
+        if (visible) {
+          expect(
+            screen.getByRole('link', { name: 'Projects' })
+          ).toHaveAttribute('aria-current', 'page');
+          expect(
+            screen.getByRole('heading', { name: /projects from this event/i })
+          ).toBeInTheDocument();
+          expect(mockListPublicEventProjects).toHaveBeenCalled();
+        } else {
+          expect(
+            screen.queryByRole('link', { name: 'Projects' })
+          ).not.toBeInTheDocument();
+          expect(
+            screen.queryByRole('heading', { name: /projects from this event/i })
+          ).not.toBeInTheDocument();
+          expect(screen.getByRole('link', { name: 'Info' })).toHaveAttribute(
+            'aria-current',
+            'page'
+          );
+          expect(mockListPublicEventProjects).not.toHaveBeenCalled();
+        }
+      }
     );
   });
 

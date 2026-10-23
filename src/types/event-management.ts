@@ -403,6 +403,7 @@ export type OrganizerEventListItem = {
 };
 
 export type OrganizerEventSettings = {
+  requireGithubUrl?: boolean;
   id: EntityId;
   title: string;
   timezone: string;
@@ -530,6 +531,8 @@ export interface ApplicationControlsState {
 }
 
 export interface PublicEventDetail extends PublicEventCard {
+  judgingEnabled: boolean;
+  judgingSubmissionsCloseAt: ISODateTimeString | Date | null;
   description?: string | null;
   publicProgramLabel?: string | null;
   publicSponsorText?: string | null;

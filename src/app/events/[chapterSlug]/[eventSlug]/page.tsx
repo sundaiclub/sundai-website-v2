@@ -223,9 +223,18 @@ export default async function PublicEventDetailPage({
     getViewerCheckInTicket({ eventId: event.id, clerkId: userId }),
     findViewerJudgedEvent(event.chapterSlug, event.slug, judgeToken),
   ]);
+  const submissionsCloseAt = event.judgingSubmissionsCloseAt ?? event.endTime;
+  const showProjects =
+    !event.judgingEnabled ||
+    Boolean(
+      submissionsCloseAt && new Date(submissionsCloseAt).getTime() < Date.now()
+    );
   const visibleTabs = eventTabs.filter(
     tab =>
-      (tab.id !== 'ticket' || ticket) && (tab.id !== 'judging' || judgedEvent)
+      (tab.id !== 'ticket' || ticket) &&
+      (tab.id !== 'judging' || judgedEvent) &&
+      (tab.id !== 'pitch' || !event.judgingEnabled) &&
+      (tab.id !== 'projects' || showProjects)
   );
   const requestedTab = Array.isArray(searchParams?.tab)
     ? searchParams?.tab[0]
@@ -245,7 +254,9 @@ export default async function PublicEventDetailPage({
         registrationStatus: event.viewerRegistrationStatus ?? null,
       },
     }) as Promise<PublicMaterial[]>,
-    listPublicEventProjects({ eventId: event.id, clerkId: userId }),
+    showProjects
+      ? listPublicEventProjects({ eventId: event.id, clerkId: userId })
+      : Promise.resolve([]),
   ]);
   const materials = publicMaterials(
     visibleMaterials.map(material => ({

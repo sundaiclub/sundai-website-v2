@@ -2,6 +2,10 @@ import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import prisma from '@/lib/prisma';
 import { requireEventPitchAccess } from '@/lib/eventManagementApi';
+import {
+  GITHUB_URL_REQUIRED_MESSAGE,
+  meetsGithubUrlRequirement,
+} from '@/lib/projectSubmissionRequirements';
 
 // Join queue by adding one of user's projects
 export async function POST(
@@ -30,7 +34,12 @@ export async function POST(
       where: { eventId: params.eventId },
       include: {
         event: {
-          select: { chapterId: true, startTime: true, endTime: true },
+          select: {
+            chapterId: true,
+            startTime: true,
+            endTime: true,
+            requireGithubUrl: true,
+          },
         },
       },
     });
@@ -110,6 +119,16 @@ export async function POST(
 
     if (!isOwnerOrParticipant) {
       return new NextResponse('Unauthorized', { status: 401 });
+    }
+
+    if (
+      pitchSession.event.requireGithubUrl &&
+      !meetsGithubUrlRequirement(project.githubUrl)
+    ) {
+      return NextResponse.json(
+        { message: GITHUB_URL_REQUIRED_MESSAGE },
+        { status: 400 }
+      );
     }
 
     if (confirmCrossEvent !== true) {

@@ -136,6 +136,8 @@ type PublicEventsEventRecord = {
   description?: string | null;
   startTime: Date | string;
   endTime?: Date | string | null;
+  judgingEnabled?: boolean;
+  judgingSubmissionsCloseAt?: Date | string | null;
   publicLocation?: string | null;
   status?: string | null;
   visibility?: string | null;
@@ -559,6 +561,8 @@ export function redactPublicEventForViewer(
       options.approvedCount
     ),
     description: event.description ?? null,
+    judgingEnabled: event.judgingEnabled === true,
+    judgingSubmissionsCloseAt: event.judgingSubmissionsCloseAt ?? null,
     publicProgramLabel: event.publicProgramLabel ?? event.programType ?? null,
     publicSponsorText: null,
     publicExpertText: null,

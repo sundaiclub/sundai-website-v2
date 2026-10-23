@@ -1,3 +1,4 @@
+import { projectEditLockResponse } from '@/lib/projectEditLock';
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import type { Prisma, ProjectStatus } from '@prisma/client';
@@ -81,6 +82,9 @@ export async function PATCH(
     if (!canEdit) {
       return new NextResponse('Unauthorized', { status: 401 });
     }
+
+    const locked = await projectEditLockResponse(params.projectId, isAdmin);
+    if (locked) return locked;
 
     const formData = await req.formData();
     const updateData: Prisma.ProjectUpdateInput = {};

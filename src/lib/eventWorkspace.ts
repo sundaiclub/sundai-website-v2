@@ -68,7 +68,7 @@ function projectCapabilities(
   return {
     administerEvent,
     editEventSettings: canManageEventSettingsWithContext(context),
-    assignStaff: administerEvent,
+    assignStaff: canManageEventSettingsWithContext(context),
     decideApplicants: canDecideEventApplicantsWithContext(context),
     manageOperations: canManageEventOperationsWithContext(context),
     sendCommunications: canManageEventCommunicationsWithContext(context),

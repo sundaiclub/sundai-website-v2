@@ -191,13 +191,13 @@ describe('/organizer/events/[eventId] administration', () => {
 
   afterEach(cleanup);
 
-  it('lets MCs edit settings while keeping lifecycle and staff controls admin-only', async () => {
+  it('lets MCs add co-MCs while keeping lifecycle and MC changes admin-only', async () => {
     renderAdministration();
     expect(
       await screen.findByRole('link', { name: /edit event details/i })
     ).toHaveAttribute('href', `/organizer/events/${eventId}/settings`);
     expect(
-      screen.getByRole('button', { name: /add|assign staff/i })
+      screen.getByRole('button', { name: /^(add|assign) staff$/i })
     ).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: /unpublish/i })
@@ -214,15 +214,24 @@ describe('/organizer/events/[eventId] administration', () => {
         ...adminWorkspace.capabilities,
         administerEvent: false,
         editEventSettings: true,
-        assignStaff: false,
+        assignStaff: true,
         viewNoteHistory: false,
       },
     });
     renderAdministration();
     await screen.findByText('AI Build Night');
     expect(
-      screen.queryByRole('button', { name: /add|assign staff/i })
+      screen.getByRole('button', { name: /^(add|assign) staff$/i })
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /staff audit history/i })
     ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('combobox', { name: /change assignment/i })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /add co-MC and send email/i })
+    ).toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: /publish|unpublish|cancel event/i })
     ).not.toBeInTheDocument();
@@ -247,12 +256,17 @@ describe('/organizer/events/[eventId] administration', () => {
     expect(
       screen.queryByRole('link', { name: /edit event details/i })
     ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', {
+        name: /add|assign staff|add co-MC and send email/i,
+      })
+    ).not.toBeInTheDocument();
   });
 
   it('assigns an MC or co-MC through the event-scoped staff endpoint', async () => {
     renderAdministration();
     fireEvent.click(
-      await screen.findByRole('button', { name: /add|assign staff/i })
+      await screen.findByRole('button', { name: /^(add|assign) staff$/i })
     );
     fireEvent.change(await screen.findByPlaceholderText(/search members/i), {
       target: { value: 'Casey' },

@@ -4,6 +4,7 @@ import prisma from '../../src/lib/prisma';
 
 // Mock dependencies
 jest.mock('../../src/lib/prisma', () => ({
+  judgingSubmission: { findMany: jest.fn().mockResolvedValue([]) },
   hacker: {
     findUnique: jest.fn(),
   },
@@ -46,6 +47,65 @@ describe('/api/projects/[projectId]/submit', () => {
   });
 
   describe('PATCH', () => {
+    it.each([
+      [null, true, 400],
+      ['', true, 400],
+      ['   ', true, 400],
+      ['https://gitlab.com/team/project', true, 400],
+      ['https://github.com', true, 200],
+      ['https://github.com/team', true, 200],
+      ['https://github.com/team/project/tree/main', true, 200],
+      ['https://GITHUB.COM/team/project', true, 200],
+      ['https://example.com/?link=github.com/team/project', true, 200],
+      [null, false, 200],
+    ])(
+      'checks GitHub URL %s with requirement %s (status %s)',
+      async (githubUrl, requireGithubUrl, expectedStatus) => {
+        mockPrisma.hacker.findUnique.mockResolvedValue({
+          id: mockHackerId,
+          role: 'HACKER',
+        } as any);
+        mockPrisma.project.findUnique.mockResolvedValue({
+          id: mockProjectId,
+          launchLeadId: mockHackerId,
+          githubUrl,
+          participants: [],
+        } as any);
+        (mockPrisma.event.findMany as jest.Mock).mockResolvedValue([
+          { id: 'required-event', requireGithubUrl, pitchSessions: [] },
+        ]);
+        mockPrisma.project.update.mockResolvedValue({
+          id: mockProjectId,
+          status: 'APPROVED',
+        } as any);
+
+        const response = await PATCH(
+          new NextRequest(
+            `http://localhost/api/projects/${mockProjectId}/submit`,
+            {
+              method: 'PATCH',
+              body: JSON.stringify({
+                status: 'APPROVED',
+                eventIds: ['required-event'],
+              }),
+            }
+          ),
+          { params: { projectId: mockProjectId } }
+        );
+
+        expect(response.status).toBe(expectedStatus);
+        if (expectedStatus === 400) {
+          expect(await response.json()).toEqual({
+            message:
+              'GitHub link is required. Enter a URL that contains github.com.',
+          });
+          expect(mockPrisma.project.update).not.toHaveBeenCalled();
+          expect(mockPrisma.eventProject.upsert).not.toHaveBeenCalled();
+          expect(mockPrisma.pitchProject.create).not.toHaveBeenCalled();
+        }
+      }
+    );
+
     it('should return 401 if user is not authenticated', async () => {
       mockAuth.mockReturnValue({ userId: null });
 

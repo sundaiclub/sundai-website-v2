@@ -17,7 +17,7 @@ The project-entry cutover also replaces hidden event attachment with visible pub
 - `Project` is global; `EventProject` is the event-participation boundary, while `PitchProject` links optional pitch-session state. Project creation during a relevant running event and pitch-queue entry both ensure `EventProject` exists.
 - `/pitch/[eventId]` already implements the pitch controller and recognizes MC and co-MC access.
 - AWS SES and Twilio adapters already exist in `src/lib/eventDecisionNotifications.ts`; Google Cloud Storage upload support exists in `src/lib/gcp-storage.ts`.
-- Event-settings editing is distinct from administration: assigned MCs may edit event details, while co-MCs may not; staff assignment and lifecycle actions remain limited to site admins and in-scope chapter admins. `GET /api/events/[eventId]/staff` still requires workspace authorization.
+- Event-settings editing is distinct from administration: assigned MCs may edit event details, while co-MCs may not; MC assignments, staff removal, and lifecycle actions remain limited to site admins and in-scope chapter admins. Assigned MCs can add co-MCs for their own event, including email invites for people without accounts. Email assignment reuses or creates a Hacker profile and adds an EventStaff row. The existing signup webhook links an account to that profile only after verifying its primary email. No separate invitation records are used. `GET /api/events/[eventId]/staff` still requires workspace authorization.
 - Phase 3 issue #144 is intentionally deferred. No current `Week`/`Attendance` data may be represented as event attendance or used for workspace counts/audiences.
 
 ## Technical Context

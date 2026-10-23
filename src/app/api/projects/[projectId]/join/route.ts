@@ -1,3 +1,4 @@
+import { projectEditLockResponse } from '@/lib/projectEditLock';
 import { visibleProjectsWhere } from '@/lib/projectVisibility';
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
@@ -26,6 +27,9 @@ export async function POST(
       select: { id: true },
     });
     if (!project) return new NextResponse('Project not found', { status: 404 });
+
+    const locked = await projectEditLockResponse(params.projectId, hacker.role === 'SITE_ADMIN');
+    if (locked) return locked;
 
     const { role } = await request.json();
 
@@ -87,6 +91,9 @@ export async function DELETE(
     if (!hacker) {
       return new NextResponse("Hacker not found", { status: 404 });
     }
+
+    const locked = await projectEditLockResponse(params.projectId, hacker.role === 'SITE_ADMIN');
+    if (locked) return locked;
 
     await prisma.projectToParticipant.delete({
       where: {

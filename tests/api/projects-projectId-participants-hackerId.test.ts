@@ -3,6 +3,7 @@ import { DELETE } from '../../src/app/api/projects/[projectId]/participants/[hac
 import prisma from '../../src/lib/prisma';
 
 jest.mock('../../src/lib/prisma', () => ({
+  judgingSubmission: { findMany: jest.fn().mockResolvedValue([]) },
   hacker: {
     findUnique: jest.fn(),
   },

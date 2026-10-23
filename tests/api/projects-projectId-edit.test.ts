@@ -5,6 +5,7 @@ import { uploadToS3 } from '../../src/lib/s3-images';
 
 // Mock dependencies
 jest.mock('../../src/lib/prisma', () => ({
+  judgingSubmission: { findMany: jest.fn().mockResolvedValue([]) },
   project: {
     findUnique: jest.fn(),
     update: jest.fn(),

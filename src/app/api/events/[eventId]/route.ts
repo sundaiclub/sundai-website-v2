@@ -257,7 +257,9 @@ export async function GET(
           take: 1,
           include: {
             projects: {
-              where: viewerCanManagePitch ? {} : { project: visibleProjectsWhere(userId) },
+              where: viewerCanManagePitch
+                ? {}
+                : { project: visibleProjectsWhere(userId) },
               orderBy: { position: 'asc' },
               include: {
                 pitchVotes: {
@@ -337,6 +339,7 @@ export async function PATCH(
       capacity,
       applicationMode,
       applicationRequired,
+      requireGithubUrl,
       autoPromoteWaitlist,
       approvedDetailsJson,
       applicationQuestionsJson,
@@ -389,6 +392,16 @@ export async function PATCH(
     ) {
       return NextResponse.json(
         { message: 'applicationRequired must be a boolean' },
+        { status: 400 }
+      );
+    }
+
+    if (
+      requireGithubUrl !== undefined &&
+      typeof requireGithubUrl !== 'boolean'
+    ) {
+      return NextResponse.json(
+        { message: 'requireGithubUrl must be a boolean' },
         { status: 400 }
       );
     }
@@ -511,6 +524,7 @@ export async function PATCH(
         ...(nextApplicationRequired !== undefined && {
           applicationRequired: nextApplicationRequired,
         }),
+        ...(requireGithubUrl !== undefined && { requireGithubUrl }),
         ...(autoPromoteWaitlist !== undefined && {
           autoPromoteWaitlist: Boolean(autoPromoteWaitlist),
         }),

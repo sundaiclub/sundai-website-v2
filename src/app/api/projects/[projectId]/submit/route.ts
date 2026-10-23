@@ -1,7 +1,12 @@
+import { projectEditLockResponse } from '@/lib/projectEditLock';
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import type { ProjectStatus } from '@prisma/client';
 import prisma from '@/lib/prisma';
+import {
+  GITHUB_URL_REQUIRED_MESSAGE,
+  meetsGithubUrlRequirement,
+} from '@/lib/projectSubmissionRequirements';
 
 const PROJECT_STATUSES = new Set<ProjectStatus>([
   'DRAFT',
@@ -77,6 +82,9 @@ export async function PATCH(
       return new NextResponse('Unauthorized', { status: 401 });
     }
 
+    const locked = await projectEditLockResponse(params.projectId, isAdmin);
+    if (locked) return locked;
+
     if (
       (eventIds.length === 0 && removedEventIds.length === 0) ||
       status !== 'APPROVED'
@@ -126,6 +134,7 @@ export async function PATCH(
         id: true,
         startTime: true,
         endTime: true,
+        requireGithubUrl: true,
         pitchSessions: {
           select: { id: true, phase: true, defaultPitchSec: true },
           orderBy: { createdAt: 'asc' },
@@ -144,6 +153,15 @@ export async function PATCH(
     const events = accessibleEvents.filter(event =>
       eventIds.includes(event.id)
     );
+    if (
+      events.some(event => event.requireGithubUrl) &&
+      !meetsGithubUrlRequirement(project.githubUrl)
+    ) {
+      return NextResponse.json(
+        { message: GITHUB_URL_REQUIRED_MESSAGE },
+        { status: 400 }
+      );
+    }
     const pitchEntriesToRemove =
       removedEventIds.length > 0
         ? await prisma.pitchProject.findMany({

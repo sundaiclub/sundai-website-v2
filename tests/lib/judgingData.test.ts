@@ -441,6 +441,39 @@ describe('saveProjectJudgingSubmission', () => {
     ).resolves.toBeDefined();
   });
 
+  it('allows existing answers to change after judging concludes', async () => {
+    jest.setSystemTime(new Date('2026-10-11T00:00:00.000Z'));
+    prisma.event.findUnique.mockResolvedValue({
+      ...event,
+      judgingOpen: false,
+      judgingAssignmentsPublishedAt: now,
+    });
+    prisma.judgingSubmission.findUnique.mockResolvedValue({
+      id: 'submission-1', trackId: 'track-ai',
+    });
+    await expect(saveProjectJudgingSubmission(input)).resolves.toBeDefined();
+    expect(prisma.project.update).toHaveBeenCalled();
+  });
+
+  it.each([true, false])('does not accept new submissions after scoring starts (open=%s)', async judgingOpen => {
+    prisma.event.findUnique.mockResolvedValue({
+      ...event, judgingOpen, judgingAssignmentsPublishedAt: now,
+    });
+    await expect(saveProjectJudgingSubmission(input)).rejects.toMatchObject({ status: 409 });
+    expect(prisma.judgingSubmission.upsert).not.toHaveBeenCalled();
+  });
+
+  it('keeps existing answers locked during scoring', async () => {
+    prisma.event.findUnique.mockResolvedValue({
+      ...event, judgingOpen: true, judgingAssignmentsPublishedAt: now,
+    });
+    prisma.judgingSubmission.findUnique.mockResolvedValue({
+      id: 'submission-1', trackId: 'track-ai',
+    });
+    await expect(saveProjectJudgingSubmission(input)).rejects.toMatchObject({ status: 409 });
+    expect(prisma.project.update).not.toHaveBeenCalled();
+  });
+
   it('allows only one judged event per project', async () => {
     prisma.judgingSubmission.findFirst.mockResolvedValue({
       event: { title: 'Other Demo Day' },

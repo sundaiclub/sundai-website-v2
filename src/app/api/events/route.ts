@@ -186,6 +186,7 @@ export async function POST(req: Request) {
       capacity,
       applicationMode,
       applicationRequired = true,
+      requireGithubUrl = false,
       autoPromoteWaitlist,
       approvedDetailsJson,
       applicationQuestionsJson,
@@ -235,6 +236,13 @@ export async function POST(req: Request) {
     if (!parsedApplicationMode) {
       return NextResponse.json(
         { message: 'applicationMode must be REQUIRES_APPROVAL or OPEN_RSVP' },
+        { status: 400 }
+      );
+    }
+
+    if (typeof requireGithubUrl !== 'boolean') {
+      return NextResponse.json(
+        { message: 'requireGithubUrl must be a boolean' },
         { status: 400 }
       );
     }
@@ -345,6 +353,7 @@ export async function POST(req: Request) {
             capacity: capacity === null ? null : Number(capacity),
           }),
           applicationMode: parsedApplicationMode,
+          requireGithubUrl,
           applicationRequired:
             parsedApplicationMode === 'OPEN_RSVP' ? applicationRequired : true,
           autoPromoteWaitlist: Boolean(autoPromoteWaitlist),

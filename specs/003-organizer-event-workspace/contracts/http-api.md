@@ -62,7 +62,7 @@ Requires workspace access. Returns the current staff list; it no longer permits 
 
 ### `POST /api/events/[eventId]/staff`
 
-Requires site admin or in-scope chapter admin.
+Requires site admin, in-scope chapter admin, or assigned event MC. MCs may only add `CO_MC` assignments and cannot change an existing MC assignment.
 
 ```json
 { "hackerId": "hacker_1", "role": "MC" }
@@ -73,6 +73,16 @@ Creates the assignment or changes its one role. Writes `EventStaffAudit` in the 
 ### `DELETE /api/events/[eventId]/staff/[staffId]`
 
 Requires site admin or in-scope chapter admin. Deletes the assignment and writes a removal audit atomically.
+
+### Add a co-MC by email
+
+`POST /api/events/[eventId]/staff` also accepts `{ "email": "person@example.com", "role": "CO_MC" }` instead of a hacker ID. Requires a site admin, in-scope chapter admin, or assigned event MC.
+
+The request reuses a profile with the same normalized email or creates a profile without a Clerk ID. It adds the co-MC assignment, staff audit, and approved registration in one transaction, then sends an event link. An ambiguous email returns `409` and requires selection from the member list. An email assignment cannot change an existing MC role.
+
+Returns `{ "staff": { ... }, "delivery": { "sent": true, "message": null, "link": "..." } }`. Email failure does not undo the assignment. Submitting the same email again resends the link without duplicate assignments.
+
+`/events/staff/[eventId]` prompts recipients to sign in or create an account with the email that received the link. The existing signup webhook links the verified primary email to the profile. The page reads the existing workspace endpoint and opens the workspace once access is available. It does not accept invites or write staff assignments.
 
 ## Materials
 

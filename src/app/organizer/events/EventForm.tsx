@@ -206,6 +206,7 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
   const [hasNoCapacityLimit, setHasNoCapacityLimit] = useState(false);
   const [applicationMode, setApplicationMode] = useState('REQUIRES_APPROVAL');
   const [applicationRequired, setApplicationRequired] = useState(true);
+  const [requireGithubUrl, setRequireGithubUrl] = useState(false);
   const [autoPromoteWaitlist, setAutoPromoteWaitlist] = useState(false);
   const [trackAttendance, setTrackAttendance] = useState(false);
   const [approvedAddress, setApprovedAddress] = useState('');
@@ -364,6 +365,7 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
             eventPayload.applicationMode ?? 'REQUIRES_APPROVAL'
           );
           setApplicationRequired(eventPayload.applicationRequired !== false);
+          setRequireGithubUrl(eventPayload.requireGithubUrl === true);
           setApplicationsOpen(eventPayload.applicationsOpen !== false);
           setApplicationsCloseReason(
             eventPayload.applicationsCloseReason ?? ''
@@ -772,6 +774,7 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
       timezone,
       capacity: hasNoCapacityLimit ? null : Number(capacity),
       applicationMode,
+      requireGithubUrl,
       applicationRequired:
         applicationMode !== 'OPEN_RSVP' || applicationRequired,
       autoPromoteWaitlist,
@@ -1276,6 +1279,22 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
               <span className="text-sm font-semibold">No capacity limit</span>
             </label>
           </div>
+        </ManagementSection>
+
+        <ManagementSection title="Project submissions">
+          <label className="flex items-center gap-2">
+            <input
+              checked={requireGithubUrl}
+              className={classes.checkbox}
+              onChange={event => setRequireGithubUrl(event.target.checked)}
+              type="checkbox"
+            />
+            <span className="text-sm font-semibold">Require GitHub URL</span>
+          </label>
+          <p className={`mt-2 text-sm ${classes.mutedText}`}>
+            Participants must add a URL that contains github.com before they can
+            submit a project to this event.
+          </p>
         </ManagementSection>
 
         <ManagementSection title="Approved-only details">

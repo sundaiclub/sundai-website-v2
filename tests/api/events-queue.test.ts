@@ -75,6 +75,55 @@ describe('queue endpoints', () => {
     expect(res.status).toBe(401);
   });
 
+  it.each([
+    [null, 400],
+    ['https://gitlab.com/team/project', 400],
+    ['https://github.com/team', 200],
+  ])(
+    'checks the GitHub requirement for an existing project: %s',
+    async (githubUrl, expectedStatus) => {
+      mockAuth.mockReturnValue({ userId: 'clerk-1' });
+      prisma.hacker.findUnique.mockResolvedValue({ id: 'h1', role: 'HACKER' });
+      prisma.pitchSession.findFirst.mockResolvedValue({
+        id: 'ps1',
+        phase: 'VOTING',
+        event: {
+          chapterId: 'chapter-boston',
+          startTime: new Date(Date.now() - 60_000),
+          endTime: new Date(Date.now() + 60_000),
+          requireGithubUrl: true,
+        },
+      });
+      prisma.project.findUnique.mockResolvedValue({
+        id: 'p1',
+        launchLeadId: 'h1',
+        participants: [],
+        githubUrl,
+      });
+      prisma.pitchProject.findUnique.mockResolvedValue(null);
+      prisma.pitchProject.findFirst.mockResolvedValue(null);
+      prisma.pitchProject.create.mockResolvedValue({ id: 'entry-1' });
+
+      const response = await POST_JOIN(
+        new NextRequest('http://localhost/api/events/e1/pitch/queue', {
+          method: 'POST',
+          body: JSON.stringify({ projectId: 'p1' }),
+        }),
+        { params: { eventId: 'e1' } }
+      );
+
+      expect(response.status).toBe(expectedStatus);
+      if (expectedStatus === 400) {
+        expect(await response.json()).toEqual({
+          message:
+            'GitHub link is required. Enter a URL that contains github.com.',
+        });
+        expect(prisma.eventProject.upsert).not.toHaveBeenCalled();
+        expect(prisma.pitchProject.create).not.toHaveBeenCalled();
+      }
+    }
+  );
+
   it('join rejects a project owner who is not part of the event', async () => {
     mockAuth.mockReturnValue({ userId: 'clerk-1' });
     prisma.hacker.findUnique.mockResolvedValue({

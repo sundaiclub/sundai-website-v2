@@ -1,3 +1,7 @@
+import {
+  isProjectEditLocked,
+  projectEditLockResponse,
+} from '@/lib/projectEditLock';
 import { projectReadAccessWhere } from '@/lib/projectReadAccess';
 import { JUDGE_TOKEN_HEADER } from '@/types/judging';
 import { NextResponse } from "next/server";
@@ -50,6 +54,7 @@ export async function GET(
 
     return NextResponse.json({
       ...project,
+      editLockedForJudging: await isProjectEditLocked(params.projectId),
       likes: project.likes.map((like) => ({
         hackerId: like.hackerId,
         createdAt: like.createdAt,
@@ -97,6 +102,9 @@ export async function DELETE(
     if (!isAdmin && !isLaunchLead) {
       return new NextResponse("Unauthorized", { status: 401 });
     }
+
+    const locked = await projectEditLockResponse(params.projectId, isAdmin);
+    if (locked) return locked;
 
     const pitchEntries = await prisma.pitchProject.findMany({
       where: { projectId: params.projectId },

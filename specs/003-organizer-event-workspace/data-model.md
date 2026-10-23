@@ -15,7 +15,7 @@ The workspace root. Existing event metadata, chapter, staff, registrations, and 
 **Rules**
 
 - Workspace access is evaluated against current site role, active chapter-admin membership, or current event staff assignment.
-- Lifecycle and staff actions remain admin-only.
+- Lifecycle actions, MC role changes, and staff removal remain admin-only. Assigned MCs can add co-MCs for their event.
 - No phase 3 attendance relation is added.
 
 ### EventStaff
@@ -29,6 +29,16 @@ One event-scoped operational assignment per hacker.
 - Replace `@@unique([eventId, hackerId, role])` with `@@unique([eventId, hackerId])`.
 - If historical duplicate MC/co-MC rows exist for one hacker/event, migrate to MC because it is the higher existing capability and write/retain migration evidence before applying the constraint.
 - Role changes update the one assignment and append an `EventStaffAudit` record.
+
+### Email co-MC assignment
+
+- Reuse `Hacker` and `EventStaff`. There is no separate invitation entity.
+- Normalize the email and look up profiles with the same trimmed, case-insensitive email. If none exists, create a Hacker with no Clerk ID. If more than one exists, require selection from the member list.
+- Serialize email assignments with a transaction-scoped advisory lock to avoid duplicate profiles from concurrent staff requests.
+- Create the co-MC assignment, staff audit, and approved registration in one transaction. An email assignment cannot change an MC role.
+- The existing signup webhook links the profile only after verifying the matching primary email.
+- The event link only checks existing workspace access. It cannot create or restore an assignment.
+- Email delivery failure leaves the assignment in place and returns a shareable event link. Submit the same email again to resend it.
 
 ### ChapterMembership
 

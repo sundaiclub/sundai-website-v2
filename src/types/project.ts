@@ -1,4 +1,5 @@
 export type Project = {
+  editLockedForJudging?: boolean;
   id: string;
   title: string;
   status: "DRAFT" | "PENDING" | "APPROVED";

@@ -1,3 +1,4 @@
+import { projectEditLockResponse } from '@/lib/projectEditLock';
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import prisma from '@/lib/prisma';
@@ -38,6 +39,9 @@ export async function DELETE(
     if (!canManageTeam) {
       return new NextResponse('Forbidden', { status: 403 });
     }
+
+    const locked = await projectEditLockResponse(params.projectId, currentUser.role === 'SITE_ADMIN');
+    if (locked) return locked;
 
     await prisma.projectToParticipant.delete({
       where: {

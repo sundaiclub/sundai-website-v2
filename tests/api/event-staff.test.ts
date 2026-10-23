@@ -26,12 +26,14 @@ import {
 jest.mock('@clerk/nextjs/server', () =>
   require('../utils/api-auth').mockClerkServerModule()
 );
+jest.mock('../../src/lib/eventDelivery', () => ({ sendEventEmail: jest.fn() }));
 
 jest.mock('../../src/lib/prisma', () => ({
   __esModule: true,
   default: {
     hacker: {
       findUnique: jest.fn(),
+      create: jest.fn(),
     },
     chapter: {
       findUnique: jest.fn(),
@@ -60,6 +62,7 @@ jest.mock('../../src/lib/prisma', () => ({
       create: jest.fn(),
     },
     $transaction: jest.fn(),
+    $queryRaw: jest.fn(),
   },
 }));
 
@@ -130,6 +133,10 @@ describe('/api/events/[eventId]/staff', () => {
       id: 'registration-event-staff',
     });
     prisma.eventRegistrationAudit.create.mockResolvedValue({});
+    prisma.$queryRaw.mockReset().mockResolvedValue([]);
+    require('../../src/lib/eventDelivery')
+      .sendEventEmail.mockReset()
+      .mockResolvedValue({ status: 'SENT' });
   });
 
   it('allows a site admin to assign an MC', async () => {
@@ -510,5 +517,238 @@ describe('/api/events/[eventId]/staff', () => {
     expect(removeResponse.status).toBe(403);
     expect(prisma.eventStaff.upsert).not.toHaveBeenCalled();
     expect(prisma.eventStaff.delete).not.toHaveBeenCalled();
+  });
+
+  it('allows an assigned MC to add an existing person as a co-MC', async () => {
+    const { hacker: mc, staff } = buildEventStaffFixture();
+    const target = buildHacker({ id: 'new-co-mc' });
+    const event = buildEvent({ id: staff.eventId });
+    mockActor(mc, target);
+    mockMembershipLookup();
+    prisma.event.findUnique.mockResolvedValue(event);
+    prisma.eventStaff.findFirst.mockReset();
+    prisma.eventStaff.findFirst
+      .mockResolvedValueOnce(staff)
+      .mockResolvedValueOnce(null);
+    prisma.eventStaff.upsert.mockResolvedValue({
+      id: 'staff-new',
+      eventId: event.id,
+      hackerId: target.id,
+      role: 'CO_MC',
+    });
+
+    const response = await POST_EVENT_STAFF(
+      createJsonRequest(`/api/events/${event.id}/staff`, {
+        body: { hackerId: target.id, role: 'CO_MC' },
+      }),
+      createRouteContext({ eventId: event.id })
+    );
+
+    expect(response.status).toBe(201);
+    expect(prisma.eventStaff.findFirst).toHaveBeenCalledWith({
+      where: { eventId: event.id, hackerId: mc.id, role: 'MC' },
+    });
+    expect(prisma.eventStaff.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: { eventId: event.id, hackerId: target.id, role: 'CO_MC' },
+        update: {},
+      })
+    );
+  });
+
+  it.each(['MC', 'CO_MC'] as const)(
+    'does not let an MC replace an MC assignment with %s',
+    async role => {
+      const { hacker: mc, staff } = buildEventStaffFixture();
+      const event = buildEvent({ id: staff.eventId });
+      mockActor(mc);
+      mockMembershipLookup();
+      prisma.event.findUnique.mockResolvedValue(event);
+      prisma.eventStaff.findFirst.mockReset();
+      prisma.eventStaff.findFirst.mockResolvedValue(staff);
+      const response = await POST_EVENT_STAFF(
+        createJsonRequest(`/api/events/${event.id}/staff`, {
+          body: { hackerId: mc.id, role },
+        }),
+        createRouteContext({ eventId: event.id })
+      );
+      expect(response.status).toBe(403);
+      expect(prisma.eventStaff.upsert).not.toHaveBeenCalled();
+    }
+  );
+
+  it('does not let a co-MC add staff', async () => {
+    const { hacker: coMc, staff } = buildCoMcFixture();
+    const event = buildEvent({ id: staff.eventId });
+    mockActor(coMc);
+    mockMembershipLookup();
+    prisma.event.findUnique.mockResolvedValue(event);
+    prisma.eventStaff.findFirst.mockReset();
+    prisma.eventStaff.findFirst.mockResolvedValue(staff);
+    const response = await POST_EVENT_STAFF(
+      createJsonRequest(`/api/events/${event.id}/staff`, {
+        body: { hackerId: 'new-staff', role: 'CO_MC' },
+      }),
+      createRouteContext({ eventId: event.id })
+    );
+    expect(response.status).toBe(403);
+    expect(prisma.eventStaff.upsert).not.toHaveBeenCalled();
+  });
+});
+
+describe('email co-MC assignment', () => {
+  const event = buildEvent();
+  const target = {
+    id: 'hacker-email',
+    name: 'new',
+    email: 'new@example.com',
+    clerkId: null,
+  };
+  const savedStaff = {
+    id: 'staff-email',
+    eventId: event.id,
+    hackerId: target.id,
+    role: 'CO_MC',
+    hacker: target,
+  };
+  const send = () =>
+    POST_EVENT_STAFF(
+      createJsonRequest(`/api/events/${event.id}/staff`, {
+        origin: 'https://sundai.example',
+        body: { email: ' New@Example.com ', role: 'CO_MC' },
+      }),
+      createRouteContext({ eventId: event.id })
+    );
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    resetClerkMocks();
+    mockActor(buildSiteAdmin());
+    mockMembershipLookup();
+    prisma.event.findUnique.mockResolvedValue(event);
+    prisma.eventStaff.findFirst.mockReset().mockResolvedValue(null);
+    prisma.eventStaff.upsert.mockResolvedValue(savedStaff);
+    prisma.hacker.create.mockResolvedValue(target);
+    prisma.$queryRaw.mockReset().mockResolvedValue([]);
+    prisma.$transaction.mockImplementation((operation: any) =>
+      operation(prisma)
+    );
+    prisma.eventRegistration.findUnique.mockResolvedValue(null);
+    prisma.eventRegistration.upsert.mockResolvedValue({
+      id: 'registration-email',
+    });
+    require('../../src/lib/eventDelivery')
+      .sendEventEmail.mockReset()
+      .mockResolvedValue({ status: 'SENT' });
+  });
+
+  it('creates an account-free profile, assigns co-MC access, and sends the event link', async () => {
+    const response = await send();
+    expect(response.status).toBe(201);
+    expect(prisma.hacker.create).toHaveBeenCalledWith({
+      data: { email: 'new@example.com', name: 'new', role: 'HACKER' },
+      select: { id: true },
+    });
+    expect(prisma.eventStaff.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: { eventId: event.id, hackerId: target.id, role: 'CO_MC' },
+        update: {},
+      })
+    );
+    expect(prisma.eventStaffAudit.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        staffHackerId: target.id,
+        action: 'ASSIGNED',
+        toRole: 'CO_MC',
+      }),
+    });
+    expect(prisma.eventRegistration.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
+          hackerId: target.id,
+          status: 'APPROVED',
+        }),
+      })
+    );
+    expect(
+      require('../../src/lib/eventDelivery').sendEventEmail
+    ).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: 'new@example.com',
+        body: expect.stringContaining(
+          `https://sundai.example/events/staff/${event.id}`
+        ),
+      })
+    );
+    expect((await response.json()).staff).toEqual(savedStaff);
+  });
+
+  it('reuses an existing profile with the same normalized email', async () => {
+    prisma.$queryRaw.mockResolvedValue([{ id: target.id }]);
+    expect((await send()).status).toBe(201);
+    expect(prisma.$queryRaw).toHaveBeenLastCalledWith(
+      expect.anything(),
+      'new@example.com'
+    );
+    expect(prisma.hacker.create).not.toHaveBeenCalled();
+  });
+
+  it('does not duplicate staff or audits when the email is submitted again', async () => {
+    prisma.$queryRaw.mockResolvedValue([{ id: target.id }]);
+    prisma.eventStaff.findFirst
+      .mockResolvedValueOnce(savedStaff)
+      .mockResolvedValueOnce(savedStaff);
+    expect((await send()).status).toBe(200);
+    expect(prisma.hacker.create).not.toHaveBeenCalled();
+    expect(prisma.eventStaff.upsert).not.toHaveBeenCalled();
+    expect(prisma.eventStaffAudit.create).not.toHaveBeenCalled();
+    expect(
+      require('../../src/lib/eventDelivery').sendEventEmail
+    ).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects ambiguous emails instead of assigning the wrong profile', async () => {
+    prisma.$queryRaw.mockResolvedValue([{ id: 'one' }, { id: 'two' }]);
+    expect((await send()).status).toBe(409);
+    expect(prisma.hacker.create).not.toHaveBeenCalled();
+    expect(prisma.eventStaff.upsert).not.toHaveBeenCalled();
+  });
+
+  it('does not change an existing MC role through an email assignment', async () => {
+    prisma.$queryRaw.mockResolvedValue([{ id: target.id }]);
+    prisma.eventStaff.findFirst.mockResolvedValue({
+      ...savedStaff,
+      role: 'MC',
+    });
+    expect((await send()).status).toBe(400);
+    expect(prisma.eventStaff.upsert).not.toHaveBeenCalled();
+  });
+
+  it('returns the assigned staff and event link if email delivery fails', async () => {
+    require('../../src/lib/eventDelivery').sendEventEmail.mockResolvedValue({
+      status: 'FAILED',
+    });
+    const response = await send();
+    expect(response.status).toBe(201);
+    expect((await response.json()).delivery).toMatchObject({
+      sent: false,
+      link: `https://sundai.example/events/staff/${event.id}`,
+    });
+  });
+
+  it.each([
+    { email: 'bad-email', role: 'CO_MC' },
+    { email: 'a@b.com\nBcc: person@example.com', role: 'CO_MC' },
+    { email: 'new@example.com', role: 'MC' },
+    { email: 'new@example.com', role: 'CO_MC', hackerId: 'other-person' },
+    null,
+  ])('rejects invalid or conflicting email input: %j', async body => {
+    const response = await POST_EVENT_STAFF(
+      createJsonRequest(`/api/events/${event.id}/staff`, { body }),
+      createRouteContext({ eventId: event.id })
+    );
+    expect(response.status).toBe(400);
+    expect(prisma.hacker.create).not.toHaveBeenCalled();
+    expect(prisma.eventStaff.upsert).not.toHaveBeenCalled();
   });
 });

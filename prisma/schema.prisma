@@ -433,6 +433,7 @@ model Event {
   capacity                    Int?
   applicationMode             EventApplicationMode     @default(REQUIRES_APPROVAL)
   applicationRequired         Boolean                  @default(true)
+  requireGithubUrl            Boolean                  @default(false)
   autoPromoteWaitlist         Boolean                  @default(false)
   approvedDetailsJson         Json?
   applicationQuestionsJson    Json?

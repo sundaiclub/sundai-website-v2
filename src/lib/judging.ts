@@ -96,6 +96,30 @@ export function isJudgingSubmissionWindowOpen(
   return opensAt <= now && (!closesAt || now <= closesAt);
 }
 
+export const PROJECT_JUDGING_LOCK_MESSAGE =
+  'This project is locked for judging. You can edit it after judging ends.';
+
+/** Closing scoring after assignments are published concludes judging. */
+export function hasJudgingConcluded(event: {
+  judgingAssignmentsPublishedAt: Date | string | null;
+  judgingOpen: boolean;
+}): boolean {
+  return Boolean(event.judgingAssignmentsPublishedAt) && !event.judgingOpen;
+}
+
+export function isProjectLockedForJudging(
+  event: Parameters<typeof judgingSubmissionWindow>[0] &
+    Parameters<typeof hasJudgingConcluded>[0] & { judgingEnabled: boolean },
+  now = new Date()
+): boolean {
+  if (!event.judgingEnabled || hasJudgingConcluded(event)) return false;
+  const { closesAt } = judgingSubmissionWindow(event);
+  return (
+    Boolean(event.judgingAssignmentsPublishedAt) ||
+    Boolean(closesAt && now > closesAt)
+  );
+}
+
 export function isValidJudgingScore(value: unknown): value is number {
   return (
     Number.isInteger(value) &&
