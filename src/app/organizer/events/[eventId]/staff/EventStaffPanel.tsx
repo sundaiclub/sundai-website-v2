@@ -11,7 +11,7 @@ import {
 } from '../../../../components/ManagementSurface';
 import type { HackerSelectionOption } from '@/types/hacker';
 import type { EventStaffRole } from '@/types/event-management';
-import StaffInvitations from './StaffInvitations';
+import AddCoMcByEmail from './AddCoMcByEmail';
 
 type StaffMember = {
   id: string;
@@ -338,7 +338,17 @@ export default function EventStaffPanel({
         )}
       </div>
 
-      {canAssignStaff && <StaffInvitations eventId={eventId} />}
+      {canAssignStaff && (
+        <AddCoMcByEmail
+          eventId={eventId}
+          onAssigned={saved => {
+            setStaff(current => [
+              ...current.filter(member => member.hackerId !== saved.hackerId),
+              saved,
+            ]);
+          }}
+        />
+      )}
 
       {canAdministerStaff && audits && (
         <div className="mt-5">

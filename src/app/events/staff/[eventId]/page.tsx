@@ -10,61 +10,63 @@ import {
   useManagementClasses,
 } from '@/app/components/ManagementSurface';
 
-export default function StaffInvitationPage({
+export default function EventStaffAccessPage({
   params,
 }: {
-  params: { invitationId: string };
+  params: { eventId: string };
 }) {
   const { isLoaded, isSignedIn } = useUser();
   const router = useRouter();
   const classes = useManagementClasses();
   const [message, setMessage] = useState('');
-  const [accepting, setAccepting] = useState(false);
+  const [checking, setChecking] = useState(false);
   const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
     let active = true;
     let retry: ReturnType<typeof setTimeout> | undefined;
-    setAccepting(true);
+    setChecking(true);
     setMessage('');
-    fetch(`/api/events/staff-invitations/${params.invitationId}/accept`, {
-      method: 'POST',
-    })
-      .then(async response => {
-        const payload = await response.json();
+    // The signup webhook links the verified email to the assigned profile.
+    // This read checks current access and never creates or restores staff roles.
+    fetch(`/api/events/${params.eventId}/workspace`)
+      .then(response => {
         if (!active) return;
-        if (response.ok) router.replace(payload.workspaceUrl);
-        else {
-          setMessage(payload.message ?? 'Unable to accept this invite.');
-          if (response.status === 409 && attempt < 5) {
+        if (response.ok) router.replace(`/organizer/events/${params.eventId}`);
+        else if (response.status === 401) {
+          setMessage(
+            'Your account is being prepared. Try again in a few seconds.'
+          );
+          if (attempt < 5)
             retry = setTimeout(() => setAttempt(value => value + 1), 2000);
-          }
-        }
+        } else if (response.status === 403) {
+          setMessage(
+            'This account does not have access. Sign in with the email address that received the co-MC email.'
+          );
+        } else setMessage('The event workspace is unavailable.');
       })
       .catch(() => {
-        if (active) setMessage('Unable to accept this invite. Try again.');
+        if (active) setMessage('Unable to open the event. Try again.');
       })
       .finally(() => {
-        if (active) setAccepting(false);
+        if (active) setChecking(false);
       });
     return () => {
       active = false;
       clearTimeout(retry);
     };
-  }, [isLoaded, isSignedIn, params.invitationId, router, attempt]);
+  }, [isLoaded, isSignedIn, params.eventId, router, attempt]);
 
   return (
     <ManagementPage maxWidth="max-w-2xl">
-      <ManagementSection title="Co-MC invitation">
+      <ManagementSection title="Open your event workspace">
         <p>
-          Sign in or create an account to accept your co-MC invite. Use the
-          email address that received the invite and verify it on your account.
+          Sign in or create an account with the email address that received the
+          co-MC email. Verify that email address to get access.
         </p>
-        {!isLoaded || accepting ? (
-          <p role="status">
-            {accepting ? 'Accepting your invite…' : 'Loading…'}
-          </p>
+        {!isLoaded || checking ? (
+          <p role="status">{checking ? 'Opening your event…' : 'Loading…'}</p>
         ) : !isSignedIn ? (
           <div className="mt-4">
             <SignInAction label="Sign in or create an account" />

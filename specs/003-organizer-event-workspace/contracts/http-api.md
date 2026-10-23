@@ -74,13 +74,15 @@ Creates the assignment or changes its one role. Writes `EventStaffAudit` in the 
 
 Requires site admin or in-scope chapter admin. Deletes the assignment and writes a removal audit atomically.
 
-### Email co-MC invites
+### Add a co-MC by email
 
-- `GET /api/events/[eventId]/staff/invitations`: list pending invites; requires a staff manager (site admin, in-scope chapter admin, or assigned MC).
-- `POST /api/events/[eventId]/staff/invitations`: accepts `{ "email": "person@example.com" }`, normalizes the email, saves a 7-day co-MC invite, and sends its link. Sending again renews the invite. Returns the invite and email delivery result, including a shareable link if delivery fails. No account or staff row is created at this point.
-- `DELETE /api/events/[eventId]/staff/invitations/[invitationId]`: cancels a pending invite for that event; requires a staff manager.
-- `POST /api/events/staff-invitations/[invitationId]/accept`: requires a signed-in Clerk account with a verified matching email. Claims a live invite and creates co-MC access, a staff audit, and an approved staff registration in one transaction. Preserves existing MC assignments. Returns `409` while the account webhook is pending, `403` for a wrong or unverified email, and `410` for an unavailable invite. An accepted link cannot restore removed access.
-- `/events/staff-invitations/[invitationId]`: public invite page. Prompts visitors to sign in or create an account, returns them to the invite, and accepts it after sign-in.
+`POST /api/events/[eventId]/staff` also accepts `{ "email": "person@example.com", "role": "CO_MC" }` instead of a hacker ID. Requires a site admin, in-scope chapter admin, or assigned event MC.
+
+The request reuses a profile with the same normalized email or creates a profile without a Clerk ID. It adds the co-MC assignment, staff audit, and approved registration in one transaction, then sends an event link. An ambiguous email returns `409` and requires selection from the member list. An email assignment cannot change an existing MC role.
+
+Returns `{ "staff": { ... }, "delivery": { "sent": true, "message": null, "link": "..." } }`. Email failure does not undo the assignment. Submitting the same email again resends the link without duplicate assignments.
+
+`/events/staff/[eventId]` prompts recipients to sign in or create an account with the email that received the link. The existing signup webhook links the verified primary email to the profile. The page reads the existing workspace endpoint and opens the workspace once access is available. It does not accept invites or write staff assignments.
 
 ## Materials
 

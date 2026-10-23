@@ -108,7 +108,7 @@ Site admins and chapter admins can manage event staff and lifecycle actions with
 1. **Given** a site admin or the event's chapter admin manages an event, **When** they add or remove MCs and co-MCs, **Then** workspace access changes accordingly and the staff list reflects the change.
 2. **Given** an assigned MC has no separate admin role, **When** they add a co-MC for their event, **Then** the action succeeds. Assigning or changing MC roles, removing staff, and changing the event lifecycle remain denied.
 3. **Given** a co-MC has no separate admin role, **When** they try to assign staff, **Then** the action is denied.
-4. **Given** an MC or admin invites an email address, **When** the recipient opens the invite page, **Then** they must sign in or create an account and verify the invited email address before they get co-MC access. Wrong-email accounts, expired invites, and cancelled invites cannot get access. The sender can resend or cancel pending invites.
+4. **Given** an MC or admin adds a co-MC by email, **When** the email is submitted, **Then** the system reuses or creates a Hacker profile, adds its co-MC assignment, and sends an event link. A recipient without an account must create one with that email and verify it before the existing signup webhook links the account. Opening the link does not create or restore staff assignments. Submitting the same email again resends the link without duplicate profiles or staff audits.
 5. **Given** a chapter admin attempts to manage an event outside their chapter, **When** they request an administrative action, **Then** the action is denied without exposing private workspace information.
 
 ---

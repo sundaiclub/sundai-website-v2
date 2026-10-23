@@ -11,7 +11,6 @@ The workspace root. Existing event metadata, chapter, staff, registrations, and 
 - `materials EventMaterial[]`
 - `communications EventCommunication[]`
 - `staffAudits EventStaffAudit[]`
-- `staffInvitations EventStaffInvitation[]`
 
 **Rules**
 
@@ -30,6 +29,16 @@ One event-scoped operational assignment per hacker.
 - Replace `@@unique([eventId, hackerId, role])` with `@@unique([eventId, hackerId])`.
 - If historical duplicate MC/co-MC rows exist for one hacker/event, migrate to MC because it is the higher existing capability and write/retain migration evidence before applying the constraint.
 - Role changes update the one assignment and append an `EventStaffAudit` record.
+
+### Email co-MC assignment
+
+- Reuse `Hacker` and `EventStaff`. There is no separate invitation entity.
+- Normalize the email and look up profiles with the same trimmed, case-insensitive email. If none exists, create a Hacker with no Clerk ID. If more than one exists, require selection from the member list.
+- Serialize email assignments with a transaction-scoped advisory lock to avoid duplicate profiles from concurrent staff requests.
+- Create the co-MC assignment, staff audit, and approved registration in one transaction. An email assignment cannot change an MC role.
+- The existing signup webhook links the profile only after verifying the matching primary email.
+- The event link only checks existing workspace access. It cannot create or restore an assignment.
+- Email delivery failure leaves the assignment in place and returns a shareable event link. Submit the same email again to resend it.
 
 ### ChapterMembership
 
@@ -89,22 +98,6 @@ Unchanged physical model: one current note per hacker and immutable revisions.
 - No public, attendee, message, material, project-public, or reporting response includes note data.
 
 ## New Entities
-
-### EventStaffInvitation
-
-A pending co-MC invite for one event and one normalized email address. The invite does not create a Hacker or grant access before account verification.
-
-**Fields**: `id`, `eventId`, `email`, `invitedById`, `acceptedById?`, `acceptedAt?`, `revokedAt?`, `expiresAt`, timestamps.
-
-**Rules**
-
-- Unique on `(eventId, email)`. Email addresses are trimmed and converted to lower case.
-- Site admins, the event's chapter admins, and assigned event MCs can create, resend, or cancel pending invites.
-- Invites expire after 7 days. Resending renews the expiry date and clears prior acceptance or cancellation state.
-- The recipient must sign in with a Clerk account that has verified the invited email address. Hacker email fields alone do not prove ownership.
-- Acceptance claims a live invite and adds event staff, a staff audit, and an approved staff registration in one transaction.
-- Acceptance preserves an existing MC role. Repeated requests do not restore staff access after removal.
-- Event deletion removes its invites. Invite links alone cannot grant access.
 
 ### EventMaterial
 

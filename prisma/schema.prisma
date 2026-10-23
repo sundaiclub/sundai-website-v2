@@ -80,8 +80,6 @@ model Hacker {
   staffAuditActions         EventStaffAudit[]             @relation("EventStaffAuditActor")
   judgeAssignments          EventJudge[]                  @relation("EventJudgeHacker")
   invitedJudges             EventJudge[]                  @relation("EventJudgeInviter")
-  sentStaffInvitations      EventStaffInvitation[]        @relation("StaffInvitationInviter")
-  acceptedStaffInvitations  EventStaffInvitation[]        @relation("StaffInvitationAcceptor")
   judgingSubmissions        JudgingSubmission[]           @relation("JudgingSubmissionSubmitter")
 
   @@index([clerkId])
@@ -469,7 +467,6 @@ model Event {
   materialAudits              EventMaterialAudit[]
   communications              EventCommunication[]
   staffAudits                 EventStaffAudit[]
-  staffInvitations            EventStaffInvitation[]
   judgingTracks               JudgingTrack[]
   judgingCriteria             JudgingCriterion[]
   judges                      EventJudge[]
@@ -786,25 +783,6 @@ model SmsPreferenceEvent {
 
   @@index([fromNumber, receivedAt])
   @@index([hackerId, receivedAt])
-}
-
-model EventStaffInvitation {
-  id           String   @id @default(uuid())
-  event        Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  eventId      String
-  email        String
-  invitedBy    Hacker   @relation("StaffInvitationInviter", fields: [invitedById], references: [id])
-  invitedById  String
-  acceptedBy   Hacker?  @relation("StaffInvitationAcceptor", fields: [acceptedById], references: [id])
-  acceptedById String?
-  acceptedAt   DateTime?
-  revokedAt    DateTime?
-  expiresAt    DateTime
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  @@unique([eventId, email])
-  @@index([eventId, createdAt])
 }
 
 model EventStaffAudit {

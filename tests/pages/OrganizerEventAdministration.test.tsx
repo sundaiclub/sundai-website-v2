@@ -197,7 +197,7 @@ describe('/organizer/events/[eventId] administration', () => {
       await screen.findByRole('link', { name: /edit event details/i })
     ).toHaveAttribute('href', `/organizer/events/${eventId}/settings`);
     expect(
-      screen.getByRole('button', { name: /add|assign staff/i })
+      screen.getByRole('button', { name: /^(add|assign) staff$/i })
     ).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: /unpublish/i })
@@ -221,7 +221,7 @@ describe('/organizer/events/[eventId] administration', () => {
     renderAdministration();
     await screen.findByText('AI Build Night');
     expect(
-      screen.getByRole('button', { name: /add|assign staff/i })
+      screen.getByRole('button', { name: /^(add|assign) staff$/i })
     ).toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: /staff audit history/i })
@@ -230,7 +230,7 @@ describe('/organizer/events/[eventId] administration', () => {
       screen.queryByRole('combobox', { name: /change assignment/i })
     ).not.toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: /send co-MC invite/i })
+      screen.getByRole('button', { name: /add co-MC and send email/i })
     ).toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: /publish|unpublish|cancel event/i })
@@ -258,7 +258,7 @@ describe('/organizer/events/[eventId] administration', () => {
     ).not.toBeInTheDocument();
     expect(
       screen.queryByRole('button', {
-        name: /add|assign staff|send co-MC invite/i,
+        name: /add|assign staff|add co-MC and send email/i,
       })
     ).not.toBeInTheDocument();
   });
@@ -266,7 +266,7 @@ describe('/organizer/events/[eventId] administration', () => {
   it('assigns an MC or co-MC through the event-scoped staff endpoint', async () => {
     renderAdministration();
     fireEvent.click(
-      await screen.findByRole('button', { name: /add|assign staff/i })
+      await screen.findByRole('button', { name: /^(add|assign) staff$/i })
     );
     fireEvent.change(await screen.findByPlaceholderText(/search members/i), {
       target: { value: 'Casey' },
