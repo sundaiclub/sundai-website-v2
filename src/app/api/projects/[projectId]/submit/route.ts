@@ -4,6 +4,10 @@ import { auth } from '@clerk/nextjs/server';
 import type { ProjectStatus } from '@prisma/client';
 import prisma from '@/lib/prisma';
 import {
+  projectEventAccessWhere,
+  projectEventWindowWhere,
+} from '@/lib/projectEvents';
+import {
   GITHUB_URL_REQUIRED_MESSAGE,
   meetsGithubUrlRequirement,
 } from '@/lib/projectSubmissionRequirements';
@@ -85,9 +89,13 @@ export async function PATCH(
     const locked = await projectEditLockResponse(params.projectId, isAdmin);
     if (locked) return locked;
 
+    const syncDraftEvents =
+      project.status === 'DRAFT' && Array.isArray(body?.eventIds);
     if (
-      (eventIds.length === 0 && removedEventIds.length === 0) ||
-      status !== 'APPROVED'
+      (!syncDraftEvents &&
+        eventIds.length === 0 &&
+        removedEventIds.length === 0) ||
+      (status !== 'APPROVED' && !(syncDraftEvents && status === 'DRAFT'))
     ) {
       const updatedProject = await prisma.project.update({
         where: { id: params.projectId },
@@ -101,34 +109,19 @@ export async function PATCH(
     const accessibleEvents = await prisma.event.findMany({
       where: {
         id: { in: requestedEventIds },
-        status: 'PUBLISHED',
-        ...(isAdmin
-          ? {}
-          : {
-              OR: [
-                {
-                  registrations: {
-                    some: {
-                      hackerId: currentUser.id,
-                      status: 'APPROVED' as const,
-                      cancelledAt: null,
-                    },
-                  },
-                },
-                { staff: { some: { hackerId: currentUser.id } } },
-                {
-                  chapter: {
-                    memberships: {
-                      some: {
-                        hackerId: currentUser.id,
-                        role: 'ADMIN' as const,
-                        status: 'ACTIVE' as const,
-                      },
-                    },
-                  },
-                },
-              ],
-            }),
+        ...projectEventAccessWhere(currentUser),
+        AND: [
+          {
+            OR: [
+              { id: { in: removedEventIds } },
+              // Retain existing published participation when saving later edits.
+              ...(project.status === 'APPROVED'
+                ? [{ projects: { some: { projectId: params.projectId } } }]
+                : []),
+              projectEventWindowWhere(new Date()),
+            ],
+          },
+        ],
       },
       select: {
         id: true,
@@ -145,7 +138,10 @@ export async function PATCH(
 
     if (accessibleEvents.length !== requestedEventIds.length) {
       return NextResponse.json(
-        { message: 'One or more selected events are not available to you' },
+        {
+          message:
+            'One or more selected events are unavailable or submissions have closed',
+        },
         { status: 403 }
       );
     }
@@ -154,6 +150,7 @@ export async function PATCH(
       eventIds.includes(event.id)
     );
     if (
+      status === 'APPROVED' &&
       events.some(event => event.requireGithubUrl) &&
       !meetsGithubUrlRequirement(project.githubUrl)
     ) {
@@ -186,7 +183,10 @@ export async function PATCH(
         sourceEvent.endTime >= now
     );
     const shouldJoinPitch = Boolean(
-      sourcePitch && sourceIsHappening && sourcePitch.phase !== 'FINISHED'
+      status === 'APPROVED' &&
+        sourcePitch &&
+        sourceIsHappening &&
+        sourcePitch.phase !== 'FINISHED'
     );
     const lastPitchProject = shouldJoinPitch
       ? await prisma.pitchProject.findFirst({
@@ -201,6 +201,16 @@ export async function PATCH(
         where: { id: params.projectId },
         data: { status },
       }),
+      ...(syncDraftEvents
+        ? [
+            prisma.eventProject.deleteMany({
+              where: {
+                projectId: params.projectId,
+                eventId: { notIn: eventIds },
+              },
+            }),
+          ]
+        : []),
       ...events.map(event =>
         prisma.eventProject.upsert({
           where: {

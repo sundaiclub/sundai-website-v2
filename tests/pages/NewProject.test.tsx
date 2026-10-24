@@ -251,6 +251,8 @@ describe('NewProject', () => {
         )
       )
     );
+    const createCall = (global.fetch as jest.Mock).mock.calls.find(([url]) => url === '/api/projects');
+    expect(createCall[1].body.getAll('eventIds[]')).toEqual(['event-1']);
   });
 
   it('requires a track before creating a judged project and carries it to the editor', async () => {

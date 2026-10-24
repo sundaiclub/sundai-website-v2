@@ -20,12 +20,10 @@ jest.mock('@clerk/nextjs', () => ({
 
 // Mock Next.js router
 const mockPush = jest.fn();
+const mockRouter = { push: mockPush, back: jest.fn() };
 const mockSearchParams = jest.fn(() => new URLSearchParams());
 jest.mock('next/navigation', () => ({
-  useRouter: () => ({
-    push: mockPush,
-    back: jest.fn(),
-  }),
+  useRouter: () => mockRouter,
   useParams: () => ({
     projectId: 'test-project-id',
   }),
@@ -92,7 +90,12 @@ describe('ProjectEdit', () => {
     jest.clearAllMocks();
     mockUseUserContext.mockReturnValue({
       isAdmin: true,
-      userInfo: { id: 'current-user-id', name: 'Current User', email: 'current@example.com', role: 'SITE_ADMIN' },
+      userInfo: {
+        id: 'current-user-id',
+        name: 'Current User',
+        email: 'current@example.com',
+        role: 'SITE_ADMIN',
+      },
       loading: false,
     });
     mockSearchParams.mockReturnValue(new URLSearchParams());
@@ -112,25 +115,45 @@ describe('ProjectEdit', () => {
     });
   });
 
-  it.each([false, true])('shows the judging lock to hackers and retains admin edits (admin=%s)', async isAdmin => {
-    mockUseUserContext.mockReturnValue({
-      isAdmin,
-      userInfo: { id: 'launch-lead-id', role: isAdmin ? 'SITE_ADMIN' : 'HACKER' },
-      loading: false,
-    });
-    (global.fetch as jest.Mock).mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ ...mockProject, editLockedForJudging: true }),
-    });
-    render(<ThemeProvider><ProjectEdit /></ThemeProvider>);
-    if (isAdmin) {
-      expect(await screen.findByDisplayValue('Test Project')).toBeInTheDocument();
-    } else {
-      expect(await screen.findByText('This project is locked for judging. You can edit it after judging ends.')).toBeInTheDocument();
-      expect(screen.queryByDisplayValue('Test Project')).not.toBeInTheDocument();
-      expect(screen.getByRole('link', { name: 'View project' })).toHaveAttribute('href', '/projects/test-project-id');
+  it.each([false, true])(
+    'shows the judging lock to hackers and retains admin edits (admin=%s)',
+    async isAdmin => {
+      mockUseUserContext.mockReturnValue({
+        isAdmin,
+        userInfo: {
+          id: 'launch-lead-id',
+          role: isAdmin ? 'SITE_ADMIN' : 'HACKER',
+        },
+        loading: false,
+      });
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ ...mockProject, editLockedForJudging: true }),
+      });
+      render(
+        <ThemeProvider>
+          <ProjectEdit />
+        </ThemeProvider>
+      );
+      if (isAdmin) {
+        expect(
+          await screen.findByDisplayValue('Test Project')
+        ).toBeInTheDocument();
+      } else {
+        expect(
+          await screen.findByText(
+            'This project is locked for judging. You can edit it after judging ends.'
+          )
+        ).toBeInTheDocument();
+        expect(
+          screen.queryByDisplayValue('Test Project')
+        ).not.toBeInTheDocument();
+        expect(
+          screen.getByRole('link', { name: 'View project' })
+        ).toHaveAttribute('href', '/projects/test-project-id');
+      }
     }
-  });
+  );
 
   it('should render loading state initially', () => {
     (global.fetch as jest.Mock).mockResolvedValueOnce(new Promise(() => {}));
@@ -446,10 +469,150 @@ describe('ProjectEdit', () => {
     );
     expect(JSON.parse(submitCall[1].body)).toEqual({
       status: 'APPROVED',
-      eventIds: ['event-1'],
+      eventIds: [],
       removedEventIds: [],
       sourceEventId: 'event-1',
     });
+  });
+
+  it.each([false, true])(
+    'keeps a saved draft event selected when reopened and published (judged=%s)',
+    async judged => {
+      const draft = { ...mockProject, status: 'DRAFT' };
+      let stored = false;
+      const option = () => ({
+        id: 'event-draft',
+        title: 'Draft Event',
+        chapterName: 'Boston',
+        image: null,
+        selectedByDefault: stored,
+        alreadyAdded: stored,
+        judging: judged
+          ? {
+              tracks: [
+                { id: 'track-1', name: 'AI', questions: [], description: null },
+              ],
+              submission: {
+                trackId: 'track-1',
+                answers: { additionalInfo: 'Saved details' },
+              },
+            }
+          : null,
+      });
+      mockSearchParams.mockReturnValue(
+        new URLSearchParams('eventId=event-draft')
+      );
+      (global.fetch as jest.Mock).mockImplementation(
+        (input: RequestInfo | URL, init?: RequestInit) => {
+          const url = input.toString();
+          if (url.endsWith('/submit'))
+            stored = JSON.parse(init!.body as string).eventIds.includes(
+              'event-draft'
+            );
+          return Promise.resolve({
+            ok: true,
+            json: async () =>
+              url.startsWith('/api/events/project-options')
+                ? [option()]
+                : url.startsWith('/api/projects/test-project-id')
+                  ? draft
+                  : [],
+          });
+        }
+      );
+      const first = render(
+        <ThemeProvider>
+          <ProjectEdit />
+        </ThemeProvider>
+      );
+      expect(
+        await screen.findByRole('checkbox', { name: /Draft Event/ })
+      ).toBeChecked();
+      fireEvent.click(screen.getAllByRole('button', { name: 'Save Draft' })[0]);
+      await waitFor(() =>
+        expect(mockPush).toHaveBeenCalledWith('/projects/test-project-id')
+      );
+      const saveCall = (global.fetch as jest.Mock).mock.calls.find(([url]) =>
+        url.endsWith('/submit')
+      );
+      expect(JSON.parse(saveCall[1].body)).toEqual({
+        status: 'DRAFT',
+        eventIds: ['event-draft'],
+        removedEventIds: [],
+        sourceEventId: null,
+      });
+      first.unmount();
+      mockSearchParams.mockReturnValue(new URLSearchParams());
+      mockPush.mockClear();
+      render(
+        <ThemeProvider>
+          <ProjectEdit />
+        </ThemeProvider>
+      );
+      expect(
+        await screen.findByRole('checkbox', { name: /Draft Event/ })
+      ).toBeChecked();
+      if (judged)
+        expect(screen.getByRole('combobox', { name: 'Track *' })).toHaveValue(
+          'track-1'
+        );
+      fireEvent.click(screen.getAllByRole('button', { name: 'Publish' })[0]);
+      await waitFor(() =>
+        expect(mockPush).toHaveBeenCalledWith('/projects/test-project-id')
+      );
+      const calls = (global.fetch as jest.Mock).mock.calls.filter(([url]) =>
+        url.endsWith('/submit')
+      );
+      expect(JSON.parse(calls[calls.length - 1][1].body)).toMatchObject({
+        status: 'APPROVED',
+        eventIds: ['event-draft'],
+      });
+    }
+  );
+
+  it('blocks draft save and publish if saved event selections cannot be loaded', async () => {
+    let failEvents!: (reason: Error) => void;
+    const eventRequest = new Promise((_resolve, reject) => {
+      failEvents = reject;
+    });
+    (global.fetch as jest.Mock).mockImplementation(
+      (input: RequestInfo | URL) =>
+        input.toString().startsWith('/api/events/project-options')
+          ? eventRequest
+          : Promise.resolve({
+              ok: true,
+              json: async () =>
+                input === '/api/projects/test-project-id'
+                  ? { ...mockProject, status: 'DRAFT' }
+                  : [],
+            })
+    );
+    render(
+      <ThemeProvider>
+        <ProjectEdit />
+      </ThemeProvider>
+    );
+    await screen.findByDisplayValue('Test Project');
+    for (const button of screen.getAllByRole('button', {
+      name: /^(Save Draft|Publish)$/,
+    })) {
+      expect(button).toBeDisabled();
+    }
+    failEvents(new Error('Event request failed'));
+    await waitFor(() =>
+      expect(mockToast.error).toHaveBeenCalledWith(
+        'Unable to load events. Reload the page before saving.'
+      )
+    );
+    for (const button of screen.getAllByRole('button', {
+      name: /^(Save Draft|Publish)$/,
+    })) {
+      expect(button).toBeDisabled();
+      fireEvent.click(button);
+    }
+    expect(
+      (global.fetch as jest.Mock).mock.calls.filter(([, init]) => init?.method)
+    ).toEqual([]);
   });
 
   it('shows current events and adds an approved project to a new event', async () => {

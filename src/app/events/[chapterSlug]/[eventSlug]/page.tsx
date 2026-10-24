@@ -225,10 +225,12 @@ export default async function PublicEventDetailPage({
   ]);
   const submissionsCloseAt = event.judgingSubmissionsCloseAt ?? event.endTime;
   const showProjects =
-    !event.judgingEnabled ||
-    Boolean(
-      submissionsCloseAt && new Date(submissionsCloseAt).getTime() < Date.now()
-    );
+    !event.projectsHidden &&
+    (!event.judgingEnabled ||
+      Boolean(
+        submissionsCloseAt &&
+          new Date(submissionsCloseAt).getTime() < Date.now()
+      ));
   const visibleTabs = eventTabs.filter(
     tab =>
       (tab.id !== 'ticket' || ticket) &&

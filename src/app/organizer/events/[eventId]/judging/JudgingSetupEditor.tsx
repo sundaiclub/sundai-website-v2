@@ -19,6 +19,7 @@ import type {
   JudgingCriterionConfig,
   JudgingQuestion,
 } from '@/types/judging';
+import { JUDGING_SCORE_MAX, JUDGING_SCORE_MIN } from '@/types/judging';
 
 type DraftCriterion = {
   key: string;
@@ -588,7 +589,7 @@ export default function JudgingSetupEditor({
       >
         <ManagementSection
           title="Event criteria"
-          description={`Every project is scored on these criteria from 1 to 5. Weights control how much each criterion counts toward the total.`}
+          description={`Every project is scored on these criteria from ${JUDGING_SCORE_MIN} to ${JUDGING_SCORE_MAX}. Weights control how much each criterion counts toward the total.`}
         >
           <CriteriaEditor
             criteria={draft.criteria}

@@ -469,7 +469,7 @@ export default function EventJudgingPanel({
                       </span>
                     )}
                   </legend>
-                  <div className="grid grid-cols-5 gap-1">
+                  <div className="grid grid-cols-5 gap-1 sm:grid-cols-10">
                     {Array.from(
                       { length: panel.scoreMax - panel.scoreMin + 1 },
                       (_, offset) => panel.scoreMin + offset

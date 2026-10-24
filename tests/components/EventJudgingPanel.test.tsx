@@ -16,7 +16,7 @@ const panel: JudgePanelPayload = {
   judgingOpen: true,
   assignmentsPublished: true,
   scoreMin: 1,
-  scoreMax: 5,
+  scoreMax: 10,
   tracks: [
     {
       id: 'a',

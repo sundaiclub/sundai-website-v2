@@ -532,6 +532,7 @@ export interface ApplicationControlsState {
 
 export interface PublicEventDetail extends PublicEventCard {
   judgingEnabled: boolean;
+  projectsHidden: boolean;
   judgingSubmissionsCloseAt: ISODateTimeString | Date | null;
   description?: string | null;
   publicProgramLabel?: string | null;

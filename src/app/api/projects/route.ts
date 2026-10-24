@@ -4,6 +4,10 @@ import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import prisma from '@/lib/prisma';
 import { getOrCreateCurrentWeek } from '@/lib/weeks';
+import {
+  projectEventAccessWhere,
+  projectEventWindowWhere,
+} from '@/lib/projectEvents';
 
 const ignoredDomainTags = (process.env.IGNORE_DOMAIN_TAGS || '')
   .split(',')
@@ -180,6 +184,33 @@ export async function POST(req: Request) {
       return new NextResponse('Builder not found', { status: 404 });
     }
 
+    const eventIds = Array.from(
+      new Set(
+        formData
+          .getAll('eventIds[]')
+          .filter((id): id is string => typeof id === 'string' && id.length > 0)
+      )
+    );
+    if (eventIds.length > 0) {
+      const events = await prisma.event.findMany({
+        where: {
+          ...projectEventAccessWhere(hacker),
+          id: { in: eventIds },
+          AND: [projectEventWindowWhere(new Date())],
+        },
+        select: { id: true },
+      });
+      if (events.length !== eventIds.length) {
+        return NextResponse.json(
+          {
+            message:
+              'One or more selected events are unavailable or submissions have closed',
+          },
+          { status: 403 }
+        );
+      }
+    }
+
     const currentWeek = await getOrCreateCurrentWeek();
     const isResearchSite = process.env.IS_RESEARCH_SITE === 'true';
     const hack_type = isResearchSite ? 'RESEARCH' : 'REGULAR';
@@ -190,6 +221,16 @@ export async function POST(req: Request) {
         preview,
         launchLeadId: hacker.id,
         status: 'DRAFT',
+        ...(eventIds.length > 0
+          ? {
+              eventParticipations: {
+                create: eventIds.map(eventId => ({
+                  eventId,
+                  addedById: hacker.id,
+                })),
+              },
+            }
+          : {}),
         hack_type,
         is_broken: false,
         is_starred: false,

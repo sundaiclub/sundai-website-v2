@@ -129,6 +129,7 @@ export async function GET(
         capacity: true,
         applicationMode: true,
         applicationRequired: true,
+        projectsHidden: true,
         applicationsOpen: true,
         applicationsClosedAt: true,
         applicationsCloseReason: true,

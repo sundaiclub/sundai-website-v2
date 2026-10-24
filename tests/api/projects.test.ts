@@ -222,6 +222,56 @@ describe('/api/projects', () => {
       );
     });
 
+    it.each([true, false])(
+      'stores only explicit, available draft events (available=%s)',
+      async available => {
+        mockAuth.mockReturnValue({ userId: 'test-clerk-id' });
+        mockPrisma.hacker.findUnique.mockResolvedValue(mockHacker);
+        mockPrisma.week.findFirst.mockResolvedValue({ id: 'week-1' });
+        mockPrisma.project.create.mockResolvedValue({
+          ...mockProject,
+          status: 'DRAFT',
+        });
+        mockPrisma.event.findMany.mockResolvedValue(
+          available ? [{ id: 'event-1' }] : []
+        );
+        const formData = new FormData();
+        formData.append('title', 'Draft');
+        formData.append('preview', 'Draft preview');
+        formData.append('members', '[]');
+        formData.append('eventIds[]', 'event-1');
+        formData.append('eventIds[]', 'event-1');
+        const request = new NextRequest('http://localhost/api/projects', {
+          method: 'POST',
+        });
+        request.formData = jest.fn().mockResolvedValue(formData);
+
+        expect((await POST(request)).status).toBe(available ? 200 : 403);
+        expect(mockPrisma.event.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: expect.objectContaining({
+              id: { in: ['event-1'] },
+              AND: [expect.objectContaining({ OR: expect.any(Array) })],
+            }),
+          })
+        );
+        if (available) {
+          expect(mockPrisma.project.create).toHaveBeenCalledWith(
+            expect.objectContaining({
+              data: expect.objectContaining({
+                status: 'DRAFT',
+                eventParticipations: {
+                  create: [{ eventId: 'event-1', addedById: mockHacker.id }],
+                },
+              }),
+            })
+          );
+        } else {
+          expect(mockPrisma.project.create).not.toHaveBeenCalled();
+        }
+      }
+    );
+
     it('returns 401 when user is not authenticated', async () => {
       mockAuth.mockReturnValue({ userId: null });
 
