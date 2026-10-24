@@ -175,7 +175,7 @@ export async function POST(
             message:
               delivery.status === 'SENT'
                 ? null
-                : 'The co-MC was added, but the email could not be sent. Share the link or submit the email address again.',
+              : 'The co-MC was added, but the email could not be sent. Submit the email address again to resend it.',
           },
         },
         { status: result.created ? 201 : 200 }

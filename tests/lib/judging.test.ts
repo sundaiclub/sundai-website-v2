@@ -98,9 +98,9 @@ describe('judging submission window', () => {
 });
 
 describe('judging scores', () => {
-  it('accepts whole scores from 1 to 5', () => {
-    expect([1, 5].every(isValidJudgingScore)).toBe(true);
-    expect([0, 6, 2.5, '4', null].some(isValidJudgingScore)).toBe(false);
+  it('accepts whole scores from 1 to 10', () => {
+    expect([1, 10].every(isValidJudgingScore)).toBe(true);
+    expect([0, 11, 2.5, '4', null].some(isValidJudgingScore)).toBe(false);
   });
 
   it('weights scored criteria and ignores unscored ones', () => {

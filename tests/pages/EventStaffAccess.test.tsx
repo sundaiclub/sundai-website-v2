@@ -127,10 +127,7 @@ it('adds the co-MC through the staff endpoint and updates the staff list', async
   expect(
     await screen.findByText('Co-MC added. Email sent.')
   ).toBeInTheDocument();
-  expect(screen.getByRole('link')).toHaveAttribute(
-    'href',
-    'https://example.com/events/staff/event-1'
-  );
+  expect(screen.queryByRole('link')).not.toBeInTheDocument();
   expect(global.fetch).toHaveBeenCalledWith(
     '/api/events/event-1/staff',
     expect.objectContaining({

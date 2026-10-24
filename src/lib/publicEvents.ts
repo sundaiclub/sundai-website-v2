@@ -137,6 +137,7 @@ type PublicEventsEventRecord = {
   startTime: Date | string;
   endTime?: Date | string | null;
   judgingEnabled?: boolean;
+  projectsHidden?: boolean;
   judgingSubmissionsCloseAt?: Date | string | null;
   publicLocation?: string | null;
   status?: string | null;
@@ -562,6 +563,7 @@ export function redactPublicEventForViewer(
     ),
     description: event.description ?? null,
     judgingEnabled: event.judgingEnabled === true,
+    projectsHidden: event.projectsHidden === true,
     judgingSubmissionsCloseAt: event.judgingSubmissionsCloseAt ?? null,
     publicProgramLabel: event.publicProgramLabel ?? event.programType ?? null,
     publicSponsorText: null,

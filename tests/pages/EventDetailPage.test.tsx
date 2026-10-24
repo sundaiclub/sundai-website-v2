@@ -322,6 +322,7 @@ function buildEventDetail(
     startTime: eventFixture.startTime,
     endTime: eventFixture.endTime,
     judgingEnabled: false,
+    projectsHidden: false,
     judgingSubmissionsCloseAt: null,
     publicStatus: 'OPEN',
     viewerRegistrationStatus: null,
@@ -913,13 +914,14 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
         false,
       ],
     ] as const)(
-      'shows Projects only after submissions close: %s',
+      'shows public Projects only after submissions close: %s',
       async (_label, closesAt, endTime, visible) => {
         await renderDetailPage(
           buildEventDetail({
             judgingEnabled: true,
             judgingSubmissionsCloseAt: closesAt,
             endTime,
+            projectsHidden: false,
           }),
           'projects'
         );
@@ -947,6 +949,36 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
         }
       }
     );
+  });
+
+  it.each([
+    {
+      judgingEnabled: true,
+      judgingSubmissionsCloseAt: '2026-01-01T00:00:00.000Z',
+    },
+    { judgingEnabled: true, judgingSubmissionsCloseAt: null },
+    { judgingEnabled: false, judgingSubmissionsCloseAt: null },
+  ])('hides private Projects and blocks their tab URL: %j', async settings => {
+    await renderDetailPage(
+      buildEventDetail({
+        ...settings,
+        endTime: '2026-01-01T00:00:00.000Z',
+        projectsHidden: true,
+      }),
+      'projects'
+    );
+
+    expect(
+      screen.queryByRole('link', { name: 'Projects' })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: /projects from this event/i })
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Info' })).toHaveAttribute(
+      'aria-current',
+      'page'
+    );
+    expect(mockListPublicEventProjects).not.toHaveBeenCalled();
   });
 
   it('uses project Markdown spacing for the event description', async () => {

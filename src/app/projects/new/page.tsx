@@ -166,6 +166,9 @@ export default function NewProject() {
       formData.append('title', project.title);
       formData.append('preview', project.preview);
       formData.append('launchLeadId', project.launchLeadId);
+      selectedEventIds.forEach(eventId =>
+        formData.append('eventIds[]', eventId)
+      );
       formData.append(
         'members',
         JSON.stringify(

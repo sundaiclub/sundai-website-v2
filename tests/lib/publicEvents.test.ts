@@ -195,23 +195,29 @@ function buildRegistration(
 }
 
 describe('public event helpers', () => {
-  it('includes judging settings in public event details', () => {
-    const closesAt = new Date('2026-10-23T18:00:00.000Z');
-    const event = redactPublicEventForViewer(
-      buildPublicEvent({
-        judgingEnabled: true,
-        judgingSubmissionsCloseAt: closesAt,
-      })
-    );
+  it.each([true, false])(
+    'includes project visibility %s in public event details',
+    projectsHidden => {
+      const closesAt = new Date('2026-10-23T18:00:00.000Z');
+      const event = redactPublicEventForViewer(
+        buildPublicEvent({
+          judgingEnabled: true,
+          projectsHidden,
+          judgingSubmissionsCloseAt: closesAt,
+        })
+      );
 
-    expect(event.judgingEnabled).toBe(true);
-    expect(event.judgingSubmissionsCloseAt).toEqual(closesAt);
-  });
+      expect(event.judgingEnabled).toBe(true);
+      expect(event.projectsHidden).toBe(projectsHidden);
+      expect(event.judgingSubmissionsCloseAt).toEqual(closesAt);
+    }
+  );
 
   it('returns disabled judging settings for events without judging', () => {
     const event = redactPublicEventForViewer(buildPublicEvent());
 
     expect(event.judgingEnabled).toBe(false);
+    expect(event.projectsHidden).toBe(false);
     expect(event.judgingSubmissionsCloseAt).toBeNull();
   });
 

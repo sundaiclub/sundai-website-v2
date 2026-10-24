@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getCurrentHacker, unauthorized } from '@/lib/eventManagementApi';
+import { loadProjectJudgingOptions } from '@/lib/judgingData';
 import {
-  judgingSubmissionWindowWhere,
-  loadProjectJudgingOptions,
-} from '@/lib/judgingData';
+  projectEventAccessWhere,
+  projectEventWindowWhere,
+} from '@/lib/projectEvents';
 
 export const dynamic = 'force-dynamic';
 
@@ -37,47 +38,8 @@ export async function GET(request: Request) {
 
     const events = await prisma.event.findMany({
       where: {
-        status: 'PUBLISHED',
-        AND: [
-          {
-            // Judging events may override the window projects are accepted in.
-            OR: [
-              {
-                judgingEnabled: false,
-                startTime: { lte: now },
-                endTime: { gte: now },
-              },
-              judgingSubmissionWindowWhere(now),
-            ],
-          },
-        ],
-        ...(isSiteAdmin
-          ? {}
-          : {
-              OR: [
-                {
-                  registrations: {
-                    some: {
-                      hackerId: hacker.id,
-                      status: 'APPROVED' as const,
-                      cancelledAt: null,
-                    },
-                  },
-                },
-                { staff: { some: { hackerId: hacker.id } } },
-                {
-                  chapter: {
-                    memberships: {
-                      some: {
-                        hackerId: hacker.id,
-                        role: 'ADMIN' as const,
-                        status: 'ACTIVE' as const,
-                      },
-                    },
-                  },
-                },
-              ],
-            }),
+        ...projectEventAccessWhere(hacker),
+        AND: [projectEventWindowWhere(now)],
       },
       select: {
         id: true,

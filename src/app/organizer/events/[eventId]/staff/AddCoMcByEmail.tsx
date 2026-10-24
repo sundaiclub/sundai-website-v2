@@ -1,7 +1,11 @@
 'use client';
 
 import { useState, type FormEvent } from 'react';
-import { useManagementClasses } from '@/app/components/ManagementSurface';
+import {
+  ManagementAlert,
+  useManagementClasses,
+  type ManagementTone,
+} from '@/app/components/ManagementSurface';
 import type { EventWorkspaceStaffMember } from '@/types/event-workspace';
 
 export default function AddCoMcByEmail({
@@ -15,13 +19,12 @@ export default function AddCoMcByEmail({
   const [email, setEmail] = useState('');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
-  const [link, setLink] = useState('');
+  const [tone, setTone] = useState<ManagementTone>('success');
 
   async function submit(event: FormEvent) {
     event.preventDefault();
     setBusy(true);
     setMessage('');
-    setLink('');
     try {
       const response = await fetch(`/api/events/${eventId}/staff`, {
         method: 'POST',
@@ -33,13 +36,14 @@ export default function AddCoMcByEmail({
         throw new Error(payload.message ?? 'Unable to add the co-MC.');
       onAssigned({ ...payload.staff, name: payload.staff.hacker.name });
       setEmail('');
+      setTone(payload.delivery.sent ? 'success' : 'warning');
       setMessage(
         payload.delivery.sent
           ? 'Co-MC added. Email sent.'
           : payload.delivery.message
       );
-      setLink(payload.delivery.link);
     } catch (error) {
+      setTone('danger');
       setMessage(
         error instanceof Error ? error.message : 'Unable to add the co-MC.'
       );
@@ -79,14 +83,10 @@ export default function AddCoMcByEmail({
           Add co-MC and send email
         </button>
       </form>
-      {message && <p role="status">{message}</p>}
-      {link && (
-        <p className="break-all text-sm">
-          Event link:{' '}
-          <a className="underline" href={link}>
-            {link}
-          </a>
-        </p>
+      {message && (
+        <ManagementAlert tone={tone}>
+          <span role="status">{message}</span>
+        </ManagementAlert>
       )}
     </div>
   );

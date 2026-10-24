@@ -72,6 +72,7 @@ function ButtonPanel({
   handlePublish,
   saving,
   publishing,
+  eventsReady,
   isDraft,
   contextual,
 }: {
@@ -82,6 +83,7 @@ function ButtonPanel({
   handlePublish: () => void;
   saving: boolean;
   publishing: boolean;
+  eventsReady: boolean;
   isDraft: boolean;
   contextual: boolean;
 }) {
@@ -100,7 +102,7 @@ function ButtonPanel({
       {!contextual && (
         <button
           onClick={handleSave}
-          disabled={saving || publishing}
+          disabled={saving || publishing || !eventsReady}
           className={`px-4 py-2 ${
             isDraft
               ? isDarkMode
@@ -124,7 +126,7 @@ function ButtonPanel({
       {isDraft && (
         <button
           onClick={handlePublish}
-          disabled={saving || publishing}
+          disabled={saving || publishing || !eventsReady}
           className={`px-4 py-2 ${
             isDarkMode
               ? 'bg-green-600 hover:bg-green-700'
@@ -173,6 +175,7 @@ export default function ProjectEditPage() {
   const { isAdmin, userInfo } = useUserContext();
   const { isDarkMode } = useTheme();
   const [project, setProject] = useState<Project | null>(null);
+  const [eventsReady, setEventsReady] = useState(false);
   const [eventOptions, setEventOptions] = useState<ProjectEventOption[]>([]);
   const [selectedEventIds, setSelectedEventIds] =
     useState<string[]>(contextualEventIds);
@@ -293,6 +296,7 @@ export default function ProjectEditPage() {
   useEffect(() => {
     if (!params?.projectId) return;
 
+    setEventsReady(false);
     fetch(
       `/api/events/project-options?projectId=${encodeURIComponent(params.projectId)}`
     )
@@ -313,10 +317,11 @@ export default function ProjectEditPage() {
                 .filter(event => event.selectedByDefault)
                 .map(event => event.id),
             ])
-          ),
+          ).filter(id => events.some(event => event.id === id)),
           events
         );
         setSelectedEventIds(selectedIds);
+        setEventsReady(true);
         const submission = events.find(
           event => selectedIds.includes(event.id) && event.judging?.submission
         )?.judging?.submission;
@@ -336,7 +341,10 @@ export default function ProjectEditPage() {
           setJudgingTrackId(contextualTrack?.id ?? '');
         }
       })
-      .catch(error => console.error('Error fetching current events:', error));
+      .catch(error => {
+        console.error('Error fetching current events:', error);
+        toast.error('Unable to load events. Reload the page before saving.');
+      });
   }, [
     contextualEventIdsKey,
     contextualJudgingEventId,
@@ -535,8 +543,9 @@ export default function ProjectEditPage() {
         .map(event => event.id);
 
       if (
-        project.status === 'APPROVED' &&
-        (selectedEventIds.length > 0 || removedEventIds.length > 0)
+        project.status === 'DRAFT' ||
+        (project.status === 'APPROVED' &&
+          (selectedEventIds.length > 0 || removedEventIds.length > 0))
       ) {
         const eventResponse = await fetch(
           `/api/projects/${params?.projectId}/submit`,
@@ -544,7 +553,7 @@ export default function ProjectEditPage() {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              status: 'APPROVED',
+              status: project.status,
               eventIds: selectedEventIds,
               removedEventIds,
               sourceEventId: null,
@@ -875,6 +884,7 @@ export default function ProjectEditPage() {
             handlePublish={handlePublish}
             saving={saving}
             publishing={publishing}
+            eventsReady={eventsReady}
             isDraft={project?.status === 'DRAFT'}
             contextual={contextual}
           />
@@ -1376,6 +1386,7 @@ export default function ProjectEditPage() {
             handlePublish={handlePublish}
             saving={saving}
             publishing={publishing}
+            eventsReady={eventsReady}
             isDraft={project?.status === 'DRAFT'}
             contextual={contextual}
           />

@@ -1,7 +1,7 @@
 import type { EntityId } from './event-management';
 
 export const JUDGING_SCORE_MIN = 1;
-export const JUDGING_SCORE_MAX = 5;
+export const JUDGING_SCORE_MAX = 10;
 export const ADDITIONAL_INFO_KEY = 'additionalInfo';
 /** Query parameter that carries a judge's magic-link token. */
 export const JUDGE_TOKEN_PARAM = 'judge';

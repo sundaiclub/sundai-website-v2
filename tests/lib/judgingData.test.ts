@@ -158,7 +158,7 @@ describe('saveJudgeReview', () => {
 
   it('rejects out-of-range scores and criteria from other tracks', async () => {
     await expect(
-      saveJudgeReview({ ...input, scores: { 'crit-idea': 6 } })
+      saveJudgeReview({ ...input, scores: { 'crit-idea': 11 } })
     ).rejects.toBeInstanceOf(JudgingError);
     prisma.judgingCriterion.findMany.mockResolvedValue([
       eventCriterion,
