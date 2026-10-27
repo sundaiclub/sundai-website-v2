@@ -1,3 +1,8 @@
+jest.mock('next/navigation', () => ({
+  ...jest.requireActual('next/navigation'),
+  useParams: () => ({ chapterSlug: 'boston' }),
+}));
+
 import React from 'react';
 import {
   fireEvent,
@@ -125,7 +130,7 @@ function mockSignedOut() {
 }
 
 function renderChapterPage() {
-  render(<ChapterLandingPage params={{ chapterSlug: 'boston' }} />);
+  render(<ChapterLandingPage />);
 }
 
 describe('/chapters/[chapterSlug] public chapter page', () => {

@@ -125,8 +125,9 @@ async function resolveChapterIdentifier(chapterIdOrSlug: string) {
 
 export async function GET(
   _req: Request,
-  { params }: { params: { chapterId: string } }
+  props: { params: Promise<{ chapterId: string }> }
 ) {
+  const params = await props.params;
   try {
     const now = new Date();
     const hacker = await getCurrentHacker();
@@ -270,8 +271,9 @@ export async function GET(
 
 export async function PATCH(
   req: Request,
-  { params }: { params: { chapterId: string } }
+  props: { params: Promise<{ chapterId: string }> }
 ) {
+  const params = await props.params;
   try {
     const now = new Date();
     const resolvedChapter = await resolveChapterIdentifier(params.chapterId);

@@ -1,5 +1,7 @@
 'use client';
 
+import { useParams } from 'next/navigation';
+
 import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
@@ -33,11 +35,8 @@ function firstMembership(
   return chapter?.viewerMembership ?? null;
 }
 
-export default function ChapterLandingPage({
-  params,
-}: {
-  params: { chapterSlug: string };
-}) {
+export default function ChapterLandingPage() {
+  const params = useParams<{ chapterSlug: string }>();
   const classes = useManagementClasses();
   const { isAdmin, userInfo } = useUserContext();
   const [chapter, setChapter] = useState<ChapterLanding | null>(null);

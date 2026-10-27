@@ -6,8 +6,9 @@ import type { JsonObject } from '@/types/event-management';
 
 export async function PATCH(
   req: Request,
-  { params }: { params: { chapterId: string } }
+  props: { params: Promise<{ chapterId: string }> }
 ) {
+  const params = await props.params;
   try {
     const hacker = await getCurrentHacker();
     if (!hacker) return new NextResponse('Unauthorized', { status: 401 });

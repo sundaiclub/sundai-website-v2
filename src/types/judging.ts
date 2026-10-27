@@ -117,6 +117,7 @@ export interface JudgePanelPayload {
   judge: { id: EntityId; name: string | null; email: string };
   judgingOpen: boolean;
   assignmentsPublished: boolean;
+  requireGithubUrl: boolean;
   scoreMin: number;
   scoreMax: number;
   tracks: Array<{

@@ -18,7 +18,10 @@ jest.mock('@clerk/nextjs', () => ({
   useUser: () => mockUseUser(),
   useClerk: () => ({ openSignIn: mockOpenSignIn }),
 }));
-jest.mock('next/navigation', () => ({ useRouter: () => mockRouter }));
+jest.mock('next/navigation', () => ({
+  useRouter: () => mockRouter,
+  useParams: () => ({ eventId: 'event-1' }),
+}));
 jest.mock('../../src/app/contexts/ThemeContext', () => ({
   useTheme: () => ({ isDarkMode: false }),
 }));
@@ -43,7 +46,7 @@ afterEach(() => {
 });
 
 it('returns new accounts to the event access page after signup', () => {
-  render(<EventStaffAccessPage params={{ eventId: 'event-1' }} />);
+  render(<EventStaffAccessPage />);
   fireEvent.click(
     screen.getByRole('button', { name: 'Sign in or create an account' })
   );
@@ -57,7 +60,7 @@ it('returns new accounts to the event access page after signup', () => {
 it('opens the workspace after sign-in using the existing permission check', async () => {
   mockUseUser.mockReturnValue({ isLoaded: true, isSignedIn: true });
   (global.fetch as jest.Mock).mockImplementation(() => response({}));
-  render(<EventStaffAccessPage params={{ eventId: 'event-1' }} />);
+  render(<EventStaffAccessPage />);
   await waitFor(() =>
     expect(mockReplace).toHaveBeenCalledWith('/organizer/events/event-1')
   );
@@ -67,7 +70,7 @@ it('opens the workspace after sign-in using the existing permission check', asyn
 it('does not grant access to a different account or restore a removed assignment', async () => {
   mockUseUser.mockReturnValue({ isLoaded: true, isSignedIn: true });
   (global.fetch as jest.Mock).mockImplementation(() => response(null, 403));
-  render(<EventStaffAccessPage params={{ eventId: 'event-1' }} />);
+  render(<EventStaffAccessPage />);
   expect(
     await screen.findByText(/this account does not have access/i)
   ).toBeInTheDocument();
@@ -82,7 +85,7 @@ it('waits for the signup webhook to link the account before opening the workspac
   (global.fetch as jest.Mock)
     .mockResolvedValueOnce({ ok: false, status: 401 })
     .mockResolvedValueOnce({ ok: true, status: 200 });
-  render(<EventStaffAccessPage params={{ eventId: 'event-1' }} />);
+  render(<EventStaffAccessPage />);
   await act(async () => {
     await Promise.resolve();
   });

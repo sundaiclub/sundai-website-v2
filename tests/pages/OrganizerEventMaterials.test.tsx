@@ -144,7 +144,7 @@ function mockMaterialsFetch(
   }) as jest.Mock;
 }
 
-function loadPage(): React.ComponentType<{ params: { eventId: string } }> {
+function loadPage(): (props: { params: Promise<{ eventId: string }> }) => Promise<React.ReactElement> {
   try {
     return require('../../src/app/organizer/events/[eventId]/materials/page')
       .default;
@@ -155,9 +155,9 @@ function loadPage(): React.ComponentType<{ params: { eventId: string } }> {
   }
 }
 
-function renderPage() {
+async function renderPage() {
   const Page = loadPage();
-  return render(<Page params={{ eventId }} />);
+  return render(await Page({ params: Promise.resolve({ eventId }) }));
 }
 
 function fetchBody(path: string, method: string) {
@@ -178,7 +178,7 @@ describe('/organizer/events/[eventId]/materials', () => {
   afterEach(cleanup);
 
   it('shows the upload policy before file selection and labels visibility and availability', async () => {
-    renderPage();
+    await renderPage();
 
     expect(await screen.findByText('Public schedule')).toBeInTheDocument();
     const policy = screen.getByRole('heading', {
@@ -198,7 +198,7 @@ describe('/organizer/events/[eventId]/materials', () => {
   });
 
   it('creates a scheme-free link with organizer-selected visibility and ordering', async () => {
-    renderPage();
+    await renderPage();
     await screen.findByText('Public schedule');
 
     fireEvent.click(screen.getByRole('button', { name: /add material/i }));
@@ -235,7 +235,7 @@ describe('/organizer/events/[eventId]/materials', () => {
       [publicLink],
       'Material link: HTTP links are not supported. Use HTTPS or omit the protocol.'
     );
-    renderPage();
+    await renderPage();
     await screen.findByText('Public schedule');
 
     fireEvent.click(screen.getByRole('button', { name: /add material/i }));
@@ -253,7 +253,7 @@ describe('/organizer/events/[eventId]/materials', () => {
   });
 
   it('uploads a file through an intent before finalizing the material record', async () => {
-    renderPage();
+    await renderPage();
     await screen.findByText('Public schedule');
 
     fireEvent.click(screen.getByRole('button', { name: /add material/i }));
@@ -301,7 +301,7 @@ describe('/organizer/events/[eventId]/materials', () => {
   });
 
   it('supports ordering changes and persists the new position', async () => {
-    renderPage();
+    await renderPage();
     await screen.findByText('Attendee brief');
 
     fireEvent.click(
@@ -320,12 +320,12 @@ describe('/organizer/events/[eventId]/materials', () => {
 
   it('renders empty and load-error states without stale material rows', async () => {
     mockMaterialsFetch([]);
-    renderPage();
+    await renderPage();
     expect(await screen.findByText(/no materials/i)).toBeInTheDocument();
 
     cleanup();
     global.fetch = jest.fn(() => jsonResponse({ error: 'Unavailable' }, 503));
-    renderPage();
+    await renderPage();
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent(/materials.*unavailable/i);
     expect(screen.queryByText('Public schedule')).not.toBeInTheDocument();
@@ -333,7 +333,7 @@ describe('/organizer/events/[eventId]/materials', () => {
 
   it('requires confirmation and removes a material through the event-scoped API', async () => {
     const confirm = jest.spyOn(window, 'confirm').mockReturnValue(true);
-    renderPage();
+    await renderPage();
     await screen.findByText('Sponsor contacts');
 
     fireEvent.click(

@@ -6,8 +6,9 @@ import { judgingErrorResponse, loadJudgingConfig } from '@/lib/judgingData';
 
 export async function POST(
   request: Request,
-  { params }: { params: { eventId: string; judgeId: string } }
+  props: { params: Promise<{ eventId: string; judgeId: string }> }
 ) {
+  const params = await props.params;
   try {
     const access = await requireEventJudgingManager(params.eventId);
     if (access.response) return access.response;

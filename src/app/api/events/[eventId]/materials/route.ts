@@ -12,7 +12,7 @@ import {
   listVisibleEventMaterials,
 } from '@/lib/eventMaterials';
 
-type RouteContext = { params: { eventId: string } };
+type RouteContext = { params: Promise<{ eventId: string }> };
 
 async function getMaterialViewer(eventId: string) {
   const hacker = await getCurrentHacker();
@@ -65,7 +65,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
-export async function GET(_request: Request, { params }: RouteContext) {
+export async function GET(_request: Request, props: RouteContext) {
+  const params = await props.params;
   try {
     const viewer = await getMaterialViewer(params.eventId);
     if (viewer === null) {
@@ -95,7 +96,8 @@ export async function GET(_request: Request, { params }: RouteContext) {
   }
 }
 
-export async function POST(request: Request, { params }: RouteContext) {
+export async function POST(request: Request, props: RouteContext) {
+  const params = await props.params;
   try {
     const viewer = await getMaterialViewer(params.eventId);
     if (!viewer?.hacker) {

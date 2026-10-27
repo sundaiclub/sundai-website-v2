@@ -7,9 +7,10 @@ import {
   updateEventJudge,
 } from '@/lib/judgingData';
 
-type JudgeRouteContext = { params: { eventId: string; judgeId: string } };
+type JudgeRouteContext = { params: Promise<{ eventId: string; judgeId: string }> };
 
-export async function PATCH(request: Request, { params }: JudgeRouteContext) {
+export async function PATCH(request: Request, props: JudgeRouteContext) {
+  const params = await props.params;
   try {
     const access = await requireEventJudgingManager(params.eventId);
     if (access.response) return access.response;
@@ -36,7 +37,8 @@ export async function PATCH(request: Request, { params }: JudgeRouteContext) {
   }
 }
 
-export async function DELETE(_request: Request, { params }: JudgeRouteContext) {
+export async function DELETE(_request: Request, props: JudgeRouteContext) {
+  const params = await props.params;
   try {
     const access = await requireEventJudgingManager(params.eventId);
     if (access.response) return access.response;

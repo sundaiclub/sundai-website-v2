@@ -10,9 +10,10 @@ import {
 import { createEmailBatches, publishEmailBatches } from '@/lib/emailQueue';
 
 export const runtime = 'nodejs';
-type Context = { params: { emailId: string } };
+type Context = { params: Promise<{ emailId: string }> };
 
-export async function GET(request: Request, { params }: Context) {
+export async function GET(request: Request, props: Context) {
+  const params = await props.params;
   const { response } = await requireSiteAdmin();
   if (response) return response;
   const ids = new URL(request.url).searchParams.get('batches')?.split(',');
@@ -33,7 +34,8 @@ export async function GET(request: Request, { params }: Context) {
   });
 }
 
-export async function PATCH(request: Request, { params }: Context) {
+export async function PATCH(request: Request, props: Context) {
+  const params = await props.params;
   const { response } = await requireSiteAdmin();
   if (response) return response;
   const draft = parseWeeklyEmailDraft(await request.json().catch(() => null));
@@ -57,7 +59,8 @@ export async function PATCH(request: Request, { params }: Context) {
   return NextResponse.json({ id: params.emailId, ...draft });
 }
 
-export async function POST(request: Request, { params }: Context) {
+export async function POST(request: Request, props: Context) {
+  const params = await props.params;
   const { hacker, response } = await requireSiteAdmin();
   if (response) return response;
   const input = await request.json().catch(() => null);

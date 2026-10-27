@@ -39,10 +39,11 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 export async function GET(
   request: Request,
-  { params }: { params: { hackerId: string } }
+  props: { params: Promise<{ hackerId: string }> }
 ) {
+  const params = await props.params;
   try {
-    const { userId } = auth();
+    const { userId } = await auth();
     const projectVisibility = visibleProjectsWhere(userId);
     const hacker = await prisma.hacker.findUnique({
       where: { id: params.hackerId },
@@ -119,10 +120,11 @@ export async function GET(
 
 export async function PATCH(
   request: Request,
-  { params }: { params: { hackerId: string } }
+  props: { params: Promise<{ hackerId: string }> }
 ) {
+  const params = await props.params;
   try {
-    const { userId } = auth();
+    const { userId } = await auth();
     if (!userId) {
       return NextResponse.json("Unauthorized", { status: 401 });
     }

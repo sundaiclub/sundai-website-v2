@@ -17,8 +17,9 @@ const MAX_HISTORY_PAGE_SIZE = 50;
 
 export async function GET(
   request: Request,
-  { params }: { params: { eventId: string } }
+  props: { params: Promise<{ eventId: string }> }
 ) {
+  const params = await props.params;
   try {
     const access = await requireEventCommunicationsManager(params.eventId);
     if (access.response) return access.response;
@@ -103,8 +104,9 @@ export async function GET(
 
 export async function POST(
   request: Request,
-  { params }: { params: { eventId: string } }
+  props: { params: Promise<{ eventId: string }> }
 ) {
+  const params = await props.params;
   try {
     const access = await requireEventCommunicationsManager(params.eventId);
     if (access.response) return access.response;

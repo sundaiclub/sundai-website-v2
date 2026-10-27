@@ -11,8 +11,9 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(
   _request: Request,
-  { params }: { params: { eventId: string } }
+  props: { params: Promise<{ eventId: string }> }
 ) {
+  const params = await props.params;
   try {
     const access = await requireEventJudgingManager(params.eventId);
     if (access.response) return access.response;
@@ -24,8 +25,9 @@ export async function GET(
 
 export async function PUT(
   request: Request,
-  { params }: { params: { eventId: string } }
+  props: { params: Promise<{ eventId: string }> }
 ) {
+  const params = await props.params;
   try {
     const access = await requireEventJudgingManager(params.eventId);
     if (access.response) return access.response;

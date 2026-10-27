@@ -1,5 +1,7 @@
 'use client';
 
+import { useParams } from 'next/navigation';
+
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import {
@@ -58,11 +60,8 @@ function entryId(entry: WorkspaceProject) {
   return entry.pitchProjectId ?? entry.id!;
 }
 
-export default function OrganizerEventProjectsPage({
-  params,
-}: {
-  params: { eventId: string };
-}) {
+export default function OrganizerEventProjectsPage() {
+  const params = useParams<{ eventId: string }>();
   const classes = useManagementClasses();
   const [projects, setProjects] = useState<WorkspaceProject[]>([]);
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');

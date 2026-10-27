@@ -1,4 +1,5 @@
 'use client';
+import { useParams } from 'next/navigation';
 import {
   ManagementLinkButton,
   ManagementSection,
@@ -115,11 +116,8 @@ function Counts({ workspace }: { workspace: EventWorkspacePayload }) {
   );
 }
 
-export default function OrganizerEventOverviewPage({
-  params,
-}: {
-  params: { eventId: string };
-}) {
+export default function OrganizerEventOverviewPage() {
+  const params = useParams<{ eventId: string }>();
   const classes = useManagementClasses();
   const workspace = useEventWorkspace();
 

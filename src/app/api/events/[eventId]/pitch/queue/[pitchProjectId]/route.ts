@@ -6,10 +6,11 @@ import { requireEventPitchAccess } from '@/lib/eventManagementApi';
 // Delist (remove) an item from the queue
 export async function DELETE(
   req: Request,
-  { params }: { params: { eventId: string; pitchProjectId: string } }
+  props: { params: Promise<{ eventId: string; pitchProjectId: string }> }
 ) {
+  const params = await props.params;
   try {
-    const { userId } = auth();
+    const { userId } = await auth();
     if (!userId) return new NextResponse('Unauthorized', { status: 401 });
 
     const me = await prisma.hacker.findUnique({

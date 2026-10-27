@@ -1,5 +1,7 @@
 'use client';
 
+import { useParams } from 'next/navigation';
+
 import Image from 'next/image';
 import { useEffect, useState } from 'react';
 import {
@@ -96,11 +98,8 @@ function replaceTemplate(
         : template
   );
 }
-export default function OrganizerChapterSettingsPage({
-  params,
-}: {
-  params: { chapterSlug: string };
-}) {
+export default function OrganizerChapterSettingsPage() {
+  const params = useParams<{ chapterSlug: string }>();
   const classes = useManagementClasses();
   const { loading } = useUserContext();
   const [chapter, setChapter] = useState<OrganizerChapterSettings | null>(null);

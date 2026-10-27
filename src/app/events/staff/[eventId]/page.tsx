@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useUser } from '@clerk/nextjs';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import { SignInAction } from '@/app/components/SignInAction';
 import {
   ManagementPage,
@@ -10,11 +10,8 @@ import {
   useManagementClasses,
 } from '@/app/components/ManagementSurface';
 
-export default function EventStaffAccessPage({
-  params,
-}: {
-  params: { eventId: string };
-}) {
+export default function EventStaffAccessPage() {
+  const params = useParams<{ eventId: string }>();
   const { isLoaded, isSignedIn } = useUser();
   const router = useRouter();
   const classes = useManagementClasses();

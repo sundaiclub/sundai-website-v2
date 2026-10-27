@@ -7,10 +7,11 @@ import { DEFAULT_SOCIAL_IMAGE_URL, publicUrl } from "@/lib/siteUrl";
 import ProjectDetailClient from "./ProjectDetailClient";
 
 type Props = {
-  params: { projectId: string };
+  params: Promise<{ projectId: string }>;
 };
 
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
+export async function generateMetadata(props: Props): Promise<Metadata> {
+  const params = await props.params;
   const project = await prisma.project.findUnique({
     where: { id: params.projectId, AND: visibleProjectsWhere() },
     include: { thumbnail: true },

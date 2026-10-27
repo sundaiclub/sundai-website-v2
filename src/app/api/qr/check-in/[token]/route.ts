@@ -5,8 +5,9 @@ import { isCheckInToken, renderCheckInQrPng } from '@/lib/eventCheckIn';
 // organizer-gated check-in URL for this token.
 export async function GET(
   _req: Request,
-  { params }: { params: { token: string } }
+  props: { params: Promise<{ token: string }> }
 ) {
+  const params = await props.params;
   if (!isCheckInToken(params.token)) {
     return new NextResponse('Not Found', { status: 404 });
   }

@@ -34,18 +34,19 @@ function formatTime(value: Date, timezone: string) {
   });
 }
 
-export default async function CheckInPage({
-  params,
-}: {
-  params: { token: string };
-}) {
+export default async function CheckInPage(
+  props: {
+    params: Promise<{ token: string }>;
+  }
+) {
+  const params = await props.params;
   const registration = await loadRegistrationByCheckInToken(params.token);
   if (!registration) notFound();
 
   const { event, hacker } = registration;
   const eventPath = `/events/${encodeURIComponent(event.chapter.slug)}/${encodeURIComponent(event.slug)}`;
 
-  const { userId } = auth();
+  const { userId } = await auth();
   const viewer = userId
     ? await prisma.hacker.findUnique({
         where: { clerkId: userId },

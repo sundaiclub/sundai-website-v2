@@ -1,5 +1,7 @@
 'use client';
 
+import { useParams } from 'next/navigation';
+
 import { useEffect, useState } from 'react';
 import {
   ManagementAlert,
@@ -22,11 +24,8 @@ const views: Array<{ id: JudgingView; label: string }> = [
   { id: 'results', label: 'Results' },
 ];
 
-export default function OrganizerEventJudgingPage({
-  params,
-}: {
-  params: { eventId: string };
-}) {
+export default function OrganizerEventJudgingPage() {
+  const params = useParams<{ eventId: string }>();
   const classes = useManagementClasses();
   const { capabilities } = useEventWorkspace();
   const [config, setConfig] = useState<EventJudgingConfig | null>(null);

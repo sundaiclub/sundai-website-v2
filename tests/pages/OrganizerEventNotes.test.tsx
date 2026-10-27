@@ -14,6 +14,7 @@ jest.mock('../../src/app/contexts/ThemeContext', () => ({
 }));
 
 jest.mock('next/navigation', () => ({
+  useParams: () => ({ eventId: 'event-ai-build-night' }),
   usePathname: () => '/organizer/events/event-ai-build-night/notes',
   useRouter: () => ({ push: jest.fn(), replace: jest.fn(), refresh: jest.fn() }),
 }));
@@ -111,7 +112,7 @@ function mockNotesFetch({
   }) as jest.Mock;
 }
 
-function loadPage(): React.ComponentType<{ params: { eventId: string } }> {
+function loadPage(): React.ComponentType {
   try {
     return require('../../src/app/organizer/events/[eventId]/notes/page')
       .default;
@@ -122,7 +123,7 @@ function loadPage(): React.ComponentType<{ params: { eventId: string } }> {
 
 function renderPage() {
   const Page = loadPage();
-  return render(<Page params={{ eventId }} />);
+  return render(<Page />);
 }
 
 describe('/organizer/events/[eventId]/notes', () => {

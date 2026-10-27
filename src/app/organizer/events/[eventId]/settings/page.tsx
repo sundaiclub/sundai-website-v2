@@ -1,15 +1,14 @@
 'use client';
 
+import { useParams } from 'next/navigation';
+
 import { useEffect, useState } from 'react';
 import { ManagementAlert } from '../../../../components/ManagementSurface';
 import { OrganizerEventForm } from '../../EventForm';
 import type { EventWorkspacePayload } from '../WorkspaceShell';
 
-export default function OrganizerEventSettingsPage({
-  params,
-}: {
-  params: { eventId: string };
-}) {
+export default function OrganizerEventSettingsPage() {
+  const params = useParams<{ eventId: string }>();
   const [access, setAccess] = useState<
     'loading' | 'allowed' | 'denied' | 'unavailable'
   >('loading');

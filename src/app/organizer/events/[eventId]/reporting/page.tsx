@@ -1,5 +1,7 @@
 'use client';
 
+import { useParams } from 'next/navigation';
+
 import { useEffect, useState } from 'react';
 import {
   ManagementAlert,
@@ -32,11 +34,8 @@ function MetricList({ metrics }: { metrics: Record<string, number> }) {
   );
 }
 
-export default function OrganizerEventReportingPage({
-  params,
-}: {
-  params: { eventId: string };
-}) {
+export default function OrganizerEventReportingPage() {
+  const params = useParams<{ eventId: string }>();
   const classes = useManagementClasses();
   const [preview, setPreview] = useState<EventReportingPreview | null>(null);
   const [state, setState] = useState<

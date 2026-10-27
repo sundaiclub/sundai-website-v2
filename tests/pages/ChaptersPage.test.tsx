@@ -42,7 +42,7 @@ jest.mock('@clerk/nextjs', () => ({
   UserButton: () => <div>User Button</div>,
 }));
 
-type PageComponent = React.ComponentType<{ params?: { chapterSlug: string } }>;
+type PageComponent = React.ComponentType;
 
 const signedOutUser = null;
 
@@ -511,7 +511,7 @@ function renderLandingPage(chapterSlug: string) {
     '/chapters/[chapterSlug]',
     '../../src/app/chapters/[chapterSlug]/page'
   );
-  render(<ChapterLandingPage params={{ chapterSlug }} />);
+  render(<ChapterLandingPage />);
 }
 
 describe('chapter public directory and landing pages', () => {

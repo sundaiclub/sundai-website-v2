@@ -12,10 +12,11 @@ import { sendEventEmail } from '@/lib/eventDelivery';
 
 export async function GET(
   _request: Request,
-  { params }: { params: { eventId: string } }
+  props: { params: Promise<{ eventId: string }> }
 ) {
+  const params = await props.params;
   try {
-    if (!auth()?.userId) return unauthorized();
+    if (!(await auth())?.userId) return unauthorized();
     const access = await requireEventWorkspaceAccess(params.eventId);
     if (access.response) return access.response;
 
@@ -38,8 +39,9 @@ export async function GET(
 
 export async function POST(
   request: Request,
-  { params }: { params: { eventId: string } }
+  props: { params: Promise<{ eventId: string }> }
 ) {
+  const params = await props.params;
   try {
     const access = await requireEventStaffManager(params.eventId);
     if (access.response) return access.response;

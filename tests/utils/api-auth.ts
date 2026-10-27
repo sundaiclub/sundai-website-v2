@@ -138,7 +138,7 @@ export function mockClerkServerModule() {
 }
 
 function getMockAuth() {
-  return asMock<[], ClerkAuthResult>(clerkServer().auth);
+  return asMock<[], Promise<ClerkAuthResult>>(clerkServer().auth);
 }
 
 function getMockCurrentUser() {
@@ -146,7 +146,7 @@ function getMockCurrentUser() {
 }
 
 export function mockSignedOutClerk() {
-  getMockAuth().mockReturnValue({
+  getMockAuth().mockResolvedValue({
     userId: null,
     sessionId: null,
     orgId: null,
@@ -169,7 +169,7 @@ export function mockAuthenticatedClerk(options: MockClerkAuthOptions = {}) {
     claims: options.claims,
   };
 
-  getMockAuth().mockReturnValue(authResult);
+  getMockAuth().mockResolvedValue(authResult);
 
   return authResult;
 }
@@ -347,5 +347,5 @@ export function createSiteAdminIncludeBannedRegistrationsRequest(
 export function createRouteContext<TParams extends Record<string, string>>(
   params: TParams
 ) {
-  return { params };
+  return { params: Promise.resolve(params) };
 }

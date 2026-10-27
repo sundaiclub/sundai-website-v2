@@ -5,8 +5,9 @@ import { publicRegistrationActionResponse } from '@/lib/publicRegistrationApi';
 
 export async function POST(
   _req: Request,
-  { params }: { params: { eventId: string } }
+  props: { params: Promise<{ eventId: string }> }
 ) {
+  const params = await props.params;
   try {
     const hacker = await getCurrentHacker();
     if (!hacker) return unauthorized();

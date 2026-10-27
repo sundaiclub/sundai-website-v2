@@ -172,7 +172,7 @@ function mockCommunicationFetch({
   }) as jest.Mock;
 }
 
-function loadPage(): React.ComponentType<{ params: { eventId: string } }> {
+function loadPage(): (props: { params: Promise<{ eventId: string }> }) => Promise<React.ReactElement> {
   try {
     return require('../../src/app/organizer/events/[eventId]/communications/page')
       .default;
@@ -183,9 +183,9 @@ function loadPage(): React.ComponentType<{ params: { eventId: string } }> {
   }
 }
 
-function renderPage() {
+async function renderPage() {
   const Page = loadPage();
-  return render(<Page params={{ eventId }} />);
+  return render(await Page({ params: Promise.resolve({ eventId }) }));
 }
 
 async function composeEmail() {
@@ -206,7 +206,7 @@ describe('/organizer/events/[eventId]/communications', () => {
   });
 
   it('shows provider availability and disables SMS until provider and consent configuration are active', async () => {
-    renderPage();
+    await renderPage();
 
     expect(await screen.findByText(/email.*available/i)).toBeInTheDocument();
     expect(screen.getByText(/sms.*unavailable/i)).toBeInTheDocument();
@@ -228,7 +228,7 @@ describe('/organizer/events/[eventId]/communications', () => {
         sentAt: '2026-09-04T18:50:00.000Z',
       },
     });
-    renderPage();
+    await renderPage();
 
     const status = await screen.findByText(/^invitation sent$/i);
     const inviteSection = screen.getByRole('heading', {
@@ -244,7 +244,7 @@ describe('/organizer/events/[eventId]/communications', () => {
   });
 
   it('composes an email with channel, audience, subject, and body', async () => {
-    renderPage();
+    await renderPage();
     await composeEmail();
 
     fireEvent.click(
@@ -263,7 +263,7 @@ describe('/organizer/events/[eventId]/communications', () => {
 
   it('uses checkboxes for combined channels and registration-status audiences', async () => {
     mockCommunicationFetch({ smsAvailable: true });
-    renderPage();
+    await renderPage();
 
     const email = await screen.findByRole('checkbox', { name: /^email$/i });
     const sms = screen.getByRole('checkbox', { name: /^sms$/i });
@@ -307,7 +307,7 @@ describe('/organizer/events/[eventId]/communications', () => {
   });
 
   it('previews selected locations and clears confirmation after changing them', async () => {
-    renderPage();
+    await renderPage();
     await composeEmail();
     expect(screen.getByRole('radio', { name: 'All locations' })).toBeChecked();
     fireEvent.click(screen.getByRole('radio', { name: 'Specific locations' }));
@@ -344,7 +344,7 @@ describe('/organizer/events/[eventId]/communications', () => {
 
   it('opens a separate modal to review and confirm chapter invitations', async () => {
     mockCommunicationFetch({ smsAvailable: true });
-    renderPage();
+    await renderPage();
 
     fireEvent.click(
       await screen.findByRole('button', { name: /invite chapter members/i })
@@ -394,7 +394,7 @@ describe('/organizer/events/[eventId]/communications', () => {
   });
 
   it('shows eligible and aggregate exclusion counts and requires explicit confirmation', async () => {
-    renderPage();
+    await renderPage();
     await composeEmail();
     fireEvent.click(
       screen.getByRole('button', { name: /save.*preview|preview/i })
@@ -410,7 +410,7 @@ describe('/organizer/events/[eventId]/communications', () => {
 
   it('replaces stale confirmation after a 409 and requires reconfirmation', async () => {
     mockCommunicationFetch({ changedAudience: true });
-    renderPage();
+    await renderPage();
     await composeEmail();
     fireEvent.click(
       screen.getByRole('button', { name: /save.*preview|preview/i })
@@ -427,7 +427,7 @@ describe('/organizer/events/[eventId]/communications', () => {
   });
 
   it('shows immutable history summary and recipient-level delivery details', async () => {
-    renderPage();
+    await renderPage();
 
     expect(
       await screen.findByText(/tomorrow’s build night/i)

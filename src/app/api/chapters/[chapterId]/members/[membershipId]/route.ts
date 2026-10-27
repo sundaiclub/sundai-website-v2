@@ -4,8 +4,9 @@ import { requireChapterMemberManager } from '@/lib/eventManagementApi';
 
 export async function PATCH(
   req: Request,
-  { params }: { params: { chapterId: string; membershipId: string } }
+  props: { params: Promise<{ chapterId: string; membershipId: string }> }
 ) {
+  const params = await props.params;
   try {
     const { response } = await requireChapterMemberManager(params.chapterId);
     if (response) return response;

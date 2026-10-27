@@ -778,6 +778,7 @@ export async function loadJudgePanel(
           judgingOpen: true,
           judgingEnabled: true,
           judgingAssignmentsPublishedAt: true,
+          requireGithubUrl: true,
         },
       },
       tracks: {
@@ -843,6 +844,7 @@ export async function loadJudgePanel(
     judge: { id: judge.id, name: judge.name, email: judge.email },
     judgingOpen: judge.event.judgingOpen,
     assignmentsPublished: Boolean(judge.event.judgingAssignmentsPublishedAt),
+    requireGithubUrl: judge.event.requireGithubUrl,
     scoreMin: JUDGING_SCORE_MIN,
     scoreMax: JUDGING_SCORE_MAX,
     tracks: judge.tracks.map(({ track }) => {
@@ -1233,7 +1235,10 @@ export async function saveProjectJudgingSubmission(input: {
     }
     const existing = await tx.judgingSubmission.findUnique({
       where: {
-        eventId_projectId: { eventId: input.eventId, projectId: input.projectId },
+        eventId_projectId: {
+          eventId: input.eventId,
+          projectId: input.projectId,
+        },
       },
       select: { id: true, trackId: true },
     });

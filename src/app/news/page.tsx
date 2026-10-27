@@ -18,8 +18,7 @@ export const metadata = {
   robots: { index: true, follow: true },
 };
 
-import dynamic from "next/dynamic";
-const NewsClient = dynamic(() => import("./NewsClient"), { ssr: false });
+import NewsClient from "./NewsClient";
 
 export default function NewsPage() {
   return <NewsClient />;

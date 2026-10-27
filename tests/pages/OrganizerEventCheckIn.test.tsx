@@ -1,3 +1,8 @@
+jest.mock('next/navigation', () => ({
+  ...jest.requireActual('next/navigation'),
+  useParams: () => ({ eventId: 'event-1' }),
+}));
+
 import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import OrganizerEventCheckInPage from '../../src/app/organizer/events/[eventId]/check-in/page';
@@ -51,7 +56,7 @@ function jsonResponse(data: unknown, status = 200) {
 }
 
 function renderPage() {
-  return render(<OrganizerEventCheckInPage params={{ eventId: 'event-1' }} />);
+  return render(<OrganizerEventCheckInPage />);
 }
 
 describe('/organizer/events/[eventId]/check-in', () => {

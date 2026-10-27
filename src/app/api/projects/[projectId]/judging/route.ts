@@ -14,8 +14,9 @@ import {
 /** Saves the project's judging track and answers for one judging event. */
 export async function PUT(
   request: Request,
-  { params }: { params: { projectId: string } }
+  props: { params: Promise<{ projectId: string }> }
 ) {
+  const params = await props.params;
   try {
     const hacker = await getCurrentHacker();
     if (!hacker) return unauthorized();

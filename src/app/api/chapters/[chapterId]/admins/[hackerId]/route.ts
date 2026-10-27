@@ -4,8 +4,9 @@ import { requireChapterMemberManager } from '@/lib/eventManagementApi';
 
 export async function DELETE(
   _req: Request,
-  { params }: { params: { chapterId: string; hackerId: string } }
+  props: { params: Promise<{ chapterId: string; hackerId: string }> }
 ) {
+  const params = await props.params;
   try {
     const { response } = await requireChapterMemberManager(params.chapterId);
     if (response) return response;

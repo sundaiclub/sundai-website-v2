@@ -27,6 +27,7 @@ jest.mock('../../src/app/contexts/UserContext', () => ({
 }));
 
 jest.mock('next/navigation', () => ({
+  useParams: () => ({ eventId: 'event-ai-build-night' }),
   usePathname: () => '/organizer/events/event-ai-build-night/registrations',
   useSearchParams: () => new URLSearchParams(),
   useRouter: () => ({
@@ -39,10 +40,9 @@ jest.mock('next/navigation', () => ({
   }),
 }));
 
-type PageComponent = React.ComponentType<{ params: { eventId: string } }>;
+type PageComponent = React.ComponentType;
 type WorkspaceLayoutComponent = React.ComponentType<{
   children: React.ReactNode;
-  params: { eventId: string };
 }>;
 
 const eventId = 'event-ai-build-night';
@@ -454,7 +454,7 @@ function renderRegistrationsPage() {
     '../../src/app/organizer/events/[eventId]/registrations/page'
   );
 
-  render(<OrganizerEventRegistrationsPage params={{ eventId }} />);
+  render(<OrganizerEventRegistrationsPage />);
 }
 
 function renderWorkspaceRegistrations() {
@@ -468,8 +468,8 @@ function renderWorkspaceRegistrations() {
   );
 
   render(
-    <OrganizerEventLayout params={{ eventId }}>
-      <OrganizerEventRegistrationsPage params={{ eventId }} />
+    <OrganizerEventLayout>
+      <OrganizerEventRegistrationsPage />
     </OrganizerEventLayout>
   );
 }

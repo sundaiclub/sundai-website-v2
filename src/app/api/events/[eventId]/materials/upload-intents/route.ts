@@ -6,16 +6,14 @@ import {
 } from '@/lib/eventMaterials';
 
 function storageUnavailable(error: unknown) {
-  return (
-    error instanceof Error &&
-    /S3_|credential|bucket|signed url|AccessDenied/i.test(error.message)
-  );
+  return (error instanceof Error && /S3_|credential|bucket|signed url|AccessDenied/i.test(error.message));
 }
 
 export async function POST(
   request: Request,
-  { params }: { params: { eventId: string } }
+  props: { params: Promise<{ eventId: string }> }
 ) {
+  const params = await props.params;
   try {
     const access = await requireEventMaterialsManager(params.eventId);
     if (access.response) return access.response;

@@ -28,7 +28,7 @@ function SignInPrompt() {
 }
 
 export default async function PitchLandingPage() {
-  const { userId } = auth();
+  const { userId } = await auth();
   if (!userId) return <SignInPrompt />;
 
   const hacker = await prisma.hacker.findUnique({

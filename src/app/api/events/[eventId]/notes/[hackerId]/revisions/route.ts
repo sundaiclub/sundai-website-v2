@@ -10,12 +10,11 @@ import { parseNonNegativeInteger } from '@/lib/pagination';
 
 export async function GET(
   request: Request,
-  {
-    params,
-  }: {
-    params: { eventId: string; hackerId: string };
+  props: {
+    params: Promise<{ eventId: string; hackerId: string }>;
   }
 ) {
+  const params = await props.params;
   try {
     const access = await requireEventWorkspaceAccess(params.eventId);
     if (access.response) return access.response;

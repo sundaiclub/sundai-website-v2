@@ -46,12 +46,12 @@ const DEFAULT_SOCIAL_IMAGE = {
 };
 
 type EventPageProps = {
-  params: { chapterSlug: string; eventSlug: string };
-  searchParams?: {
+  params: Promise<{ chapterSlug: string; eventSlug: string }>;
+  searchParams?: Promise<{
     tab?: string | string[];
     notice?: string | string[];
     judge?: string | string[];
-  };
+  }>;
 };
 
 function firstParam(value: string | string[] | undefined) {
@@ -68,10 +68,9 @@ const eventTabs: Array<{ id: EventTab; label: string }> = [
   { id: 'judging', label: 'Judging' },
 ];
 
-export async function generateMetadata({
-  params,
-  searchParams,
-}: EventPageProps): Promise<Metadata> {
+export async function generateMetadata(props: EventPageProps): Promise<Metadata> {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const judgeToken = firstParam(searchParams?.judge);
   // Keep a judge's magic-link token out of Referer headers sent to other sites.
   const judgeLinkMetadata: Metadata = judgeToken
@@ -184,11 +183,10 @@ function approvedAddress(event: {
   return typeof address === 'string' ? address.trim() : null;
 }
 
-export default async function PublicEventDetailPage({
-  params,
-  searchParams,
-}: EventPageProps) {
-  const { userId } = auth();
+export default async function PublicEventDetailPage(props: EventPageProps) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
+  const { userId } = await auth();
   const judgeToken = firstParam(searchParams?.judge) ?? null;
   const event = await getPublicEventBySlug({
     chapterSlug: params.chapterSlug,

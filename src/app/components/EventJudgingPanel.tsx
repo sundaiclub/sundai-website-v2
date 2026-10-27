@@ -360,6 +360,29 @@ export default function EventJudgingPanel({
           {projectNav}
           <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_20rem]">
             <div className="grid min-w-0 gap-4">
+              {panel.requireGithubUrl && (
+                <div
+                  className={`${classes.panel} flex min-w-0 flex-col gap-1 p-4 sm:flex-row sm:items-baseline sm:gap-3`}
+                >
+                  <span className="shrink-0 text-sm font-bold">
+                    GitHub repository
+                  </span>
+                  {project.githubUrl ? (
+                    <a
+                      className="min-w-0 break-all font-mono text-sm underline underline-offset-2"
+                      href={project.githubUrl}
+                      rel="noopener noreferrer"
+                      target="_blank"
+                    >
+                      {project.githubUrl} ↗
+                    </a>
+                  ) : (
+                    <span className={`text-sm ${classes.mutedText}`}>
+                      No GitHub link provided
+                    </span>
+                  )}
+                </div>
+              )}
               <article
                 className={`${classes.panel} flex items-start gap-3 p-4 sm:gap-4`}
               >
@@ -394,7 +417,10 @@ export default function EventJudgingPanel({
                   )}
                   <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm font-semibold">
                     {[
-                      ['GitHub', project.githubUrl],
+                      [
+                        'GitHub',
+                        panel.requireGithubUrl ? null : project.githubUrl,
+                      ],
                       ['Demo', project.demoUrl],
                       ['Blog', project.blogUrl],
                       [
