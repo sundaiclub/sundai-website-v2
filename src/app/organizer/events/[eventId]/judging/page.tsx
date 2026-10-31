@@ -1,5 +1,7 @@
 'use client';
 
+import { useParams } from 'next/navigation';
+
 import { useEffect, useState } from 'react';
 import {
   ManagementAlert,
@@ -22,16 +24,44 @@ const views: Array<{ id: JudgingView; label: string }> = [
   { id: 'results', label: 'Results' },
 ];
 
-export default function OrganizerEventJudgingPage({
-  params,
-}: {
-  params: { eventId: string };
-}) {
+export default function OrganizerEventJudgingPage() {
+  const params = useParams<{ eventId: string }>();
   const classes = useManagementClasses();
   const { capabilities } = useEventWorkspace();
   const [config, setConfig] = useState<EventJudgingConfig | null>(null);
   const [error, setError] = useState('');
   const [view, setView] = useState<JudgingView>('setup');
+  const [downloading, setDownloading] = useState(false);
+  const [downloadError, setDownloadError] = useState('');
+
+  async function downloadJudging() {
+    setDownloading(true);
+    setDownloadError('');
+    try {
+      const response = await fetch(
+        `/api/events/${params.eventId}/judging/export`,
+        {
+          cache: 'no-store',
+        }
+      );
+      if (!response.ok) throw new Error('Download failed');
+      const url = URL.createObjectURL(await response.blob());
+      const link = document.createElement('a');
+      link.href = url;
+      link.download =
+        response.headers
+          .get('Content-Disposition')
+          ?.match(/filename="([^"]+)"/)?.[1] ?? 'judging-results.xlsx';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      setDownloadError('Could not download judging results. Please try again.');
+    } finally {
+      setDownloading(false);
+    }
+  }
 
   useEffect(() => {
     let current = true;
@@ -99,6 +129,16 @@ export default function OrganizerEventJudgingPage({
           ))}
         </div>
         <div className="flex flex-wrap gap-2">
+          <button
+            className={classes.secondaryButton}
+            disabled={downloading}
+            onClick={downloadJudging}
+            type="button"
+          >
+            {downloading
+              ? 'Downloading judging results…'
+              : 'Download judging results'}
+          </button>
           <ManagementBadge tone={config.judgingEnabled ? 'success' : 'default'}>
             {config.judgingEnabled ? 'Judging enabled' : 'Judging off'}
           </ManagementBadge>
@@ -109,6 +149,12 @@ export default function OrganizerEventJudgingPage({
           )}
         </div>
       </div>
+
+      {downloadError && (
+        <ManagementAlert tone="danger">
+          <span role="alert">{downloadError}</span>
+        </ManagementAlert>
+      )}
 
       {view === 'setup' && (
         <JudgingSetupEditor

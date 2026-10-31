@@ -6,7 +6,7 @@ import prisma from "@/lib/prisma";
 const VOTE_VALUES = new Set(["LIKE", "DISLIKE"]);
 
 async function getAuthorizedHacker() {
-  const { userId: clerkId } = auth();
+  const { userId: clerkId } = await auth();
   if (!clerkId) {
     return { error: new NextResponse("Unauthorized", { status: 401 }) };
   }
@@ -59,8 +59,9 @@ async function getActivePitchProject(eventId: string, pitchProjectId: string) {
 
 export async function PUT(
   req: Request,
-  { params }: { params: { eventId: string; pitchProjectId: string } }
+  props: { params: Promise<{ eventId: string; pitchProjectId: string }> }
 ) {
+  const params = await props.params;
   try {
     const authResult = await getAuthorizedHacker();
     if (authResult.error) return authResult.error;
@@ -131,8 +132,9 @@ export async function PUT(
 
 export async function DELETE(
   req: Request,
-  { params }: { params: { eventId: string; pitchProjectId: string } }
+  props: { params: Promise<{ eventId: string; pitchProjectId: string }> }
 ) {
+  const params = await props.params;
   try {
     const authResult = await getAuthorizedHacker();
     if (authResult.error) return authResult.error;

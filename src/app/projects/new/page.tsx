@@ -1,6 +1,6 @@
 'use client';
 import MarkdownEditor from '@/app/components/MarkdownEditor';
-import React, { useState, useEffect } from 'react';
+import React, { Suspense, useState, useEffect } from 'react';
 import { useUser } from '@clerk/nextjs';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
@@ -25,7 +25,7 @@ type ProjectEventOption = {
   judging: ProjectJudgingOption | null;
 };
 
-export default function NewProject() {
+function NewProjectForm() {
   const { user } = useUser();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -556,5 +556,13 @@ export default function NewProject() {
         onAddMemberWithRole={handleAddMember}
       />
     </div>
+  );
+}
+
+export default function NewProject() {
+  return (
+    <Suspense fallback={<p role="status">Loading project form...</p>}>
+      <NewProjectForm />
+    </Suspense>
   );
 }

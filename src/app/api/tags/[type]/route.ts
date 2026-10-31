@@ -2,9 +2,10 @@ import { NextResponse } from 'next/server';
 import prisma from "@/lib/prisma";
 
 export async function GET(
-    request: Request,
-    { params }: { params: { type: string } }
+  request: Request,
+  props: { params: Promise<{ type: string }> }
 ) {
+    const params = await props.params;
     try {
     // Convert the type parameter to uppercase and validate it
     const tagType = params.type.toUpperCase();
@@ -62,9 +63,10 @@ export async function GET(
 }
 
 export async function POST(
-    request: Request,
-    { params }: { params: { type: string } }
+  request: Request,
+  props: { params: Promise<{ type: string }> }
 ) {
+    const params = await props.params;
     try {
         const tagType = params.type.toUpperCase();
         if (!['TECH', 'DOMAIN'].includes(tagType)) {

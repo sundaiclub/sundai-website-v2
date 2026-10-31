@@ -10,6 +10,7 @@ jest.mock('../../src/app/contexts/ThemeContext', () => ({
 }));
 
 jest.mock('next/navigation', () => ({
+  useParams: () => ({ eventId: 'event-ai-build-night' }),
   usePathname: () => '/organizer/events/event-ai-build-night/settings',
   useSearchParams: () => new URLSearchParams(),
   useRouter: () => ({
@@ -22,7 +23,7 @@ jest.mock('next/navigation', () => ({
   }),
 }));
 
-type PageComponent = React.ComponentType<{ params: { eventId: string } }>;
+type PageComponent = React.ComponentType;
 
 const eventSettings = {
   id: 'event-ai-build-night',
@@ -168,7 +169,7 @@ function renderSettingsPage(eventId = eventSettings.id) {
     '../../src/app/organizer/events/[eventId]/settings/page'
   );
 
-  render(<OrganizerEventSettingsPage params={{ eventId }} />);
+  render(<OrganizerEventSettingsPage />);
 }
 
 function patchBodyForEvent(eventId = eventSettings.id) {

@@ -1,5 +1,7 @@
 'use client';
 
+import { useParams } from 'next/navigation';
+
 import { useEffect, useMemo, useState } from 'react';
 import {
   ManagementAlert,
@@ -30,11 +32,8 @@ function readable(value: string) {
     .join(' ');
 }
 
-export default function OrganizerEventPitchPage({
-  params,
-}: {
-  params: { eventId: string };
-}) {
+export default function OrganizerEventPitchPage() {
+  const params = useParams<{ eventId: string }>();
   const classes = useManagementClasses();
   const workspace = useEventWorkspace();
   const [projects, setProjects] = useState<PitchProject[]>([]);

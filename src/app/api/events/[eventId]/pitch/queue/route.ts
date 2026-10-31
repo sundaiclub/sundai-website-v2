@@ -10,10 +10,11 @@ import {
 // Join queue by adding one of user's projects
 export async function POST(
   req: Request,
-  { params }: { params: { eventId: string } }
+  props: { params: Promise<{ eventId: string }> }
 ) {
+  const params = await props.params;
   try {
-    const { userId } = auth();
+    const { userId } = await auth();
     if (!userId) return new NextResponse('Unauthorized', { status: 401 });
 
     const user = await prisma.hacker.findUnique({
@@ -235,10 +236,11 @@ export async function POST(
 // Reorder queue: accepts array of { id, position }. Admins or audience based on flag
 export async function PATCH(
   req: Request,
-  { params }: { params: { eventId: string } }
+  props: { params: Promise<{ eventId: string }> }
 ) {
+  const params = await props.params;
   try {
-    const { userId } = auth();
+    const { userId } = await auth();
     if (!userId) return new NextResponse('Unauthorized', { status: 401 });
 
     const hacker = await prisma.hacker.findUnique({

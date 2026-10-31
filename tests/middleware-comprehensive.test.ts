@@ -57,7 +57,7 @@ describe('middleware', () => {
   it('protects routes that are not public', async () => {
     const middleware = require('../src/middleware').default;
     const protect = jest.fn();
-    const auth = jest.fn(() => ({ protect }));
+    const auth = Object.assign(jest.fn(), { protect });
 
     await middleware(auth, { nextUrl: { pathname: '/admin' } });
 

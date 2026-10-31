@@ -10,8 +10,9 @@ import { createBanFlag } from '@/lib/moderation';
 
 export async function GET(
   _req: Request,
-  { params }: { params: { chapterId: string } }
+  props: { params: Promise<{ chapterId: string }> }
 ) {
+  const params = await props.params;
   try {
     const chapterId = await resolveChapterId(params.chapterId);
     if (!chapterId) return notFound();
@@ -39,8 +40,9 @@ export async function GET(
 
 export async function POST(
   req: Request,
-  { params }: { params: { chapterId: string } }
+  props: { params: Promise<{ chapterId: string }> }
 ) {
+  const params = await props.params;
   try {
     const chapterId = await resolveChapterId(params.chapterId);
     if (!chapterId) return notFound();

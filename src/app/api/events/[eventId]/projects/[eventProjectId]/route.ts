@@ -4,7 +4,7 @@ import { updateEventProjectCardStatus } from '@/lib/eventWorkspaceProjects';
 import type { EventProjectCardStatus } from '@/types/event-workspace';
 
 type RouteContext = {
-  params: { eventId: string; eventProjectId: string };
+  params: Promise<{ eventId: string; eventProjectId: string }>;
 };
 
 const CARD_STATUSES = new Set<EventProjectCardStatus>([
@@ -18,7 +18,8 @@ function jsonError(error: string, status: number) {
   return NextResponse.json({ error }, { status });
 }
 
-export async function PATCH(request: Request, { params }: RouteContext) {
+export async function PATCH(request: Request, props: RouteContext) {
+  const params = await props.params;
   try {
     const access = await requireEventWorkspaceAccess(params.eventId);
     if (access.response) return access.response;

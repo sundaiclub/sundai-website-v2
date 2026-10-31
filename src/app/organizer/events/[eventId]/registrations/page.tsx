@@ -1,5 +1,7 @@
 'use client';
 
+import { useParams } from 'next/navigation';
+
 import { useEffect, useState } from 'react';
 import {
   ManagementAlert,
@@ -52,11 +54,8 @@ function normalizeReviewState(
   };
 }
 
-export default function OrganizerEventRegistrationsPage({
-  params,
-}: {
-  params: { eventId: string };
-}) {
+export default function OrganizerEventRegistrationsPage() {
+  const params = useParams<{ eventId: string }>();
   const { isAdmin } = useUserContext();
   const [workspace, setWorkspace] = useState<EventWorkspacePayload | null>(
     null

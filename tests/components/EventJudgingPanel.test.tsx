@@ -15,6 +15,7 @@ const panel: JudgePanelPayload = {
   judge: { id: 'judge', name: 'Jo', email: 'jo@example.com' },
   judgingOpen: true,
   assignmentsPublished: true,
+  requireGithubUrl: false,
   scoreMin: 1,
   scoreMax: 10,
   tracks: [

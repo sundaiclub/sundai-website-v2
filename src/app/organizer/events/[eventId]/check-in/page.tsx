@@ -1,5 +1,7 @@
 'use client';
 
+import { useParams } from 'next/navigation';
+
 import { useEffect, useState } from 'react';
 import {
   ManagementAlert,
@@ -24,11 +26,8 @@ function formatCheckInTime(value: string, timezone: string) {
   });
 }
 
-export default function OrganizerEventCheckInPage({
-  params,
-}: {
-  params: { eventId: string };
-}) {
+export default function OrganizerEventCheckInPage() {
+  const params = useParams<{ eventId: string }>();
   const classes = useManagementClasses();
   const { event } = useEventWorkspace();
   const [search, setSearch] = useState('');

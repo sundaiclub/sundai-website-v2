@@ -5,8 +5,9 @@ import { judgingErrorResponse, saveJudgeReview } from '@/lib/judgingData';
 
 export async function PUT(
   request: Request,
-  { params }: { params: { eventId: string; submissionId: string } }
+  props: { params: Promise<{ eventId: string; submissionId: string }> }
 ) {
+  const params = await props.params;
   try {
     const judge = await resolveEventJudge(
       params.eventId,

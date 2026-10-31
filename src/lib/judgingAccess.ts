@@ -66,7 +66,7 @@ export async function resolveEventJudge(
     if (judge) return judge;
   }
 
-  const { userId } = auth();
+  const { userId } = await auth();
   if (!userId) return null;
   const hacker = await prisma.hacker.findUnique({
     where: { clerkId: userId },

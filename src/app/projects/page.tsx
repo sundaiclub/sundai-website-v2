@@ -1,9 +1,10 @@
 "use client";
+import { Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import ProjectGrid from "../components/Project";
 import { useTheme } from "../contexts/ThemeContext";
 
-export default function AllProjectsList() {
+function ProjectsList() {
   const { isDarkMode } = useTheme();
   const searchParams = useSearchParams();
 
@@ -36,5 +37,13 @@ export default function AllProjectsList() {
         />
       </div>
     </div>
+  );
+}
+
+export default function AllProjectsList() {
+  return (
+    <Suspense fallback={<p role="status">Loading projects...</p>}>
+      <ProjectsList />
+    </Suspense>
   );
 }

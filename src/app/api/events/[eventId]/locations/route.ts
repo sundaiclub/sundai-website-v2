@@ -5,8 +5,9 @@ import { parseEventLocationConfig } from '@/lib/eventLocations';
 
 export async function GET(
   _request: Request,
-  { params }: { params: { eventId: string } }
+  props: { params: Promise<{ eventId: string }> }
 ) {
+  const params = await props.params;
   try {
     const access = await requireEventSettingsManager(params.eventId);
     if (access.response) return access.response;
@@ -26,8 +27,9 @@ export async function GET(
 
 export async function PATCH(
   request: Request,
-  { params }: { params: { eventId: string } }
+  props: { params: Promise<{ eventId: string }> }
 ) {
+  const params = await props.params;
   try {
     const access = await requireEventSettingsManager(params.eventId);
     if (access.response) return access.response;

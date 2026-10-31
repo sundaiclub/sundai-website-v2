@@ -367,6 +367,15 @@ email/SMS. These integrations are optional for local development: unavailable
 providers are shown as unavailable in the workspace instead of making unrelated
 event operations fail.
 
+### Judging results download
+
+MCs, site admins and active chapter admins can select **Download judging results**
+on any judging tab. The Excel download is available before, during and after
+scoring. It includes the current leaderboard, question and answer columns directly
+after **Final score**, project links, team names and email addresses, and completed
+review counts. Track names identify each question column. The export uses one
+database snapshot and the same project eligibility, scores and order as the page.
+
 ### Private event material storage
 
 Event material files use a dedicated private S3 bucket, separate from the image

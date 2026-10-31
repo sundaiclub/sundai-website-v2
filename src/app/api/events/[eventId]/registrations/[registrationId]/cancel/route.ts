@@ -15,8 +15,9 @@ import { notifyEventDecision } from '@/lib/eventDecisionNotifications';
 
 export async function POST(
   _req: Request,
-  { params }: { params: { eventId: string; registrationId: string } }
+  props: { params: Promise<{ eventId: string; registrationId: string }> }
 ) {
+  const params = await props.params;
   try {
     const hacker = await getCurrentHacker();
     if (!hacker) return unauthorized();

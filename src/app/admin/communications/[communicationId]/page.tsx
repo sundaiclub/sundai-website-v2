@@ -1,5 +1,7 @@
 'use client';
 
+import { useParams } from 'next/navigation';
+
 import { useEffect, useState } from 'react';
 import type { AdminCommunicationDetail } from '@/types/admin-communications';
 import AdminAuthGate from '../../AdminAuthGate';
@@ -15,11 +17,8 @@ import {
 } from '../../../components/ManagementSurface';
 import { useUserContext } from '../../../contexts/UserContext';
 
-export default function AdminCommunicationDetailPage({
-  params,
-}: {
-  params: { communicationId: string };
-}) {
+export default function AdminCommunicationDetailPage() {
+  const params = useParams<{ communicationId: string }>();
   const classes = useManagementClasses();
   const { isAdmin, loading, userInfo } = useUserContext();
   const [item, setItem] = useState<AdminCommunicationDetail | null>(null);

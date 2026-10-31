@@ -1,11 +1,12 @@
 import { notFound, redirect } from 'next/navigation';
 import prisma from '@/lib/prisma';
 
-export default async function LegacyPitchEventPage({
-  params,
-}: {
-  params: { eventId: string };
-}) {
+export default async function LegacyPitchEventPage(
+  props: {
+    params: Promise<{ eventId: string }>;
+  }
+) {
+  const params = await props.params;
   const event = await prisma.event.findUnique({
     where: { id: params.eventId },
     select: {

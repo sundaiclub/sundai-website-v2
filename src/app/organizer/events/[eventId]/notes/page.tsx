@@ -1,5 +1,7 @@
 'use client';
 
+import { useParams } from 'next/navigation';
+
 import { useEffect, useState } from 'react';
 import {
   ManagementAlert,
@@ -39,11 +41,8 @@ function rowName(row: NoteRow) {
   return row.hacker?.name ?? row.name ?? 'Unknown hacker';
 }
 
-export default function OrganizerEventNotesPage({
-  params,
-}: {
-  params: { eventId: string };
-}) {
+export default function OrganizerEventNotesPage() {
+  const params = useParams<{ eventId: string }>();
   const classes = useManagementClasses();
   const [rows, setRows] = useState<NoteRow[]>([]);
   const [search, setSearch] = useState('');

@@ -78,12 +78,11 @@ function isValidationError(error: unknown) {
 
 export async function PATCH(
   request: Request,
-  {
-    params,
-  }: {
-    params: { eventId: string; materialId: string };
+  props: {
+    params: Promise<{ eventId: string; materialId: string }>;
   }
 ) {
+  const params = await props.params;
   try {
     const access = await requireEventMaterialsManager(params.eventId);
     if (access.response) return access.response;
@@ -117,12 +116,11 @@ export async function PATCH(
 
 export async function DELETE(
   _request: Request,
-  {
-    params,
-  }: {
-    params: { eventId: string; materialId: string };
+  props: {
+    params: Promise<{ eventId: string; materialId: string }>;
   }
 ) {
+  const params = await props.params;
   try {
     const access = await requireEventMaterialsManager(params.eventId);
     if (access.response) return access.response;

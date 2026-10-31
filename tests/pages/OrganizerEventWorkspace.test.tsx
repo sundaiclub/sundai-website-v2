@@ -13,6 +13,7 @@ jest.mock('../../src/app/contexts/UserContext', () => ({
 }));
 
 jest.mock('next/navigation', () => ({
+  useParams: () => ({ eventId: 'event-ai-build-night' }),
   usePathname: () => '/organizer/events/event-ai-build-night',
   useRouter: () => ({
     push: jest.fn(),
@@ -119,20 +120,15 @@ function mockWorkspaceFetch(data: unknown = workspace, status = 200) {
 
 function loadLayout(): React.ComponentType<{
   children: React.ReactNode;
-  params: { eventId: string };
 }> {
   return require('../../src/app/organizer/events/[eventId]/layout').default;
 }
 
-function loadOverview(): React.ComponentType<{
-  params: { eventId: string };
-}> {
+function loadOverview(): React.ComponentType {
   return require('../../src/app/organizer/events/[eventId]/page').default;
 }
 
-function loadPitch(): React.ComponentType<{
-  params: { eventId: string };
-}> {
+function loadPitch(): React.ComponentType {
   return require('../../src/app/organizer/events/[eventId]/pitch/page').default;
 }
 
@@ -140,7 +136,7 @@ function renderWorkspace(
   children: React.ReactNode = <div>Overview content</div>
 ) {
   const Layout = loadLayout();
-  return render(<Layout params={{ eventId }}>{children}</Layout>);
+  return render(<Layout>{children}</Layout>);
 }
 
 describe('/organizer/events/[eventId] workspace', () => {
@@ -228,7 +224,7 @@ describe('/organizer/events/[eventId] workspace', () => {
 
   it('renders overview settings, staff, and safe operational counts', async () => {
     const Overview = loadOverview();
-    renderWorkspace(<Overview params={{ eventId }} />);
+    renderWorkspace(<Overview />);
 
     expect(await screen.findByText(/capacity/i)).toBeInTheDocument();
     expect(screen.getByText('80')).toBeInTheDocument();
@@ -250,7 +246,7 @@ describe('/organizer/events/[eventId] workspace', () => {
       event: { ...workspace.event, status: 'DRAFT' },
     });
     const Overview = loadOverview();
-    renderWorkspace(<Overview params={{ eventId }} />);
+    renderWorkspace(<Overview />);
 
     await screen.findByText('AI Build Night');
 
@@ -271,7 +267,7 @@ describe('/organizer/events/[eventId] workspace', () => {
       event: { ...workspace.event, status: 'DRAFT' },
     });
     const Pitch = loadPitch();
-    renderWorkspace(<Pitch params={{ eventId }} />);
+    renderWorkspace(<Pitch />);
 
     await screen.findByText('Pitch summary');
 
@@ -296,7 +292,7 @@ describe('/organizer/events/[eventId] workspace', () => {
 
   it('hides check-in controls when attendance tracking is off', async () => {
     const Overview = loadOverview();
-    renderWorkspace(<Overview params={{ eventId }} />);
+    renderWorkspace(<Overview />);
     await screen.findByText('AI Build Night');
 
     expect(
@@ -325,7 +321,7 @@ describe('/organizer/events/[eventId] workspace', () => {
       ],
     });
     const Overview = loadOverview();
-    renderWorkspace(<Overview params={{ eventId }} />);
+    renderWorkspace(<Overview />);
     await screen.findByText('AI Build Night');
 
     expect(screen.getByRole('link', { name: /^check-in$/i })).toHaveAttribute(

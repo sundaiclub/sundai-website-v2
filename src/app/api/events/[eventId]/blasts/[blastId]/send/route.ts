@@ -20,8 +20,9 @@ export const runtime = 'nodejs';
 
 export async function POST(
   request: Request,
-  { params }: { params: { eventId: string; blastId: string } }
+  props: { params: Promise<{ eventId: string; blastId: string }> }
 ) {
+  const params = await props.params;
   try {
     const access = await requireEventCommunicationsManager(params.eventId);
     if (access.response) return access.response;

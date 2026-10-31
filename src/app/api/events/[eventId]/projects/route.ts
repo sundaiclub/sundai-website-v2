@@ -8,8 +8,9 @@ const MAX_PAGE_SIZE = 100;
 
 export async function GET(
   request: Request,
-  { params }: { params: { eventId: string } }
+  props: { params: Promise<{ eventId: string }> }
 ) {
+  const params = await props.params;
   try {
     const access = await requireEventWorkspaceAccess(params.eventId);
     if (access.response) return access.response;

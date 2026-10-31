@@ -1,3 +1,8 @@
+jest.mock('next/navigation', () => ({
+  ...jest.requireActual('next/navigation'),
+  useParams: () => ({ eventId: 'event-boston', chapterSlug: 'boston' }),
+}));
+
 import React from 'react'
 import { render, screen, waitFor } from '@testing-library/react'
 
@@ -51,7 +56,7 @@ describe('organizer auth error handling', () => {
     const EventSettingsPage =
       require('../../src/app/organizer/events/[eventId]/settings/page').default
 
-    render(<EventSettingsPage params={{ eventId: 'event-boston' }} />)
+    render(<EventSettingsPage />)
 
     expect(
       await screen.findByText(/you do not have permission/i),
@@ -80,7 +85,7 @@ describe('organizer auth error handling', () => {
     const ChapterSettingsPage =
       require('../../src/app/organizer/chapters/[chapterSlug]/settings/page').default
 
-    render(<ChapterSettingsPage params={{ chapterSlug: 'boston' }} />)
+    render(<ChapterSettingsPage />)
 
     expect(
       await screen.findByText(/you do not have permission/i),

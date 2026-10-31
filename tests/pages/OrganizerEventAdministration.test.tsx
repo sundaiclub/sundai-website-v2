@@ -19,6 +19,7 @@ jest.mock('../../src/app/contexts/UserContext', () => ({
 }));
 
 jest.mock('next/navigation', () => ({
+  useParams: () => ({ eventId: 'event-ai-build-night' }),
   usePathname: () => '/organizer/events/event-ai-build-night',
   useRouter: () => ({
     push: jest.fn(),
@@ -158,12 +159,11 @@ function mockAdministrationFetch(workspace = adminWorkspace) {
 
 function loadLayout(): React.ComponentType<{
   children: React.ReactNode;
-  params: { eventId: string };
 }> {
   return require('../../src/app/organizer/events/[eventId]/layout').default;
 }
 
-function loadOverview(): React.ComponentType<{ params: { eventId: string } }> {
+function loadOverview(): React.ComponentType {
   return require('../../src/app/organizer/events/[eventId]/page').default;
 }
 
@@ -171,8 +171,8 @@ function renderAdministration() {
   const Layout = loadLayout();
   const Overview = loadOverview();
   return render(
-    <Layout params={{ eventId }}>
-      <Overview params={{ eventId }} />
+    <Layout>
+      <Overview />
     </Layout>
   );
 }

@@ -46,10 +46,11 @@ function isSubmittedParticipant(value: unknown): value is SubmittedParticipant {
 
 export async function PATCH(
   req: Request,
-  { params }: { params: { projectId: string } }
+  props: { params: Promise<{ projectId: string }> }
 ) {
+  const params = await props.params;
   try {
-    const { userId } = auth();
+    const { userId } = await auth();
     if (!userId) {
       return new NextResponse('Unauthorized', { status: 401 });
     }

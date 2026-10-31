@@ -19,8 +19,9 @@ function isPitchSessionPhaseTransition(
 }
 export async function POST(
   req: Request,
-  { params }: { params: { eventId: string } }
+  props: { params: Promise<{ eventId: string }> }
 ) {
+  const params = await props.params;
   try {
     const { response } = await requireEventPitchAccess(params.eventId);
     if (response) return response;

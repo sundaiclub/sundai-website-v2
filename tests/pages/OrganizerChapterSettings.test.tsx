@@ -27,7 +27,7 @@ jest.mock('next/navigation', () => ({
   }),
 }));
 
-type PageComponent = React.ComponentType<{ params?: { chapterSlug: string } }>;
+type PageComponent = React.ComponentType;
 
 const chapterAdminUser = {
   id: 'hacker-chapter-admin',
@@ -338,7 +338,7 @@ function renderSettingsPage() {
     '../../src/app/organizer/chapters/[chapterSlug]/settings/page'
   );
 
-  render(<OrganizerChapterSettingsPage params={{ chapterSlug: 'boston' }} />);
+  render(<OrganizerChapterSettingsPage />);
 }
 
 describe('/organizer/chapters/[chapterSlug]/settings', () => {

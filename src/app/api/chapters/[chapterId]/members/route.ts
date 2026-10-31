@@ -4,8 +4,9 @@ import { requireChapterMemberManager } from '@/lib/eventManagementApi';
 
 export async function GET(
   _req: Request,
-  { params }: { params: { chapterId: string } }
+  props: { params: Promise<{ chapterId: string }> }
 ) {
+  const params = await props.params;
   try {
     const { response } = await requireChapterMemberManager(params.chapterId);
     if (response) return response;
