@@ -992,16 +992,17 @@ function average(values: number[]) {
 }
 
 export async function loadJudgingResults(
-  eventId: string
+  eventId: string,
+  db: Prisma.TransactionClient = prisma
 ): Promise<JudgingResults> {
   const [tracks, criteria, submissions, event] = await Promise.all([
-    prisma.judgingTrack.findMany({
+    db.judgingTrack.findMany({
       where: { eventId },
       orderBy: [{ position: 'asc' }, { createdAt: 'asc' }],
       select: { id: true, name: true },
     }),
-    loadEventCriteria(eventId),
-    prisma.judgingSubmission.findMany({
+    loadEventCriteria(eventId, db),
+    db.judgingSubmission.findMany({
       where: judgeableSubmissionWhere(eventId),
       select: {
         id: true,
@@ -1018,7 +1019,7 @@ export async function loadJudgingResults(
         },
       },
     }),
-    prisma.event.findUnique({
+    db.event.findUnique({
       where: { id: eventId },
       select: { judgesPerProject: true },
     }),
