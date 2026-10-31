@@ -1,8 +1,0 @@
-.DS_Store
-/.build
-/Packages
-.swiftpm/configuration/registries.json
-.netrc
-/xtool
-*.h264
-*.aac
