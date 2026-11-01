@@ -1,7 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ManagementAlert,
   ManagementBadge,
@@ -22,18 +21,11 @@ function judgeHeaders(token: string | null): Record<string, string> {
   return token ? { [JUDGE_TOKEN_HEADER]: token } : {};
 }
 
-function updateJudgingUrl(trackId: string, index: number | null) {
+function updateJudgingUrl(trackId: string, index: number) {
   const url = new URL(window.location.href);
   url.searchParams.set('track', trackId);
-  if (index === null) url.searchParams.delete('project');
-  else url.searchParams.set('project', String(index + 1));
-  if (url.href === window.location.href) return;
-  // Next.js skips router synchronization when its internal navigation marker is
-  // passed back in. Let its history wrapper restore that marker after syncing.
-  const state = { ...window.history.state };
-  delete state.__NA;
-  delete state._N;
-  window.history.replaceState(state, '', url);
+  url.searchParams.set('project', String(index + 1));
+  window.history.replaceState(null, '', url);
 }
 
 type Draft = { scores: Record<string, number>; comment: string };
@@ -61,32 +53,18 @@ export default function EventJudgingPanel({
   judgeToken: string | null;
 }) {
   const classes = useManagementClasses();
-  const searchParams = useSearchParams();
-  const [loadedPanel, setLoadedPanel] = useState<{
-    eventId: string;
-    judgeToken: string | null;
-    payload: JudgePanelPayload;
-  } | null>(null);
-  const panel =
-    loadedPanel?.eventId === eventId && loadedPanel.judgeToken === judgeToken
-      ? loadedPanel.payload
-      : null;
+  const [panel, setPanel] = useState<JudgePanelPayload | null>(null);
   const [loadError, setLoadError] = useState('');
-  const [drafts, setDrafts] = useState<Record<string, Draft>>({});
+  const [trackId, setTrackId] = useState('');
+  const [index, setIndex] = useState(0);
+  const [draft, setDraft] = useState<Draft>({ scores: {}, comment: '' });
   const [saving, setSaving] = useState(false);
-  const session = useRef<object | null>(null);
   const [notice, setNotice] = useState<{
     tone: 'success' | 'danger';
     text: string;
   } | null>(null);
 
   useEffect(() => {
-    const currentSession = {};
-    session.current = currentSession;
-    setDrafts({});
-    setSaving(false);
-    setNotice(null);
-    setLoadError('');
     let current = true;
     let timer: ReturnType<typeof setTimeout> | undefined;
     async function load() {
@@ -100,7 +78,21 @@ export default function EventJudgingPanel({
           throw new Error(body?.message || 'Unable to load judging.');
         if (!current) return;
         const payload = body as JudgePanelPayload;
-        setLoadedPanel({ eventId, judgeToken, payload });
+        const params = new URLSearchParams(window.location.search);
+        const selectedTrack =
+          payload.tracks.find(track => track.id === params.get('track')) ??
+          payload.tracks.find(track => track.projects.length > 0) ??
+          payload.tracks[0];
+        const projectNumber = Number(params.get('project'));
+        setPanel(payload);
+        setTrackId(selectedTrack?.id ?? '');
+        setIndex(
+          Number.isSafeInteger(projectNumber) &&
+            projectNumber >= 1 &&
+            projectNumber <= (selectedTrack?.projects.length ?? 0)
+            ? projectNumber - 1
+            : 0
+        );
         setLoadError('');
         if (!payload.assignmentsPublished) timer = setTimeout(load, 15000);
       } catch (error) {
@@ -114,55 +106,17 @@ export default function EventJudgingPanel({
     load();
     return () => {
       current = false;
-      session.current = null;
       clearTimeout(timer);
     };
   }, [eventId, judgeToken]);
 
-  const track =
-    panel?.tracks.find(item => item.id === searchParams.get('track')) ??
-    panel?.tracks.find(item => item.projects.length > 0) ??
-    panel?.tracks[0];
-  const trackId = track?.id ?? '';
+  const track = panel?.tracks.find(item => item.id === trackId);
   const projects = useMemo(() => track?.projects ?? [], [track]);
-  const projectParam = searchParams.get('project') ?? '';
-  const projectNumber = /^[1-9]\d*$/.test(projectParam)
-    ? Number(projectParam)
-    : NaN;
-  const index =
-    Number.isSafeInteger(projectNumber) && projectNumber <= projects.length
-      ? projectNumber - 1
-      : 0;
   const project = projects[index];
-  const draft = project
-    ? (drafts[project.submissionId] ?? draftFor(project))
-    : draftFor(undefined);
-
-  function setDraft(update: (current: Draft) => Draft) {
-    if (!project) return;
-    setDrafts(current => ({
-      ...current,
-      [project.submissionId]: update(
-        current[project.submissionId] ?? draftFor(project)
-      ),
-    }));
-  }
 
   useEffect(() => {
-    if (panel?.assignmentsPublished && trackId) {
-      updateJudgingUrl(trackId, projects.length > 0 ? index : null);
-    }
-  }, [
-    panel?.assignmentsPublished,
-    trackId,
-    projects.length,
-    index,
-    searchParams,
-  ]);
-
-  useEffect(() => {
-    setNotice(null);
-  }, [eventId, judgeToken, project?.submissionId]);
+    setDraft(draftFor(project));
+  }, [project]);
 
   const isComplete = useCallback(
     (item: JudgeProjectView) =>
@@ -174,11 +128,7 @@ export default function EventJudgingPanel({
   const canScore = Boolean(panel?.judgingOpen);
 
   async function save(): Promise<boolean> {
-    const currentSession = session.current;
-    if (!project || !panel || !currentSession || saving) return false;
-    const sourceUrl = window.location.href;
-    const isCurrentSelection = () =>
-      session.current === currentSession && window.location.href === sourceUrl;
+    if (!project || !panel) return false;
     setSaving(true);
     setNotice(null);
     try {
@@ -194,53 +144,38 @@ export default function EventJudgingPanel({
         }
       );
       const body = await response.json().catch(() => null);
-      if (session.current !== currentSession) return false;
       if (!response.ok) {
-        if (isCurrentSelection()) {
-          setNotice({
-            tone: 'danger',
-            text: body?.message ?? 'Unable to save scores.',
-          });
-        }
+        setNotice({
+          tone: 'danger',
+          text: body?.message ?? 'Unable to save scores.',
+        });
         return false;
       }
-      setLoadedPanel(current =>
-        current?.eventId === eventId && current.judgeToken === judgeToken
+      setPanel(current =>
+        current
           ? {
               ...current,
-              payload: {
-                ...current.payload,
-                tracks: current.payload.tracks.map(item => ({
-                  ...item,
-                  projects: item.projects.map(entry =>
-                    entry.submissionId === project.submissionId
-                      ? { ...entry, review: body }
-                      : entry
-                  ),
-                })),
-              },
+              tracks: current.tracks.map(item => ({
+                ...item,
+                projects: item.projects.map(entry =>
+                  entry.submissionId === project.submissionId
+                    ? { ...entry, review: body }
+                    : entry
+                ),
+              })),
             }
           : current
       );
-      setDrafts(current => {
-        const next = { ...current };
-        delete next[project.submissionId];
-        return next;
+      setNotice({
+        tone: 'success',
+        text: `Saved scores for ${project.title}.`,
       });
-      if (isCurrentSelection()) {
-        setNotice({
-          tone: 'success',
-          text: `Saved scores for ${project.title}.`,
-        });
-      }
       return true;
     } catch {
-      if (isCurrentSelection()) {
-        setNotice({ tone: 'danger', text: 'Unable to save scores.' });
-      }
+      setNotice({ tone: 'danger', text: 'Unable to save scores.' });
       return false;
     } finally {
-      if (session.current === currentSession) setSaving(false);
+      setSaving(false);
     }
   }
 
@@ -250,6 +185,7 @@ export default function EventJudgingPanel({
     if (canScore && dirty && !(await save())) return;
     if (window.location.href !== sourceUrl) return;
     updateJudgingUrl(trackId, nextIndex);
+    setIndex(nextIndex);
     setNotice(null);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
@@ -258,8 +194,9 @@ export default function EventJudgingPanel({
     const sourceUrl = window.location.href;
     if (canScore && dirty && !(await save())) return;
     if (window.location.href !== sourceUrl) return;
-    const nextTrack = panel?.tracks.find(item => item.id === nextTrackId);
-    updateJudgingUrl(nextTrackId, nextTrack?.projects.length ? 0 : null);
+    updateJudgingUrl(nextTrackId, 0);
+    setTrackId(nextTrackId);
+    setIndex(0);
     setNotice(null);
   }
 
@@ -599,7 +536,7 @@ export default function EventJudgingPanel({
                                 ? 'border-gray-700 hover:bg-gray-800'
                                 : 'border-gray-300 hover:bg-gray-100'
                           }`}
-                          disabled={!canScore || saving}
+                          disabled={!canScore}
                           key={score}
                           onClick={() =>
                             setDraft(current => ({
@@ -628,7 +565,7 @@ export default function EventJudgingPanel({
                 </span>
                 <textarea
                   className={`${classes.textarea} !min-h-24`}
-                  disabled={!canScore || saving}
+                  disabled={!canScore}
                   onChange={event =>
                     setDraft(current => ({
                       ...current,
