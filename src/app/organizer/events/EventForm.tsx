@@ -1407,9 +1407,7 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
                     type="checkbox"
                   />
                   <span className="text-sm font-semibold">
-                    {applicationsOpen
-                      ? 'Applications open'
-                      : 'Applications closed'}
+                    Applications open
                   </span>
                 </label>
                 <label className="grid gap-2">
