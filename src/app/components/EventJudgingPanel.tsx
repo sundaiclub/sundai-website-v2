@@ -21,6 +21,14 @@ function judgeHeaders(token: string | null): Record<string, string> {
   return token ? { [JUDGE_TOKEN_HEADER]: token } : {};
 }
 
+function updateJudgingUrl(trackId: string, index: number | null) {
+  const url = new URL(window.location.href);
+  url.searchParams.set('track', trackId);
+  if (index === null) url.searchParams.delete('project');
+  else url.searchParams.set('project', String(index + 1));
+  window.history.replaceState(window.history.state, '', url);
+}
+
 type Draft = { scores: Record<string, number>; comment: string };
 
 function draftFor(project: JudgeProjectView | undefined): Draft {
@@ -71,12 +79,29 @@ export default function EventJudgingPanel({
           throw new Error(body?.message || 'Unable to load judging.');
         if (!current) return;
         const payload = body as JudgePanelPayload;
+        const params = new URLSearchParams(window.location.search);
+        const selectedTrack =
+          payload.tracks.find(track => track.id === params.get('track')) ??
+          payload.tracks.find(track => track.projects.length > 0) ??
+          payload.tracks[0];
+        const projectParam = params.get('project') ?? '';
+        const projectNumber = /^[1-9]\d*$/.test(projectParam)
+          ? Number(projectParam)
+          : NaN;
+        const selectedIndex =
+          Number.isSafeInteger(projectNumber) &&
+          projectNumber <= (selectedTrack?.projects.length ?? 0)
+            ? projectNumber - 1
+            : 0;
         setPanel(payload);
-        setTrackId(
-          payload.tracks.find(track => track.projects.length > 0)?.id ??
-            payload.tracks[0]?.id ??
-            ''
-        );
+        setTrackId(selectedTrack?.id ?? '');
+        setIndex(selectedIndex);
+        if (payload.assignmentsPublished && selectedTrack) {
+          updateJudgingUrl(
+            selectedTrack.id,
+            selectedTrack.projects.length > 0 ? selectedIndex : null
+          );
+        }
         setLoadError('');
         if (!payload.assignmentsPublished) timer = setTimeout(load, 15000);
       } catch (error) {
@@ -166,6 +191,7 @@ export default function EventJudgingPanel({
   /** Saves pending changes before moving, so judges never lose scores. */
   async function goTo(nextIndex: number) {
     if (canScore && dirty && !(await save())) return;
+    updateJudgingUrl(trackId, nextIndex);
     setIndex(nextIndex);
     setNotice(null);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -173,6 +199,8 @@ export default function EventJudgingPanel({
 
   async function changeTrack(nextTrackId: string) {
     if (canScore && dirty && !(await save())) return;
+    const nextTrack = panel?.tracks.find(item => item.id === nextTrackId);
+    updateJudgingUrl(nextTrackId, nextTrack?.projects.length ? 0 : null);
     setTrackId(nextTrackId);
     setIndex(0);
     setNotice(null);
