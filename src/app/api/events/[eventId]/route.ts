@@ -295,6 +295,9 @@ export async function GET(
       ...(event.meetingUrl ? { meetingUrl: event.meetingUrl } : {}),
       canViewPitch: true,
       pitchPhase,
+      pitchSession: publicEvent.pitchSession
+        ? { phase: publicEvent.pitchSession.phase }
+        : null,
       canManagePitch: viewerCanManagePitch,
       staff: pitchEvent?.staff ?? [],
       pitchSessions: pitchEvent?.pitchSessions ?? [],

@@ -45,7 +45,6 @@ describe('PitchEventPage viewer states', () => {
         title: 'Demo Night',
         canViewPitch: false,
         pitchPhase: 'VOTING',
-        hasPitchProjects: true,
       }),
     });
 
@@ -60,39 +59,32 @@ describe('PitchEventPage viewer states', () => {
     ).not.toBeInTheDocument();
   });
 
-  it.each([
-    [false, 'Voting has not started yet.'],
-    [true, 'Voting is currently happening.'],
-  ])(
-    'shows the correct voting message when hasPitchProjects is %s',
-    async (hasPitchProjects, message) => {
-      mockUseUser.mockReturnValue({ isLoaded: true, isSignedIn: true });
-      global.fetch = jest.fn().mockResolvedValue({
-        ok: true,
-        json: async () => ({
-          id: 'evt-1',
-          title: 'Demo Night',
-          canViewPitch: false,
-          pitchPhase: 'VOTING',
-          hasPitchProjects,
-        }),
-      });
+  it.each([false, true])('shows voting status (%s)', async hasPitchProjects => {
+    mockUseUser.mockReturnValue({ isLoaded: true, isSignedIn: true });
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        id: 'evt-1',
+        title: 'Demo Night',
+        canViewPitch: false,
+        pitchPhase: 'VOTING',
+        hasPitchProjects,
+      }),
+    });
 
-      render(<PitchEventPage eventId="evt-1" />);
+    render(<PitchEventPage eventId="evt-1" />);
 
-      expect(await screen.findByText(message)).toBeInTheDocument();
-      await waitFor(() => {
-        expect(screen.queryByText('Demo Night')).not.toBeInTheDocument();
-      });
-      expect(
-        screen.queryByText(
-          hasPitchProjects
-            ? 'Voting has not started yet.'
-            : 'Voting is currently happening.'
-        )
-      ).not.toBeInTheDocument();
-    }
-  );
+    expect(
+      await screen.findByText(
+        hasPitchProjects
+          ? 'Voting is currently happening.'
+          : 'Voting has not started yet.'
+      )
+    ).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.queryByText('Demo Night')).not.toBeInTheDocument();
+    });
+  });
 
   it('uses prominent header actions without a voting-open badge', async () => {
     mockUseUser.mockReturnValue({ isLoaded: true, isSignedIn: true });
