@@ -423,6 +423,8 @@ it('updates the URL only after pending scores save successfully', async () => {
   fireEvent.click(screen.getAllByRole('button', { name: /Save & next/ })[0]);
   expect(new URLSearchParams(window.location.search).get('project')).toBe('1');
   expect(screen.getByText('Assigned project')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'demo: 6' })).toBeDisabled();
+  expect(screen.getByRole('textbox')).toBeDisabled();
 
   await act(async () => {
     finishSave({
@@ -432,11 +434,241 @@ it('updates the URL only after pending scores save successfully', async () => {
   });
   expect(await screen.findByText('Second project')).toBeInTheDocument();
   expect(new URLSearchParams(window.location.search).get('project')).toBe('2');
+  expect(screen.getByRole('button', { name: 'demo: 6' })).toBeEnabled();
+  expect(screen.getByRole('textbox')).toBeEnabled();
   expect(global.fetch).toHaveBeenLastCalledWith(
     '/api/judging/event/reviews/s1',
     expect.objectContaining({
       method: 'PUT',
       body: JSON.stringify({ scores: { idea: 4, demo: 5 }, comment: '' }),
+    })
+  );
+});
+
+it.each(['project', 'track'])(
+  'does not let a pending save-and-%s action overwrite a newer URL',
+  async action => {
+    let finishSave!: (value: unknown) => void;
+    global.fetch = jest
+      .fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => multipleTracks })
+      .mockReturnValueOnce(
+        new Promise(resolve => {
+          finishSave = resolve;
+        })
+      );
+    render(<EventJudgingPanel eventId="event" judgeToken="token" />);
+    expect(await screen.findByText('Assigned project')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'demo: 5' }));
+    fireEvent.click(
+      action === 'project'
+        ? screen.getAllByRole('button', { name: /Save & next/ })[0]
+        : screen.getByRole('button', { name: /Judge B/ })
+    );
+
+    act(() => {
+      window.history.replaceState(
+        null,
+        '',
+        '?tab=judging&track=b&project=2&judge=token'
+      );
+    });
+    expect(
+      await screen.findByText('Other track second project')
+    ).toBeInTheDocument();
+    const destination = window.location.href;
+    await act(async () => {
+      finishSave({
+        ok: true,
+        json: async () => ({ scores: { idea: 4, demo: 5 }, comment: '' }),
+      });
+    });
+    expect(window.location.href).toBe(destination);
+    expect(screen.getByText('Other track second project')).toBeInTheDocument();
+    expect(
+      screen.queryByText(/Saved scores for Assigned project/)
+    ).not.toBeInTheDocument();
+  }
+);
+
+it('does not rewrite a new event URL when an old save completes', async () => {
+  let finishSave!: (value: unknown) => void;
+  global.fetch = jest
+    .fn()
+    .mockResolvedValueOnce({ ok: true, json: async () => multipleTracks })
+    .mockReturnValueOnce(
+      new Promise(resolve => {
+        finishSave = resolve;
+      })
+    )
+    .mockReturnValueOnce(new Promise(() => {}));
+  const view = render(<EventJudgingPanel eventId="event" judgeToken="token" />);
+  expect(await screen.findByText('Assigned project')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'demo: 5' }));
+  fireEvent.click(screen.getAllByRole('button', { name: /Save & next/ })[0]);
+  replaceState(
+    routerState,
+    '',
+    '/events/boston/other?tab=judging&track=other&project=4'
+  );
+  view.rerender(<EventJudgingPanel eventId="other" judgeToken="token" />);
+  const destination = window.location.href;
+  await act(async () => {
+    finishSave({
+      ok: true,
+      json: async () => ({ scores: { idea: 4, demo: 5 }, comment: '' }),
+    });
+  });
+  expect(window.location.href).toBe(destination);
+  expect(screen.getByText('Loading judging…')).toBeInTheDocument();
+});
+
+it('does not show a stale save error after navigating to another project', async () => {
+  let finishSave!: (value: unknown) => void;
+  global.fetch = jest
+    .fn()
+    .mockResolvedValueOnce({ ok: true, json: async () => multipleTracks })
+    .mockReturnValueOnce(
+      new Promise(resolve => {
+        finishSave = resolve;
+      })
+    );
+  render(<EventJudgingPanel eventId="event" judgeToken="token" />);
+  expect(await screen.findByText('Assigned project')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'demo: 5' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Save scores' }));
+  act(() => {
+    window.history.replaceState(
+      null,
+      '',
+      '?tab=judging&track=a&project=2&judge=token'
+    );
+  });
+  expect(await screen.findByText('Second project')).toBeInTheDocument();
+  await act(async () => {
+    finishSave({
+      ok: false,
+      json: async () => ({ message: 'Old project save failed' }),
+    });
+  });
+  expect(screen.queryByText('Old project save failed')).not.toBeInTheDocument();
+});
+
+it('preserves each project draft when browser history changes the selection', async () => {
+  global.fetch = jest
+    .fn()
+    .mockResolvedValue({ ok: true, json: async () => multipleTracks });
+  render(<EventJudgingPanel eventId="event" judgeToken="token" />);
+  expect(await screen.findByText('Assigned project')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'demo: 5' }));
+  fireEvent.change(screen.getByRole('textbox'), {
+    target: { value: 'First project note' },
+  });
+
+  act(() => {
+    replaceState(routerState, '', '?tab=judging&track=a&project=2&judge=token');
+    window.dispatchEvent(new PopStateEvent('popstate', { state: routerState }));
+  });
+  expect(await screen.findByText('Second project')).toBeInTheDocument();
+  expect(screen.getByRole('textbox')).toHaveValue('');
+  expect(screen.getByRole('button', { name: 'demo: 5' })).toHaveAttribute(
+    'aria-pressed',
+    'false'
+  );
+  fireEvent.click(screen.getByRole('button', { name: 'idea: 7' }));
+  fireEvent.change(screen.getByRole('textbox'), {
+    target: { value: 'Second project note' },
+  });
+
+  act(() => {
+    replaceState(routerState, '', '?tab=judging&track=a&project=1&judge=token');
+    window.dispatchEvent(new PopStateEvent('popstate', { state: routerState }));
+  });
+  expect(await screen.findByText('Assigned project')).toBeInTheDocument();
+  expect(screen.getByRole('textbox')).toHaveValue('First project note');
+  expect(screen.getByRole('button', { name: 'demo: 5' })).toHaveAttribute(
+    'aria-pressed',
+    'true'
+  );
+
+  act(() => {
+    replaceState(routerState, '', '?tab=judging&track=a&project=2&judge=token');
+    window.dispatchEvent(new PopStateEvent('popstate', { state: routerState }));
+  });
+  expect(await screen.findByText('Second project')).toBeInTheDocument();
+  expect(screen.getByRole('textbox')).toHaveValue('Second project note');
+  expect(screen.getByRole('button', { name: 'idea: 7' })).toHaveAttribute(
+    'aria-pressed',
+    'true'
+  );
+  expect(global.fetch).toHaveBeenCalledTimes(1);
+});
+
+it('ignores an old judge session save while a new judge is saving', async () => {
+  let finishOldSave!: (value: unknown) => void;
+  let finishNewSave!: (value: unknown) => void;
+  global.fetch = jest
+    .fn()
+    .mockResolvedValueOnce({ ok: true, json: async () => multipleTracks })
+    .mockReturnValueOnce(
+      new Promise(resolve => {
+        finishOldSave = resolve;
+      })
+    )
+    .mockResolvedValueOnce({ ok: true, json: async () => multipleTracks })
+    .mockReturnValueOnce(
+      new Promise(resolve => {
+        finishNewSave = resolve;
+      })
+    );
+  const view = render(<EventJudgingPanel eventId="event" judgeToken="token" />);
+  expect(await screen.findByText('Assigned project')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'demo: 5' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Save scores' }));
+
+  replaceState(
+    routerState,
+    '',
+    '?tab=judging&track=a&project=1&judge=new-token'
+  );
+  view.rerender(<EventJudgingPanel eventId="event" judgeToken="new-token" />);
+  expect(await screen.findByText('Assigned project')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'demo: 5' })).toHaveAttribute(
+    'aria-pressed',
+    'false'
+  );
+  fireEvent.click(screen.getByRole('button', { name: 'demo: 7' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Save scores' }));
+
+  await act(async () => {
+    finishOldSave({
+      ok: true,
+      json: async () => ({ scores: { idea: 4, demo: 5 }, comment: '' }),
+    });
+  });
+  expect(screen.getByRole('button', { name: 'demo: 7' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'demo: 7' })).toHaveAttribute(
+    'aria-pressed',
+    'true'
+  );
+  expect(screen.queryByText(/Saved scores for/)).not.toBeInTheDocument();
+
+  await act(async () => {
+    finishNewSave({
+      ok: true,
+      json: async () => ({ scores: { idea: 4, demo: 7 }, comment: '' }),
+    });
+  });
+  expect(screen.getByRole('button', { name: 'demo: 7' })).toBeEnabled();
+  expect(screen.getByRole('button', { name: 'demo: 7' })).toHaveAttribute(
+    'aria-pressed',
+    'true'
+  );
+  expect(global.fetch).toHaveBeenLastCalledWith(
+    '/api/judging/event/reviews/s1',
+    expect.objectContaining({
+      headers: expect.objectContaining({ 'x-judge-token': 'new-token' }),
+      body: JSON.stringify({ scores: { idea: 4, demo: 7 }, comment: '' }),
     })
   );
 });

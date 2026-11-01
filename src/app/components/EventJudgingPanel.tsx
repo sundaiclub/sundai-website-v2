@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {
   ManagementAlert,
@@ -72,14 +72,21 @@ export default function EventJudgingPanel({
       ? loadedPanel.payload
       : null;
   const [loadError, setLoadError] = useState('');
-  const [draft, setDraft] = useState<Draft>({ scores: {}, comment: '' });
+  const [drafts, setDrafts] = useState<Record<string, Draft>>({});
   const [saving, setSaving] = useState(false);
+  const session = useRef<object | null>(null);
   const [notice, setNotice] = useState<{
     tone: 'success' | 'danger';
     text: string;
   } | null>(null);
 
   useEffect(() => {
+    const currentSession = {};
+    session.current = currentSession;
+    setDrafts({});
+    setSaving(false);
+    setNotice(null);
+    setLoadError('');
     let current = true;
     let timer: ReturnType<typeof setTimeout> | undefined;
     async function load() {
@@ -107,6 +114,7 @@ export default function EventJudgingPanel({
     load();
     return () => {
       current = false;
+      session.current = null;
       clearTimeout(timer);
     };
   }, [eventId, judgeToken]);
@@ -126,6 +134,19 @@ export default function EventJudgingPanel({
       ? projectNumber - 1
       : 0;
   const project = projects[index];
+  const draft = project
+    ? (drafts[project.submissionId] ?? draftFor(project))
+    : draftFor(undefined);
+
+  function setDraft(update: (current: Draft) => Draft) {
+    if (!project) return;
+    setDrafts(current => ({
+      ...current,
+      [project.submissionId]: update(
+        current[project.submissionId] ?? draftFor(project)
+      ),
+    }));
+  }
 
   useEffect(() => {
     if (panel?.assignmentsPublished && trackId) {
@@ -140,8 +161,8 @@ export default function EventJudgingPanel({
   ]);
 
   useEffect(() => {
-    setDraft(draftFor(project));
-  }, [project]);
+    setNotice(null);
+  }, [eventId, judgeToken, project?.submissionId]);
 
   const isComplete = useCallback(
     (item: JudgeProjectView) =>
@@ -153,7 +174,11 @@ export default function EventJudgingPanel({
   const canScore = Boolean(panel?.judgingOpen);
 
   async function save(): Promise<boolean> {
-    if (!project || !panel) return false;
+    const currentSession = session.current;
+    if (!project || !panel || !currentSession || saving) return false;
+    const sourceUrl = window.location.href;
+    const isCurrentSelection = () =>
+      session.current === currentSession && window.location.href === sourceUrl;
     setSaving(true);
     setNotice(null);
     try {
@@ -169,11 +194,14 @@ export default function EventJudgingPanel({
         }
       );
       const body = await response.json().catch(() => null);
+      if (session.current !== currentSession) return false;
       if (!response.ok) {
-        setNotice({
-          tone: 'danger',
-          text: body?.message ?? 'Unable to save scores.',
-        });
+        if (isCurrentSelection()) {
+          setNotice({
+            tone: 'danger',
+            text: body?.message ?? 'Unable to save scores.',
+          });
+        }
         return false;
       }
       setLoadedPanel(current =>
@@ -194,29 +222,42 @@ export default function EventJudgingPanel({
             }
           : current
       );
-      setNotice({
-        tone: 'success',
-        text: `Saved scores for ${project.title}.`,
+      setDrafts(current => {
+        const next = { ...current };
+        delete next[project.submissionId];
+        return next;
       });
+      if (isCurrentSelection()) {
+        setNotice({
+          tone: 'success',
+          text: `Saved scores for ${project.title}.`,
+        });
+      }
       return true;
     } catch {
-      setNotice({ tone: 'danger', text: 'Unable to save scores.' });
+      if (isCurrentSelection()) {
+        setNotice({ tone: 'danger', text: 'Unable to save scores.' });
+      }
       return false;
     } finally {
-      setSaving(false);
+      if (session.current === currentSession) setSaving(false);
     }
   }
 
   /** Saves pending changes before moving, so judges never lose scores. */
   async function goTo(nextIndex: number) {
+    const sourceUrl = window.location.href;
     if (canScore && dirty && !(await save())) return;
+    if (window.location.href !== sourceUrl) return;
     updateJudgingUrl(trackId, nextIndex);
     setNotice(null);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   async function changeTrack(nextTrackId: string) {
+    const sourceUrl = window.location.href;
     if (canScore && dirty && !(await save())) return;
+    if (window.location.href !== sourceUrl) return;
     const nextTrack = panel?.tracks.find(item => item.id === nextTrackId);
     updateJudgingUrl(nextTrackId, nextTrack?.projects.length ? 0 : null);
     setNotice(null);
@@ -558,7 +599,7 @@ export default function EventJudgingPanel({
                                 ? 'border-gray-700 hover:bg-gray-800'
                                 : 'border-gray-300 hover:bg-gray-100'
                           }`}
-                          disabled={!canScore}
+                          disabled={!canScore || saving}
                           key={score}
                           onClick={() =>
                             setDraft(current => ({
@@ -587,7 +628,7 @@ export default function EventJudgingPanel({
                 </span>
                 <textarea
                   className={`${classes.textarea} !min-h-24`}
-                  disabled={!canScore}
+                  disabled={!canScore || saving}
                   onChange={event =>
                     setDraft(current => ({
                       ...current,
