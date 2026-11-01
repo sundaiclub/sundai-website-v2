@@ -410,32 +410,54 @@ describe('/api/events/[eventId]', () => {
     expect(body).not.toHaveProperty('phase');
   });
 
-  it('GET hides voting from signed-in viewers who are not part of the event', async () => {
-    mockAuth.mockReturnValue({ userId: 'clerk-viewer' });
-    prisma.hacker.findUnique.mockResolvedValue({
-      id: 'h-viewer',
-      role: 'HACKER',
-    });
-    prisma.event.findFirst.mockResolvedValue(
-      buildPublicEvent({ pitchSessions: [{ phase: 'VOTING' }] })
-    );
+  it.each([0, 2])(
+    'GET reports pitch queue availability with %i projects without exposing voting',
+    async projectCount => {
+      mockAuth.mockReturnValue({ userId: 'clerk-viewer' });
+      prisma.hacker.findUnique.mockResolvedValue({
+        id: 'h-viewer',
+        role: 'HACKER',
+      });
+      prisma.event.findFirst.mockResolvedValue(
+        buildPublicEvent({
+          pitchSessions: [
+            { phase: 'VOTING', _count: { projects: projectCount } },
+          ],
+        })
+      );
 
-    const response = await GET_EVENT(
-      new NextRequest('http://localhost:3000/api/events/evt-1') as any,
-      { params: { eventId: 'evt-1' } } as any
-    );
-    const body = await response.json();
+      const response = await GET_EVENT(
+        new NextRequest('http://localhost:3000/api/events/evt-1') as any,
+        { params: { eventId: 'evt-1' } } as any
+      );
+      const body = await response.json();
 
-    expect(response.status).toBe(200);
-    expect(body).toEqual(
-      expect.objectContaining({
-        canViewPitch: false,
-        pitchPhase: 'VOTING',
-      })
-    );
-    expect(body).not.toHaveProperty('pitchSessions');
-    expect(prisma.event.findUnique).not.toHaveBeenCalled();
-  });
+      expect(response.status).toBe(200);
+      expect(body).toEqual(
+        expect.objectContaining({
+          canViewPitch: false,
+          pitchPhase: 'VOTING',
+          hasPitchProjects: projectCount > 0,
+        })
+      );
+      expect(body).not.toHaveProperty('pitchSessions');
+      expect(prisma.event.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          select: expect.objectContaining({
+            pitchSessions: {
+              select: {
+                phase: true,
+                _count: { select: { projects: true } },
+              },
+              orderBy: { createdAt: 'asc' },
+              take: 1,
+            },
+          }),
+        })
+      );
+      expect(prisma.event.findUnique).not.toHaveBeenCalled();
+    }
+  );
 
   it('GET exposes the usual pitch UI once pitching starts to signed-in viewers', async () => {
     mockAuth.mockReturnValue({ userId: 'clerk-viewer' });

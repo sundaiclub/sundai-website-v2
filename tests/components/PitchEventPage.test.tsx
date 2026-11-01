@@ -45,6 +45,7 @@ describe('PitchEventPage viewer states', () => {
         title: 'Demo Night',
         canViewPitch: false,
         pitchPhase: 'VOTING',
+        hasPitchProjects: true,
       }),
     });
 
@@ -59,27 +60,39 @@ describe('PitchEventPage viewer states', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('shows the voting-in-progress message to signed-in non-attendees', async () => {
-    mockUseUser.mockReturnValue({ isLoaded: true, isSignedIn: true });
-    global.fetch = jest.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        id: 'evt-1',
-        title: 'Demo Night',
-        canViewPitch: false,
-        pitchPhase: 'VOTING',
-      }),
-    });
+  it.each([
+    [false, 'Voting has not started yet.'],
+    [true, 'Voting is currently happening.'],
+  ])(
+    'shows the correct voting message when hasPitchProjects is %s',
+    async (hasPitchProjects, message) => {
+      mockUseUser.mockReturnValue({ isLoaded: true, isSignedIn: true });
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          id: 'evt-1',
+          title: 'Demo Night',
+          canViewPitch: false,
+          pitchPhase: 'VOTING',
+          hasPitchProjects,
+        }),
+      });
 
-    render(<PitchEventPage eventId="evt-1" />);
+      render(<PitchEventPage eventId="evt-1" />);
 
-    expect(
-      await screen.findByText('Voting is currently happening.')
-    ).toBeInTheDocument();
-    await waitFor(() => {
-      expect(screen.queryByText('Demo Night')).not.toBeInTheDocument();
-    });
-  });
+      expect(await screen.findByText(message)).toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.queryByText('Demo Night')).not.toBeInTheDocument();
+      });
+      expect(
+        screen.queryByText(
+          hasPitchProjects
+            ? 'Voting has not started yet.'
+            : 'Voting is currently happening.'
+        )
+      ).not.toBeInTheDocument();
+    }
+  );
 
   it('uses prominent header actions without a voting-open badge', async () => {
     mockUseUser.mockReturnValue({ isLoaded: true, isSignedIn: true });
