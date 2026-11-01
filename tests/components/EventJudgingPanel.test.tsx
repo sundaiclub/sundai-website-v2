@@ -8,6 +8,25 @@ import {
 } from '@testing-library/react';
 import EventJudgingPanel from '@/app/components/EventJudgingPanel';
 import type { JudgePanelPayload } from '@/types/judging';
+import { useSearchParams } from 'next/navigation';
+
+jest.mock('next/navigation', () => ({
+  useSearchParams: () => {
+    const React = require('react');
+    const search = React.useSyncExternalStore(
+      (onChange: () => void) => {
+        window.addEventListener('popstate', onChange);
+        window.addEventListener('test:replace-state', onChange);
+        return () => {
+          window.removeEventListener('popstate', onChange);
+          window.removeEventListener('test:replace-state', onChange);
+        };
+      },
+      () => window.location.search
+    );
+    return React.useMemo(() => new URLSearchParams(search), [search]);
+  },
+}));
 
 jest.mock('@/app/contexts/ThemeContext', () => ({
   useTheme: () => ({ theme: 'light' }),
@@ -101,13 +120,59 @@ const multipleTracks: JudgePanelPayload = {
   ],
 };
 
+const replaceState = window.history.replaceState.bind(window.history);
+const routerState = {
+  __NA: true,
+  __PRIVATE_NEXTJS_INTERNALS_TREE: ['event'],
+};
+
 beforeEach(() => {
-  window.history.replaceState(
-    { preserved: true },
+  replaceState(
+    { ...routerState, preserved: true },
     '',
     '/events/boston/hackathon?tab=judging&judge=token#scores'
   );
+  // Model the App Router's history wrapper: internal Next.js calls bypass
+  // synchronization; external calls notify useSearchParams and retain its state.
+  jest
+    .spyOn(window.history, 'replaceState')
+    .mockImplementation((data, title, url) => {
+      if (data?.__NA || data?._N) {
+        replaceState(data, title, url);
+        return;
+      }
+      replaceState({ ...data, ...routerState }, title, url);
+      window.dispatchEvent(new Event('test:replace-state'));
+    });
   window.scrollTo = jest.fn();
+});
+
+afterEach(() => {
+  jest.restoreAllMocks();
+});
+
+function RouterProject() {
+  const params = useSearchParams();
+  return <output aria-label="Router project">{params.get('project')}</output>;
+}
+
+it('keeps Next.js search parameters synchronized when using project buttons', async () => {
+  global.fetch = jest
+    .fn()
+    .mockResolvedValue({ ok: true, json: async () => multipleTracks });
+  render(
+    <>
+      <EventJudgingPanel eventId="event" judgeToken="token" />
+      <RouterProject />
+    </>
+  );
+  expect(await screen.findByText('Assigned project')).toBeInTheDocument();
+  fireEvent.click(
+    (await screen.findAllByRole('button', { name: /Next project/ }))[0]
+  );
+  await waitFor(() =>
+    expect(screen.getByLabelText('Router project')).toHaveTextContent('2')
+  );
 });
 
 it('does not count a partial review as complete', async () => {
@@ -175,7 +240,7 @@ it('updates the project number on navigation and restores it after refresh', asy
     'token'
   );
   expect(window.location.hash).toBe('#scores');
-  expect(window.history.state).toEqual({ preserved: true });
+  expect(window.history.state).toEqual({ ...routerState, preserved: true });
 
   view.unmount();
   render(<EventJudgingPanel eventId="event" judgeToken="token" />);
@@ -187,6 +252,71 @@ it('updates the project number on navigation and restores it after refresh', asy
   );
   expect(await screen.findByText('Assigned project')).toBeInTheDocument();
   expect(new URLSearchParams(window.location.search).get('project')).toBe('1');
+});
+
+it('follows same-page URL navigation without refetching or remounting', async () => {
+  global.fetch = jest
+    .fn()
+    .mockResolvedValue({ ok: true, json: async () => multipleTracks });
+  render(<EventJudgingPanel eventId="event" judgeToken="token" />);
+  expect(await screen.findByText('Assigned project')).toBeInTheDocument();
+
+  act(() => {
+    window.history.replaceState(
+      null,
+      '',
+      '?tab=judging&track=b&project=2&judge=token'
+    );
+  });
+  expect(
+    await screen.findByText('Other track second project')
+  ).toBeInTheDocument();
+  expect(screen.getByText('You are now judging B')).toBeInTheDocument();
+  expect(global.fetch).toHaveBeenCalledTimes(1);
+});
+
+it('restores the displayed project when browser history changes', async () => {
+  global.fetch = jest
+    .fn()
+    .mockResolvedValue({ ok: true, json: async () => multipleTracks });
+  render(<EventJudgingPanel eventId="event" judgeToken="token" />);
+  expect(await screen.findByText('Assigned project')).toBeInTheDocument();
+
+  act(() => {
+    replaceState(routerState, '', '?tab=judging&track=b&project=2&judge=token');
+    window.dispatchEvent(new PopStateEvent('popstate', { state: routerState }));
+  });
+  expect(
+    await screen.findByText('Other track second project')
+  ).toBeInTheDocument();
+
+  act(() => {
+    replaceState(routerState, '', '?tab=judging&track=a&project=1&judge=token');
+    window.dispatchEvent(new PopStateEvent('popstate', { state: routerState }));
+  });
+  expect(await screen.findByText('Assigned project')).toBeInTheDocument();
+  expect(global.fetch).toHaveBeenCalledTimes(1);
+});
+
+it('does not normalize a new event URL with the previous event assignments', async () => {
+  global.fetch = jest
+    .fn()
+    .mockResolvedValueOnce({ ok: true, json: async () => multipleTracks })
+    .mockReturnValueOnce(new Promise(() => {}));
+  const view = render(<EventJudgingPanel eventId="event" judgeToken="token" />);
+  expect(await screen.findByText('Assigned project')).toBeInTheDocument();
+
+  replaceState(
+    routerState,
+    '',
+    '/events/boston/other?tab=judging&track=other&project=4'
+  );
+  view.rerender(<EventJudgingPanel eventId="other" judgeToken="token" />);
+  expect(screen.getByText('Loading judging…')).toBeInTheDocument();
+  expect(new URLSearchParams(window.location.search).get('track')).toBe(
+    'other'
+  );
+  expect(new URLSearchParams(window.location.search).get('project')).toBe('4');
 });
 
 it('restores the selected track and resets the project when changing tracks', async () => {
@@ -275,4 +405,38 @@ it('keeps the project and URL unchanged when saving before navigation fails', as
   await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(3));
   expect(screen.getByText('Assigned project')).toBeInTheDocument();
   expect(window.location.href).toBe(originalUrl);
+});
+
+it('updates the URL only after pending scores save successfully', async () => {
+  let finishSave!: (value: unknown) => void;
+  global.fetch = jest
+    .fn()
+    .mockResolvedValueOnce({ ok: true, json: async () => multipleTracks })
+    .mockReturnValueOnce(
+      new Promise(resolve => {
+        finishSave = resolve;
+      })
+    );
+  render(<EventJudgingPanel eventId="event" judgeToken="token" />);
+  expect(await screen.findByText('Assigned project')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'demo: 5' }));
+  fireEvent.click(screen.getAllByRole('button', { name: /Save & next/ })[0]);
+  expect(new URLSearchParams(window.location.search).get('project')).toBe('1');
+  expect(screen.getByText('Assigned project')).toBeInTheDocument();
+
+  await act(async () => {
+    finishSave({
+      ok: true,
+      json: async () => ({ scores: { idea: 4, demo: 5 }, comment: '' }),
+    });
+  });
+  expect(await screen.findByText('Second project')).toBeInTheDocument();
+  expect(new URLSearchParams(window.location.search).get('project')).toBe('2');
+  expect(global.fetch).toHaveBeenLastCalledWith(
+    '/api/judging/event/reviews/s1',
+    expect.objectContaining({
+      method: 'PUT',
+      body: JSON.stringify({ scores: { idea: 4, demo: 5 }, comment: '' }),
+    })
+  );
 });
