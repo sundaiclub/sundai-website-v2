@@ -1,5 +1,5 @@
 import React from 'react';
-import { act, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import EventJudgingPanel from '@/app/components/EventJudgingPanel';
 import type { JudgePanelPayload } from '@/types/judging';
 
@@ -54,6 +54,15 @@ const panel: JudgePanelPayload = {
   ],
 };
 
+beforeEach(() => {
+  window.history.replaceState(
+    null,
+    '',
+    '/events/boston/hackathon?tab=judging&judge=token#scores'
+  );
+  window.scrollTo = jest.fn();
+});
+
 it('does not count a partial review as complete', async () => {
   global.fetch = jest
     .fn()
@@ -67,6 +76,132 @@ it('does not count a partial review as complete', async () => {
     '/api/judging/event',
     expect.objectContaining({ headers: { 'x-judge-token': 'token' } })
   );
+});
+
+const assignedPanel: JudgePanelPayload = {
+  ...panel,
+  tracks: ['a', 'b'].map(id => ({
+    ...panel.tracks[0],
+    id,
+    name: id.toUpperCase(),
+    projects: [1, 2].map(number => ({
+      ...panel.tracks[0].projects[0],
+      submissionId: `${id}-${number}`,
+      title: `Project ${id}-${number}`,
+      review: null,
+    })),
+  })),
+};
+
+it('restores the track and project on refresh and updates the URL when navigating', async () => {
+  window.history.replaceState(
+    null,
+    '',
+    '?tab=judging&track=b&project=2&judge=token#scores'
+  );
+  global.fetch = jest
+    .fn()
+    .mockResolvedValue({ ok: true, json: async () => assignedPanel });
+  const view = render(<EventJudgingPanel eventId="event" judgeToken="token" />);
+  expect(await screen.findByText('Project b-2')).toBeInTheDocument();
+  fireEvent.click(
+    screen.getAllByRole('button', { name: /Previous project/ })[0]
+  );
+  expect(await screen.findByText('Project b-1')).toBeInTheDocument();
+  expect(window.location.search).toBe(
+    '?tab=judging&track=b&project=1&judge=token'
+  );
+  expect(window.location.hash).toBe('#scores');
+
+  view.unmount();
+  render(<EventJudgingPanel eventId="event" judgeToken="token" />);
+  expect(await screen.findByText('Project b-1')).toBeInTheDocument();
+  fireEvent.click(screen.getAllByRole('button', { name: /Next project/ })[0]);
+  expect(await screen.findByText('Project b-2')).toBeInTheDocument();
+  expect(new URLSearchParams(window.location.search).get('project')).toBe('2');
+  fireEvent.click(screen.getByRole('button', { name: /Judge A/ }));
+  expect(await screen.findByText('Project a-1')).toBeInTheDocument();
+  expect(window.location.search).toBe(
+    '?tab=judging&track=a&project=1&judge=token'
+  );
+});
+
+it.each(['', '0', '-1', '3', '1.5', 'invalid'])(
+  'defaults to the first assigned project for invalid project=%s',
+  async project => {
+    window.history.replaceState(
+      null,
+      '',
+      `?tab=judging&track=missing&project=${project}`
+    );
+    global.fetch = jest
+      .fn()
+      .mockResolvedValue({ ok: true, json: async () => assignedPanel });
+    render(<EventJudgingPanel eventId="event" judgeToken={null} />);
+    expect(await screen.findByText('Project a-1')).toBeInTheDocument();
+  }
+);
+
+const scored = { idea: 5, demo: 5 };
+
+function withScores(scoredIds: string[]): JudgePanelPayload {
+  return {
+    ...assignedPanel,
+    tracks: assignedPanel.tracks.map(track => ({
+      ...track,
+      projects: track.projects.map(project => ({
+        ...project,
+        review: scoredIds.includes(project.submissionId)
+          ? { scores: scored, comment: '', updatedAt: '2026-10-22T12:00:00Z' }
+          : null,
+      })),
+    })),
+  };
+}
+
+it.each([
+  ['', ['a-1'], 'Project a-2'],
+  ['', ['a-1', 'a-2'], 'Project b-1'],
+  ['', ['a-1', 'a-2', 'b-1', 'b-2'], 'Project a-1'],
+  ['&track=b', ['b-1'], 'Project b-2'],
+  ['&track=b', ['a-1', 'b-1', 'b-2'], 'Project a-2'],
+])(
+  'opens the first unscored project when the URL has no project (%s, scored %j)',
+  async (query, scoredIds, expected) => {
+    window.history.replaceState(null, '', `?tab=judging${query}`);
+    global.fetch = jest
+      .fn()
+      .mockResolvedValue({ ok: true, json: async () => withScores(scoredIds) });
+    render(<EventJudgingPanel eventId="event" judgeToken={null} />);
+    expect(await screen.findByText(expected)).toBeInTheDocument();
+  }
+);
+
+it('keeps the URL project on refresh even when it is already scored', async () => {
+  window.history.replaceState(null, '', '?tab=judging&track=a&project=1');
+  global.fetch = jest
+    .fn()
+    .mockResolvedValue({ ok: true, json: async () => withScores(['a-1']) });
+  render(<EventJudgingPanel eventId="event" judgeToken={null} />);
+  expect(await screen.findByText('Project a-1')).toBeInTheDocument();
+});
+
+it('keeps the URL unchanged when saving before navigation fails', async () => {
+  global.fetch = jest
+    .fn()
+    .mockResolvedValueOnce({ ok: true, json: async () => assignedPanel })
+    .mockResolvedValue({
+      ok: false,
+      json: async () => ({ message: 'Save failed' }),
+    });
+  render(<EventJudgingPanel eventId="event" judgeToken="token" />);
+  expect(await screen.findByText('Project a-1')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'demo: 5' }));
+  const url = window.location.href;
+  fireEvent.click(screen.getAllByRole('button', { name: /Save & next/ })[0]);
+  expect(await screen.findByText('Save failed')).toBeInTheDocument();
+  expect(window.location.href).toBe(url);
+  expect(screen.getByText('Project a-1')).toBeInTheDocument();
 });
 
 it('waits for publication and then loads the assigned list', async () => {

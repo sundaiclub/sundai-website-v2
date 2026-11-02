@@ -808,6 +808,7 @@ export async function loadJudgePanel(
             trackId: { in: trackIds },
             assignments: { some: { judgeId } },
           },
+          orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
           select: {
             id: true,
             trackId: true,
