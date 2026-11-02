@@ -117,6 +117,9 @@ it('restores the track and project on refresh and updates the URL when navigatin
   render(<EventJudgingPanel eventId="event" judgeToken="token" />);
   expect(await screen.findByText('Project b-1')).toBeInTheDocument();
   fireEvent.click(screen.getAllByRole('button', { name: /Next project/ })[0]);
+  fireEvent.click(
+    screen.getByRole('button', { name: 'Continue to next project anyway' })
+  );
   expect(await screen.findByText('Project b-2')).toBeInTheDocument();
   expect(new URLSearchParams(window.location.search).get('project')).toBe('2');
   fireEvent.click(screen.getByRole('button', { name: /Judge A/ }));
@@ -199,9 +202,80 @@ it('keeps the URL unchanged when saving before navigation fails', async () => {
   fireEvent.click(screen.getByRole('button', { name: 'demo: 5' }));
   const url = window.location.href;
   fireEvent.click(screen.getAllByRole('button', { name: /Save & next/ })[0]);
+  fireEvent.click(
+    screen.getByRole('button', { name: 'Continue to next project anyway' })
+  );
   expect(await screen.findByText('Save failed')).toBeInTheDocument();
   expect(window.location.href).toBe(url);
   expect(screen.getByText('Project a-1')).toBeInTheDocument();
+});
+
+it('confirms a save and offers the next project beside the save button', async () => {
+  global.fetch = jest
+    .fn()
+    .mockResolvedValueOnce({ ok: true, json: async () => assignedPanel })
+    .mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        scores: { demo: 5 },
+        comment: '',
+        updatedAt: '2026-10-22T12:00:00Z',
+      }),
+    });
+  render(<EventJudgingPanel eventId="event" judgeToken="token" />);
+  expect(await screen.findByText('Project a-1')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'demo: 5' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Save scores' }));
+  expect(
+    await screen.findByText('Scores for Project a-1 saved successfully.')
+  ).toBeInTheDocument();
+  const nextButtons = screen.getAllByRole('button', { name: /Next project/ });
+  fireEvent.click(nextButtons[nextButtons.length - 1]);
+  fireEvent.click(
+    screen.getByRole('button', { name: 'Continue to next project anyway' })
+  );
+  expect(await screen.findByText('Project a-2')).toBeInTheDocument();
+});
+
+it('warns about missing criteria before moving on and lets the judge stay', async () => {
+  global.fetch = jest
+    .fn()
+    .mockResolvedValue({ ok: true, json: async () => assignedPanel });
+  render(<EventJudgingPanel eventId="event" judgeToken="token" />);
+  expect(await screen.findByText('Project a-1')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'demo: 5' }));
+  fireEvent.click(screen.getAllByRole('button', { name: /Save & next/ })[0]);
+  const dialog = screen.getByRole('alertdialog');
+  expect(dialog).toHaveTextContent('idea');
+  expect(dialog).not.toHaveTextContent(/\bdemo\b/);
+  expect(dialog).toHaveTextContent("otherwise your score won't count");
+  fireEvent.click(
+    screen.getByRole('button', { name: 'Stay and finish scoring' })
+  );
+  expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+  expect(screen.getByText('Project a-1')).toBeInTheDocument();
+  expect(global.fetch).toHaveBeenCalledTimes(1);
+});
+
+it('moves on without a warning once every criterion is scored', async () => {
+  global.fetch = jest
+    .fn()
+    .mockResolvedValueOnce({ ok: true, json: async () => assignedPanel })
+    .mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        scores: scored,
+        comment: '',
+        updatedAt: '2026-10-22T12:00:00Z',
+      }),
+    });
+  render(<EventJudgingPanel eventId="event" judgeToken="token" />);
+  expect(await screen.findByText('Project a-1')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'idea: 5' }));
+  fireEvent.click(screen.getByRole('button', { name: 'demo: 5' }));
+  fireEvent.click(screen.getAllByRole('button', { name: /Save & next/ })[0]);
+  expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+  expect(await screen.findByText('Project a-2')).toBeInTheDocument();
 });
 
 it('waits for publication and then loads the assigned list', async () => {
