@@ -142,6 +142,50 @@ it.each(['', '0', '-1', '3', '1.5', 'invalid'])(
   }
 );
 
+const scored = { idea: 5, demo: 5 };
+
+function withScores(scoredIds: string[]): JudgePanelPayload {
+  return {
+    ...assignedPanel,
+    tracks: assignedPanel.tracks.map(track => ({
+      ...track,
+      projects: track.projects.map(project => ({
+        ...project,
+        review: scoredIds.includes(project.submissionId)
+          ? { scores: scored, comment: '', updatedAt: '2026-10-22T12:00:00Z' }
+          : null,
+      })),
+    })),
+  };
+}
+
+it.each([
+  ['', ['a-1'], 'Project a-2'],
+  ['', ['a-1', 'a-2'], 'Project b-1'],
+  ['', ['a-1', 'a-2', 'b-1', 'b-2'], 'Project a-1'],
+  ['&track=b', ['b-1'], 'Project b-2'],
+  ['&track=b', ['a-1', 'b-1', 'b-2'], 'Project a-2'],
+])(
+  'opens the first unscored project when the URL has no project (%s, scored %j)',
+  async (query, scoredIds, expected) => {
+    window.history.replaceState(null, '', `?tab=judging${query}`);
+    global.fetch = jest
+      .fn()
+      .mockResolvedValue({ ok: true, json: async () => withScores(scoredIds) });
+    render(<EventJudgingPanel eventId="event" judgeToken={null} />);
+    expect(await screen.findByText(expected)).toBeInTheDocument();
+  }
+);
+
+it('keeps the URL project on refresh even when it is already scored', async () => {
+  window.history.replaceState(null, '', '?tab=judging&track=a&project=1');
+  global.fetch = jest
+    .fn()
+    .mockResolvedValue({ ok: true, json: async () => withScores(['a-1']) });
+  render(<EventJudgingPanel eventId="event" judgeToken={null} />);
+  expect(await screen.findByText('Project a-1')).toBeInTheDocument();
+});
+
 it('keeps the URL unchanged when saving before navigation fails', async () => {
   global.fetch = jest
     .fn()
