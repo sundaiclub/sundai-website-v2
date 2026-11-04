@@ -1,4 +1,5 @@
 import { visibleProjectsWhere } from '@/lib/projectVisibility';
+import { publicFields, publicProjectSelect } from '@/lib/publicData';
 import prisma from '@/lib/prisma';
 import type { Prisma, PrismaClient } from '@prisma/client';
 import type { PublicEventProject } from '@/types/event-management';
@@ -22,7 +23,7 @@ function publicEventProjectSelect(eventId: string) {
         updatedAt: true,
         is_starred: true,
         is_broken: true,
-        thumbnail: { select: { url: true, alt: true, prompt: true } },
+        thumbnail: { select: { url: true, alt: true } },
         launchLead: {
           select: {
             id: true,
@@ -84,7 +85,7 @@ export function rankPublicEventProjects(
   return rows
     .map(row => ({
       project: {
-        ...row.project,
+        ...publicFields(row.project, publicProjectSelect),
         preview: row.project.preview ?? '',
         description: row.project.description ?? '',
         participants: row.project.participants.map(participant => ({

@@ -4,6 +4,7 @@ import {
   publicChapterWhere,
   visibleChapterWhere,
 } from '../../src/lib/chapters';
+import { publicChapterSelect, publicFields } from '@/lib/publicData';
 import {
   buildChapter,
   buildChapterAdminFixture,
@@ -110,7 +111,8 @@ describe('chapter helper indexed query shapes', () => {
       })
     ).resolves.toEqual([
       {
-        ...buildChapter(),
+        ...publicFields(buildChapter(), publicChapterSelect),
+        memberships: [],
         nextEvent,
       },
     ]);

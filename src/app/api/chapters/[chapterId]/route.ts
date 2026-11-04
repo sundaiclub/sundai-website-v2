@@ -1,4 +1,9 @@
 import { visibleProjectsWhere } from '@/lib/projectVisibility';
+import {
+  privateJson,
+  publicChapterSelect,
+  publicFields,
+} from '@/lib/publicData';
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import {
@@ -28,7 +33,11 @@ function chapterInclude(now: Date) {
     heroImage: { select: { id: true, url: true, alt: true, filename: true } },
     memberships: {
       where: { status: 'ACTIVE' as const, role: 'ADMIN' as const },
-      include: { hacker: { select: { id: true, name: true, email: true } } },
+      select: {
+        id: true,
+        role: true,
+        hacker: { select: { id: true, name: true } },
+      },
     },
     events: {
       where: {
@@ -51,7 +60,10 @@ function chapterInclude(now: Date) {
           },
         },
         projects: {
-          where: { cardStatus: 'APPROVED' as const, project: visibleProjectsWhere() },
+          where: {
+            cardStatus: 'APPROVED' as const,
+            project: visibleProjectsWhere(),
+          },
           select: {
             project: { select: chapterProjectSelect },
           },
@@ -234,10 +246,17 @@ export async function GET(
       ...project
     }: (typeof rankedProjects)[number]) => project;
 
-    return NextResponse.json({
-      ...chapterDetails,
+    return privateJson({
+      ...publicFields(chapterDetails, publicChapterSelect),
+      memberships: publicFields(chapter.memberships, {
+        id: true,
+        role: true,
+        hacker: { select: { id: true, name: true } },
+      }),
       ...(canManageChapter
         ? {
+            mailingListName: chapter.mailingListName,
+            mailingListExternalId: chapter.mailingListExternalId,
             defaultApprovalMessage,
             defaultWaitlistMessage,
             defaultRejectionMessage,
@@ -325,7 +344,7 @@ export async function PATCH(
       include: chapterInclude(now),
     });
 
-    return NextResponse.json(chapter);
+    return privateJson(chapter);
   } catch (error) {
     console.error('[CHAPTER_PATCH]', error);
     return new NextResponse('Internal Error', { status: 500 });

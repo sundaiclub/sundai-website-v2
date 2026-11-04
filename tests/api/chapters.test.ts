@@ -281,7 +281,7 @@ describe('/api/chapters', () => {
     );
   });
 
-  it('returns public chapter detail by slug with public metadata, mailing-list CTA data, and upcoming published events', async () => {
+  it('returns public chapter detail by slug with public metadata and upcoming published events', async () => {
     const chapter = buildChapter({
       id: 'chapter-boston',
       slug: 'boston',
@@ -360,8 +360,6 @@ describe('/api/chapters', () => {
       description: chapter.description,
       accessMode: 'PUBLIC',
       status: 'ACTIVE',
-      mailingListName: 'Boston builders',
-      mailingListExternalId: 'audience-boston-builders',
       upcomingEvents: [
         {
           id: 'event-boston-demo-night',
@@ -630,8 +628,6 @@ describe('/api/chapters', () => {
       id: chapter.id,
       slug: chapter.slug,
       accessMode: 'PRIVATE',
-      mailingListName: 'Cambridge builders',
-      mailingListExternalId: 'audience-cambridge-builders',
       viewerMembership: {
         id: invitedMembership.id,
         role: 'MEMBER',

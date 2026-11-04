@@ -1,4 +1,9 @@
 import { visibleProjectsWhere } from '@/lib/projectVisibility';
+import {
+  privateJson,
+  publicFields,
+  publicProjectSelect,
+} from '@/lib/publicData';
 import { HackType, Prisma, ProjectStatus } from '@prisma/client';
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
@@ -48,9 +53,15 @@ export async function GET(req: Request) {
         : [];
 
     const { userId } = await auth();
+    const viewer = userId
+      ? await prisma.hacker.findUnique({
+          where: { clerkId: userId },
+          select: { role: true },
+        })
+      : null;
     const projectWhere: Prisma.ProjectWhereInput = {
       AND: [
-        visibleProjectsWhere(userId),
+        visibleProjectsWhere(userId, viewer?.role === 'SITE_ADMIN'),
         status ? { status: status as ProjectStatus } : {},
         { hack_type },
         ...ignoredDomainTagsFilter,
@@ -59,36 +70,7 @@ export async function GET(req: Request) {
 
     const projects = await prisma.project.findMany({
       where: projectWhere,
-      include: {
-        thumbnail: {
-          select: {
-            url: true,
-            alt: true,
-          },
-        },
-        launchLead: {
-          include: {
-            avatar: true,
-          },
-        },
-        participants: {
-          include: {
-            hacker: {
-              include: {
-                avatar: true,
-              },
-            },
-          },
-        },
-        techTags: true,
-        domainTags: true,
-        likes: {
-          select: {
-            hackerId: true,
-            createdAt: true,
-          },
-        },
-      },
+      select: publicProjectSelect,
       orderBy: [
         {
           status: status === 'PENDING' ? 'asc' : 'desc',
@@ -106,7 +88,7 @@ export async function GET(req: Request) {
     });
 
     const serializedProjects = projects.map(project => ({
-      ...project,
+      ...publicFields(project, publicProjectSelect),
       likes: project.likes.map(like => ({
         hackerId: like.hackerId,
         createdAt: like.createdAt,
@@ -120,20 +102,17 @@ export async function GET(req: Request) {
         where: projectWhere,
       });
 
-      return NextResponse.json({
+      return privateJson({
         projects: serializedProjects.slice(0, safeLimit),
         hasMore: serializedProjects.length > safeLimit!,
         totalCount,
       });
     }
 
-    return NextResponse.json(serializedProjects);
+    return privateJson(serializedProjects);
   } catch (error) {
     console.error('Error fetching projects:', error);
-    return NextResponse.json(
-      { error: 'Error fetching projects' },
-      { status: 500 }
-    );
+    return privateJson({ error: 'Error fetching projects' }, { status: 500 });
   }
 }
 
@@ -150,7 +129,7 @@ export async function POST(req: Request) {
     const members = JSON.parse(formData.get('members') as string);
 
     if (!title) {
-      return NextResponse.json(
+      return privateJson(
         {
           message: 'Title is required',
         },
@@ -159,7 +138,7 @@ export async function POST(req: Request) {
     }
 
     if (!preview) {
-      return NextResponse.json(
+      return privateJson(
         {
           message: 'Preview is required',
         },
@@ -168,7 +147,7 @@ export async function POST(req: Request) {
     }
 
     if (preview.length > 100) {
-      return NextResponse.json(
+      return privateJson(
         {
           message: 'Preview must be 100 characters or less',
         },
@@ -201,7 +180,7 @@ export async function POST(req: Request) {
         select: { id: true },
       });
       if (events.length !== eventIds.length) {
-        return NextResponse.json(
+        return privateJson(
           {
             message:
               'One or more selected events are unavailable or submissions have closed',
@@ -246,17 +225,10 @@ export async function POST(req: Request) {
           })),
         },
       },
-      include: {
-        participants: {
-          include: {
-            hacker: true,
-          },
-        },
-        thumbnail: true,
-      },
+      select: publicProjectSelect,
     });
 
-    return NextResponse.json(project);
+    return privateJson(publicFields(project, publicProjectSelect));
   } catch (error) {
     console.error('[PROJECTS_POST]', error);
     return new NextResponse('Internal Error', { status: 500 });

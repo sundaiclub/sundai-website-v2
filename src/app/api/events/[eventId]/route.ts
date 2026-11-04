@@ -1,4 +1,5 @@
 import { visibleProjectsWhere } from '@/lib/projectVisibility';
+import { publicFields, publicProjectSelect } from '@/lib/publicData';
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import prisma from '@/lib/prisma';
@@ -267,18 +268,7 @@ export async function GET(
                 pitchVotes: {
                   select: { hackerId: true, value: true, createdAt: true },
                 },
-                project: {
-                  include: {
-                    thumbnail: true,
-                    launchLead: { include: { avatar: true } },
-                    participants: {
-                      include: { hacker: { include: { avatar: true } } },
-                    },
-                    techTags: true,
-                    domainTags: true,
-                    likes: { select: { hackerId: true, createdAt: true } },
-                  },
-                },
+                project: { select: publicProjectSelect },
               },
             },
           },
@@ -293,7 +283,13 @@ export async function GET(
       pitchPhase,
       canManagePitch: viewerCanManagePitch,
       staff: pitchEvent?.staff ?? [],
-      pitchSessions: pitchEvent?.pitchSessions ?? [],
+      pitchSessions: (pitchEvent?.pitchSessions ?? []).map(session => ({
+        ...session,
+        projects: session.projects.map(entry => ({
+          ...entry,
+          project: publicFields(entry.project, publicProjectSelect),
+        })),
+      })),
     });
   } catch (error) {
     console.error('[EVENT_GET]', error);
