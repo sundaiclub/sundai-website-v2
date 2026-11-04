@@ -1,4 +1,5 @@
 import prisma from "@/lib/prisma";
+import { publicChapterSelect, publicFields } from '@/lib/publicData';
 import {
   SMS_CONSENT_CONFIGURED,
   SMS_CONSENT_VERSION,
@@ -233,10 +234,14 @@ export async function listVisibleChapters(options: ListVisibleChaptersOptions = 
   return chapters.map((chapter) => {
     const { events, ...chapterFields } = chapter as Chapter & {
       events?: Array<Record<string, unknown>>;
+      memberships?: ChapterMembership[];
     };
 
     return {
-      ...chapterFields,
+      ...publicFields(chapterFields, publicChapterSelect),
+      ...(options.includeViewerMembership && viewerId
+        ? { memberships: publicFields(chapterFields.memberships ?? [], { hackerId: true, role: true, status: true }) }
+        : {}),
       nextEvent: events?.[0] ?? null,
     };
   }) as Chapter[];

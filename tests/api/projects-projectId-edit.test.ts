@@ -1,3 +1,4 @@
+import { publicFields, publicProjectSelect } from '@/lib/publicData';
 import { NextRequest } from 'next/server';
 import { PATCH } from '../../src/app/api/projects/[projectId]/edit/route';
 import prisma from '../../src/lib/prisma';
@@ -169,7 +170,7 @@ describe('/api/projects/[projectId]/edit', () => {
       const data = await response.json();
 
       expect(response.status).toBe(200);
-      expect(data).toEqual(mockUpdatedProject);
+      expect(data).toEqual(publicFields(mockUpdatedProject, publicProjectSelect));
       expect(mockPrisma.project.update).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
@@ -225,7 +226,7 @@ describe('/api/projects/[projectId]/edit', () => {
       const data = await response.json();
 
       expect(response.status).toBe(200);
-      expect(data).toEqual(mockUpdatedProject);
+      expect(data).toEqual(publicFields(mockUpdatedProject, publicProjectSelect));
     });
 
     it('should allow team member to edit project', async () => {
@@ -273,7 +274,7 @@ describe('/api/projects/[projectId]/edit', () => {
       const data = await response.json();
 
       expect(response.status).toBe(200);
-      expect(data).toEqual(mockUpdatedProject);
+      expect(data).toEqual(publicFields(mockUpdatedProject, publicProjectSelect));
     });
 
     it('should return 403 if non-admin tries to approve project', async () => {
@@ -420,7 +421,7 @@ describe('/api/projects/[projectId]/edit', () => {
       const data = await response.json();
 
       expect(response.status).toBe(200);
-      expect(data).toEqual(mockUpdatedProject);
+      expect(data).toEqual(publicFields(mockUpdatedProject, publicProjectSelect));
       expect(mockUploadToS3).toHaveBeenCalled();
     });
 
@@ -507,7 +508,7 @@ describe('/api/projects/[projectId]/edit', () => {
       const data = await response.json();
 
       expect(response.status).toBe(200);
-      expect(data).toEqual(mockUpdatedProject);
+      expect(data).toEqual(publicFields(mockUpdatedProject, publicProjectSelect));
     });
 
     it('should handle team management for admins and launch leads', async () => {
@@ -562,7 +563,7 @@ describe('/api/projects/[projectId]/edit', () => {
       const data = await response.json();
 
       expect(response.status).toBe(200);
-      expect(data).toEqual(mockUpdatedProject);
+      expect(data).toEqual(publicFields(mockUpdatedProject, publicProjectSelect));
     });
 
     it('should return 500 on internal error', async () => {
