@@ -1,4 +1,7 @@
 import { GET } from '../../src/app/api/hackers/route';
+import { auth } from '@clerk/nextjs/server';
+
+jest.mock('@clerk/nextjs/server', () => ({ auth: jest.fn() }));
 
 // Mock prisma
 jest.mock('../../src/lib/prisma', () => ({
@@ -21,6 +24,7 @@ describe('/api/hackers', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    (auth as jest.Mock).mockResolvedValue({ userId: 'clerk-123' });
     // Reset the mock implementation
     require('../../src/lib/prisma').default = mockPrisma;
   });
@@ -77,7 +81,7 @@ describe('/api/hackers', () => {
       const data = await response.json();
 
       expect(response.status).toBe(200);
-      expect(data).toEqual(mockHackers);
+      expect(data).toEqual(mockHackers.map(({ id, name }) => ({ id, name })));
     });
 
     it('should handle database errors', async () => {
