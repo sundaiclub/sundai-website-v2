@@ -10,7 +10,11 @@ import {
   useManagementClasses,
 } from '../../../../components/ManagementSurface';
 import type { HackerSelectionOption } from '@/types/hacker';
-import type { EventJudgeSummary, EventJudgingConfig } from '@/types/judging';
+import type {
+  EventJudgeSummary,
+  EventJudgingConfig,
+  JudgeRevokeResult,
+} from '@/types/judging';
 
 type InviteDelivery = {
   sent: boolean;
@@ -32,6 +36,24 @@ function deliveryNotice(email: string, delivery: InviteDelivery): Notice {
         text: `Saved, but the invite email to ${email} was not sent: ${delivery.message}`,
         devLink: delivery.devLink,
       };
+}
+
+function revokeNotice(label: string, rebalance?: JudgeRevokeResult): Notice {
+  const moved = rebalance?.reassigned
+    ? ` ${rebalance.reassigned} unscored ${
+        rebalance.reassigned === 1 ? 'project was' : 'projects were'
+      } reassigned to other judges.`
+    : '';
+  if (rebalance?.uncoveredProjects.length) {
+    return {
+      tone: 'warning',
+      text: `${label} can no longer judge.${moved} No other eligible judge could take: ${rebalance.uncoveredProjects.join(', ')}.`,
+    };
+  }
+  return {
+    tone: 'success',
+    text: `${label} can no longer judge. Their scores are kept.${moved}`,
+  };
 }
 
 function judgeStatus(judge: EventJudgeSummary) {
@@ -114,6 +136,7 @@ export default function JudgesManager({
     describe: (body: {
       config?: EventJudgingConfig;
       delivery?: InviteDelivery;
+      rebalance?: JudgeRevokeResult;
     }) => Notice | null
   ) {
     setPending(key);
@@ -377,7 +400,9 @@ export default function JudgesManager({
                           onClick={() => {
                             if (
                               !window.confirm(
-                                `Revoke judging access for ${label}? Their scores are kept.`
+                                config.judgingAssignmentsPublishedAt
+                                  ? `Revoke judging access for ${label}? Their completed scores are kept and their unscored projects are reassigned to the other judges.`
+                                  : `Revoke judging access for ${label}? Their scores are kept.`
                               )
                             ) {
                               return;
@@ -386,10 +411,7 @@ export default function JudgesManager({
                               judge.id,
                               `/api/events/${eventId}/judging/judges/${judge.id}`,
                               { method: 'DELETE' },
-                              () => ({
-                                tone: 'success',
-                                text: `${label} can no longer judge. Their scores are kept.`,
-                              })
+                              body => revokeNotice(label, body.rebalance)
                             );
                           }}
                           type="button"
