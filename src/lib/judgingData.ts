@@ -2,7 +2,10 @@ import { randomUUID } from 'crypto';
 import { NextResponse } from 'next/server';
 import type { Prisma } from '@prisma/client';
 import prisma from '@/lib/prisma';
-import { allocateJudgingAssignments } from '@/lib/judgingAssignments';
+import {
+  allocateJudgingAssignments,
+  reassignJudgingAssignments,
+} from '@/lib/judgingAssignments';
 import {
   EventDateTimeInputError,
   parseOptionalEventDateTimeInput,
@@ -33,6 +36,7 @@ import {
   JUDGING_SCORE_MAX,
   JUDGING_SCORE_MIN,
   type EventJudgingConfig,
+  type JudgeRevokeResult,
   type JudgePanelPayload,
   type JudgingAnswers,
   type JudgingAssignmentPreview,
@@ -808,6 +812,7 @@ export async function loadJudgePanel(
             trackId: { in: trackIds },
             assignments: { some: { judgeId } },
           },
+          orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
           select: {
             id: true,
             trackId: true,
@@ -1448,13 +1453,93 @@ export async function updateEventJudge(input: {
   });
 }
 
-/** Revoking keeps submitted reviews but cuts off the judge's link immediately. */
-export async function revokeEventJudge(eventId: string, judgeId: string) {
+/**
+ * Revoking keeps submitted reviews but cuts off the judge's link immediately.
+ * Once scoring has started, the judge's unfinished projects go to the
+ * remaining judges and their completed reviews stay assigned.
+ */
+export async function revokeEventJudge(
+  eventId: string,
+  judgeId: string
+): Promise<JudgeRevokeResult> {
   return withJudgingEventLock(eventId, async tx => {
     const result = await tx.eventJudge.updateMany({
       where: { id: judgeId, eventId, revokedAt: null },
       data: { revokedAt: new Date() },
     });
     if (result.count === 0) throw new JudgingError('Judge not found.', 404);
+    const event = await tx.event.findUnique({
+      where: { id: eventId },
+      select: {
+        judgingAssignmentsPublishedAt: true,
+        judgingCriteria: { select: { id: true, trackId: true } },
+        judges: {
+          where: { revokedAt: null },
+          select: { id: true, tracks: { select: { trackId: true } } },
+        },
+      },
+    });
+    if (!event?.judgingAssignmentsPublishedAt) {
+      return { reassigned: 0, uncoveredProjects: [] };
+    }
+
+    const owned = await tx.judgingAssignment.findMany({
+      where: { judgeId },
+      select: {
+        submission: {
+          select: {
+            id: true,
+            trackId: true,
+            project: { select: { title: true } },
+            reviews: {
+              where: { judgeId },
+              select: {
+                scores: { select: { criterionId: true, score: true } },
+              },
+            },
+          },
+        },
+      },
+    });
+    const released = owned
+      .map(item => item.submission)
+      .filter(submission => {
+        const review = submission.reviews[0];
+        return !(
+          review &&
+          isJudgingReviewComplete(
+            event.judgingCriteria.filter(
+              item =>
+                item.trackId === null || item.trackId === submission.trackId
+            ),
+            Object.fromEntries(
+              review.scores.map(score => [score.criterionId, score.score])
+            )
+          )
+        );
+      });
+    if (released.length === 0) return { reassigned: 0, uncoveredProjects: [] };
+
+    await tx.judgingAssignment.deleteMany({
+      where: { judgeId, submissionId: { in: released.map(item => item.id) } },
+    });
+    const existing = await tx.judgingAssignment.findMany({
+      where: { judge: { eventId, revokedAt: null } },
+      select: { judgeId: true, submissionId: true },
+    });
+    const { assignments, uncovered } = reassignJudgingAssignments(
+      released,
+      event.judges.map(judge => ({
+        id: judge.id,
+        trackIds: judge.tracks.map(track => track.trackId),
+      })),
+      existing
+    );
+    await tx.judgingAssignment.createMany({ data: assignments });
+    const titles = new Map(released.map(item => [item.id, item.project.title]));
+    return {
+      reassigned: assignments.length,
+      uncoveredProjects: uncovered.map(id => titles.get(id)!),
+    };
   });
 }

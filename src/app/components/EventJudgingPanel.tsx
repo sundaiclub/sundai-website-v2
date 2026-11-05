@@ -8,7 +8,7 @@ import {
   useManagementClasses,
 } from './ManagementSurface';
 import ProjectMarkdown from './ProjectMarkdown';
-import { isJudgingReviewComplete } from '@/lib/judging';
+import { isJudgingReviewComplete, isValidJudgingScore } from '@/lib/judging';
 import {
   JUDGE_TOKEN_HEADER,
   JUDGE_TOKEN_PARAM,
@@ -19,6 +19,48 @@ import {
 /** Magic-link judges authenticate each request with the token from their invite URL. */
 function judgeHeaders(token: string | null): Record<string, string> {
   return token ? { [JUDGE_TOKEN_HEADER]: token } : {};
+}
+
+function updateJudgingUrl(trackId: string, index: number) {
+  const url = new URL(window.location.href);
+  url.searchParams.set('track', trackId);
+  url.searchParams.set('project', String(index + 1));
+  window.history.replaceState(null, '', url);
+}
+
+const isUnscored =
+  (track: JudgePanelPayload['tracks'][number]) => (project: JudgeProjectView) =>
+    !isJudgingReviewComplete(track.criteria, project.review?.scores ?? {});
+
+/**
+ * A refresh keeps the judge on the project in the URL; arriving without one
+ * starts them at the first project they have not finished scoring.
+ */
+function initialPosition(payload: JudgePanelPayload) {
+  const params = new URLSearchParams(window.location.search);
+  const urlTrack = payload.tracks.find(
+    track => track.id === params.get('track')
+  );
+  const projectNumber = Number(params.get('project'));
+  if (
+    urlTrack &&
+    Number.isSafeInteger(projectNumber) &&
+    projectNumber >= 1 &&
+    projectNumber <= urlTrack.projects.length
+  )
+    return { trackId: urlTrack.id, index: projectNumber - 1 };
+  const tracks = urlTrack
+    ? [urlTrack, ...payload.tracks.filter(track => track !== urlTrack)]
+    : payload.tracks;
+  for (const track of tracks) {
+    const index = track.projects.findIndex(isUnscored(track));
+    if (index >= 0) return { trackId: track.id, index };
+  }
+  const track =
+    urlTrack ??
+    payload.tracks.find(item => item.projects.length > 0) ??
+    payload.tracks[0];
+  return { trackId: track?.id ?? '', index: 0 };
 }
 
 type Draft = { scores: Record<string, number>; comment: string };
@@ -52,6 +94,7 @@ export default function EventJudgingPanel({
   const [index, setIndex] = useState(0);
   const [draft, setDraft] = useState<Draft>({ scores: {}, comment: '' });
   const [saving, setSaving] = useState(false);
+  const [confirmingSkip, setConfirmingSkip] = useState(false);
   const [notice, setNotice] = useState<{
     tone: 'success' | 'danger';
     text: string;
@@ -71,12 +114,11 @@ export default function EventJudgingPanel({
           throw new Error(body?.message || 'Unable to load judging.');
         if (!current) return;
         const payload = body as JudgePanelPayload;
+        const { trackId: nextTrackId, index: nextIndex } =
+          initialPosition(payload);
         setPanel(payload);
-        setTrackId(
-          payload.tracks.find(track => track.projects.length > 0)?.id ??
-            payload.tracks[0]?.id ??
-            ''
-        );
+        setTrackId(nextTrackId);
+        setIndex(nextIndex);
         setLoadError('');
         if (!payload.assignmentsPublished) timer = setTimeout(load, 15000);
       } catch (error) {
@@ -110,6 +152,10 @@ export default function EventJudgingPanel({
   const completedCount = projects.filter(isComplete).length;
   const dirty = project ? !sameDraft(draft, draftFor(project)) : false;
   const canScore = Boolean(panel?.judgingOpen);
+  const missingCriteria =
+    track?.criteria.filter(
+      criterion => !isValidJudgingScore(draft.scores[criterion.id])
+    ) ?? [];
 
   async function save(): Promise<boolean> {
     if (!project || !panel) return false;
@@ -152,7 +198,7 @@ export default function EventJudgingPanel({
       );
       setNotice({
         tone: 'success',
-        text: `Saved scores for ${project.title}.`,
+        text: `Scores for ${project.title} saved successfully.`,
       });
       return true;
     } catch {
@@ -166,13 +212,24 @@ export default function EventJudgingPanel({
   /** Saves pending changes before moving, so judges never lose scores. */
   async function goTo(nextIndex: number) {
     if (canScore && dirty && !(await save())) return;
+    updateJudgingUrl(trackId, nextIndex);
     setIndex(nextIndex);
     setNotice(null);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
+  /** Warns before leaving a project whose review would not count yet. */
+  function goNext() {
+    if (canScore && missingCriteria.length > 0) {
+      setConfirmingSkip(true);
+      return;
+    }
+    goTo(index + 1);
+  }
+
   async function changeTrack(nextTrackId: string) {
     if (canScore && dirty && !(await save())) return;
+    updateJudgingUrl(nextTrackId, 0);
     setTrackId(nextTrackId);
     setIndex(0);
     setNotice(null);
@@ -214,7 +271,7 @@ export default function EventJudgingPanel({
       <button
         className={classes.primaryButton}
         disabled={saving || (isLastProject && !hasUnsavedScores)}
-        onClick={() => (isLastProject ? save() : goTo(index + 1))}
+        onClick={() => (isLastProject ? save() : goNext())}
         type="button"
       >
         {hasUnsavedScores ? (
@@ -553,7 +610,7 @@ export default function EventJudgingPanel({
                   value={draft.comment}
                 />
               </label>
-              {notice && (
+              {notice && !(notice.tone === 'success' && dirty) && (
                 <ManagementAlert tone={notice.tone}>
                   <span role="status">{notice.text}</span>
                 </ManagementAlert>
@@ -572,10 +629,69 @@ export default function EventJudgingPanel({
                       : 'Save scores'}
                 </button>
               )}
+              {notice?.tone === 'success' && !dirty && !isLastProject && (
+                <button
+                  className={classes.secondaryButton}
+                  disabled={saving}
+                  onClick={goNext}
+                  type="button"
+                >
+                  Next project →
+                </button>
+              )}
             </aside>
           </div>
           {projectNav}
         </>
+      )}
+
+      {confirmingSkip && (
+        <div
+          aria-labelledby="incomplete-scores-title"
+          aria-modal="true"
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4"
+          role="alertdialog"
+        >
+          <div
+            className={`${classes.panel} ${classes.isDarkMode ? '!bg-gray-900' : '!bg-white'} w-full max-w-md p-6`}
+          >
+            <h3 className="text-xl font-bold" id="incomplete-scores-title">
+              You haven&apos;t finished scoring this project
+            </h3>
+            <p className={`mt-3 text-sm leading-6 ${classes.mutedText}`}>
+              You forgot to fill in these scoring criteria:
+            </p>
+            <ul className="mt-3 list-disc space-y-1 pl-5 text-sm font-semibold">
+              {missingCriteria.map(criterion => (
+                <li key={criterion.id}>{criterion.name}</li>
+              ))}
+            </ul>
+            <p className={`mt-3 text-sm leading-6 ${classes.mutedText}`}>
+              Make sure you fill out all of them, otherwise your score
+              won&apos;t count.
+            </p>
+            <div className="mt-6 flex flex-wrap justify-end gap-3">
+              <button
+                autoFocus
+                className={classes.primaryButton}
+                onClick={() => setConfirmingSkip(false)}
+                type="button"
+              >
+                Stay and finish scoring
+              </button>
+              <button
+                className={classes.secondaryButton}
+                onClick={() => {
+                  setConfirmingSkip(false);
+                  goTo(index + 1);
+                }}
+                type="button"
+              >
+                Continue to next project anyway
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

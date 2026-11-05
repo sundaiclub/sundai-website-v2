@@ -58,6 +58,7 @@ beforeEach(() => {
   db.project.findUnique.mockResolvedValue({
     id: 'project-1',
     launchLeadId: 'lead-1',
+    launchLead: { id: 'lead-1' },
     status: 'APPROVED',
     participants: [],
     likes: [],

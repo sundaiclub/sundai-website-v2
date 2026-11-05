@@ -1,4 +1,9 @@
 import { projectEditLockResponse } from '@/lib/projectEditLock';
+import {
+  privateJson,
+  publicFields,
+  publicProjectSelect,
+} from '@/lib/publicData';
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import type { Prisma, ProjectStatus } from '@prisma/client';
@@ -168,10 +173,7 @@ export async function PATCH(
     const thumbnailPrompt = formData.get('thumbnailPrompt')?.toString() || null;
 
     if (thumbnail instanceof File && validateImageUploadSize(thumbnail)) {
-      return NextResponse.json(
-        { error: IMAGE_UPLOAD_SIZE_ERROR },
-        { status: 413 }
-      );
+      return privateJson({ error: IMAGE_UPLOAD_SIZE_ERROR }, { status: 413 });
     }
 
     if (deleteThumbnail) {
@@ -246,31 +248,13 @@ export async function PATCH(
     const updatedProject = await prisma.project.update({
       where: { id: params.projectId },
       data: updateData,
-      include: {
-        thumbnail: true,
-        techTags: true,
-        domainTags: true,
-        launchLead: {
-          include: {
-            avatar: true,
-          },
-        },
-        participants: {
-          include: {
-            hacker: {
-              include: {
-                avatar: true,
-              },
-            },
-          },
-        },
-      },
+      select: publicProjectSelect,
     });
 
-    return NextResponse.json(updatedProject);
+    return privateJson(publicFields(updatedProject, publicProjectSelect));
   } catch (error) {
     if (error instanceof HttpsUrlInputError) {
-      return NextResponse.json({ error: error.message }, { status: 400 });
+      return privateJson({ error: error.message }, { status: 400 });
     }
     console.error('[PROJECT_UPDATE]', error);
     return new NextResponse('Internal Error', { status: 500 });

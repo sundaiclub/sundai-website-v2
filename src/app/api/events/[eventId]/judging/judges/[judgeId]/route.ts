@@ -42,8 +42,11 @@ export async function DELETE(_request: Request, props: JudgeRouteContext) {
   try {
     const access = await requireEventJudgingManager(params.eventId);
     if (access.response) return access.response;
-    await revokeEventJudge(params.eventId, params.judgeId);
-    return NextResponse.json(await loadJudgingConfig(params.eventId));
+    const rebalance = await revokeEventJudge(params.eventId, params.judgeId);
+    return NextResponse.json({
+      config: await loadJudgingConfig(params.eventId),
+      rebalance,
+    });
   } catch (error) {
     return judgingErrorResponse(error, '[EVENT_JUDGE_DELETE]');
   }

@@ -56,6 +56,12 @@ export interface EventJudgeSummary {
   reviewCount: number;
 }
 
+/** What happened to a revoked judge's unscored projects. */
+export interface JudgeRevokeResult {
+  reassigned: number;
+  uncoveredProjects: string[];
+}
+
 export interface EventJudgingConfig extends JudgingSettings {
   judgingAssignmentsPublishedAt: string | null;
   eventStartTime: string;

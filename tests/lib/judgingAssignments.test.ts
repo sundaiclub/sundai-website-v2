@@ -1,4 +1,7 @@
-import { allocateJudgingAssignments as allocate } from '@/lib/judgingAssignments';
+import {
+  allocateJudgingAssignments as allocate,
+  reassignJudgingAssignments as reassign,
+} from '@/lib/judgingAssignments';
 
 const projects = (trackId: string, count: number) =>
   Array.from({ length: count }, (_, i) => ({ id: `${trackId}-${i}`, trackId }));
@@ -138,4 +141,68 @@ it('matches exhaustive optimal workloads across small overlapping track rosters'
       )
     ).toBe(best);
   }
+});
+
+describe('reassignJudgingAssignments', () => {
+  it('gives released projects to the least-loaded eligible judges', () => {
+    const result = reassign(
+      [
+        { id: 'p1', trackId: 'a' },
+        { id: 'p2', trackId: 'a' },
+      ],
+      [
+        { id: 'j1', trackIds: ['a'] },
+        { id: 'j2', trackIds: ['a'] },
+        { id: 'j3', trackIds: ['a'] },
+      ],
+      [
+        { judgeId: 'j1', submissionId: 'p1' },
+        { judgeId: 'j1', submissionId: 'p3' },
+        { judgeId: 'j2', submissionId: 'p4' },
+      ]
+    );
+    expect(result).toEqual({
+      assignments: [
+        { judgeId: 'j3', submissionId: 'p1' },
+        { judgeId: 'j2', submissionId: 'p2' },
+      ],
+      uncovered: [],
+    });
+  });
+
+  it('never doubles a judge on a project or crosses tracks', () => {
+    const result = reassign(
+      [
+        { id: 'p1', trackId: 'a' },
+        { id: 'p2', trackId: 'b' },
+      ],
+      [
+        { id: 'j1', trackIds: ['a'] },
+        { id: 'j2', trackIds: ['a'] },
+      ],
+      [
+        { judgeId: 'j1', submissionId: 'p1' },
+        { judgeId: 'j2', submissionId: 'p1' },
+      ]
+    );
+    expect(result).toEqual({ assignments: [], uncovered: ['p1', 'p2'] });
+  });
+
+  it('serves the scarcest projects before flexible ones', () => {
+    const result = reassign(
+      [
+        { id: 'p1', trackId: 'a' },
+        { id: 'p2', trackId: 'b' },
+      ],
+      [
+        { id: 'j1', trackIds: ['a', 'b'] },
+        { id: 'j2', trackIds: ['a', 'b'] },
+      ],
+      [{ judgeId: 'j1', submissionId: 'p2' }]
+    );
+    expect(result.assignments).toEqual([
+      { judgeId: 'j2', submissionId: 'p2' },
+      { judgeId: 'j1', submissionId: 'p1' },
+    ]);
+  });
 });

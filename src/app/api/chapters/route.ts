@@ -1,3 +1,4 @@
+import { privateJson } from '@/lib/publicData';
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { isChapterTimezone } from '@/lib/chapterTimezones';
@@ -70,7 +71,7 @@ export async function GET(req: Request) {
         return new NextResponse('Forbidden', { status: 403 });
       }
 
-      return NextResponse.json(chapters);
+      return privateJson(chapters);
     }
 
     const chapters = await listVisibleChapters({
@@ -78,7 +79,7 @@ export async function GET(req: Request) {
       includeViewerMembership: Boolean(hacker),
     });
 
-    return NextResponse.json(chapters);
+    return privateJson(chapters);
   } catch (error) {
     console.error('[CHAPTERS_GET]', error);
     return new NextResponse('Internal Error', { status: 500 });
@@ -131,7 +132,7 @@ export async function POST(req: Request) {
       select: chapterSelect,
     });
 
-    return NextResponse.json(chapter, { status: 201 });
+    return privateJson(chapter, { status: 201 });
   } catch (error) {
     console.error('[CHAPTERS_POST]', error);
     return new NextResponse('Internal Error', { status: 500 });

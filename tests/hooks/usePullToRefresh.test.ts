@@ -43,14 +43,6 @@ Object.defineProperty(document.documentElement, 'style', {
   writable: true,
 });
 
-// Mock window.location.reload
-Object.defineProperty(window, 'location', {
-  value: {
-    reload: jest.fn(),
-  },
-  writable: true,
-});
-
 // Mock window.scrollY
 Object.defineProperty(window, 'scrollY', {
   value: 0,
@@ -60,6 +52,7 @@ Object.defineProperty(window, 'scrollY', {
 describe('usePullToRefresh', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    window.scrollY = 0;
     mockQuerySelector.mockReturnValue({
       setAttribute: mockSetAttribute,
     });
@@ -167,20 +160,29 @@ describe('usePullToRefresh', () => {
   });
 
   it('should handle touchend event with refresh trigger', () => {
-    // This test verifies that the touchend handler is properly set up
-    // The actual refresh logic depends on internal state that's hard to test
     renderHook(() => usePullToRefresh());
 
+    const touchStartHandler = mockAddEventListener.mock.calls.find(
+      call => call[0] === 'touchstart'
+    )[1];
+    const touchMoveHandler = mockAddEventListener.mock.calls.find(
+      call => call[0] === 'touchmove'
+    )[1];
     const touchEndHandler = mockAddEventListener.mock.calls.find(
       call => call[0] === 'touchend'
     )[1];
 
-    const mockTouchEndEvent = {};
+    touchStartHandler({ touches: [{ pageY: 100 }] });
+    touchMoveHandler({
+      touches: [{ pageY: 300 }],
+      preventDefault: mockPreventDefault,
+    });
+    touchEndHandler({});
 
-    // Should not throw error when calling touchend handler
-    expect(() => {
-      touchEndHandler(mockTouchEndEvent);
-    }).not.toThrow();
+    // JSDOM reports reload attempts through console.error; location is read-only.
+    expect(console.error).toHaveBeenCalledWith(expect.objectContaining({
+      message: 'Not implemented: navigation (except hash changes)',
+    }));
   });
 
   it('should not trigger refresh when pull distance is below threshold', () => {
@@ -215,7 +217,7 @@ describe('usePullToRefresh', () => {
     touchEndHandler(mockTouchEndEvent);
 
     // Should not trigger refresh
-    expect(window.location.reload).not.toHaveBeenCalled();
+    expect(console.error).not.toHaveBeenCalled();
   });
 
   it('should handle PWA mode correctly', () => {

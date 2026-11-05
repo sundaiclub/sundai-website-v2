@@ -116,3 +116,56 @@ export function allocateJudgingAssignments(
     .filter(item => item.edge.capacity === 0)
     .map(({ judgeId, submissionId }) => ({ judgeId, submissionId }));
 }
+
+/** Hands each released project to the least-loaded eligible judge not already
+ * on it, leaving every existing assignment in place so scoring in progress is
+ * undisturbed. Projects nobody eligible can take are returned as uncovered. */
+export function reassignJudgingAssignments(
+  released: Array<{ id: string; trackId: string }>,
+  judges: Array<{ id: string; trackIds: string[] }>,
+  existing: Array<{ judgeId: string; submissionId: string }>
+): {
+  assignments: Array<{ judgeId: string; submissionId: string }>;
+  uncovered: string[];
+} {
+  const load = new Map(judges.map(judge => [judge.id, 0]));
+  const taken = new Set<string>();
+  for (const item of existing) {
+    taken.add(`${item.judgeId}:${item.submissionId}`);
+    if (load.has(item.judgeId))
+      load.set(item.judgeId, load.get(item.judgeId)! + 1);
+  }
+  const orderedJudges = [...judges].sort((a, b) => a.id.localeCompare(b.id));
+  const assignments: Array<{ judgeId: string; submissionId: string }> = [];
+  const uncovered: string[] = [];
+  // Scarcest projects first so a flexible judge is not spent on an easy one.
+  const eligibleFor = (project: { id: string; trackId: string }) =>
+    orderedJudges.filter(
+      judge =>
+        judge.trackIds.includes(project.trackId) &&
+        !taken.has(`${judge.id}:${project.id}`)
+    );
+  const ordered = [...released].sort(
+    (a, b) =>
+      eligibleFor(a).length - eligibleFor(b).length || a.id.localeCompare(b.id)
+  );
+  for (const project of ordered) {
+    const judge = eligibleFor(project).reduce<
+      (typeof orderedJudges)[number] | null
+    >(
+      (best, candidate) =>
+        !best || load.get(candidate.id)! < load.get(best.id)!
+          ? candidate
+          : best,
+      null
+    );
+    if (!judge) {
+      uncovered.push(project.id);
+      continue;
+    }
+    taken.add(`${judge.id}:${project.id}`);
+    load.set(judge.id, load.get(judge.id)! + 1);
+    assignments.push({ judgeId: judge.id, submissionId: project.id });
+  }
+  return { assignments, uncovered };
+}
