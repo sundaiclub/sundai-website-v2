@@ -6,6 +6,7 @@ import type {
   JsonObject,
   RegistrationStatus,
 } from './event-management';
+import type { DeliveryStats } from './delivery-stats';
 
 export type WorkspaceSection =
   | 'overview'
@@ -239,25 +240,30 @@ export interface EventCommunication {
   updatedAt: string;
 }
 
-export interface EventCommunicationRecipient {
+export interface EventCommunicationHistoryItem {
   id: EntityId;
-  communicationId: EntityId;
-  hackerId: EntityId;
-  registrationId: EntityId | null;
-  contactValue: string;
-  displayName: string;
-  status: EventCommunicationRecipientStatus;
-  providerMessageId: string | null;
-  errorCode: string | null;
-  errorMessage: string | null;
-  attemptedAt: string | null;
-  deliveredAt: string | null;
+  channel: EventCommunicationChannel;
+  status: EventCommunicationStatus;
+  subject: string | null;
+  body: string;
+  recipientCount: number;
+  sentAt: string | null;
+  stats: DeliveryStats;
+}
+
+// The email and SMS versions of one send, shown as one history entry.
+export interface EventCommunicationHistoryGroup {
+  sendGroupId: string;
+  audienceType: EventCommunicationAudience;
+  audienceDefinition: JsonObject | null;
+  sender: { id: EntityId; name: string } | null;
   createdAt: string;
-  updatedAt: string;
+  communications: EventCommunicationHistoryItem[];
 }
 
 export interface EventCommunicationDraftInput {
   channel: EventCommunicationChannel;
+  sendGroupId?: string;
   subject?: string | null;
   body: string;
   audienceType: EventCommunicationAudience;
