@@ -2,6 +2,14 @@ import { randomUUID } from 'crypto';
 import type { Prisma, PrismaClient } from '@prisma/client';
 import prisma from './prisma';
 import { sendEventEmail, type EventDeliveryResult } from './eventDelivery';
+import {
+  registerMessageLinks,
+  rewriteEmailLinks,
+  trackableHtmlUrls,
+  type MessageLinkSource,
+} from './messageLinks';
+import { listUnsubscribeHeaders, recipientRefOf } from './messageRecipients';
+import { sesRecipientTags } from './sesEvents';
 
 export const EMAIL_QUEUE_TOPIC = 'email-delivery';
 export const EMAIL_QUEUE_REGION = 'iad1';
@@ -14,7 +22,38 @@ export type QueuedEmail = {
   body: string;
   html?: string;
   eventRecipientId?: string;
+  weeklyRecipientId?: string;
 };
+
+const recipientIdOf = (message: QueuedEmail) =>
+  message.eventRecipientId ?? message.weeklyRecipientId;
+
+// Rewrites links to the click redirect for each snapshotted recipient. Test
+// sends have no source or recipient and keep their original links.
+async function trackEmailLinks(
+  db: Prisma.TransactionClient,
+  messages: QueuedEmail[],
+  source: MessageLinkSource
+) {
+  if (!source.eventCommunicationId && !source.weeklyEmailId) return messages;
+  const urls = new Set<string>();
+  for (const message of messages) {
+    if (message.html && recipientIdOf(message)) {
+      for (const url of trackableHtmlUrls(message.html)) urls.add(url);
+    }
+  }
+  const linkIds = await registerMessageLinks(db, [...urls], source);
+  if (!linkIds.size) return messages;
+  return messages.map(message => {
+    const recipientId = recipientIdOf(message);
+    return message.html && recipientId
+      ? {
+          ...message,
+          html: rewriteEmailLinks(message.html, linkIds, recipientId),
+        }
+      : message;
+  });
+}
 
 export class EmailQueueBusy extends Error {
   constructor(message: string) {
@@ -27,8 +66,9 @@ export class EmailQueueBusy extends Error {
 export async function createEmailBatches(
   db: Prisma.TransactionClient,
   messages: QueuedEmail[],
-  source: { eventCommunicationId?: string; weeklyEmailId?: string } = {}
+  source: MessageLinkSource = {}
 ) {
+  messages = await trackEmailLinks(db, messages, source);
   const batches = [];
   for (let offset = 0; offset < messages.length; offset += EMAIL_BATCH_SIZE) {
     batches.push({
@@ -125,11 +165,30 @@ async function saveBatchResults(
     });
     if (!completed.count) return;
     for (let index = 0; index < messages.length; index++) {
-      if (messages[index].eventRecipientId) {
-        await tx.eventCommunicationRecipient.updateMany({
-          where: { id: messages[index].eventRecipientId, status: 'SENDING' },
-          data: outcomes[index],
-        });
+      const { eventRecipientId, weeklyRecipientId } = messages[index];
+      const outcome = outcomes[index];
+      const updateRecipient = (
+        where: { status?: 'SENDING'; providerMessageId?: null },
+        data: Partial<EventDeliveryResult>
+      ) =>
+        eventRecipientId
+          ? tx.eventCommunicationRecipient.updateMany({
+              where: { id: eventRecipientId, ...where },
+              data,
+            })
+          : tx.weeklyEmailRecipient.updateMany({
+              where: { id: weeklyRecipientId, ...where },
+              data,
+            });
+      if (!eventRecipientId && !weeklyRecipientId) continue;
+      // An SES event can arrive before this save. Keep its newer status and
+      // only fill in the message ID.
+      const updated = await updateRecipient({ status: 'SENDING' }, outcome);
+      if (!updated.count && outcome.providerMessageId) {
+        await updateRecipient(
+          { providerMessageId: null },
+          { providerMessageId: outcome.providerMessageId }
+        );
       }
     }
     if (batch.eventCommunicationId) {
@@ -222,25 +281,41 @@ export async function processEmailBatch(
       where: { id: batchId, status: 'QUEUED' },
       data: { status: 'PROCESSING', claimToken, claimedAt: new Date() },
     });
-    if (result.count)
-      await tx.eventCommunicationRecipient.updateMany({
-        where: {
-          id: {
-            in: messages.flatMap(message =>
-              message.eventRecipientId ? [message.eventRecipientId] : []
-            ),
-          },
-          status: 'PENDING',
-        },
-        data: { status: 'SENDING', attemptedAt: new Date() },
-      });
+    if (result.count) {
+      const sending = { status: 'SENDING' as const, attemptedAt: new Date() };
+      const eventIds = messages.flatMap(message =>
+        message.eventRecipientId ? [message.eventRecipientId] : []
+      );
+      const weeklyIds = messages.flatMap(message =>
+        message.weeklyRecipientId ? [message.weeklyRecipientId] : []
+      );
+      if (eventIds.length)
+        await tx.eventCommunicationRecipient.updateMany({
+          where: { id: { in: eventIds }, status: 'PENDING' },
+          data: sending,
+        });
+      if (weeklyIds.length)
+        await tx.weeklyEmailRecipient.updateMany({
+          where: { id: { in: weeklyIds }, status: 'PENDING' },
+          data: sending,
+        });
+    }
     return result.count;
   });
   if (!claimed) return;
   const outcomes = await Promise.all(
     messages.map(async message => {
+      // Bulk messages get one-click unsubscribe. Test sends do not.
+      const ref = recipientRefOf(message);
       try {
-        return await (dependencies.sendEmail ?? sendEventEmail)(message);
+        return await (dependencies.sendEmail ?? sendEventEmail)({
+          to: message.to,
+          subject: message.subject,
+          body: message.body,
+          html: message.html,
+          tags: sesRecipientTags(message),
+          headers: ref ? listUnsubscribeHeaders(ref) : undefined,
+        });
       } catch {
         return {
           status: 'FAILED' as const,

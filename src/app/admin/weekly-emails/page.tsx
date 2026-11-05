@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react';
 import AdminAuthGate from '../AdminAuthGate';
 import MarkdownEditor from '@/app/components/MarkdownEditor';
+import DeliveryStatsSummary from '@/app/components/DeliveryStatsSummary';
+import type { DeliveryStats } from '@/types/delivery-stats';
 import { useUserContext } from '@/app/contexts/UserContext';
 import {
   ManagementAlert,
@@ -14,6 +16,13 @@ import {
 } from '@/app/components/ManagementSurface';
 
 type Draft = { id: string; subject: string; body: string };
+type SentEmail = {
+  id: string;
+  subject: string;
+  status: 'SENDING' | 'SENT';
+  sentAt: string | null;
+  stats: DeliveryStats;
+};
 
 async function readResponse(response: Response) {
   const payload = await response.json().catch(() => null);
@@ -28,6 +37,8 @@ export default function WeeklyEmailsPage() {
   const classes = useManagementClasses();
   const { isAdmin, loading, userInfo } = useUserContext();
   const [drafts, setDrafts] = useState<Draft[]>([]);
+  const [sent, setSent] = useState<SentEmail[]>([]);
+  const [openSentId, setOpenSentId] = useState('');
   const [draftId, setDraftId] = useState('');
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
@@ -65,10 +76,19 @@ export default function WeeklyEmailsPage() {
                 'The test email could not be sent. Your draft is saved.'
               );
             else setNotice('Test email sent to your account email address.');
-          } else
+          } else {
             setNotice(
               `Send complete. ${result.sent} emails accepted; ${result.failed} failed.`
             );
+            fetch('/api/admin/weekly-emails')
+              .then(readResponse)
+              .then(payload => {
+                if (current) setSent(payload.sent ?? []);
+              })
+              .catch(() => {
+                /* The history refreshes on the next page load. */
+              });
+          }
         }
       } catch {
         /* Keep the saved job; the worker continues without this page. */
@@ -86,6 +106,7 @@ export default function WeeklyEmailsPage() {
       .then(readResponse)
       .then(payload => {
         setDrafts(payload.drafts);
+        setSent(payload.sent ?? []);
         setReady(true);
       })
       .catch(error => setError(error.message));
@@ -309,6 +330,52 @@ export default function WeeklyEmailsPage() {
             </p>
           )}
         </ManagementSection>
+        <div className="mt-5">
+          <ManagementSection
+            title="Sent weekly emails"
+            description="Delivery, failures, and link clicks update as SES reports them."
+          >
+            {sent.length === 0 ? (
+              <p className={`text-sm ${classes.mutedText}`}>
+                No weekly emails have been sent.
+              </p>
+            ) : (
+              <ul className={`divide-y ${classes.divider}`}>
+                {sent.map(email => {
+                  const isOpen = openSentId === email.id;
+                  return (
+                    <li className="py-4" key={email.id}>
+                      <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <h3 className="font-bold">{email.subject}</h3>
+                          <p className={`text-sm ${classes.mutedText}`}>
+                            {email.status === 'SENDING' ? 'Sending · ' : ''}
+                            {email.sentAt
+                              ? new Date(email.sentAt).toLocaleString()
+                              : 'Send time unknown'}
+                          </p>
+                        </div>
+                        <button
+                          aria-expanded={isOpen}
+                          className={classes.secondaryButton}
+                          type="button"
+                          onClick={() => setOpenSentId(isOpen ? '' : email.id)}
+                        >
+                          {isOpen ? 'Hide details' : 'View details'}
+                        </button>
+                      </div>
+                      <DeliveryStatsSummary
+                        channel="EMAIL"
+                        detailed={isOpen}
+                        stats={email.stats}
+                      />
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </ManagementSection>
+        </div>
       </AdminAuthGate>
     </ManagementPage>
   );

@@ -12,11 +12,17 @@ import {
   resolveCurrentEventCommunicationAudience,
   snapshotEventCommunicationAudience,
 } from '@/lib/eventCommunications';
-import { deliverEventSmsRecipients } from '@/lib/eventDelivery';
+import {
+  deliverEventSmsRecipients,
+  plainTextEmailHtml,
+} from '@/lib/eventDelivery';
 import { chapterEventInvitationDelivery } from '@/lib/chapterEventInvitations';
 import { publishEmailBatches } from '@/lib/emailQueue';
+import { shortenSmsLinks } from '@/lib/messageLinks';
 
 export const runtime = 'nodejs';
+// SMS sends run in the request with limited Twilio concurrency.
+export const maxDuration = 300;
 
 export async function POST(
   request: Request,
@@ -122,7 +128,7 @@ export async function POST(
     }
 
     let deliveryBody = communication.body;
-    let emailHtml: string | undefined;
+    let emailHtml = plainTextEmailHtml(communication.body);
     if (communication.audienceType === 'CHAPTER_MEMBERS') {
       const chapter = await prisma.chapter.findUnique({
         where: { id: access.event!.chapterId },
@@ -167,14 +173,23 @@ export async function POST(
       return NextResponse.json(queued, { status: 202 });
     }
 
+    // Each recipient gets short tracked links in place of full URLs.
+    const bodies = await prisma.$transaction(
+      tx =>
+        shortenSmsLinks(
+          tx,
+          communication.id,
+          deliveryBody,
+          snapshot.recipients.map(recipient => recipient.id)
+        ),
+      { timeout: 60_000 }
+    );
     const outcomes = await deliverEventSmsRecipients({
-      body: deliveryBody,
-      recipients: snapshot.recipients.map(
-        (recipient: { id: string; contactValue: string }) => ({
-          recipientId: recipient.id,
-          contactValue: recipient.contactValue,
-        })
-      ),
+      recipients: snapshot.recipients.map(recipient => ({
+        recipientId: recipient.id,
+        contactValue: recipient.contactValue,
+        body: bodies.get(recipient.id) ?? deliveryBody,
+      })),
     });
     const finalized = await finalizeEventCommunication({
       communicationId: communication.id,

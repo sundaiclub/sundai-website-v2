@@ -76,6 +76,7 @@ model Hacker {
   sentCommunications        EventCommunication[]          @relation("EventCommunicationSender")
   communicationRecipients   EventCommunicationRecipient[] @relation("EventCommunicationRecipientHacker")
   smsPreferenceEvents       SmsPreferenceEvent[]          @relation("SmsPreferenceEventHacker")
+  weeklyEmailRecipients     WeeklyEmailRecipient[]
   staffAuditSubjects        EventStaffAudit[]             @relation("EventStaffAuditSubject")
   staffAuditActions         EventStaffAudit[]             @relation("EventStaffAuditActor")
   judgeAssignments          EventJudge[]                  @relation("EventJudgeHacker")
@@ -474,6 +475,7 @@ model Event {
   createdAt                   DateTime                 @default(now())
   updatedAt                   DateTime                 @updatedAt
 
+  messageLinks                MessageLink[]
   @@unique([chapterId, slug])
   @@index([startTime])
   @@index([chapterId, status, startTime])
@@ -725,6 +727,8 @@ model EventCommunication {
   sentBy                 Hacker?                       @relation("EventCommunicationSender", fields: [sentById], references: [id])
   sentById               String?
   channel                EventCommunicationChannel
+  // Links the email and SMS versions of one organizer send.
+  sendGroupId            String                        @default(uuid())
   status                 EventCommunicationStatus      @default(DRAFT)
   subject                String?
   body                   String
@@ -739,8 +743,11 @@ model EventCommunication {
   updatedAt              DateTime                      @updatedAt
   recipients             EventCommunicationRecipient[]
   emailBatches           EmailDeliveryBatch[]
+  messageLinks           MessageLink[]
 
   @@index([eventId, createdAt])
+  @@index([eventId, sendGroupId])
+  @@index([sendGroupId])
   @@index([eventId, status, createdAt])
   @@index([createdById, createdAt])
 }
@@ -761,8 +768,12 @@ model EventCommunicationRecipient {
   errorMessage      String?
   attemptedAt       DateTime?
   deliveredAt       DateTime?
+  complainedAt      DateTime?
+  unsubscribedAt    DateTime?
   createdAt         DateTime                          @default(now())
   updatedAt         DateTime                          @updatedAt
+  linkClicks        MessageLinkClick[]
+  shortLinks        MessageShortLink[]
 
   @@unique([communicationId, hackerId])
   @@index([communicationId, status])
@@ -938,12 +949,97 @@ model WeeklyEmail {
   id           String               @id @default(uuid())
   subject      String               @db.VarChar(200)
   body         String
-  status       WeeklyEmailStatus    @default(DRAFT)
-  createdAt    DateTime             @default(now())
-  updatedAt    DateTime             @updatedAt
+  status       WeeklyEmailStatus      @default(DRAFT)
+  sentAt       DateTime?
+  createdAt    DateTime               @default(now())
+  updatedAt    DateTime               @updatedAt
   emailBatches EmailDeliveryBatch[]
+  recipients   WeeklyEmailRecipient[]
+  messageLinks MessageLink[]
 
   @@index([status, updatedAt])
+  @@index([status, sentAt])
+}
+
+model WeeklyEmailRecipient {
+  id                String                            @id @default(uuid())
+  weeklyEmail       WeeklyEmail                       @relation(fields: [weeklyEmailId], references: [id])
+  weeklyEmailId     String
+  hacker            Hacker                            @relation(fields: [hackerId], references: [id])
+  hackerId          String
+  contactValue      String
+  status            EventCommunicationRecipientStatus @default(PENDING)
+  providerMessageId String?
+  errorCode         String?
+  errorMessage      String?
+  attemptedAt       DateTime?
+  deliveredAt       DateTime?
+  complainedAt      DateTime?
+  unsubscribedAt    DateTime?
+  createdAt         DateTime                          @default(now())
+  updatedAt         DateTime                          @updatedAt
+  linkClicks        MessageLinkClick[]
+
+  @@unique([weeklyEmailId, hackerId])
+  @@index([weeklyEmailId, status])
+  @@index([providerMessageId])
+  @@index([hackerId, createdAt])
+}
+
+enum MessageLinkKind {
+  CONTENT
+  // Unsubscribe and notification-preference links.
+  PREFERENCES
+}
+
+// One tracked destination in a sent message. Redirects only go to stored URLs.
+model MessageLink {
+  id                   String              @id @default(uuid())
+  url                  String
+  kind                 MessageLinkKind     @default(CONTENT)
+  // The event page this link opens. Registrations after a click count as RSVPs.
+  event                Event?              @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  eventId              String?
+  eventCommunication   EventCommunication? @relation(fields: [eventCommunicationId], references: [id])
+  eventCommunicationId String?
+  weeklyEmail          WeeklyEmail?        @relation(fields: [weeklyEmailId], references: [id])
+  weeklyEmailId        String?
+  createdAt            DateTime            @default(now())
+  clicks               MessageLinkClick[]
+  shortLinks           MessageShortLink[]
+
+  @@unique([eventCommunicationId, url])
+  @@unique([weeklyEmailId, url])
+}
+
+// A short per-recipient SMS link: /s/<code>.
+model MessageShortLink {
+  code             String                       @id
+  link             MessageLink                  @relation(fields: [linkId], references: [id])
+  linkId           String
+  eventRecipient   EventCommunicationRecipient? @relation(fields: [eventRecipientId], references: [id])
+  eventRecipientId String?
+  createdAt        DateTime                     @default(now())
+
+  @@unique([linkId, eventRecipientId])
+}
+
+model MessageLinkClick {
+  id                String                       @id @default(uuid())
+  link              MessageLink                  @relation(fields: [linkId], references: [id])
+  linkId            String
+  eventRecipient    EventCommunicationRecipient? @relation(fields: [eventRecipientId], references: [id])
+  eventRecipientId  String?
+  weeklyRecipient   WeeklyEmailRecipient?        @relation(fields: [weeklyRecipientId], references: [id])
+  weeklyRecipientId String?
+  // Link scanners and previews are kept but excluded from click results.
+  isBot             Boolean                      @default(false)
+  botReason         String?
+  clickedAt         DateTime                     @default(now())
+
+  @@index([linkId, isBot])
+  @@index([eventRecipientId, clickedAt])
+  @@index([weeklyRecipientId, clickedAt])
 }
 
 enum WeeklyEmailStatus {

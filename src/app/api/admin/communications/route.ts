@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
-import { communicationStats, fiveWordExcerpt } from '@/lib/adminCommunications';
+import { loadAdminCommunicationGroups } from '@/lib/adminCommunications';
 import { requireSiteAdmin } from '@/lib/eventManagementApi';
+import { loadMessagingHealth } from '@/lib/messagingHealth';
+import { parsePageNumber } from '@/lib/pagination';
 import prisma from '@/lib/prisma';
 
 const PAGE_SIZE = 50;
@@ -11,54 +13,31 @@ export async function GET(request: Request) {
     const { response } = await requireSiteAdmin();
     if (response) return response;
 
-    const requestedPage = Number(new URL(request.url).searchParams.get('page'));
-    const page = Number.isSafeInteger(requestedPage) && requestedPage > 0
-      ? requestedPage
-      : 1;
+    const page =
+      parsePageNumber(new URL(request.url).searchParams.get('page')) ?? 1;
     const where = { sentAt: { not: null } };
-    const [total, communications] = await Promise.all([
-      prisma.eventCommunication.count({ where }),
-      prisma.eventCommunication.findMany({
+    const [allGroups, groupPage, health] = await Promise.all([
+      prisma.eventCommunication.groupBy({
+        by: ['eventId', 'sendGroupId'],
         where,
-        orderBy: [{ sentAt: 'desc' }, { id: 'desc' }],
+      }),
+      prisma.eventCommunication.groupBy({
+        by: ['eventId', 'sendGroupId'],
+        where,
+        _max: { sentAt: true },
+        orderBy: { _max: { sentAt: 'desc' } },
         skip: (page - 1) * PAGE_SIZE,
         take: PAGE_SIZE,
-        select: {
-          id: true,
-          channel: true,
-          status: true,
-          subject: true,
-          body: true,
-          sentAt: true,
-          event: {
-            select: {
-              id: true,
-              title: true,
-              chapter: { select: { id: true, name: true, slug: true } },
-            },
-          },
-          sentBy: { select: { id: true, name: true, email: true } },
-          recipients: { select: { status: true } },
-        },
       }),
+      loadMessagingHealth(),
     ]);
 
     return NextResponse.json({
       page,
       pageSize: PAGE_SIZE,
-      total,
-      items: communications.map(item => ({
-        id: item.id,
-        channel: item.channel,
-        status: item.status,
-        subject: item.subject,
-        excerpt: fiveWordExcerpt(item.body),
-        sentAt: item.sentAt!.toISOString(),
-        chapter: item.event.chapter,
-        event: { id: item.event.id, title: item.event.title },
-        sentBy: item.sentBy,
-        stats: communicationStats(item.recipients.map(row => row.status)),
-      })),
+      total: allGroups.length,
+      health,
+      items: await loadAdminCommunicationGroups(where, groupPage),
     });
   } catch (error) {
     console.error('[ADMIN_COMMUNICATIONS_GET]', error);

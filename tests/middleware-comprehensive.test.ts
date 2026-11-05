@@ -36,6 +36,20 @@ describe('middleware', () => {
     );
   });
 
+  it('keeps the signed SES webhook and tracked email links public', () => {
+    require('../src/middleware');
+    const { createRouteMatcher } = require('@clerk/nextjs/server');
+
+    expect(createRouteMatcher).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        '/api/webhooks/ses',
+        '/l/(.*)',
+        '/s/(.*)',
+        '/api/email/unsubscribe/(.*)',
+      ])
+    );
+  });
+
   it('keeps the legal pages public', () => {
     require('../src/middleware');
     const { createRouteMatcher } = require('@clerk/nextjs/server');
