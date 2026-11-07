@@ -149,7 +149,16 @@ describe('/api/hackers/[hackerId]', () => {
       const data = await response.json();
 
       expect(response.status).toBe(200);
-      expect(data).toEqual(mockUpdatedHacker);
+      expect(data).toMatchObject({
+        id: mockUpdatedHacker.id,
+        name: mockUpdatedHacker.name,
+        bio: mockUpdatedHacker.bio,
+        githubUrl: mockUpdatedHacker.githubUrl,
+        avatar: mockUpdatedHacker.avatar,
+        ledProjects: [],
+        projects: [],
+        featuredProjectIds: [],
+      });
       expect(mockPrisma.hacker.update).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { id: 'hacker-1' },

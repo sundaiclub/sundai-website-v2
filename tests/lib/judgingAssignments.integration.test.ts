@@ -13,6 +13,8 @@ import {
   loadJudgingAssignments,
   loadJudgingConfig,
   loadJudgingResults,
+  recordJudgeViewing,
+  revokeEventJudge,
   saveJudgeReview,
   saveJudgingConfig,
   saveProjectJudgingSubmission,
@@ -263,7 +265,7 @@ integrationTest(
           email: `${name}@example.com`,
           name,
           trackIds,
-        });
+        }).then(result => result.judgeId);
       const aJudge = await invite('a-only', [a.id]);
       const token = randomUUID();
       await prisma.eventJudge.update({
@@ -416,16 +418,81 @@ integrationTest(
         )?.completed
       ).toBe(1);
 
-      await expect(invite('too-late', [a.id])).rejects.toThrow(
-        'Assignments are fixed'
-      );
+      // A judge can only mark one of their own projects as open.
       await expect(
-        updateEventJudge({
-          eventId: event.id,
-          judgeId: aJudge,
-          trackIds: [b.id],
+        recordJudgeViewing(event.id, aJudge, outside.id)
+      ).rejects.toMatchObject({ status: 404 });
+      const open = panel.tracks[0].projects[3].submissionId;
+      await recordJudgeViewing(event.id, aJudge, open);
+      expect(
+        (await prisma.eventJudge.findUnique({ where: { id: aJudge } }))
+          ?.viewingSubmissionId
+      ).toBe(open);
+
+      // A late judge takes unstarted work from deep in the busy queues; the
+      // project a judge has open and scored work never move.
+      const late = await upsertEventJudge({
+        eventId: event.id,
+        actorId: lead.id,
+        hackerId: null,
+        email: 'late@example.com',
+        name: 'late',
+        trackIds: [a.id],
+      });
+      expect(late.rebalance).toEqual({
+        reassigned: 0,
+        pulled: 2,
+        uncoveredProjects: [],
+      });
+      const lateIds = (await loadJudgePanel(
+        event.id,
+        late.judgeId
+      ))!.tracks[0].projects.map(project => project.submissionId);
+      // One from the shared judge, and from a-only the deepest one not open.
+      expect(lateIds).toHaveLength(2);
+      expect(lateIds).toContain(panel.tracks[0].projects[2].submissionId);
+      expect(lateIds).not.toContain(open);
+      expect(
+        (await loadJudgePanel(event.id, aJudge))!.tracks[0].projects.map(
+          project => project.submissionId
+        )
+      ).toContain(open);
+      // Dropping a track hands its unfinished work to the other judges.
+      const moved = await updateEventJudge({
+        eventId: event.id,
+        judgeId: aJudge,
+        trackIds: [b.id],
+      });
+      expect(moved).toMatchObject({ reassigned: 2, uncoveredProjects: [] });
+      expect(moved!.pulled).toBeGreaterThan(0);
+      const rebalanced = await loadJudgingAssignments(event.id);
+      expect(rebalanced.projects.every(project => project.assigned === 1)).toBe(
+        true
+      );
+      expect(
+        await prisma.judgingAssignment.findUnique({
+          where: {
+            judgeId_submissionId: {
+              judgeId: aJudge,
+              submissionId: assigned.submissionId,
+            },
+          },
         })
-      ).rejects.toThrow('Assignments are fixed');
+      ).not.toBeNull();
+      // Revoking hands every unfinished project to the judges who remain.
+      const lateLoad = rebalanced.judges.find(
+        judge => judge.id === late.judgeId
+      )!.total;
+      expect(await revokeEventJudge(event.id, late.judgeId)).toEqual({
+        reassigned: lateLoad,
+        pulled: 0,
+        uncoveredProjects: [],
+      });
+      expect(
+        (await loadJudgingAssignments(event.id)).projects.every(
+          project => project.assigned === 1
+        )
+      ).toBe(true);
       await expect(
         saveJudgingConfig(event.id, { ...input, judgesPerProject: 2 })
       ).rejects.toThrow('fixed because scoring has started');

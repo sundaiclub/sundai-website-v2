@@ -27,6 +27,13 @@ jest.mock(
     }
 );
 jest.mock(
+  '@/app/organizer/events/[eventId]/judging/JudgingNotesView',
+  () =>
+    function Notes() {
+      return <p>Notes content</p>;
+    }
+);
+jest.mock(
   '@/app/organizer/events/[eventId]/judging/JudgingAssignmentsView',
   () =>
     function Assignments() {
@@ -64,7 +71,7 @@ it('keeps the download available on every judging tab even when judging is off',
   expect(
     await screen.findByRole('button', { name: 'Download judging results' })
   ).toBeEnabled();
-  for (const tab of ['Judges', 'Assignments', 'Results', 'Setup']) {
+  for (const tab of ['Judges', 'Assignments', 'Results', 'Notes', 'Setup']) {
     fireEvent.click(screen.getByRole('tab', { name: tab }));
     expect(
       screen.getByRole('button', { name: 'Download judging results' })

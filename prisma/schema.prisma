@@ -1025,27 +1025,30 @@ model JudgingCriterion {
 }
 
 model EventJudge {
-  id          String            @id @default(uuid())
-  event       Event             @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  eventId     String
-  email       String
-  name        String?
-  hacker      Hacker?           @relation("EventJudgeHacker", fields: [hackerId], references: [id])
-  hackerId    String?
+  id                  String              @id @default(uuid())
+  event               Event               @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  eventId             String
+  email               String
+  name                String?
+  hacker              Hacker?             @relation("EventJudgeHacker", fields: [hackerId], references: [id])
+  hackerId            String?
   // SHA-256 of the magic-link token; the raw token only lives in the email and cookie.
-  tokenHash   String            @unique
-  invitedBy   Hacker            @relation("EventJudgeInviter", fields: [invitedById], references: [id])
-  invitedById String
-  invitedAt   DateTime          @default(now())
-  lastSentAt  DateTime?
-  lastSeenAt  DateTime?
+  tokenHash           String              @unique
+  invitedBy           Hacker              @relation("EventJudgeInviter", fields: [invitedById], references: [id])
+  invitedById         String
+  invitedAt           DateTime            @default(now())
+  lastSentAt          DateTime?
+  lastSeenAt          DateTime?
+  // The project the judge's page has open; a rebalance never moves it.
+  viewingSubmission   JudgingSubmission?  @relation("EventJudgeViewing", fields: [viewingSubmissionId], references: [id], onDelete: SetNull)
+  viewingSubmissionId String?
   // Revoking keeps the judge's reviews but invalidates their link and access.
-  revokedAt   DateTime?
-  tracks      EventJudgeTrack[]
-  reviews     JudgingReview[]
-  assignments JudgingAssignment[]
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
+  revokedAt           DateTime?
+  tracks              EventJudgeTrack[]
+  reviews             JudgingReview[]
+  assignments         JudgingAssignment[]
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
 
   @@unique([eventId, email])
   @@index([hackerId])
@@ -1062,21 +1065,22 @@ model EventJudgeTrack {
 }
 
 model JudgingSubmission {
-  id            String          @id @default(uuid())
-  event         Event           @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  id            String              @id @default(uuid())
+  event         Event               @relation(fields: [eventId], references: [id], onDelete: Cascade)
   eventId       String
-  project       Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project       Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
   projectId     String
-  track         JudgingTrack    @relation(fields: [trackId], references: [id])
+  track         JudgingTrack        @relation(fields: [trackId], references: [id])
   trackId       String
   // { [questionId]: answer, additionalInfo: string }
   answersJson   Json
-  submittedBy   Hacker          @relation("JudgingSubmissionSubmitter", fields: [submittedById], references: [id])
+  submittedBy   Hacker              @relation("JudgingSubmissionSubmitter", fields: [submittedById], references: [id])
   submittedById String
   reviews       JudgingReview[]
   assignments   JudgingAssignment[]
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
+  viewingJudges EventJudge[]        @relation("EventJudgeViewing")
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
 
   @@unique([eventId, projectId])
   @@index([trackId])

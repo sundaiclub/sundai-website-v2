@@ -10,7 +10,11 @@ import {
   useManagementClasses,
 } from '../../../../components/ManagementSurface';
 import type { HackerSelectionOption } from '@/types/hacker';
-import type { EventJudgeSummary, EventJudgingConfig } from '@/types/judging';
+import type {
+  EventJudgeSummary,
+  EventJudgingConfig,
+  JudgeRebalanceResult,
+} from '@/types/judging';
 
 type InviteDelivery = {
   sent: boolean;
@@ -32,6 +36,33 @@ function deliveryNotice(email: string, delivery: InviteDelivery): Notice {
         text: `Saved, but the invite email to ${email} was not sent: ${delivery.message}`,
         devLink: delivery.devLink,
       };
+}
+
+function projectCount(count: number) {
+  return `${count} ${count === 1 ? 'project' : 'projects'}`;
+}
+
+/** Adds how a change to the judge pool moved projects during scoring. */
+function withRebalance(
+  notice: Notice,
+  rebalance?: JudgeRebalanceResult | null
+): Notice {
+  const parts = [notice.text];
+  if (rebalance?.reassigned)
+    parts.push(
+      `${projectCount(rebalance.reassigned)} reassigned to other judges.`
+    );
+  if (rebalance?.pulled)
+    parts.push(`${projectCount(rebalance.pulled)} assigned to them.`);
+  if (rebalance?.uncoveredProjects.length)
+    parts.push(
+      `No other eligible judge could take: ${rebalance.uncoveredProjects.join(', ')}.`
+    );
+  return {
+    ...notice,
+    tone: rebalance?.uncoveredProjects.length ? 'warning' : notice.tone,
+    text: parts.join(' '),
+  };
 }
 
 function judgeStatus(judge: EventJudgeSummary) {
@@ -114,6 +145,7 @@ export default function JudgesManager({
     describe: (body: {
       config?: EventJudgingConfig;
       delivery?: InviteDelivery;
+      rebalance?: JudgeRebalanceResult;
     }) => Notice | null
   ) {
     setPending(key);
@@ -157,7 +189,10 @@ export default function JudgesManager({
       },
       body =>
         body.delivery
-          ? deliveryNotice(inviteEmail ?? 'the judge', body.delivery)
+          ? withRebalance(
+              deliveryNotice(inviteEmail ?? 'the judge', body.delivery),
+              body.rebalance
+            )
           : null
     );
     if (ok) {
@@ -183,7 +218,6 @@ export default function JudgesManager({
   );
 
   const canInvite =
-    !config.judgingAssignmentsPublishedAt &&
     trackIds.length > 0 &&
     (mode === 'user' ? Boolean(selectedHacker) : email.trim().length > 0);
   const activeJudges = config.judges.filter(judge => !judge.revokedAt);
@@ -201,14 +235,13 @@ export default function JudgesManager({
 
   return (
     <div className="grid gap-5">
-      {config.judgingAssignmentsPublishedAt && (
-        <ManagementAlert>
-          Scoring has started. The judge list and track assignments are fixed.
-        </ManagementAlert>
-      )}
       <ManagementSection
         title="Invite a judge"
-        description="Judges get an email with a personal link that opens the judging page. They don't need an account."
+        description={
+          config.judgingAssignmentsPublishedAt
+            ? 'Judges get an email with a personal link that opens the judging page. A judge added now takes over unstarted projects from the busiest judges, never one a judge has open.'
+            : "Judges get an email with a personal link that opens the judging page. They don't need an account."
+        }
       >
         <div className="grid gap-4">
           <div className="flex gap-2" role="radiogroup" aria-label="Invite by">
@@ -377,7 +410,9 @@ export default function JudgesManager({
                           onClick={() => {
                             if (
                               !window.confirm(
-                                `Revoke judging access for ${label}? Their scores are kept.`
+                                config.judgingAssignmentsPublishedAt
+                                  ? `Revoke judging access for ${label}? Their completed scores are kept and their unscored projects are reassigned to the other judges.`
+                                  : `Revoke judging access for ${label}? Their scores are kept.`
                               )
                             ) {
                               return;
@@ -386,10 +421,14 @@ export default function JudgesManager({
                               judge.id,
                               `/api/events/${eventId}/judging/judges/${judge.id}`,
                               { method: 'DELETE' },
-                              () => ({
-                                tone: 'success',
-                                text: `${label} can no longer judge. Their scores are kept.`,
-                              })
+                              body =>
+                                withRebalance(
+                                  {
+                                    tone: 'success',
+                                    text: `${label} can no longer judge. Their scores are kept.`,
+                                  },
+                                  body.rebalance
+                                )
                             );
                           }}
                           type="button"
@@ -402,10 +441,7 @@ export default function JudgesManager({
                 </div>
                 {!judge.revokedAt && (
                   <TrackCheckboxes
-                    disabled={
-                      pending === judge.id ||
-                      Boolean(config.judgingAssignmentsPublishedAt)
-                    }
+                    disabled={pending === judge.id}
                     labelPrefix={`${label} judges`}
                     onChange={nextTrackIds => {
                       if (nextTrackIds.length === 0) {
@@ -422,10 +458,14 @@ export default function JudgesManager({
                           method: 'PATCH',
                           body: JSON.stringify({ trackIds: nextTrackIds }),
                         },
-                        () => ({
-                          tone: 'success',
-                          text: `Updated tracks for ${label}.`,
-                        })
+                        body =>
+                          withRebalance(
+                            {
+                              tone: 'success',
+                              text: `Updated tracks for ${label}.`,
+                            },
+                            body.rebalance
+                          )
                       );
                     }}
                     selected={judge.trackIds}

@@ -11,17 +11,19 @@ import {
 import { useEventWorkspace } from '../WorkspaceShell';
 import JudgesManager from './JudgesManager';
 import JudgingResultsView from './JudgingResultsView';
+import JudgingNotesView from './JudgingNotesView';
 import JudgingAssignmentsView from './JudgingAssignmentsView';
 import JudgingSetupEditor from './JudgingSetupEditor';
 import type { EventJudgingConfig } from '@/types/judging';
 
-type JudgingView = 'setup' | 'judges' | 'assignments' | 'results';
+type JudgingView = 'setup' | 'judges' | 'assignments' | 'results' | 'notes';
 
 const views: Array<{ id: JudgingView; label: string }> = [
   { id: 'setup', label: 'Setup' },
   { id: 'judges', label: 'Judges' },
   { id: 'assignments', label: 'Assignments' },
   { id: 'results', label: 'Results' },
+  { id: 'notes', label: 'Notes' },
 ];
 
 export default function OrganizerEventJudgingPage() {
@@ -174,6 +176,7 @@ export default function OrganizerEventJudgingPage() {
         <JudgingAssignmentsView eventId={params.eventId} />
       )}
       {view === 'results' && <JudgingResultsView eventId={params.eventId} />}
+      {view === 'notes' && <JudgingNotesView eventId={params.eventId} />}
     </div>
   );
 }

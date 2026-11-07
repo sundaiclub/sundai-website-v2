@@ -2,7 +2,11 @@ import { randomUUID } from 'crypto';
 import { NextResponse } from 'next/server';
 import type { Prisma } from '@prisma/client';
 import prisma from '@/lib/prisma';
-import { allocateJudgingAssignments } from '@/lib/judgingAssignments';
+import {
+  allocateJudgingAssignments,
+  pullJudgingAssignments,
+  reassignJudgingAssignments,
+} from '@/lib/judgingAssignments';
 import {
   EventDateTimeInputError,
   parseOptionalEventDateTimeInput,
@@ -33,6 +37,7 @@ import {
   JUDGING_SCORE_MAX,
   JUDGING_SCORE_MIN,
   type EventJudgingConfig,
+  type JudgeRebalanceResult,
   type JudgePanelPayload,
   type JudgingAnswers,
   type JudgingAssignmentPreview,
@@ -123,23 +128,6 @@ async function withJudgingEventLock<T>(
     },
     { timeout: 15000 }
   );
-}
-
-async function requireDraftAssignments(
-  tx: Prisma.TransactionClient,
-  eventId: string
-) {
-  const event = await tx.event.findUnique({
-    where: { id: eventId },
-    select: { judgingAssignmentsPublishedAt: true },
-  });
-  if (!event) throw new JudgingError('Event not found.', 404);
-  if (event.judgingAssignmentsPublishedAt) {
-    throw new JudgingError(
-      'Assignments are fixed because scoring has started.',
-      409
-    );
-  }
 }
 
 async function assignmentState(eventId: string, db: Prisma.TransactionClient) {
@@ -808,6 +796,7 @@ export async function loadJudgePanel(
             trackId: { in: trackIds },
             assignments: { some: { judgeId } },
           },
+          orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
           select: {
             id: true,
             trackId: true,
@@ -895,6 +884,42 @@ export async function loadJudgePanel(
       };
     }),
   };
+}
+
+/**
+ * Records the project a judge's page has open so a rebalance never moves it.
+ * Only a project assigned to that judge can be recorded; anything else is a
+ * 404, the same as reading or scoring it.
+ */
+export async function recordJudgeViewing(
+  eventId: string,
+  judgeId: string,
+  submissionId: string
+) {
+  await withJudgingEventLock(eventId, async tx => {
+    const result = await tx.eventJudge.updateMany({
+      where: {
+        id: judgeId,
+        eventId,
+        revokedAt: null,
+        event: {
+          judgingEnabled: true,
+          judgingAssignmentsPublishedAt: { not: null },
+        },
+        assignments: {
+          some: {
+            submission: {
+              ...judgeableSubmissionWhere(eventId),
+              id: submissionId,
+              track: { judges: { some: { judgeId } } },
+            },
+          },
+        },
+      },
+      data: { viewingSubmissionId: submissionId },
+    });
+    if (result.count === 0) throw new JudgingError('Project not found.', 404);
+  });
 }
 
 export async function saveJudgeReview(input: {
@@ -1336,7 +1361,8 @@ async function eventTrackIds(
 
 /**
  * Creates (or restores a revoked) judge for an existing account or a bare
- * email address. Sending the invite is left to the caller.
+ * email address. A judge added after scoring starts takes a share of the
+ * remaining work. Sending the invite is left to the caller.
  */
 export async function upsertEventJudge(input: {
   eventId: string;
@@ -1345,9 +1371,8 @@ export async function upsertEventJudge(input: {
   email: unknown;
   name: unknown;
   trackIds: unknown;
-}): Promise<string> {
+}): Promise<{ judgeId: string; rebalance: JudgeRebalanceResult }> {
   return withJudgingEventLock(input.eventId, async tx => {
-    await requireDraftAssignments(tx, input.eventId);
     let email =
       typeof input.email === 'string' ? normalizeJudgeEmail(input.email) : '';
     let name = cleanText(input.name, MAX_NAME_LENGTH) || null;
@@ -1394,7 +1419,12 @@ export async function upsertEventJudge(input: {
           tracks,
         },
       });
-      return existing.id;
+      return {
+        judgeId: existing.id,
+        rebalance: await rebalancePublishedAssignments(tx, input.eventId, {
+          pull: existing.id,
+        }),
+      };
     }
 
     const judge = await tx.eventJudge.create({
@@ -1410,22 +1440,33 @@ export async function upsertEventJudge(input: {
       },
       select: { id: true },
     });
-    return judge.id;
+    return {
+      judgeId: judge.id,
+      rebalance: await rebalancePublishedAssignments(tx, input.eventId, {
+        pull: judge.id,
+      }),
+    };
   });
 }
 
+/**
+ * During scoring, dropping a track hands the judge's unfinished projects in it
+ * to other judges, and adding one pulls in a share of that track's work.
+ */
 export async function updateEventJudge(input: {
   eventId: string;
   judgeId: string;
   name?: unknown;
   trackIds?: unknown;
-}) {
+}): Promise<JudgeRebalanceResult | null> {
   return withJudgingEventLock(input.eventId, async tx => {
-    if (input.trackIds !== undefined)
-      await requireDraftAssignments(tx, input.eventId);
     const judge = await tx.eventJudge.findFirst({
       where: { id: input.judgeId, eventId: input.eventId },
-      select: { id: true },
+      select: {
+        id: true,
+        revokedAt: true,
+        tracks: { select: { trackId: true } },
+      },
     });
     if (!judge) throw new JudgingError('Judge not found.', 404);
     const trackIds =
@@ -1445,16 +1486,212 @@ export async function updateEventJudge(input: {
         data: { name: cleanText(input.name, MAX_NAME_LENGTH) || null },
       });
     }
+    if (!trackIds || judge.revokedAt) return null;
+    const dropped = judge.tracks
+      .map(track => track.trackId)
+      .filter(trackId => !trackIds.includes(trackId));
+    return rebalancePublishedAssignments(tx, input.eventId, {
+      release: dropped.length
+        ? { judgeId: judge.id, trackIds: dropped }
+        : undefined,
+      pull: judge.id,
+    });
   });
 }
 
-/** Revoking keeps submitted reviews but cuts off the judge's link immediately. */
-export async function revokeEventJudge(eventId: string, judgeId: string) {
+/** The live assignment picture once scoring has started, or null before. */
+async function publishedAssignmentState(
+  tx: Prisma.TransactionClient,
+  eventId: string
+) {
+  const event = await tx.event.findUnique({
+    where: { id: eventId },
+    select: {
+      judgesPerProject: true,
+      judgingAssignmentsPublishedAt: true,
+      judgingCriteria: { select: { id: true, trackId: true } },
+      judgingTracks: {
+        orderBy: [{ position: 'asc' }, { createdAt: 'asc' }],
+        select: { id: true },
+      },
+      judges: {
+        where: { revokedAt: null },
+        select: {
+          id: true,
+          viewingSubmissionId: true,
+          tracks: { select: { trackId: true } },
+        },
+      },
+      judgingSubmissions: {
+        where: judgeableSubmissionWhere(eventId),
+        select: {
+          id: true,
+          trackId: true,
+          project: { select: { title: true } },
+          assignments: { select: { judgeId: true } },
+          reviews: {
+            select: {
+              judgeId: true,
+              scores: { select: { criterionId: true, score: true } },
+            },
+          },
+        },
+      },
+    },
+  });
+  if (!event?.judgingAssignmentsPublishedAt) return null;
+  const viewing = new Set(
+    event.judges.map(judge => `${judge.id}:${judge.viewingSubmissionId}`)
+  );
+  return {
+    judgesPerProject: event.judgesPerProject,
+    trackOrder: event.judgingTracks.map(track => track.id),
+    judges: event.judges.map(judge => ({
+      id: judge.id,
+      trackIds: judge.tracks.map(track => track.trackId),
+    })),
+    projects: event.judgingSubmissions.map(submission => ({
+      id: submission.id,
+      trackId: submission.trackId,
+      title: submission.project.title,
+    })),
+    assignments: event.judgingSubmissions.flatMap(submission => {
+      const criteria = event.judgingCriteria.filter(
+        item => item.trackId === null || item.trackId === submission.trackId
+      );
+      return submission.assignments.map(({ judgeId }) => {
+        const review = submission.reviews.find(
+          item => item.judgeId === judgeId
+        );
+        return {
+          judgeId,
+          submissionId: submission.id,
+          started: Boolean(review),
+          viewing: viewing.has(`${judgeId}:${submission.id}`),
+          complete: Boolean(
+            review &&
+              isJudgingReviewComplete(
+                criteria,
+                Object.fromEntries(
+                  review.scores.map(score => [score.criterionId, score.score])
+                )
+              )
+          ),
+        };
+      });
+    }),
+  };
+}
+
+/**
+ * Keeps coverage and workload even after the judge pool changes mid-scoring.
+ * `release` hands a judge's unfinished projects (optionally only in some
+ * tracks) to the other judges; `pull` gives a judge a share of the remaining
+ * work. Before scoring starts the draft preview already rebalances itself.
+ */
+async function rebalancePublishedAssignments(
+  tx: Prisma.TransactionClient,
+  eventId: string,
+  change: {
+    release?: { judgeId: string; trackIds?: string[] };
+    pull?: string;
+  }
+): Promise<JudgeRebalanceResult> {
+  const result: JudgeRebalanceResult = {
+    reassigned: 0,
+    pulled: 0,
+    uncoveredProjects: [],
+  };
+  const state = await publishedAssignmentState(tx, eventId);
+  if (!state) return result;
+  const trackOf = new Map(state.projects.map(item => [item.id, item.trackId]));
+
+  if (change.release) {
+    const { judgeId, trackIds } = change.release;
+    const released = state.assignments.filter(
+      item =>
+        item.judgeId === judgeId &&
+        !item.complete &&
+        (!trackIds || trackIds.includes(trackOf.get(item.submissionId)!))
+    );
+    if (released.length) {
+      await tx.judgingAssignment.deleteMany({
+        where: {
+          judgeId,
+          submissionId: { in: released.map(item => item.submissionId) },
+        },
+      });
+      state.assignments = state.assignments.filter(
+        item => !released.includes(item)
+      );
+      const activeIds = new Set(state.judges.map(judge => judge.id));
+      const { assignments, uncovered } = reassignJudgingAssignments(
+        state.projects.filter(project =>
+          released.some(item => item.submissionId === project.id)
+        ),
+        state.judges.filter(judge => judge.id !== change.pull),
+        state.assignments.filter(item => activeIds.has(item.judgeId))
+      );
+      await tx.judgingAssignment.createMany({ data: assignments });
+      state.assignments.push(
+        ...assignments.map(item => ({
+          ...item,
+          started: false,
+          viewing: false,
+          complete: false,
+        }))
+      );
+      result.reassigned = assignments.length;
+      result.uncoveredProjects = uncovered.map(
+        id => state.projects.find(project => project.id === id)!.title
+      );
+    }
+  }
+
+  const judge = state.judges.find(item => item.id === change.pull);
+  if (judge) {
+    const { added, moved } = pullJudgingAssignments({
+      judge,
+      judges: state.judges,
+      projects: state.projects,
+      assignments: state.assignments,
+      judgesPerProject: state.judgesPerProject,
+      trackOrder: state.trackOrder,
+    });
+    for (const item of moved) {
+      await tx.judgingAssignment.update({
+        where: {
+          judgeId_submissionId: {
+            judgeId: item.fromJudgeId,
+            submissionId: item.submissionId,
+          },
+        },
+        data: { judgeId: item.judgeId },
+      });
+    }
+    await tx.judgingAssignment.createMany({ data: added });
+    result.pulled = added.length + moved.length;
+  }
+  return result;
+}
+
+/**
+ * Revoking keeps submitted reviews but cuts off the judge's link immediately.
+ * Once scoring has started, the judge's unfinished projects go to the
+ * remaining judges and their completed reviews stay assigned.
+ */
+export async function revokeEventJudge(
+  eventId: string,
+  judgeId: string
+): Promise<JudgeRebalanceResult> {
   return withJudgingEventLock(eventId, async tx => {
     const result = await tx.eventJudge.updateMany({
       where: { id: judgeId, eventId, revokedAt: null },
       data: { revokedAt: new Date() },
     });
     if (result.count === 0) throw new JudgingError('Judge not found.', 404);
+    return rebalancePublishedAssignments(tx, eventId, {
+      release: { judgeId },
+    });
   });
 }

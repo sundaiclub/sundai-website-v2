@@ -1,22 +1,29 @@
 import { visibleProjectsWhere } from '@/lib/projectVisibility';
-import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
-import type { Prisma } from "@prisma/client";
-import prisma from "@/lib/prisma";
-import { phoneNumberForStorage } from "@/lib/phoneNumbers";
-import { HttpsUrlInputError, normalizeOptionalHttpsUrl } from "@/lib/httpsUrls";
+import {
+  privateJson,
+  publicFields,
+  publicHackerSelect,
+  publicImageSelect,
+  publicProjectSelect,
+} from '@/lib/publicData';
+import { NextResponse } from 'next/server';
+import { auth } from '@clerk/nextjs/server';
+import type { Prisma } from '@prisma/client';
+import prisma from '@/lib/prisma';
+import { phoneNumberForStorage } from '@/lib/phoneNumbers';
+import { HttpsUrlInputError, normalizeOptionalHttpsUrl } from '@/lib/httpsUrls';
 
-const REQUIRED_HACKER_UPDATE_FIELDS = ["name"] as const;
+const REQUIRED_HACKER_UPDATE_FIELDS = ['name'] as const;
 
 const NULLABLE_HACKER_UPDATE_FIELDS = [
-  "bio",
-  "githubUrl",
-  "phoneNumber",
-  "linkedinUrl",
-  "twitterUrl",
-  "username",
-  "discordName",
-  "websiteUrl",
+  'bio',
+  'githubUrl',
+  'phoneNumber',
+  'linkedinUrl',
+  'twitterUrl',
+  'username',
+  'discordName',
+  'websiteUrl',
 ] as const;
 
 const ALLOWED_HACKER_UPDATE_FIELDS = [
@@ -27,14 +34,35 @@ const ALLOWED_HACKER_UPDATE_FIELDS = [
 const HACKER_URL_FIELD_LABELS: Partial<
   Record<(typeof NULLABLE_HACKER_UPDATE_FIELDS)[number], string>
 > = {
-  githubUrl: "GitHub URL",
-  linkedinUrl: "LinkedIn URL",
-  twitterUrl: "Twitter URL",
-  websiteUrl: "Website URL",
+  githubUrl: 'GitHub URL',
+  linkedinUrl: 'LinkedIn URL',
+  twitterUrl: 'Twitter URL',
+  websiteUrl: 'Website URL',
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === "object";
+  return value !== null && typeof value === 'object';
+}
+
+function profileRelations(projectVisibility: Prisma.ProjectWhereInput) {
+  return {
+    avatar: { select: publicImageSelect },
+    ledProjects: {
+      where: projectVisibility,
+      select: publicProjectSelect,
+      orderBy: { createdAt: 'desc' as const },
+    },
+    projects: {
+      where: { project: projectVisibility },
+      select: { role: true, project: { select: publicProjectSelect } },
+      orderBy: { createdAt: 'desc' as const },
+    },
+    likes: {
+      where: { project: projectVisibility },
+      select: { createdAt: true, project: { select: publicProjectSelect } },
+      orderBy: { createdAt: 'desc' as const },
+    },
+  } satisfies Prisma.HackerInclude;
 }
 
 export async function GET(
@@ -47,74 +75,49 @@ export async function GET(
     const projectVisibility = visibleProjectsWhere(userId);
     const hacker = await prisma.hacker.findUnique({
       where: { id: params.hackerId },
-      include: {
-        avatar: true,
-        ledProjects: {
-          where: projectVisibility,
-          include: {
-            thumbnail: true,
-            likes: true,
-          },
-          orderBy: {
-            createdAt: "desc",
-          },
-        },
-        projects: {
-          where: { project: projectVisibility },
-          include: {
-            project: {
-              include: {
-                thumbnail: true,
-                likes: true,
-              },
-            },
-          },
-          orderBy: {
-            createdAt: "desc",
-          },
-        },
-        likes: {
-          where: { project: projectVisibility },
-          include: {
-            project: {
-              include: {
-                thumbnail: true,
-                launchLead: {
-                  include: {
-                    avatar: true,
-                  },
-                },
-                likes: true,
-              },
-            },
-          },
-          orderBy: {
-            createdAt: "desc",
-          },
-        },
-      },
+      include: profileRelations(projectVisibility),
     });
 
     if (!hacker) {
-      return NextResponse.json({ error: "Builder not found" }, { status: 404 });
+      return privateJson({ error: 'Builder not found' }, { status: 404 });
     }
 
     const { likes, ...hackerWithoutLikes } = hacker;
+    const visibleProjectIds = new Set([
+      ...hacker.ledProjects.map(project => project.id),
+      ...hacker.projects.map(participation => participation.project.id),
+    ]);
     const transformedHacker = {
-      ...hackerWithoutLikes,
-      likedProjects: likes.map((like) => ({
-        createdAt: like.createdAt,
-        project: like.project,
-      })),
+      ...publicFields(hackerWithoutLikes, publicHackerSelect),
+      ...(userId && hacker.clerkId === userId
+        ? {
+            email: hacker.email,
+            phoneNumber: hacker.phoneNumber,
+            role: hacker.role,
+          }
+        : {}),
+      ledProjects: publicFields(hacker.ledProjects, publicProjectSelect),
+      projects: publicFields(hacker.projects, {
+        role: true,
+        project: { select: publicProjectSelect },
+      }),
+      featuredProjectIds:
+        hacker.featuredProjectIds?.filter(id => visibleProjectIds.has(id)) ??
+        [],
+      ...(userId && hacker.clerkId === userId
+        ? {
+            likedProjects: publicFields(likes, {
+              createdAt: true,
+              project: { select: publicProjectSelect },
+            }),
+          }
+        : {}),
     };
 
-    return NextResponse.json(transformedHacker);
+    return privateJson(transformedHacker);
   } catch (error) {
-    console.error("Error fetching hacker:", error);
-    return NextResponse.json(
-      { error: "Error fetching hacker" },
-      { status: 500 }
-    );
+    console.error('Error fetching hacker:', error);
+    return privateJson({ error: 'Error fetching hacker' }, { status: 500 });
   }
 }
 
@@ -126,7 +129,7 @@ export async function PATCH(
   try {
     const { userId } = await auth();
     if (!userId) {
-      return NextResponse.json("Unauthorized", { status: 401 });
+      return privateJson('Unauthorized', { status: 401 });
     }
 
     const requestingHacker = await prisma.hacker.findUnique({
@@ -134,11 +137,11 @@ export async function PATCH(
     });
 
     if (!requestingHacker) {
-      return NextResponse.json({ error: "Builder not found" }, { status: 404 });
+      return privateJson({ error: 'Builder not found' }, { status: 404 });
     }
 
     if (requestingHacker.id !== params.hackerId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return privateJson({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const data: unknown = await request.json();
@@ -146,20 +149,20 @@ export async function PATCH(
     const sanitizedData: Prisma.HackerUpdateInput = {};
 
     if (isRecord(data)) {
-      if (typeof data.name === "string") {
+      if (typeof data.name === 'string') {
         sanitizedData.name = data.name;
       }
 
       for (const key of NULLABLE_HACKER_UPDATE_FIELDS) {
         const value = data[key];
-        if (typeof value === "string" || value === null) {
+        if (typeof value === 'string' || value === null) {
           const urlFieldLabel = HACKER_URL_FIELD_LABELS[key];
           sanitizedData[key] =
-            key === "phoneNumber" && typeof value === "string"
+            key === 'phoneNumber' && typeof value === 'string'
               ? phoneNumberForStorage(value)
               : urlFieldLabel
                 ? normalizeOptionalHttpsUrl(value, urlFieldLabel)
-              : value;
+                : value;
         }
       }
     }
@@ -168,61 +171,26 @@ export async function PATCH(
     const updatedHacker = await prisma.hacker.update({
       where: { id: params.hackerId },
       data: sanitizedData,
-      include: {
-        avatar: true,
-        ledProjects: {
-          where: projectVisibility,
-          include: {
-            thumbnail: true,
-          },
-          orderBy: {
-            createdAt: "desc",
-          },
-        },
-        projects: {
-          where: { project: projectVisibility },
-          include: {
-            project: {
-              include: {
-                thumbnail: true,
-                likes: true,
-              },
-            },
-          },
-          orderBy: {
-            createdAt: "desc",
-          },
-        },
-        likes: {
-          where: { project: projectVisibility },
-          include: {
-            project: {
-              include: {
-                thumbnail: true,
-                launchLead: {
-                  include: {
-                    avatar: true,
-                  },
-                },
-              },
-            },
-          },
-          orderBy: {
-            createdAt: "desc",
-          },
-        },
-      },
+      include: profileRelations(projectVisibility),
     });
 
-    return NextResponse.json(updatedHacker);
+    return privateJson({
+      ...publicFields(updatedHacker, publicHackerSelect),
+      email: updatedHacker.email,
+      phoneNumber: updatedHacker.phoneNumber,
+      role: updatedHacker.role,
+      ledProjects: publicFields(updatedHacker.ledProjects, publicProjectSelect),
+      projects: publicFields(updatedHacker.projects, {
+        role: true,
+        project: { select: publicProjectSelect },
+      }),
+      featuredProjectIds: updatedHacker.featuredProjectIds ?? [],
+    });
   } catch (error) {
     if (error instanceof HttpsUrlInputError) {
-      return NextResponse.json({ error: error.message }, { status: 400 });
+      return privateJson({ error: error.message }, { status: 400 });
     }
-    console.error("Error updating builder:", error);
-    return NextResponse.json(
-      { error: "Error updating builder" },
-      { status: 500 }
-    );
+    console.error('Error updating builder:', error);
+    return privateJson({ error: 'Error updating builder' }, { status: 500 });
   }
 }

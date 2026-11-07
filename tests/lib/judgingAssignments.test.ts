@@ -1,4 +1,9 @@
-import { allocateJudgingAssignments as allocate } from '@/lib/judgingAssignments';
+import {
+  allocateJudgingAssignments as allocate,
+  pullJudgingAssignments as pull,
+  reassignJudgingAssignments as reassign,
+} from '@/lib/judgingAssignments';
+import { orderForJudge } from '@/lib/judging';
 
 const projects = (trackId: string, count: number) =>
   Array.from({ length: count }, (_, i) => ({ id: `${trackId}-${i}`, trackId }));
@@ -138,4 +143,146 @@ it('matches exhaustive optimal workloads across small overlapping track rosters'
       )
     ).toBe(best);
   }
+});
+
+describe('reassignJudgingAssignments', () => {
+  it('gives released projects to the least-loaded eligible judges', () => {
+    const result = reassign(
+      [
+        { id: 'p1', trackId: 'a' },
+        { id: 'p2', trackId: 'a' },
+      ],
+      [
+        { id: 'j1', trackIds: ['a'] },
+        { id: 'j2', trackIds: ['a'] },
+        { id: 'j3', trackIds: ['a'] },
+      ],
+      [
+        { judgeId: 'j1', submissionId: 'p1' },
+        { judgeId: 'j1', submissionId: 'p3' },
+        { judgeId: 'j2', submissionId: 'p4' },
+      ]
+    );
+    expect(result).toEqual({
+      assignments: [
+        { judgeId: 'j3', submissionId: 'p1' },
+        { judgeId: 'j2', submissionId: 'p2' },
+      ],
+      uncovered: [],
+    });
+  });
+
+  it('never doubles a judge on a project or crosses tracks', () => {
+    const result = reassign(
+      [
+        { id: 'p1', trackId: 'a' },
+        { id: 'p2', trackId: 'b' },
+      ],
+      [
+        { id: 'j1', trackIds: ['a'] },
+        { id: 'j2', trackIds: ['a'] },
+      ],
+      [
+        { judgeId: 'j1', submissionId: 'p1' },
+        { judgeId: 'j2', submissionId: 'p1' },
+      ]
+    );
+    expect(result).toEqual({ assignments: [], uncovered: ['p1', 'p2'] });
+  });
+
+  it('serves the scarcest projects before flexible ones', () => {
+    const result = reassign(
+      [
+        { id: 'p1', trackId: 'a' },
+        { id: 'p2', trackId: 'b' },
+      ],
+      [
+        { id: 'j1', trackIds: ['a', 'b'] },
+        { id: 'j2', trackIds: ['a', 'b'] },
+      ],
+      [{ judgeId: 'j1', submissionId: 'p2' }]
+    );
+    expect(result.assignments).toEqual([
+      { judgeId: 'j2', submissionId: 'p2' },
+      { judgeId: 'j1', submissionId: 'p1' },
+    ]);
+  });
+});
+
+describe('pullJudgingAssignments', () => {
+  const projects = Array.from({ length: 8 }, (_, index) => ({
+    id: `p${index}`,
+    trackId: 'a',
+  }));
+  const veteran = { id: 'vet', trackIds: ['a'] };
+  const late = { id: 'late', trackIds: ['a'] };
+  const queue = orderForJudge(
+    veteran.id,
+    projects.map(project => ({ submissionId: project.id }))
+  ).map(item => item.submissionId);
+  const owned = (done: number, started = done, viewing = -1) =>
+    queue.map((submissionId, index) => ({
+      judgeId: veteran.id,
+      submissionId,
+      started: index < started,
+      viewing: index === viewing,
+      complete: index < done,
+    }));
+  const run = (assignments: ReturnType<typeof owned>, judgesPerProject = 1) =>
+    pull({
+      judge: late,
+      judges: [veteran, late],
+      projects,
+      assignments,
+      judgesPerProject,
+      trackOrder: ['a'],
+    });
+
+  it('evens out remaining work from the back of the busy queue', () => {
+    const { added, moved } = run(owned(2));
+    expect(added).toEqual([]);
+    // 6 left for the veteran: hand over 3, taken from the end of their queue.
+    expect(moved.map(item => item.submissionId)).toEqual([
+      queue[7],
+      queue[6],
+      queue[5],
+    ]);
+    expect(moved.every(item => item.fromJudgeId === 'vet')).toBe(true);
+  });
+
+  it('never takes a started project or the one a judge has open', () => {
+    // Seven opened but unfinished: only the unopened last one can move.
+    const { moved } = run(owned(0, 7));
+    expect(moved.map(item => item.submissionId)).toEqual([queue[7]]);
+    // 3 left and the judge has the last one open: the next one moves instead.
+    const open = run(owned(5, 5, 7)).moved.map(item => item.submissionId);
+    expect(open).toEqual([queue[6]]);
+  });
+
+  it('can take the next project in a queue when the judge has another open', () => {
+    // 2 left, the judge has the deeper one open: the nearer one moves.
+    expect(run(owned(6, 6, 7)).moved.map(item => item.submissionId)).toEqual([
+      queue[6],
+    ]);
+  });
+
+  it('fills under-covered projects before taking any work', () => {
+    const { added, moved } = run(owned(8), 2);
+    expect(added.map(item => item.submissionId).sort()).toEqual(
+      projects.map(project => project.id)
+    );
+    expect(moved).toEqual([]);
+  });
+
+  it('only takes projects in its own tracks', () => {
+    const result = pull({
+      judge: { id: 'late', trackIds: ['b'] },
+      judges: [veteran, { id: 'late', trackIds: ['b'] }],
+      projects,
+      assignments: owned(0),
+      judgesPerProject: 1,
+      trackOrder: ['a', 'b'],
+    });
+    expect(result).toEqual({ added: [], moved: [] });
+  });
 });

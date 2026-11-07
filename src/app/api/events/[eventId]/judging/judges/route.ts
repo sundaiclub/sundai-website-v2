@@ -26,7 +26,7 @@ export async function POST(
         { status: 400 }
       );
     }
-    const judgeId = await upsertEventJudge({
+    const { judgeId, rebalance } = await upsertEventJudge({
       eventId: params.eventId,
       actorId: access.hacker!.id,
       hackerId: body.hackerId,
@@ -39,7 +39,7 @@ export async function POST(
       new URL(request.url).origin
     );
     return NextResponse.json(
-      { config: await loadJudgingConfig(params.eventId), delivery },
+      { config: await loadJudgingConfig(params.eventId), delivery, rebalance },
       { status: 201 }
     );
   } catch (error) {

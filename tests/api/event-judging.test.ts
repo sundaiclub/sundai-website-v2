@@ -293,7 +293,10 @@ describe('organizer judging APIs', () => {
   });
 
   it('invites a judge by email and reports delivery', async () => {
-    (upsertEventJudge as jest.Mock).mockResolvedValue('judge-new');
+    (upsertEventJudge as jest.Mock).mockResolvedValue({
+      judgeId: 'judge-new',
+      rebalance: { reassigned: 0, pulled: 0, uncoveredProjects: [] },
+    });
     (sendJudgeInvite as jest.Mock).mockResolvedValue({
       sent: true,
       message: null,
