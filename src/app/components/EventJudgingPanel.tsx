@@ -100,20 +100,24 @@ export default function EventJudgingPanel({
     text: string;
   } | null>(null);
 
+  const fetchPanel = useCallback(async () => {
+    const response = await fetch(`/api/judging/${eventId}`, {
+      cache: 'no-store',
+      headers: judgeHeaders(judgeToken),
+    });
+    const body = await response.json().catch(() => null);
+    if (!response.ok)
+      throw new Error(body?.message || 'Unable to load judging.');
+    return body as JudgePanelPayload;
+  }, [eventId, judgeToken]);
+
   useEffect(() => {
     let current = true;
     let timer: ReturnType<typeof setTimeout> | undefined;
     async function load() {
       try {
-        const response = await fetch(`/api/judging/${eventId}`, {
-          cache: 'no-store',
-          headers: judgeHeaders(judgeToken),
-        });
-        const body = await response.json().catch(() => null);
-        if (!response.ok)
-          throw new Error(body?.message || 'Unable to load judging.');
+        const payload = await fetchPanel();
         if (!current) return;
-        const payload = body as JudgePanelPayload;
         const { trackId: nextTrackId, index: nextIndex } =
           initialPosition(payload);
         setPanel(payload);
@@ -134,7 +138,7 @@ export default function EventJudgingPanel({
       current = false;
       clearTimeout(timer);
     };
-  }, [eventId, judgeToken]);
+  }, [fetchPanel]);
 
   const track = panel?.tracks.find(item => item.id === trackId);
   const projects = useMemo(() => track?.projects ?? [], [track]);
@@ -174,6 +178,14 @@ export default function EventJudgingPanel({
         }
       );
       const body = await response.json().catch(() => null);
+      if (response.status === 404) {
+        await moveTo(trackId, index);
+        setNotice({
+          tone: 'danger',
+          text: `${project.title} was reassigned to another judge, so these scores were not saved.`,
+        });
+        return false;
+      }
       if (!response.ok) {
         setNotice({
           tone: 'danger',
@@ -209,12 +221,47 @@ export default function EventJudgingPanel({
     }
   }
 
+  /**
+   * Organizers can move projects between judges while scoring is open, so
+   * every move reloads the assignments and lands on the project the judge was
+   * heading to, or the nearest one past it that is still theirs.
+   */
+  async function moveTo(nextTrackId: string, nextIndex: number) {
+    const before =
+      panel?.tracks.find(item => item.id === nextTrackId)?.projects ?? [];
+    const step = nextTrackId === trackId && nextIndex < index ? -1 : 1;
+    let fresh = panel;
+    setSaving(true);
+    try {
+      fresh = await fetchPanel();
+      setPanel(fresh);
+    } catch {
+      // Keep navigating the list we have; the next move retries.
+    } finally {
+      setSaving(false);
+    }
+    const freshTrack =
+      fresh?.tracks.find(item => item.id === nextTrackId) ?? fresh?.tracks[0];
+    const ids = freshTrack?.projects.map(item => item.submissionId) ?? [];
+    let target = -1;
+    for (
+      let cursor = nextIndex;
+      target < 0 && cursor >= 0 && cursor < before.length;
+      cursor += step
+    )
+      target = ids.indexOf(before[cursor].submissionId);
+    if (target < 0)
+      target = Math.min(Math.max(nextIndex, 0), Math.max(ids.length - 1, 0));
+    updateJudgingUrl(freshTrack?.id ?? '', target);
+    setTrackId(freshTrack?.id ?? '');
+    setIndex(target);
+  }
+
   /** Saves pending changes before moving, so judges never lose scores. */
   async function goTo(nextIndex: number) {
     if (canScore && dirty && !(await save())) return;
-    updateJudgingUrl(trackId, nextIndex);
-    setIndex(nextIndex);
     setNotice(null);
+    await moveTo(trackId, nextIndex);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
@@ -229,10 +276,8 @@ export default function EventJudgingPanel({
 
   async function changeTrack(nextTrackId: string) {
     if (canScore && dirty && !(await save())) return;
-    updateJudgingUrl(nextTrackId, 0);
-    setTrackId(nextTrackId);
-    setIndex(0);
     setNotice(null);
+    await moveTo(nextTrackId, 0);
   }
 
   const otherTracks = panel?.tracks.filter(item => item.id !== trackId) ?? [];

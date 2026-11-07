@@ -56,9 +56,13 @@ export interface EventJudgeSummary {
   reviewCount: number;
 }
 
-/** What happened to a revoked judge's unscored projects. */
-export interface JudgeRevokeResult {
+/** How a change to the judge pool during scoring moved assignments. */
+export interface JudgeRebalanceResult {
+  /** Unfinished projects handed from the changed judge to other judges. */
   reassigned: number;
+  /** Projects the changed judge picked up. */
+  pulled: number;
+  /** Titles of released projects no other eligible judge could take. */
   uncoveredProjects: string[];
 }
 

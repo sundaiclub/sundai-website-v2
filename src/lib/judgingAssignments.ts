@@ -1,3 +1,5 @@
+import { orderForJudge } from '@/lib/judging';
+
 /** A deterministic minimum-cost flow: coverage first, total load second,
  * then load within each track. No judge has a workload cap. */
 export function allocateJudgingAssignments(
@@ -168,4 +170,150 @@ export function reassignJudgingAssignments(
     assignments.push({ judgeId: judge.id, submissionId: project.id });
   }
   return { assignments, uncovered };
+}
+
+type LiveAssignment = {
+  judgeId: string;
+  submissionId: string;
+  /** The judge has saved anything for this project. */
+  started: boolean;
+  complete: boolean;
+};
+
+/** Projects a judge must still see before reaching each unstarted project, in
+ * the order the judging page shows them: track by track, then shuffled. */
+function queueDepths(
+  judge: { id: string; trackIds: string[] },
+  owned: LiveAssignment[],
+  trackOf: Map<string, string>,
+  trackOrder: string[]
+): Map<string, number> {
+  const visible = owned.filter(item =>
+    judge.trackIds.includes(trackOf.get(item.submissionId)!)
+  );
+  const queue = trackOrder.flatMap(trackId =>
+    orderForJudge(
+      judge.id,
+      visible.filter(item => trackOf.get(item.submissionId) === trackId)
+    )
+  );
+  const depths = new Map<string, number>();
+  let ahead = 0;
+  for (const item of queue) {
+    if (!item.started) depths.set(item.submissionId, ahead);
+    if (!item.complete) ahead += 1;
+  }
+  return depths;
+}
+
+/**
+ * Gives a judge added during scoring a fair share of the remaining work.
+ * Under-covered projects come first; then unstarted projects move over from
+ * the busiest judges, taking those deepest in each judge's queue so nobody
+ * loses a project they are about to open. Moves stop once remaining work is
+ * as even as it can get.
+ */
+export function pullJudgingAssignments(input: {
+  judge: { id: string; trackIds: string[] };
+  judges: Array<{ id: string; trackIds: string[] }>;
+  projects: Array<{ id: string; trackId: string }>;
+  assignments: LiveAssignment[];
+  judgesPerProject: number;
+  trackOrder: string[];
+  /** Never take one of the next `minQueueDepth` projects a judge will see. */
+  minQueueDepth: number;
+}): {
+  added: Array<{ judgeId: string; submissionId: string }>;
+  moved: Array<{ fromJudgeId: string; judgeId: string; submissionId: string }>;
+} {
+  const { judge } = input;
+  const trackOf = new Map(input.projects.map(item => [item.id, item.trackId]));
+  const assignments = input.assignments.filter(item =>
+    trackOf.has(item.submissionId)
+  );
+  const onProject = (judgeId: string, submissionId: string) =>
+    assignments.some(
+      item => item.judgeId === judgeId && item.submissionId === submissionId
+    );
+  const added: Array<{ judgeId: string; submissionId: string }> = [];
+  const gaps = input.projects
+    .filter(
+      project =>
+        judge.trackIds.includes(project.trackId) &&
+        !onProject(judge.id, project.id)
+    )
+    .map(project => ({
+      project,
+      coverage: assignments.filter(item => item.submissionId === project.id)
+        .length,
+    }))
+    .filter(item => item.coverage < input.judgesPerProject)
+    .sort(
+      (a, b) =>
+        a.coverage - b.coverage || a.project.id.localeCompare(b.project.id)
+    );
+  for (const { project } of gaps) {
+    const item = {
+      judgeId: judge.id,
+      submissionId: project.id,
+      started: false,
+      complete: false,
+    };
+    assignments.push(item);
+    added.push({ judgeId: judge.id, submissionId: project.id });
+  }
+
+  const moved: Array<{
+    fromJudgeId: string;
+    judgeId: string;
+    submissionId: string;
+  }> = [];
+  const remaining = (judgeId: string) =>
+    assignments.filter(item => item.judgeId === judgeId && !item.complete)
+      .length;
+  const donors = input.judges
+    .filter(item => item.id !== judge.id)
+    .sort((a, b) => a.id.localeCompare(b.id));
+  while (true) {
+    const own = remaining(judge.id);
+    let best: {
+      donor: string;
+      load: number;
+      depth: number;
+      submissionId: string;
+    } | null = null;
+    for (const donor of donors) {
+      const load = remaining(donor.id);
+      if (load < own + 2) continue;
+      const owned = assignments.filter(item => item.judgeId === donor.id);
+      const depths = queueDepths(donor, owned, trackOf, input.trackOrder);
+      for (const [submissionId, depth] of Array.from(depths)) {
+        if (
+          depth < input.minQueueDepth ||
+          !judge.trackIds.includes(trackOf.get(submissionId)!) ||
+          onProject(judge.id, submissionId)
+        )
+          continue;
+        if (
+          !best ||
+          load > best.load ||
+          (load === best.load && depth > best.depth)
+        )
+          best = { donor: donor.id, load, depth, submissionId };
+      }
+    }
+    if (!best) break;
+    const item = assignments.find(
+      entry =>
+        entry.judgeId === best!.donor &&
+        entry.submissionId === best!.submissionId
+    )!;
+    item.judgeId = judge.id;
+    moved.push({
+      fromJudgeId: best.donor,
+      judgeId: judge.id,
+      submissionId: best.submissionId,
+    });
+  }
+  return { added, moved };
 }

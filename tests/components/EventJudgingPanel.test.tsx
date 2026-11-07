@@ -54,6 +54,28 @@ const panel: JudgePanelPayload = {
   ],
 };
 
+/** Answers panel loads with `panels` in turn (repeating the last) and score
+ * saves with `saved`. */
+function mockJudgingApi(
+  panels: JudgePanelPayload[],
+  saved?: { status?: number; body: unknown }
+) {
+  let loads = 0;
+  global.fetch = jest.fn(async (_url: string, init?: RequestInit) => {
+    if (init?.method === 'PUT') {
+      const status = saved?.status ?? 200;
+      return {
+        ok: status < 400,
+        status,
+        json: async () => saved?.body,
+      };
+    }
+    const payload = panels[Math.min(loads, panels.length - 1)];
+    loads += 1;
+    return { ok: true, status: 200, json: async () => payload };
+  }) as jest.Mock;
+}
+
 beforeEach(() => {
   window.history.replaceState(
     null,
@@ -211,17 +233,13 @@ it('keeps the URL unchanged when saving before navigation fails', async () => {
 });
 
 it('confirms a save and offers the next project beside the save button', async () => {
-  global.fetch = jest
-    .fn()
-    .mockResolvedValueOnce({ ok: true, json: async () => assignedPanel })
-    .mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        scores: { demo: 5 },
-        comment: '',
-        updatedAt: '2026-10-22T12:00:00Z',
-      }),
-    });
+  mockJudgingApi([assignedPanel], {
+    body: {
+      scores: { demo: 5 },
+      comment: '',
+      updatedAt: '2026-10-22T12:00:00Z',
+    },
+  });
   render(<EventJudgingPanel eventId="event" judgeToken="token" />);
   expect(await screen.findByText('Project a-1')).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'demo: 5' }));
@@ -258,17 +276,9 @@ it('warns about missing criteria before moving on and lets the judge stay', asyn
 });
 
 it('moves on without a warning once every criterion is scored', async () => {
-  global.fetch = jest
-    .fn()
-    .mockResolvedValueOnce({ ok: true, json: async () => assignedPanel })
-    .mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        scores: scored,
-        comment: '',
-        updatedAt: '2026-10-22T12:00:00Z',
-      }),
-    });
+  mockJudgingApi([assignedPanel], {
+    body: { scores: scored, comment: '', updatedAt: '2026-10-22T12:00:00Z' },
+  });
   render(<EventJudgingPanel eventId="event" judgeToken="token" />);
   expect(await screen.findByText('Project a-1')).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'idea: 5' }));
@@ -276,6 +286,55 @@ it('moves on without a warning once every criterion is scored', async () => {
   fireEvent.click(screen.getAllByRole('button', { name: /Save & next/ })[0]);
   expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
   expect(await screen.findByText('Project a-2')).toBeInTheDocument();
+});
+
+const withProjects = (ids: string[]): JudgePanelPayload => ({
+  ...assignedPanel,
+  tracks: [
+    {
+      ...assignedPanel.tracks[0],
+      projects: ids.map(id => ({
+        ...assignedPanel.tracks[0].projects[0],
+        submissionId: id,
+        title: `Project ${id}`,
+      })),
+    },
+  ],
+});
+
+it('reloads assignments on every move and skips projects given to another judge', async () => {
+  mockJudgingApi([
+    withProjects(['a-1', 'a-2', 'a-3']),
+    withProjects(['a-1', 'a-3', 'a-4']),
+  ]);
+  render(<EventJudgingPanel eventId="event" judgeToken="token" />);
+  expect(await screen.findByText('Project a-1')).toBeInTheDocument();
+  fireEvent.click(screen.getAllByRole('button', { name: /Next project/ })[0]);
+  fireEvent.click(
+    screen.getByRole('button', { name: 'Continue to next project anyway' })
+  );
+  expect(await screen.findByText('Project a-3')).toBeInTheDocument();
+  expect(screen.getAllByText('Project 2 of 3')[0]).toBeInTheDocument();
+  expect(window.location.search).toContain('project=2');
+  expect(global.fetch).toHaveBeenCalledTimes(2);
+});
+
+it('explains when the open project was reassigned before it was saved', async () => {
+  mockJudgingApi([withProjects(['a-1', 'a-2']), withProjects(['a-2'])], {
+    status: 404,
+    body: { message: 'Project not found.' },
+  });
+  render(<EventJudgingPanel eventId="event" judgeToken="token" />);
+  expect(await screen.findByText('Project a-1')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'demo: 5' }));
+  fireEvent.click(screen.getByRole('button', { name: 'idea: 5' }));
+  fireEvent.click(screen.getAllByRole('button', { name: /Save & next/ })[0]);
+  expect(
+    await screen.findByText(
+      'Project a-1 was reassigned to another judge, so these scores were not saved.'
+    )
+  ).toBeInTheDocument();
+  expect(screen.getByText('Project a-2')).toBeInTheDocument();
 });
 
 it('waits for publication and then loads the assigned list', async () => {

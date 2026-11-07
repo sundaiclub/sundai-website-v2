@@ -25,13 +25,16 @@ export async function PATCH(request: Request, props: JudgeRouteContext) {
         { status: 400 }
       );
     }
-    await updateEventJudge({
+    const rebalance = await updateEventJudge({
       eventId: params.eventId,
       judgeId: params.judgeId,
       name: body.name,
       trackIds: body.trackIds,
     });
-    return NextResponse.json(await loadJudgingConfig(params.eventId));
+    return NextResponse.json({
+      config: await loadJudgingConfig(params.eventId),
+      rebalance,
+    });
   } catch (error) {
     return judgingErrorResponse(error, '[EVENT_JUDGE_PATCH]');
   }
