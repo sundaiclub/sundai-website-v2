@@ -78,6 +78,7 @@ type EventPitchResponse = Omit<
 > & {
   canViewPitch?: boolean;
   pitchPhase?: PitchSessionPhase | null;
+  hasPitchProjects?: boolean;
   canManagePitch?: boolean;
   pitchSessions?: Array<
     Pick<
@@ -1833,7 +1834,11 @@ export default function PitchEventPage({ eventId }: { eventId: string }) {
       <div
         className={`flex min-h-80 items-center justify-center font-space-mono ${isDarkMode ? 'text-gray-100' : 'text-gray-900'}`}
       >
-        <p className="text-center">Voting is currently happening.</p>
+        <p className="text-center">
+          {eventPreview.hasPitchProjects
+            ? 'Voting is currently happening.'
+            : 'No projects to vote on yet.'}
+        </p>
       </div>
     );
   }
