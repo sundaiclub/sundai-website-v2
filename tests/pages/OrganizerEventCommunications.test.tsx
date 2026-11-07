@@ -39,13 +39,86 @@ const sentCommunication = {
   status: 'PARTIAL',
   subject: 'Tomorrow’s build night',
   body: 'Doors open at 9:30.',
-  audienceType: 'APPROVED',
-  creator: { id: 'hacker-mc', name: 'Morgan MC' },
-  sender: { id: 'hacker-mc', name: 'Morgan MC' },
   recipientCount: 42,
   sentCount: 40,
   failedCount: 2,
   sentAt: '2026-07-17T14:00:00.000Z',
+};
+
+const stats = (overrides: Record<string, unknown> = {}) => ({
+  total: 42,
+  pending: 0,
+  accepted: 4,
+  delivered: 36,
+  failed: 2,
+  complained: 0,
+  unsubscribed: 0,
+  clicked: 10,
+  rsvps: 4,
+  hasEventLinks: true,
+  preferenceClicks: 0,
+  botClicks: 0,
+  failureReasons: [],
+  links: [],
+  ...overrides,
+});
+
+const sentGroup = {
+  sendGroupId: 'group-sent',
+  audienceType: 'APPROVED',
+  audienceDefinition: { statuses: ['APPROVED'] },
+  sender: { id: 'hacker-mc', name: 'Morgan MC' },
+  createdAt: '2026-07-17T13:59:00.000Z',
+  communications: [
+    {
+      ...sentCommunication,
+      stats: stats({
+        failureReasons: [
+          {
+            code: 'Bounce.Permanent.NoEmail',
+            label: 'Email address does not exist',
+            hint: 'Ask the member to update their email address.',
+            example: null,
+            count: 2,
+          },
+        ],
+        links: [
+          {
+            url: 'https://www.sundai.club/events/boston/ai-build-night',
+            kind: 'CONTENT',
+            clicks: 14,
+            uniqueClicks: 10,
+            botClicks: 3,
+            rsvps: 4,
+          },
+        ],
+      }),
+    },
+    {
+      ...sentCommunication,
+      id: 'blast-sent-sms',
+      channel: 'SMS',
+      status: 'SENT',
+      subject: null,
+      body: 'Doors open at 9:30 tonight.',
+      stats: stats({
+        total: 30,
+        accepted: 0,
+        delivered: 27,
+        failed: 3,
+        clicked: 0,
+        failureReasons: [
+          {
+            code: '20429',
+            label: 'Twilio rate limit (too many requests at once)',
+            hint: 'Sends now retry and limit concurrent requests. Resend to the failed members.',
+            example: null,
+            count: 3,
+          },
+        ],
+      }),
+    },
+  ],
 };
 
 function mockCommunicationFetch({
@@ -65,7 +138,7 @@ function mockCommunicationFetch({
     const url = requestUrl(input);
     if (url === `/api/events/${eventId}/blasts` && !init?.method) {
       return jsonResponse({
-        items: [sentCommunication],
+        items: [sentGroup],
         locations: [
           { id: 'bu', name: 'Boston University' },
           { id: 'lowell', name: 'Lowell' },
@@ -147,32 +220,13 @@ function mockCommunicationFetch({
           : sentCommunication.subject,
       });
     }
-    if (url === `/api/events/${eventId}/blasts/${sentCommunication.id}`) {
-      return jsonResponse({
-        ...sentCommunication,
-        audienceDefinition: { statuses: ['APPROVED'] },
-        recipients: [
-          {
-            id: 'recipient-sent',
-            displayName: 'Ada Builder',
-            contactValue: 'ada@example.com',
-            status: 'SENT',
-          },
-          {
-            id: 'recipient-failed',
-            displayName: 'Grace Builder',
-            contactValue: 'grace@example.com',
-            status: 'FAILED',
-            errorMessage: 'Provider rejected destination',
-          },
-        ],
-      });
-    }
     return jsonResponse({ error: `Unexpected request: ${url}` }, 500);
   }) as jest.Mock;
 }
 
-function loadPage(): (props: { params: Promise<{ eventId: string }> }) => Promise<React.ReactElement> {
+function loadPage(): (props: {
+  params: Promise<{ eventId: string }>;
+}) => Promise<React.ReactElement> {
   try {
     return require('../../src/app/organizer/events/[eventId]/communications/page')
       .default;
@@ -299,6 +353,12 @@ describe('/organizer/events/[eventId]/communications', () => {
           }),
         ])
       );
+      // One send groups its email and SMS versions in history.
+      const groupIds = createCalls.map(
+        ([, init]) => JSON.parse(init.body).sendGroupId
+      );
+      expect(groupIds[0]).toMatch(/^[0-9a-f-]{36}$/);
+      expect(groupIds[1]).toBe(groupIds[0]);
     });
     expect(screen.getByText(/subject is only used for emails/i)).toBeVisible();
     expect(
@@ -426,22 +486,42 @@ describe('/organizer/events/[eventId]/communications', () => {
     ).toBeInTheDocument();
   });
 
-  it('shows immutable history summary and recipient-level delivery details', async () => {
+  it('groups email and SMS versions of one send with aggregate results only', async () => {
     await renderPage();
 
-    expect(
-      await screen.findByText(/tomorrow’s build night/i)
-    ).toBeInTheDocument();
-    expect(screen.getByText(/40.*sent/i)).toBeInTheDocument();
-    expect(screen.getByText(/2.*failed/i)).toBeInTheDocument();
-    expect(screen.getByText(/morgan mc/i)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /view details/i }));
+    const entry = (
+      await screen.findByRole('heading', { name: /tomorrow’s build night/i })
+    ).closest('li')!;
+    expect(within(entry).getByText(/email · partial/i)).toBeInTheDocument();
+    expect(within(entry).getByText(/sms · sent/i)).toBeInTheDocument();
+    expect(within(entry).getByText(/morgan mc/i)).toBeInTheDocument();
+    expect(within(entry).getByText('85.7%')).toBeInTheDocument();
+    expect(within(entry).getByText('90%')).toBeInTheDocument();
+    expect(within(entry).getByText('25%')).toBeInTheDocument();
+    // Both channels share one history entry.
+    expect(entry.parentElement!.children).toHaveLength(1);
 
-    expect(await screen.findByText(/ada builder/i)).toBeInTheDocument();
-    expect(screen.getByText(/grace builder/i)).toBeInTheDocument();
+    fireEvent.click(
+      within(entry).getByRole('button', { name: /view details/i })
+    );
+
     expect(
-      screen.getByText(/provider rejected destination/i)
+      within(entry).getByText(/email address does not exist/i)
     ).toBeInTheDocument();
+    expect(within(entry).getByText(/twilio rate limit/i)).toBeInTheDocument();
+    expect(
+      within(entry).getByText(/resend to the failed members/i)
+    ).toBeInTheDocument();
+    expect(
+      within(entry).getByText('4 registered after clicking')
+    ).toBeInTheDocument();
+    expect(
+      within(entry).getByText('sundai.club/events/boston/ai-build-night')
+    ).toBeInTheDocument();
+    expect(
+      within(entry).getByText('Doors open at 9:30 tonight.')
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/@example\.com/i)).not.toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: /edit sent/i })
     ).not.toBeInTheDocument();

@@ -7,10 +7,7 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { requireEventCommunicationsManager } from '@/lib/eventManagementApi';
 import { validateEventCommunicationDraft } from '@/lib/eventCommunications';
-import { parsePageSize } from '@/lib/pagination';
-
-const DEFAULT_RECIPIENT_PAGE_SIZE = 50;
-const MAX_RECIPIENT_PAGE_SIZE = 100;
+import { eventCommunicationDeliveryStats } from '@/lib/deliveryStats';
 
 async function findCommunication(eventId: string, blastId: string) {
   const communication = await prisma.eventCommunication.findUnique({
@@ -20,7 +17,7 @@ async function findCommunication(eventId: string, blastId: string) {
 }
 
 export async function GET(
-  request: Request,
+  _request: Request,
   props: { params: Promise<{ eventId: string; blastId: string }> }
 ) {
   const params = await props.params;
@@ -36,49 +33,11 @@ export async function GET(
       return NextResponse.json({ error: 'Not Found' }, { status: 404 });
     }
 
-    const url = new URL(request.url);
-    const limit = parsePageSize(
-      url.searchParams.get('limit'),
-      DEFAULT_RECIPIENT_PAGE_SIZE,
-      MAX_RECIPIENT_PAGE_SIZE
-    );
-    if (limit === null) {
-      return NextResponse.json(
-        { error: 'limit must be a positive integer.' },
-        { status: 400 }
-      );
-    }
-    const cursor = url.searchParams.get('cursor');
-    const rows = await prisma.eventCommunicationRecipient.findMany({
-      where: { communicationId: communication.id },
-      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
-      take: limit + 1,
-      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
-      select: {
-        id: true,
-        communicationId: true,
-        hackerId: true,
-        registrationId: true,
-        contactValue: true,
-        displayName: true,
-        status: true,
-        providerMessageId: true,
-        errorCode: true,
-        errorMessage: true,
-        attemptedAt: true,
-        deliveredAt: true,
-        createdAt: true,
-        updatedAt: true,
-      },
-    });
-    const hasMore = rows.length > limit;
-    const recipients = hasMore ? rows.slice(0, limit) : rows;
-
+    const stats = await eventCommunicationDeliveryStats([communication.id]);
     return NextResponse.json({
       ...communication,
       audienceDefinition: communication.audienceDefinitionJson,
-      recipients,
-      recipientNextCursor: hasMore ? (recipients.at(-1)?.id ?? null) : null,
+      stats: stats.get(communication.id),
     });
   } catch (error) {
     console.error('[EVENT_COMMUNICATION_GET]', error);

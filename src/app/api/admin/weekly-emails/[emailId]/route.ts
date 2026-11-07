@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { NextResponse } from 'next/server';
 import { requireSiteAdmin } from '@/lib/eventManagementApi';
 import prisma from '@/lib/prisma';
@@ -114,20 +115,33 @@ export async function POST(request: Request, props: Context) {
     { ...draft, subject: test ? `[Test] ${draft.subject}` : draft.subject },
     content
   );
-  const batchIds = await prisma.$transaction(async tx => {
-    if (!test) {
+  const batchIds = await prisma.$transaction(
+    async tx => {
+      if (test) return createEmailBatches(tx, messages);
       const claimed = await tx.weeklyEmail.updateMany({
         where: { id: draft.id, status: 'DRAFT', updatedAt: draft.updatedAt },
-        data: { status: 'SENDING' },
+        data: { status: 'SENDING', sentAt: new Date() },
       });
       if (!claimed.count) return null;
-    }
-    return createEmailBatches(
-      tx,
-      messages,
-      test ? {} : { weeklyEmailId: draft.id }
-    );
-  });
+      // Each recipient row tracks delivery, bounces, and link clicks.
+      const recipients = content.recipients.map((recipient, index) => ({
+        id: randomUUID(),
+        weeklyEmailId: draft.id,
+        hackerId: recipient.id,
+        contactValue: messages[index].to,
+      }));
+      await tx.weeklyEmailRecipient.createMany({ data: recipients });
+      return createEmailBatches(
+        tx,
+        messages.map((message, index) => ({
+          ...message,
+          weeklyRecipientId: recipients[index].id,
+        })),
+        { weeklyEmailId: draft.id }
+      );
+    },
+    { timeout: 60_000 }
+  );
   if (!batchIds)
     return NextResponse.json(
       {

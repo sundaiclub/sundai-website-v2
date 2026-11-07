@@ -8,41 +8,18 @@ import {
   ManagementSection,
   useManagementClasses,
 } from '../../../../components/ManagementSurface';
+import DeliveryStatsSummary from '../../../../components/DeliveryStatsSummary';
 import type {
   EventCommunicationAudience,
   EventCommunicationChannel,
+  EventCommunicationHistoryGroup,
   EventCommunicationPreview,
+  EventCommunicationStatus,
 } from '@/types/event-workspace';
 
 type ProviderState = {
   available: boolean;
   reason?: string;
-};
-
-type CommunicationSummary = {
-  id: string;
-  channel: EventCommunicationChannel;
-  status: string;
-  subject: string | null;
-  body: string;
-  audienceType: EventCommunicationAudience;
-  creator?: { id: string; name: string } | null;
-  sender?: { id: string; name: string } | null;
-  recipientCount: number;
-  sentCount: number;
-  failedCount: number;
-  sentAt: string | null;
-};
-
-type CommunicationDetail = CommunicationSummary & {
-  audienceDefinition?: Record<string, unknown>;
-  recipients: Array<{
-    id: string;
-    displayName: string;
-    contactValue: string;
-    status: string;
-    errorMessage?: string | null;
-  }>;
 };
 
 type RegistrationAudience = Exclude<
@@ -71,16 +48,22 @@ type ChapterInvitationDefaults = {
   smsBody: string;
 };
 
-type ChapterInvitationStatus = Pick<
-  CommunicationSummary,
-  | 'id'
-  | 'channel'
-  | 'status'
-  | 'recipientCount'
-  | 'sentCount'
-  | 'failedCount'
-  | 'sentAt'
->;
+type ChapterInvitationStatus = {
+  id: string;
+  channel: EventCommunicationChannel;
+  status: EventCommunicationStatus;
+  recipientCount: number;
+  sentCount: number;
+  failedCount: number;
+  sentAt: string | null;
+};
+
+type HistoryPayload = {
+  items?: EventCommunicationHistoryGroup[];
+  chapterInvitationStatus?: ChapterInvitationStatus | null;
+};
+
+const newSendGroupId = () => globalThis.crypto.randomUUID();
 
 export default function EventCommunicationsPanel({
   eventId,
@@ -88,7 +71,7 @@ export default function EventCommunicationsPanel({
   eventId: string;
 }) {
   const classes = useManagementClasses();
-  const [history, setHistory] = useState<CommunicationSummary[]>([]);
+  const [history, setHistory] = useState<EventCommunicationHistoryGroup[]>([]);
   const [providers, setProviders] = useState<{
     email: ProviderState;
     sms: ProviderState;
@@ -128,26 +111,25 @@ export default function EventCommunicationsPanel({
     useState<ChapterInvitationStatus | null>(null);
   const [sending, setSending] = useState(false);
   const [notice, setNotice] = useState('');
-  const [detail, setDetail] = useState<CommunicationDetail | null>(null);
-  const hasPendingSend =
-    history.some(item => item.status === 'SENDING') ||
-    detail?.status === 'SENDING';
-  const detailId = detail?.id;
+  const [detailGroupId, setDetailGroupId] = useState<string | null>(null);
+  const hasPendingSend = history.some(group =>
+    group.communications.some(item => item.status === 'SENDING')
+  );
 
   useEffect(() => {
     let isCurrent = true;
     fetch(`/api/events/${eventId}/blasts`)
       .then(async response => {
         if (!response.ok) throw new Error('Unable to load communications');
-        return response.json() as Promise<{
-          items?: CommunicationSummary[];
-          locations?: Array<{ id: string; name: string }>;
-          providerAvailability?: {
-            email: ProviderState;
-            sms: ProviderState;
-          };
-          chapterInvitationStatus?: ChapterInvitationStatus | null;
-        }>;
+        return response.json() as Promise<
+          HistoryPayload & {
+            locations?: Array<{ id: string; name: string }>;
+            providerAvailability?: {
+              email: ProviderState;
+              sms: ProviderState;
+            };
+          }
+        >;
       })
       .then(payload => {
         if (!isCurrent) return;
@@ -174,6 +156,17 @@ export default function EventCommunicationsPanel({
     };
   }, [eventId]);
 
+  async function reloadHistory() {
+    const response = await fetch(`/api/events/${eventId}/blasts`);
+    if (!response.ok) return null;
+    return (await response.json()) as HistoryPayload;
+  }
+
+  function applyHistory(payload: HistoryPayload) {
+    setHistory(payload.items ?? []);
+    setChapterInvitationStatus(payload.chapterInvitationStatus ?? null);
+  }
+
   useEffect(() => {
     if (!hasPendingSend) return;
     let current = true;
@@ -181,18 +174,8 @@ export default function EventCommunicationsPanel({
       try {
         const response = await fetch(`/api/events/${eventId}/blasts`);
         if (!response.ok) return;
-        const payload = await response.json();
-        let updatedDetail: CommunicationDetail | undefined;
-        if (detailId) {
-          const response = await fetch(
-            `/api/events/${eventId}/blasts/${detailId}`
-          );
-          if (response.ok) updatedDetail = await response.json();
-        }
-        if (!current) return;
-        setHistory(payload.items ?? []);
-        setChapterInvitationStatus(payload.chapterInvitationStatus ?? null);
-        if (updatedDetail) setDetail(updatedDetail);
+        const payload = (await response.json()) as HistoryPayload;
+        if (current) applyHistory(payload);
       } catch {
         /* Keep the last known progress until the next poll. */
       }
@@ -201,7 +184,7 @@ export default function EventCommunicationsPanel({
       current = false;
       clearInterval(timer);
     };
-  }, [eventId, hasPendingSend, detailId]);
+  }, [eventId, hasPendingSend]);
 
   function toggleChannel(channel: EventCommunicationChannel) {
     setChannels(current =>
@@ -235,6 +218,7 @@ export default function EventCommunicationsPanel({
     setDraftPreviews([]);
     setPreviewing(true);
     const audienceType = selectedAudiences[0];
+    const sendGroupId = newSendGroupId();
     const previews = await Promise.all(
       channels.map(async channel => {
         const draftResponse = await fetch(`/api/events/${eventId}/blasts`, {
@@ -242,6 +226,7 @@ export default function EventCommunicationsPanel({
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({
             channel,
+            sendGroupId,
             subject: channel === 'EMAIL' ? subject : null,
             body,
             audienceType,
@@ -304,6 +289,7 @@ export default function EventCommunicationsPanel({
         throw new Error('No communication provider is available.');
       }
 
+      const sendGroupId = newSendGroupId();
       const previews = await Promise.all(
         availableChannels.map(async channel => {
           const draftResponse = await fetch(`/api/events/${eventId}/blasts`, {
@@ -311,6 +297,7 @@ export default function EventCommunicationsPanel({
             headers: { 'content-type': 'application/json' },
             body: JSON.stringify({
               channel,
+              sendGroupId,
               subject: channel === 'EMAIL' ? invitation.subject : null,
               body:
                 channel === 'EMAIL' ? invitation.emailBody : invitation.smsBody,
@@ -418,16 +405,8 @@ export default function EventCommunicationsPanel({
         );
         return;
       }
-      setHistory(current => [
-        ...results.map(result => result.payload as CommunicationSummary),
-        ...current,
-      ]);
-      const latestResult = results
-        .map(result => result.payload as ChapterInvitationStatus)
-        .sort((left, right) =>
-          String(right.sentAt).localeCompare(String(left.sentAt))
-        )[0];
-      setChapterInvitationStatus(latestResult ?? null);
+      const updated = await reloadHistory().catch(() => null);
+      if (updated) applyHistory(updated);
       setDraftPreviews([]);
       setNotice(
         results.some(result => result.payload.status === 'SENDING')
@@ -486,10 +465,8 @@ export default function EventCommunicationsPanel({
         );
         return;
       }
-      setHistory(current => [
-        ...results.map(result => result.payload as CommunicationSummary),
-        ...current,
-      ]);
+      const updated = await reloadHistory().catch(() => null);
+      if (updated) applyHistory(updated);
       setInvitationOpen(false);
       setInvitationState('idle');
       setInvitationContent(null);
@@ -503,15 +480,6 @@ export default function EventCommunicationsPanel({
     } finally {
       setSending(false);
     }
-  }
-
-  async function viewDetail(id: string) {
-    const response = await fetch(`/api/events/${eventId}/blasts/${id}`);
-    if (!response.ok) {
-      setNotice('Communication details are unavailable.');
-      return;
-    }
-    setDetail((await response.json()) as CommunicationDetail);
   }
 
   if (loadState === 'loading') {
@@ -840,79 +808,110 @@ export default function EventCommunicationsPanel({
         )}
       </ManagementSection>
 
-      <ManagementSection title="Communication history">
+      <ManagementSection
+        title="Communication history"
+        description="Email and SMS versions of the same message are shown together. Email delivery and clicks update as SES reports them."
+      >
         {history.length === 0 ? (
           <ManagementEmptyState>
             No communications have been sent.
           </ManagementEmptyState>
         ) : (
           <ul className="space-y-3">
-            {history.map(item => (
-              <li className={`${classes.subtlePanel} p-4`} key={item.id}>
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <h3 className="font-bold">
-                      {item.subject ?? 'SMS message'}
-                    </h3>
-                    <p className={`mt-1 text-sm ${classes.mutedText}`}>
-                      {item.sender?.name ?? item.creator?.name ?? 'Organizer'} ·{' '}
-                      {item.recipientCount} recipients
-                    </p>
-                    <p className={`mt-1 text-sm ${classes.mutedText}`}>
-                      {item.sentCount} sent · {item.failedCount} failed
-                    </p>
+            {history.map(group => {
+              const isOpen = detailGroupId === group.sendGroupId;
+              const email = group.communications.find(
+                item => item.channel === 'EMAIL'
+              );
+              return (
+                <li
+                  className={`${classes.subtlePanel} p-4`}
+                  key={group.sendGroupId}
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <h3 className="font-bold">
+                        {email?.subject ?? 'SMS message'}
+                      </h3>
+                      <p className={`mt-1 text-sm ${classes.mutedText}`}>
+                        {group.sender?.name ?? 'Organizer'} ·{' '}
+                        {new Date(group.createdAt).toLocaleString()}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {group.communications.map(item => (
+                        <ManagementBadge
+                          key={item.id}
+                          tone={
+                            item.status === 'SENT'
+                              ? 'success'
+                              : item.status === 'FAILED'
+                                ? 'danger'
+                                : item.status === 'DRAFT'
+                                  ? 'default'
+                                  : 'warning'
+                          }
+                        >
+                          {item.channel === 'EMAIL' ? 'Email' : 'SMS'} ·{' '}
+                          {item.status}
+                        </ManagementBadge>
+                      ))}
+                      <button
+                        aria-expanded={isOpen}
+                        className={classes.secondaryButton}
+                        onClick={() =>
+                          setDetailGroupId(isOpen ? null : group.sendGroupId)
+                        }
+                        type="button"
+                      >
+                        {isOpen ? 'Hide details' : 'View details'}
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <ManagementBadge>{item.status}</ManagementBadge>
-                    <button
-                      className={classes.secondaryButton}
-                      onClick={() => viewDetail(item.id)}
-                      type="button"
-                    >
-                      View details
-                    </button>
+                  <div className="mt-4 space-y-4">
+                    {group.communications.map(item => (
+                      <div key={item.id}>
+                        {group.communications.length > 1 && (
+                          <h4 className="mb-2 text-sm font-bold">
+                            {item.channel === 'EMAIL' ? 'Email' : 'SMS'}
+                          </h4>
+                        )}
+                        <DeliveryStatsSummary
+                          channel={item.channel}
+                          detailed={isOpen}
+                          stats={item.stats}
+                        />
+                      </div>
+                    ))}
                   </div>
-                </div>
-              </li>
-            ))}
+                  {isOpen && (
+                    <div className="mt-4 space-y-4 border-t pt-4">
+                      <p className="text-sm">
+                        Locations:{' '}
+                        {Array.isArray(group.audienceDefinition?.locationNames)
+                          ? group.audienceDefinition.locationNames.join(', ')
+                          : 'All locations'}
+                      </p>
+                      {group.communications.map(item => (
+                        <div key={item.id}>
+                          <h4 className="text-sm font-bold">
+                            {item.channel === 'EMAIL'
+                              ? 'Email message'
+                              : 'SMS message'}
+                          </h4>
+                          <p className="mt-1 whitespace-pre-wrap text-sm">
+                            {item.body}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         )}
       </ManagementSection>
-
-      {detail && (
-        <ManagementSection
-          title={detail.subject ?? 'SMS message details'}
-          description="Saved content and audience are fixed. Recipient results update while messages send."
-        >
-          <p className="whitespace-pre-wrap">{detail.body}</p>
-          <p className="mt-3 text-sm">
-            Locations:{' '}
-            {Array.isArray(detail.audienceDefinition?.locationNames)
-              ? detail.audienceDefinition.locationNames.join(', ')
-              : 'All locations'}
-          </p>
-          <ul className="mt-4 space-y-2">
-            {detail.recipients.map(recipient => (
-              <li className={`${classes.subtlePanel} p-3`} key={recipient.id}>
-                <div className="flex flex-wrap justify-between gap-2">
-                  <div>
-                    <p className="font-bold">{recipient.displayName}</p>
-                    <p className={`text-sm ${classes.mutedText}`}>
-                      {recipient.contactValue}
-                    </p>
-                    {recipient.errorMessage && (
-                      <p className="mt-1 text-sm text-red-700">
-                        {recipient.errorMessage}
-                      </p>
-                    )}
-                  </div>
-                  <ManagementBadge>{recipient.status}</ManagementBadge>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </ManagementSection>
-      )}
 
       {invitationOpen && (
         <div
