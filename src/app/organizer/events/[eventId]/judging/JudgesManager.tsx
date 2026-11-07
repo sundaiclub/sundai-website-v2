@@ -239,7 +239,7 @@ export default function JudgesManager({
         title="Invite a judge"
         description={
           config.judgingAssignmentsPublishedAt
-            ? 'Judges get an email with a personal link that opens the judging page. A judge added now takes over unstarted projects from the busiest judges, never one of the next few in their queue.'
+            ? 'Judges get an email with a personal link that opens the judging page. A judge added now takes over unstarted projects from the busiest judges, never one a judge has open.'
             : "Judges get an email with a personal link that opens the judging page. They don't need an account."
         }
       >

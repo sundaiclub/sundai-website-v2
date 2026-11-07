@@ -886,6 +886,42 @@ export async function loadJudgePanel(
   };
 }
 
+/**
+ * Records the project a judge's page has open so a rebalance never moves it.
+ * Only a project assigned to that judge can be recorded; anything else is a
+ * 404, the same as reading or scoring it.
+ */
+export async function recordJudgeViewing(
+  eventId: string,
+  judgeId: string,
+  submissionId: string
+) {
+  await withJudgingEventLock(eventId, async tx => {
+    const result = await tx.eventJudge.updateMany({
+      where: {
+        id: judgeId,
+        eventId,
+        revokedAt: null,
+        event: {
+          judgingEnabled: true,
+          judgingAssignmentsPublishedAt: { not: null },
+        },
+        assignments: {
+          some: {
+            submission: {
+              ...judgeableSubmissionWhere(eventId),
+              id: submissionId,
+              track: { judges: { some: { judgeId } } },
+            },
+          },
+        },
+      },
+      data: { viewingSubmissionId: submissionId },
+    });
+    if (result.count === 0) throw new JudgingError('Project not found.', 404);
+  });
+}
+
 export async function saveJudgeReview(input: {
   eventId: string;
   judgeId: string;
@@ -1480,7 +1516,11 @@ async function publishedAssignmentState(
       },
       judges: {
         where: { revokedAt: null },
-        select: { id: true, tracks: { select: { trackId: true } } },
+        select: {
+          id: true,
+          viewingSubmissionId: true,
+          tracks: { select: { trackId: true } },
+        },
       },
       judgingSubmissions: {
         where: judgeableSubmissionWhere(eventId),
@@ -1500,6 +1540,9 @@ async function publishedAssignmentState(
     },
   });
   if (!event?.judgingAssignmentsPublishedAt) return null;
+  const viewing = new Set(
+    event.judges.map(judge => `${judge.id}:${judge.viewingSubmissionId}`)
+  );
   return {
     judgesPerProject: event.judgesPerProject,
     trackOrder: event.judgingTracks.map(track => track.id),
@@ -1524,6 +1567,7 @@ async function publishedAssignmentState(
           judgeId,
           submissionId: submission.id,
           started: Boolean(review),
+          viewing: viewing.has(`${judgeId}:${submission.id}`),
           complete: Boolean(
             review &&
               isJudgingReviewComplete(
@@ -1538,9 +1582,6 @@ async function publishedAssignmentState(
     }),
   };
 }
-
-/** The judging page never takes one of the next two projects a judge will see. */
-const PROTECTED_QUEUE_DEPTH = 2;
 
 /**
  * Keeps coverage and workload even after the judge pool changes mid-scoring.
@@ -1596,6 +1637,7 @@ async function rebalancePublishedAssignments(
         ...assignments.map(item => ({
           ...item,
           started: false,
+          viewing: false,
           complete: false,
         }))
       );
@@ -1615,7 +1657,6 @@ async function rebalancePublishedAssignments(
       assignments: state.assignments,
       judgesPerProject: state.judgesPerProject,
       trackOrder: state.trackOrder,
-      minQueueDepth: PROTECTED_QUEUE_DEPTH,
     });
     for (const item of moved) {
       await tx.judgingAssignment.update({

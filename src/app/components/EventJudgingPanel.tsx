@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ManagementAlert,
   ManagementBadge,
@@ -21,10 +21,13 @@ function judgeHeaders(token: string | null): Record<string, string> {
   return token ? { [JUDGE_TOKEN_HEADER]: token } : {};
 }
 
-function updateJudgingUrl(trackId: string, index: number) {
+/** The URL names the project by id, so it still points at the same project
+ * after organizers move others in or out of the judge's list. */
+function updateJudgingUrl(trackId: string, submissionId: string | undefined) {
   const url = new URL(window.location.href);
   url.searchParams.set('track', trackId);
-  url.searchParams.set('project', String(index + 1));
+  if (submissionId) url.searchParams.set('project', submissionId);
+  else url.searchParams.delete('project');
   window.history.replaceState(null, '', url);
 }
 
@@ -33,34 +36,39 @@ const isUnscored =
     !isJudgingReviewComplete(track.criteria, project.review?.scores ?? {});
 
 /**
- * A refresh keeps the judge on the project in the URL; arriving without one
- * starts them at the first project they have not finished scoring.
+ * A refresh keeps the judge on the project in the URL. Arriving without one,
+ * or with one that is not assigned to them, starts them at the first project
+ * they have not finished scoring. The panel only ever holds assigned projects.
  */
-function initialPosition(payload: JudgePanelPayload) {
+function initialPosition(payload: JudgePanelPayload): {
+  trackId: string;
+  index: number;
+  unavailable: boolean;
+} {
   const params = new URLSearchParams(window.location.search);
   const urlTrack = payload.tracks.find(
     track => track.id === params.get('track')
   );
-  const projectNumber = Number(params.get('project'));
-  if (
-    urlTrack &&
-    Number.isSafeInteger(projectNumber) &&
-    projectNumber >= 1 &&
-    projectNumber <= urlTrack.projects.length
-  )
-    return { trackId: urlTrack.id, index: projectNumber - 1 };
+  const projectId = params.get('project');
+  for (const track of payload.tracks) {
+    const index = track.projects.findIndex(
+      project => project.submissionId === projectId
+    );
+    if (index >= 0) return { trackId: track.id, index, unavailable: false };
+  }
+  const unavailable = Boolean(projectId && payload.assignmentsPublished);
   const tracks = urlTrack
     ? [urlTrack, ...payload.tracks.filter(track => track !== urlTrack)]
     : payload.tracks;
   for (const track of tracks) {
     const index = track.projects.findIndex(isUnscored(track));
-    if (index >= 0) return { trackId: track.id, index };
+    if (index >= 0) return { trackId: track.id, index, unavailable };
   }
   const track =
     urlTrack ??
     payload.tracks.find(item => item.projects.length > 0) ??
     payload.tracks[0];
-  return { trackId: track?.id ?? '', index: 0 };
+  return { trackId: track?.id ?? '', index: 0, unavailable };
 }
 
 type Draft = { scores: Record<string, number>; comment: string };
@@ -118,12 +126,27 @@ export default function EventJudgingPanel({
       try {
         const payload = await fetchPanel();
         if (!current) return;
-        const { trackId: nextTrackId, index: nextIndex } =
-          initialPosition(payload);
+        const {
+          trackId: nextTrackId,
+          index: nextIndex,
+          unavailable,
+        } = initialPosition(payload);
         setPanel(payload);
         setTrackId(nextTrackId);
         setIndex(nextIndex);
         setLoadError('');
+        if (payload.assignmentsPublished)
+          updateJudgingUrl(
+            nextTrackId,
+            payload.tracks.find(item => item.id === nextTrackId)?.projects[
+              nextIndex
+            ]?.submissionId
+          );
+        if (unavailable)
+          setNotice({
+            tone: 'danger',
+            text: 'That project is not assigned to you, so you are on your next project instead.',
+          });
         if (!payload.assignmentsPublished) timer = setTimeout(load, 15000);
       } catch (error) {
         if (!current) return;
@@ -147,6 +170,39 @@ export default function EventJudgingPanel({
   useEffect(() => {
     setDraft(draftFor(project));
   }, [project]);
+
+  const moveToRef = useRef<
+    ((nextTrackId: string, nextIndex: number) => Promise<void>) | null
+  >(null);
+  const position = useRef({ trackId, index });
+  position.current = { trackId, index };
+  const viewingId = project?.submissionId;
+  /**
+   * Tells the server which project is open so a rebalance never moves it. If
+   * it was moved just before that, reload and land on the next one still ours.
+   */
+  useEffect(() => {
+    if (!viewingId) return;
+    fetch(`/api/judging/${eventId}/viewing`, {
+      method: 'PUT',
+      headers: {
+        'content-type': 'application/json',
+        ...judgeHeaders(judgeToken),
+      },
+      body: JSON.stringify({ submissionId: viewingId }),
+    })
+      .then(response => {
+        if (response.status !== 404) return;
+        setNotice({
+          tone: 'danger',
+          text: 'That project was reassigned to another judge, so you are on your next project instead.',
+        });
+        moveToRef.current?.(position.current.trackId, position.current.index);
+      })
+      .catch(() => {
+        // The next project change reports again.
+      });
+  }, [eventId, judgeToken, viewingId]);
 
   const isComplete = useCallback(
     (item: JudgeProjectView) =>
@@ -252,10 +308,11 @@ export default function EventJudgingPanel({
       target = ids.indexOf(before[cursor].submissionId);
     if (target < 0)
       target = Math.min(Math.max(nextIndex, 0), Math.max(ids.length - 1, 0));
-    updateJudgingUrl(freshTrack?.id ?? '', target);
+    updateJudgingUrl(freshTrack?.id ?? '', ids[target]);
     setTrackId(freshTrack?.id ?? '');
     setIndex(target);
   }
+  moveToRef.current = moveTo;
 
   /** Saves pending changes before moving, so judges never lose scores. */
   async function goTo(nextIndex: number) {

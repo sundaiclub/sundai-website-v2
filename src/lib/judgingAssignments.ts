@@ -177,11 +177,14 @@ type LiveAssignment = {
   submissionId: string;
   /** The judge has saved anything for this project. */
   started: boolean;
+  /** The judge's page has this project open right now. */
+  viewing: boolean;
   complete: boolean;
 };
 
-/** Projects a judge must still see before reaching each unstarted project, in
- * the order the judging page shows them: track by track, then shuffled. */
+/** Projects a judge must still see before reaching each project that can
+ * move, in the order the judging page shows them: track by track, then
+ * shuffled. Started projects and the one the judge has open never move. */
 function queueDepths(
   judge: { id: string; trackIds: string[] },
   owned: LiveAssignment[],
@@ -200,7 +203,7 @@ function queueDepths(
   const depths = new Map<string, number>();
   let ahead = 0;
   for (const item of queue) {
-    if (!item.started) depths.set(item.submissionId, ahead);
+    if (!item.started && !item.viewing) depths.set(item.submissionId, ahead);
     if (!item.complete) ahead += 1;
   }
   return depths;
@@ -209,9 +212,10 @@ function queueDepths(
 /**
  * Gives a judge added during scoring a fair share of the remaining work.
  * Under-covered projects come first; then unstarted projects move over from
- * the busiest judges, taking those deepest in each judge's queue so nobody
- * loses a project they are about to open. Moves stop once remaining work is
- * as even as it can get.
+ * the busiest judges, never one a judge has open, taking those deepest in each
+ * judge's queue first. The judging page reloads its assignments on every move,
+ * so judges simply skip projects that left their list. Moves stop once
+ * remaining work is as even as it can get.
  */
 export function pullJudgingAssignments(input: {
   judge: { id: string; trackIds: string[] };
@@ -220,8 +224,6 @@ export function pullJudgingAssignments(input: {
   assignments: LiveAssignment[];
   judgesPerProject: number;
   trackOrder: string[];
-  /** Never take one of the next `minQueueDepth` projects a judge will see. */
-  minQueueDepth: number;
 }): {
   added: Array<{ judgeId: string; submissionId: string }>;
   moved: Array<{ fromJudgeId: string; judgeId: string; submissionId: string }>;
@@ -257,6 +259,7 @@ export function pullJudgingAssignments(input: {
       judgeId: judge.id,
       submissionId: project.id,
       started: false,
+      viewing: false,
       complete: false,
     };
     assignments.push(item);
@@ -289,7 +292,6 @@ export function pullJudgingAssignments(input: {
       const depths = queueDepths(donor, owned, trackOf, input.trackOrder);
       for (const [submissionId, depth] of Array.from(depths)) {
         if (
-          depth < input.minQueueDepth ||
           !judge.trackIds.includes(trackOf.get(submissionId)!) ||
           onProject(judge.id, submissionId)
         )

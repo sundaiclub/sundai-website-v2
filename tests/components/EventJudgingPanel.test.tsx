@@ -54,14 +54,19 @@ const panel: JudgePanelPayload = {
   ],
 };
 
-/** Answers panel loads with `panels` in turn (repeating the last) and score
- * saves with `saved`. */
+/** Answers panel loads with `panels` in turn (repeating the last), score
+ * saves with `saved`, and open-project reports with `viewingStatus`. */
 function mockJudgingApi(
   panels: JudgePanelPayload[],
-  saved?: { status?: number; body: unknown }
+  saved?: { status?: number; body: unknown },
+  viewingStatus: () => number = () => 204
 ) {
   let loads = 0;
-  global.fetch = jest.fn(async (_url: string, init?: RequestInit) => {
+  global.fetch = jest.fn(async (url: string, init?: RequestInit) => {
+    if (url.endsWith('/viewing')) {
+      const status = viewingStatus();
+      return { ok: status < 400, status, json: async () => null };
+    }
     if (init?.method === 'PUT') {
       const status = saved?.status ?? 200;
       return {
@@ -75,6 +80,15 @@ function mockJudgingApi(
     return { ok: true, status: 200, json: async () => payload };
   }) as jest.Mock;
 }
+
+const panelLoads = () =>
+  (global.fetch as jest.Mock).mock.calls.filter(
+    ([url]) => url === '/api/judging/event'
+  ).length;
+const viewingReports = () =>
+  (global.fetch as jest.Mock).mock.calls
+    .filter(([url]) => url === '/api/judging/event/viewing')
+    .map(([, init]) => JSON.parse(init.body).submissionId);
 
 beforeEach(() => {
   window.history.replaceState(
@@ -119,7 +133,7 @@ it('restores the track and project on refresh and updates the URL when navigatin
   window.history.replaceState(
     null,
     '',
-    '?tab=judging&track=b&project=2&judge=token#scores'
+    '?tab=judging&track=b&project=b-2&judge=token#scores'
   );
   global.fetch = jest
     .fn()
@@ -131,7 +145,7 @@ it('restores the track and project on refresh and updates the URL when navigatin
   );
   expect(await screen.findByText('Project b-1')).toBeInTheDocument();
   expect(window.location.search).toBe(
-    '?tab=judging&track=b&project=1&judge=token'
+    '?tab=judging&track=b&project=b-1&judge=token'
   );
   expect(window.location.hash).toBe('#scores');
 
@@ -143,16 +157,18 @@ it('restores the track and project on refresh and updates the URL when navigatin
     screen.getByRole('button', { name: 'Continue to next project anyway' })
   );
   expect(await screen.findByText('Project b-2')).toBeInTheDocument();
-  expect(new URLSearchParams(window.location.search).get('project')).toBe('2');
+  expect(new URLSearchParams(window.location.search).get('project')).toBe(
+    'b-2'
+  );
   fireEvent.click(screen.getByRole('button', { name: /Judge A/ }));
   expect(await screen.findByText('Project a-1')).toBeInTheDocument();
   expect(window.location.search).toBe(
-    '?tab=judging&track=a&project=1&judge=token'
+    '?tab=judging&track=a&project=a-1&judge=token'
   );
 });
 
-it.each(['', '0', '-1', '3', '1.5', 'invalid'])(
-  'defaults to the first assigned project for invalid project=%s',
+it.each(['', '2', 'invalid'])(
+  'defaults to the first assigned project for unknown project=%s',
   async project => {
     window.history.replaceState(
       null,
@@ -164,8 +180,29 @@ it.each(['', '0', '-1', '3', '1.5', 'invalid'])(
       .mockResolvedValue({ ok: true, json: async () => assignedPanel });
     render(<EventJudgingPanel eventId="event" judgeToken={null} />);
     expect(await screen.findByText('Project a-1')).toBeInTheDocument();
+    expect(window.location.search).toBe('?tab=judging&track=a&project=a-1');
   }
 );
+
+it('never opens a project from the URL that is not assigned to the judge', async () => {
+  window.history.replaceState(
+    null,
+    '',
+    '?tab=judging&track=b&project=someone-elses&judge=token'
+  );
+  mockJudgingApi([withScores(['b-1'])]);
+  render(<EventJudgingPanel eventId="event" judgeToken="token" />);
+  expect(await screen.findByText('Project b-2')).toBeInTheDocument();
+  expect(
+    screen.getByText(
+      'That project is not assigned to you, so you are on your next project instead.'
+    )
+  ).toBeInTheDocument();
+  expect(window.location.search).toBe(
+    '?tab=judging&track=b&project=b-2&judge=token'
+  );
+  expect(viewingReports()).toEqual(['b-2']);
+});
 
 const scored = { idea: 5, demo: 5 };
 
@@ -203,7 +240,7 @@ it.each([
 );
 
 it('keeps the URL project on refresh even when it is already scored', async () => {
-  window.history.replaceState(null, '', '?tab=judging&track=a&project=1');
+  window.history.replaceState(null, '', '?tab=judging&track=a&project=a-1');
   global.fetch = jest
     .fn()
     .mockResolvedValue({ ok: true, json: async () => withScores(['a-1']) });
@@ -272,7 +309,11 @@ it('warns about missing criteria before moving on and lets the judge stay', asyn
   );
   expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
   expect(screen.getByText('Project a-1')).toBeInTheDocument();
-  expect(global.fetch).toHaveBeenCalledTimes(1);
+  expect(panelLoads()).toBe(1);
+  expect(global.fetch).not.toHaveBeenCalledWith(
+    expect.stringContaining('/reviews/'),
+    expect.anything()
+  );
 });
 
 it('moves on without a warning once every criterion is scored', async () => {
@@ -315,8 +356,46 @@ it('reloads assignments on every move and skips projects given to another judge'
   );
   expect(await screen.findByText('Project a-3')).toBeInTheDocument();
   expect(screen.getAllByText('Project 2 of 3')[0]).toBeInTheDocument();
-  expect(window.location.search).toContain('project=2');
-  expect(global.fetch).toHaveBeenCalledTimes(2);
+  expect(window.location.search).toContain('project=a-3');
+  expect(panelLoads()).toBe(2);
+});
+
+it('reports each project the judge opens so it is never moved away', async () => {
+  mockJudgingApi([assignedPanel]);
+  render(<EventJudgingPanel eventId="event" judgeToken="token" />);
+  expect(await screen.findByText('Project a-1')).toBeInTheDocument();
+  fireEvent.click(screen.getAllByRole('button', { name: /Next project/ })[0]);
+  fireEvent.click(
+    screen.getByRole('button', { name: 'Continue to next project anyway' })
+  );
+  expect(await screen.findByText('Project a-2')).toBeInTheDocument();
+  expect(viewingReports()).toEqual(['a-1', 'a-2']);
+  expect(global.fetch).toHaveBeenCalledWith(
+    '/api/judging/event/viewing',
+    expect.objectContaining({
+      method: 'PUT',
+      headers: expect.objectContaining({ 'x-judge-token': 'token' }),
+    })
+  );
+});
+
+it('moves on when the project being opened was reassigned a moment earlier', async () => {
+  let reports = 0;
+  mockJudgingApi(
+    [withProjects(['a-1', 'a-2']), withProjects(['a-2'])],
+    undefined,
+    () => (reports++ === 0 ? 404 : 204)
+  );
+  render(<EventJudgingPanel eventId="event" judgeToken="token" />);
+  expect(await screen.findByText('Project a-2')).toBeInTheDocument();
+  expect(screen.queryByText('Project a-1')).not.toBeInTheDocument();
+  expect(
+    screen.getByText(
+      'That project was reassigned to another judge, so you are on your next project instead.'
+    )
+  ).toBeInTheDocument();
+  expect(viewingReports()).toEqual(['a-1', 'a-2']);
+  expect(window.location.search).toContain('project=a-2');
 });
 
 it('explains when the open project was reassigned before it was saved', async () => {
@@ -351,7 +430,8 @@ it('waits for publication and then loads the assigned list', async () => {
           tracks: [],
         }),
       })
-      .mockResolvedValueOnce({ ok: true, json: async () => panel });
+      .mockResolvedValueOnce({ ok: true, json: async () => panel })
+      .mockResolvedValue({ ok: true, status: 204, json: async () => null });
     render(<EventJudgingPanel eventId="event" judgeToken={null} />);
     await act(async () => {});
     expect(screen.getByText(/Judging has not started/)).toBeInTheDocument();

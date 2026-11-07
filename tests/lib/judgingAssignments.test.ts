@@ -220,11 +220,12 @@ describe('pullJudgingAssignments', () => {
     veteran.id,
     projects.map(project => ({ submissionId: project.id }))
   ).map(item => item.submissionId);
-  const owned = (done: number, started = done) =>
+  const owned = (done: number, started = done, viewing = -1) =>
     queue.map((submissionId, index) => ({
       judgeId: veteran.id,
       submissionId,
       started: index < started,
+      viewing: index === viewing,
       complete: index < done,
     }));
   const run = (assignments: ReturnType<typeof owned>, judgesPerProject = 1) =>
@@ -235,7 +236,6 @@ describe('pullJudgingAssignments', () => {
       assignments,
       judgesPerProject,
       trackOrder: ['a'],
-      minQueueDepth: 2,
     });
 
   it('evens out remaining work from the back of the busy queue', () => {
@@ -250,13 +250,20 @@ describe('pullJudgingAssignments', () => {
     expect(moved.every(item => item.fromJudgeId === 'vet')).toBe(true);
   });
 
-  it('never takes a started project or one of the next few in the queue', () => {
+  it('never takes a started project or the one a judge has open', () => {
     // Seven opened but unfinished: only the unopened last one can move.
     const { moved } = run(owned(0, 7));
     expect(moved.map(item => item.submissionId)).toEqual([queue[7]]);
-    const near = run(owned(5)).moved.map(item => item.submissionId);
-    // 3 left: positions 5 and 6 are protected, so only 7 can move.
-    expect(near).toEqual([queue[7]]);
+    // 3 left and the judge has the last one open: the next one moves instead.
+    const open = run(owned(5, 5, 7)).moved.map(item => item.submissionId);
+    expect(open).toEqual([queue[6]]);
+  });
+
+  it('can take the next project in a queue when the judge has another open', () => {
+    // 2 left, the judge has the deeper one open: the nearer one moves.
+    expect(run(owned(6, 6, 7)).moved.map(item => item.submissionId)).toEqual([
+      queue[6],
+    ]);
   });
 
   it('fills under-covered projects before taking any work', () => {
@@ -275,7 +282,6 @@ describe('pullJudgingAssignments', () => {
       assignments: owned(0),
       judgesPerProject: 1,
       trackOrder: ['a', 'b'],
-      minQueueDepth: 2,
     });
     expect(result).toEqual({ added: [], moved: [] });
   });
