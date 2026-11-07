@@ -78,7 +78,7 @@ describe('PitchEventPage viewer states', () => {
       await screen.findByText(
         hasPitchProjects
           ? 'Voting is currently happening.'
-          : 'Voting has not started yet.'
+          : 'No projects to vote on yet.'
       )
     ).toBeInTheDocument();
     await waitFor(() => {

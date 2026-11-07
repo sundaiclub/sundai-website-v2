@@ -1837,7 +1837,7 @@ export default function PitchEventPage({ eventId }: { eventId: string }) {
         <p className="text-center">
           {eventPreview.hasPitchProjects
             ? 'Voting is currently happening.'
-            : 'Voting has not started yet.'}
+            : 'No projects to vote on yet.'}
         </p>
       </div>
     );
