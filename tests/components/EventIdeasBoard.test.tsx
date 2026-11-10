@@ -139,6 +139,24 @@ describe('EventIdeasBoard', () => {
     expect(screen.getAllByRole('columnheader')).toHaveLength(4);
   });
 
+  it('shows edit and delete on the author’s own idea only', () => {
+    global.fetch = jest.fn() as jest.Mock;
+    renderBoard('Grace', [
+      { ...existingIdea, canEdit: true, canDelete: true },
+      { ...existingIdea, id: 'idea-other', idea: 'Someone else’s idea' },
+    ]);
+
+    expect(
+      screen.getByRole('button', { name: 'Edit Compiler for plants' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Delete Compiler for plants' })
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /someone else’s idea/i })
+    ).not.toBeInTheDocument();
+  });
+
   it('lets authors edit their own idea', async () => {
     const ownIdea = { ...existingIdea, canEdit: true };
     const saved = { ...ownIdea, idea: 'Compiler for gardens' };
@@ -209,7 +227,7 @@ describe('EventIdeasBoard', () => {
   it('keeps the idea when the organizer cancels or the delete fails', async () => {
     const confirm = jest.spyOn(window, 'confirm').mockReturnValue(false);
     global.fetch = jest.fn(() =>
-      jsonResponse({ message: 'Only event organizers can delete ideas' }, 403)
+      jsonResponse({ message: 'You can only delete your own ideas' }, 403)
     ) as jest.Mock;
     renderBoard(null, [{ ...existingIdea, canDelete: true }]);
     const deleteButton = screen.getByRole('button', {
@@ -225,7 +243,7 @@ describe('EventIdeasBoard', () => {
     });
 
     expect(
-      screen.getByText('Only event organizers can delete ideas')
+      screen.getByText('You can only delete your own ideas')
     ).toBeInTheDocument();
     expect(screen.getByText('Compiler for plants')).toBeInTheDocument();
     confirm.mockRestore();

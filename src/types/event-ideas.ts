@@ -15,7 +15,7 @@ export type EventIdeaInput = {
 export type PublicEventIdea = EventIdeaInput & {
   id: string;
   createdAt: string;
-  // Signed-in authors edit their own ideas; organizers delete any idea.
+  // Signed-in authors edit and delete their own ideas; organizers delete any idea.
   canEdit: boolean;
   canDelete: boolean;
 };

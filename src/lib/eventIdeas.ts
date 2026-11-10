@@ -40,11 +40,12 @@ function toPublicIdea(
   { hackerId, createdAt, ...record }: IdeaRecord,
   viewer: EventIdeasViewer
 ): PublicEventIdea {
+  const isAuthor = Boolean(viewer.hackerId && hackerId === viewer.hackerId);
   return {
     ...record,
     createdAt: createdAt.toISOString(),
-    canEdit: Boolean(viewer.hackerId && hackerId === viewer.hackerId),
-    canDelete: viewer.canModerate,
+    canEdit: isAuthor,
+    canDelete: isAuthor || viewer.canModerate,
   };
 }
 
