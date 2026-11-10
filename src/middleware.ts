@@ -11,6 +11,8 @@ export const isPublicRoute = createRouteMatcher([
   '/projects(.*)',
   '/api/chapters(.*)',
   '/api/events',
+  // Anyone can read and share project ideas on a public event.
+  '/api/events/:eventId/ideas',
   '/api/projects(.*)',
   '/api/webhooks/clerk',
   '/api/webhooks/twilio(.*)',
