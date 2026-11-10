@@ -255,7 +255,8 @@ export function EventIdeasBoard({
         </button>
       }
       description="Share what you want to build today and find people to build it with."
-      title="Ideas"
+      size="large"
+      title={<span className="lg:text-5xl">Ideas</span>}
     >
       {deleteError && (
         <div className="mb-4">
@@ -268,25 +269,26 @@ export function EventIdeasBoard({
         </ManagementEmptyState>
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[40rem] text-left text-sm">
+          {/* Sized to stay readable when projected on stage. */}
+          <table className="w-full min-w-[48rem] text-left text-xl leading-snug lg:text-4xl">
             <thead
-              className={`border-b text-xs uppercase ${classes.mutedText}`}
+              className={`border-b text-base uppercase tracking-wide lg:text-2xl ${classes.mutedText}`}
             >
               <tr>
-                <th className="px-3 py-2 font-semibold" scope="col">
+                <th className="px-4 py-3 font-semibold" scope="col">
                   Name
                 </th>
-                <th className="px-3 py-2 font-semibold" scope="col">
+                <th className="px-4 py-3 font-semibold" scope="col">
                   Idea
                 </th>
-                <th className="px-3 py-2 font-semibold" scope="col">
+                <th className="px-4 py-3 font-semibold" scope="col">
                   Description
                 </th>
-                <th className="px-3 py-2 font-semibold" scope="col">
+                <th className="px-4 py-3 font-semibold" scope="col">
                   Added
                 </th>
                 {showActions && (
-                  <th className="px-3 py-2 font-semibold" scope="col">
+                  <th className="px-4 py-3 font-semibold" scope="col">
                     <span className="sr-only">Actions</span>
                   </th>
                 )}
@@ -295,22 +297,24 @@ export function EventIdeasBoard({
             <tbody className={`divide-y ${classes.divider}`}>
               {ideas.map(idea => (
                 <tr className="align-top" key={idea.id}>
-                  <td className="whitespace-nowrap px-3 py-3 font-semibold">
+                  <td className="whitespace-nowrap px-4 py-5 font-semibold">
                     {idea.name}
                   </td>
-                  <td className="px-3 py-3 font-semibold">{idea.idea}</td>
+                  <td className="px-4 py-5 text-3xl font-bold lg:text-6xl">
+                    {idea.idea}
+                  </td>
                   <td
-                    className={`whitespace-pre-wrap break-words px-3 py-3 ${classes.mutedText}`}
+                    className={`whitespace-pre-wrap break-words px-4 py-5 ${classes.mutedText}`}
                   >
                     {idea.description}
                   </td>
                   <td
-                    className={`whitespace-nowrap px-3 py-3 ${classes.mutedText}`}
+                    className={`whitespace-nowrap px-4 py-5 ${classes.mutedText}`}
                   >
                     {timeFormat.format(new Date(idea.createdAt))}
                   </td>
                   {showActions && (
-                    <td className="whitespace-nowrap px-3 py-2 text-right">
+                    <td className="whitespace-nowrap px-4 py-4 text-right">
                       {idea.canEdit && (
                         <button
                           aria-label={`Edit ${idea.idea}`}
