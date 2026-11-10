@@ -256,7 +256,7 @@ export function EventIdeasBoard({
       }
       description="Share what you want to build today and find people to build it with."
       size="large"
-      title={<span className="lg:text-4xl">Ideas</span>}
+      title="Ideas"
     >
       {deleteError && (
         <div className="mb-4">
@@ -270,9 +270,9 @@ export function EventIdeasBoard({
       ) : (
         <div className="overflow-x-auto">
           {/* Sized to stay readable when projected on stage. */}
-          <table className="w-full min-w-[48rem] text-left text-xl leading-snug lg:text-3xl">
+          <table className="w-full min-w-[48rem] text-left text-lg leading-snug lg:text-2xl">
             <thead
-              className={`border-b text-base uppercase tracking-wide lg:text-xl ${classes.mutedText}`}
+              className={`border-b text-sm uppercase tracking-wide lg:text-base ${classes.mutedText}`}
             >
               <tr>
                 <th className="px-4 py-3 font-semibold" scope="col">
@@ -300,7 +300,7 @@ export function EventIdeasBoard({
                   <td className="whitespace-nowrap px-4 py-5 font-semibold">
                     {idea.name}
                   </td>
-                  <td className="px-4 py-5 text-2xl font-bold lg:text-5xl">
+                  <td className="px-4 py-5 text-xl font-bold lg:text-3xl">
                     {idea.idea}
                   </td>
                   <td
