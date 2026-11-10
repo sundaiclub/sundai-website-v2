@@ -32,8 +32,7 @@ import {
   getViewerCheckInTicket,
 } from '@/lib/eventCheckIn';
 import { listPublicEventProjects } from '@/lib/publicEventProjects';
-import { listEventIdeas } from '@/lib/eventIdeas';
-import prisma from '@/lib/prisma';
+import { getEventIdeasViewer, listEventIdeas } from '@/lib/eventIdeas';
 import { findViewerJudgedEvent } from '@/lib/judgingAccess';
 import { JUDGE_TOKEN_PARAM } from '@/types/judging';
 import { getPublicEventBySlug } from '@/lib/publicEvents';
@@ -253,25 +252,20 @@ export default async function PublicEventDetailPage(props: EventPageProps) {
     : searchParams?.notice;
   const eventPath = `/events/${encodeURIComponent(event.chapterSlug)}/${encodeURIComponent(event.slug)}`;
 
-  const [visibleMaterials, eventProjects, eventIdeas, viewerHacker] =
-    await Promise.all([
-      listVisibleEventMaterials({
-        eventId: event.id,
-        viewer: {
-          registrationStatus: event.viewerRegistrationStatus ?? null,
-        },
-      }) as Promise<PublicMaterial[]>,
-      showProjects
-        ? listPublicEventProjects({ eventId: event.id, clerkId: userId })
-        : Promise.resolve([]),
-      activeTab === 'ideas' ? listEventIdeas(event.id) : Promise.resolve([]),
-      activeTab === 'ideas' && userId
-        ? prisma.hacker.findUnique({
-            where: { clerkId: userId },
-            select: { name: true },
-          })
-        : Promise.resolve(null),
-    ]);
+  const ideasViewer =
+    activeTab === 'ideas' ? await getEventIdeasViewer(event.id) : null;
+  const [visibleMaterials, eventProjects, eventIdeas] = await Promise.all([
+    listVisibleEventMaterials({
+      eventId: event.id,
+      viewer: {
+        registrationStatus: event.viewerRegistrationStatus ?? null,
+      },
+    }) as Promise<PublicMaterial[]>,
+    showProjects
+      ? listPublicEventProjects({ eventId: event.id, clerkId: userId })
+      : Promise.resolve([]),
+    ideasViewer ? listEventIdeas(event.id, ideasViewer) : Promise.resolve([]),
+  ]);
   const materials = publicMaterials(
     visibleMaterials.map(material => ({
       id: material.id,
@@ -416,7 +410,7 @@ export default async function PublicEventDetailPage(props: EventPageProps) {
           eventId={event.id}
           initialIdeas={eventIdeas}
           timezone={event.timezone}
-          viewerName={viewerHacker?.name ?? null}
+          viewerName={ideasViewer?.name ?? null}
         />
       )}
 

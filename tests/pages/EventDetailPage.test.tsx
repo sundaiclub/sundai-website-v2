@@ -13,8 +13,7 @@ import { listPublicEventProjects } from '@/lib/publicEventProjects';
 import { getPublicEventSocialMetadata } from '@/lib/eventSocialMetadata';
 import { getViewerCheckInTicket } from '@/lib/eventCheckIn';
 import { findViewerJudgedEvent } from '@/lib/judgingAccess';
-import { listEventIdeas } from '@/lib/eventIdeas';
-import prisma from '@/lib/prisma';
+import { getEventIdeasViewer, listEventIdeas } from '@/lib/eventIdeas';
 import { DEFAULT_SOCIAL_IMAGE_URL, publicUrl } from '@/lib/siteUrl';
 import { mockProject } from '../utils/test-utils';
 
@@ -90,12 +89,8 @@ jest.mock('@/lib/judgingAccess', () => ({
 }));
 
 jest.mock('@/lib/eventIdeas', () => ({
+  getEventIdeasViewer: jest.fn(),
   listEventIdeas: jest.fn(),
-}));
-
-jest.mock('@/lib/prisma', () => ({
-  __esModule: true,
-  default: { hacker: { findUnique: jest.fn() } },
 }));
 
 jest.mock('@/app/components/EventIdeasBoard', () => ({
@@ -150,7 +145,12 @@ const mockListPublicEventProjects = listPublicEventProjects as jest.Mock;
 const mockGetViewerCheckInTicket = getViewerCheckInTicket as jest.Mock;
 const mockFindViewerJudgedEvent = findViewerJudgedEvent as jest.Mock;
 const mockListEventIdeas = listEventIdeas as jest.Mock;
-const mockFindHacker = prisma.hacker.findUnique as jest.Mock;
+const mockGetEventIdeasViewer = getEventIdeasViewer as jest.Mock;
+const anonymousIdeasViewer = {
+  hackerId: null,
+  name: null,
+  canModerate: false,
+};
 const routeParams = { chapterSlug: 'boston', eventSlug: 'ai-build-night' };
 const eventFixture = publicCalendarPayloadFixture.event;
 const approvedOnlyDetails = {
@@ -572,7 +572,7 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
     mockGetViewerCheckInTicket.mockResolvedValue(null);
     mockFindViewerJudgedEvent.mockResolvedValue(null);
     mockListEventIdeas.mockResolvedValue([]);
-    mockFindHacker.mockResolvedValue(null);
+    mockGetEventIdeasViewer.mockResolvedValue(anonymousIdeasViewer);
     mockSignedOut();
   });
 
@@ -875,6 +875,7 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
 
   it('shows anonymous visitors the ideas board without loading ideas elsewhere', async () => {
     await renderDetailPage(buildEventDetail());
+    expect(mockGetEventIdeasViewer).not.toHaveBeenCalled();
     expect(mockListEventIdeas).not.toHaveBeenCalled();
 
     mockListEventIdeas.mockResolvedValue([
@@ -882,8 +883,11 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
     ]);
     await renderDetailPage(buildEventDetail(), 'ideas');
 
-    expect(mockListEventIdeas).toHaveBeenCalledWith(eventFixture.id);
-    expect(mockFindHacker).not.toHaveBeenCalled();
+    expect(mockGetEventIdeasViewer).toHaveBeenCalledWith(eventFixture.id);
+    expect(mockListEventIdeas).toHaveBeenCalledWith(
+      eventFixture.id,
+      anonymousIdeasViewer
+    );
     expect(screen.getByTestId('event-ideas-board')).toHaveTextContent(
       `Ideas board ${eventFixture.id} viewer anonymous Plant-watering robot`
     );
@@ -891,14 +895,16 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
 
   it('passes the signed-in viewer name to the ideas board', async () => {
     mockSignedIn();
-    mockFindHacker.mockResolvedValue({ name: 'Ada Lovelace' });
+    const viewer = {
+      hackerId: 'hacker-1',
+      name: 'Ada Lovelace',
+      canModerate: true,
+    };
+    mockGetEventIdeasViewer.mockResolvedValue(viewer);
 
     await renderDetailPage(buildEventDetail(), 'ideas');
 
-    expect(mockFindHacker).toHaveBeenCalledWith({
-      where: { clerkId: signedInUser.clerkId },
-      select: { name: true },
-    });
+    expect(mockListEventIdeas).toHaveBeenCalledWith(eventFixture.id, viewer);
     expect(screen.getByTestId('event-ideas-board')).toHaveTextContent(
       'viewer Ada Lovelace'
     );

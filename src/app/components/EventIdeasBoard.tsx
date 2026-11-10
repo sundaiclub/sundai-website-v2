@@ -18,21 +18,26 @@ async function responseMessage(response: Response, fallback: string) {
   return typeof body?.message === 'string' ? body.message : fallback;
 }
 
-function AddIdeaDialog({
+function IdeaDialog({
   eventId,
   viewerName,
+  editing,
   onClose,
-  onCreated,
+  onSaved,
 }: {
   eventId: string;
   viewerName: string | null;
+  editing: PublicEventIdea | null;
   onClose: () => void;
-  onCreated: (idea: PublicEventIdea) => void;
+  onSaved: (idea: PublicEventIdea) => void;
 }) {
   const classes = useManagementClasses();
-  const [name, setName] = useState(viewerName ?? '');
-  const [idea, setIdea] = useState('');
-  const [description, setDescription] = useState('');
+  const [name, setName] = useState(editing?.name ?? viewerName ?? '');
+  const [idea, setIdea] = useState(editing?.idea ?? '');
+  const [description, setDescription] = useState(editing?.description ?? '');
+  const failureMessage = editing
+    ? 'Could not save your idea'
+    : 'Could not add your idea';
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -49,18 +54,23 @@ function AddIdeaDialog({
     setIsSubmitting(true);
     setError('');
     try {
-      const response = await fetch(`/api/events/${eventId}/ideas`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, idea, description }),
-      });
+      const response = await fetch(
+        editing
+          ? `/api/events/${eventId}/ideas/${editing.id}`
+          : `/api/events/${eventId}/ideas`,
+        {
+          method: editing ? 'PATCH' : 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, idea, description }),
+        }
+      );
       if (!response.ok) {
-        setError(await responseMessage(response, 'Could not add your idea'));
+        setError(await responseMessage(response, failureMessage));
         return;
       }
-      onCreated(await response.json());
+      onSaved(await response.json());
     } catch {
-      setError('Could not add your idea');
+      setError(failureMessage);
     } finally {
       setIsSubmitting(false);
     }
@@ -68,7 +78,7 @@ function AddIdeaDialog({
 
   return (
     <div
-      aria-labelledby="add-idea-dialog-title"
+      aria-labelledby="idea-dialog-title"
       aria-modal="true"
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
       onMouseDown={event => {
@@ -81,8 +91,8 @@ function AddIdeaDialog({
         style={{ backgroundColor: classes.isDarkMode ? '#111827' : '#ffffff' }}
       >
         <div className="mb-6 flex items-start justify-between gap-4">
-          <h2 className="text-2xl font-bold" id="add-idea-dialog-title">
-            Add an idea
+          <h2 className="text-2xl font-bold" id="idea-dialog-title">
+            {editing ? 'Edit your idea' : 'Add an idea'}
           </h2>
           <button
             aria-label="Close"
@@ -97,7 +107,7 @@ function AddIdeaDialog({
           <label className="grid gap-1 text-sm font-semibold">
             Name
             <input
-              autoFocus={!viewerName}
+              autoFocus={!editing && !viewerName}
               className={classes.input}
               maxLength={EVENT_IDEA_LIMITS.name}
               onChange={event => setName(event.target.value)}
@@ -108,7 +118,7 @@ function AddIdeaDialog({
           <label className="grid gap-1 text-sm font-semibold">
             Idea
             <input
-              autoFocus={Boolean(viewerName)}
+              autoFocus={Boolean(editing || viewerName)}
               className={classes.input}
               maxLength={EVENT_IDEA_LIMITS.idea}
               onChange={event => setIdea(event.target.value)}
@@ -146,7 +156,13 @@ function AddIdeaDialog({
               disabled={isSubmitting || !name.trim() || !idea.trim()}
               type="submit"
             >
-              {isSubmitting ? 'Adding...' : 'Add idea'}
+              {editing
+                ? isSubmitting
+                  ? 'Saving...'
+                  : 'Save idea'
+                : isSubmitting
+                  ? 'Adding...'
+                  : 'Add idea'}
             </button>
           </div>
         </form>
@@ -168,7 +184,12 @@ export function EventIdeasBoard({
 }) {
   const classes = useManagementClasses();
   const [ideas, setIdeas] = useState(initialIdeas);
-  const [isAdding, setIsAdding] = useState(false);
+  const [dialog, setDialog] = useState<{
+    editing: PublicEventIdea | null;
+  } | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState('');
+  const showActions = ideas.some(idea => idea.canEdit || idea.canDelete);
 
   useEffect(() => {
     let cancelled = false;
@@ -191,6 +212,30 @@ export function EventIdeasBoard({
     };
   }, [eventId]);
 
+  async function deleteIdea(idea: PublicEventIdea) {
+    if (!window.confirm(`Delete "${idea.idea}"? This cannot be undone.`)) {
+      return;
+    }
+    setDeletingId(idea.id);
+    setDeleteError('');
+    try {
+      const response = await fetch(`/api/events/${eventId}/ideas/${idea.id}`, {
+        method: 'DELETE',
+      });
+      if (!response.ok && response.status !== 404) {
+        setDeleteError(
+          await responseMessage(response, 'Could not delete the idea')
+        );
+        return;
+      }
+      setIdeas(current => current.filter(existing => existing.id !== idea.id));
+    } catch {
+      setDeleteError('Could not delete the idea');
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
   const timeFormat = new Intl.DateTimeFormat('en-US', {
     hour: 'numeric',
     minute: '2-digit',
@@ -203,7 +248,7 @@ export function EventIdeasBoard({
         <button
           aria-haspopup="dialog"
           className={classes.primaryButton}
-          onClick={() => setIsAdding(true)}
+          onClick={() => setDialog({ editing: null })}
           type="button"
         >
           Add idea
@@ -212,6 +257,11 @@ export function EventIdeasBoard({
       description="Share what you want to build today and find people to build it with."
       title="Ideas"
     >
+      {deleteError && (
+        <div className="mb-4">
+          <ManagementAlert tone="danger">{deleteError}</ManagementAlert>
+        </div>
+      )}
       {ideas.length === 0 ? (
         <ManagementEmptyState>
           No ideas yet. Be the first to add one.
@@ -235,6 +285,11 @@ export function EventIdeasBoard({
                 <th className="px-3 py-2 font-semibold" scope="col">
                   Added
                 </th>
+                {showActions && (
+                  <th className="px-3 py-2 font-semibold" scope="col">
+                    <span className="sr-only">Actions</span>
+                  </th>
+                )}
               </tr>
             </thead>
             <tbody className={`divide-y ${classes.divider}`}>
@@ -254,22 +309,53 @@ export function EventIdeasBoard({
                   >
                     {timeFormat.format(new Date(idea.createdAt))}
                   </td>
+                  {showActions && (
+                    <td className="whitespace-nowrap px-3 py-2 text-right">
+                      {idea.canEdit && (
+                        <button
+                          aria-label={`Edit ${idea.idea}`}
+                          className={classes.ghostButton}
+                          onClick={() => setDialog({ editing: idea })}
+                          type="button"
+                        >
+                          Edit
+                        </button>
+                      )}
+                      {idea.canDelete && (
+                        <button
+                          aria-label={`Delete ${idea.idea}`}
+                          className={`${classes.ghostButton} ${
+                            classes.isDarkMode ? 'text-red-300' : 'text-red-700'
+                          }`}
+                          disabled={deletingId === idea.id}
+                          onClick={() => void deleteIdea(idea)}
+                          type="button"
+                        >
+                          {deletingId === idea.id ? 'Deleting...' : 'Delete'}
+                        </button>
+                      )}
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       )}
-      {isAdding && (
-        <AddIdeaDialog
+      {dialog && (
+        <IdeaDialog
+          editing={dialog.editing}
           eventId={eventId}
-          onClose={() => setIsAdding(false)}
-          onCreated={idea => {
-            setIdeas(current => [
-              idea,
-              ...current.filter(existing => existing.id !== idea.id),
-            ]);
-            setIsAdding(false);
+          onClose={() => setDialog(null)}
+          onSaved={idea => {
+            setIdeas(current =>
+              current.some(existing => existing.id === idea.id)
+                ? current.map(existing =>
+                    existing.id === idea.id ? idea : existing
+                  )
+                : [idea, ...current]
+            );
+            setDialog(null);
           }}
           viewerName={viewerName}
         />

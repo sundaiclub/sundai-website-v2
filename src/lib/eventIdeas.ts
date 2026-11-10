@@ -1,4 +1,9 @@
 import prisma from '@/lib/prisma';
+import { getCurrentHacker } from '@/lib/eventManagementApi';
+import {
+  canManageEventIdeasWithContext,
+  getEventPermissionContext,
+} from '@/lib/eventManagementAuth';
 import { publicEventVisibilityWhere } from '@/lib/publicEvents';
 import {
   EVENT_IDEA_LIMITS,
@@ -6,8 +11,9 @@ import {
   type PublicEventIdea,
 } from '@/types/event-ideas';
 
-const PUBLIC_IDEA_SELECT = {
+const IDEA_SELECT = {
   id: true,
+  hackerId: true,
   name: true,
   idea: true,
   description: true,
@@ -16,14 +22,30 @@ const PUBLIC_IDEA_SELECT = {
 
 type IdeaRecord = {
   id: string;
+  hackerId: string | null;
   name: string;
   idea: string;
   description: string | null;
   createdAt: Date;
 };
 
-function toPublicIdea(record: IdeaRecord): PublicEventIdea {
-  return { ...record, createdAt: record.createdAt.toISOString() };
+export type EventIdeasViewer = {
+  hackerId: string | null;
+  name: string | null;
+  canModerate: boolean;
+};
+
+// The author's hacker id stays on the server; viewers only see what they can do.
+function toPublicIdea(
+  { hackerId, createdAt, ...record }: IdeaRecord,
+  viewer: EventIdeasViewer
+): PublicEventIdea {
+  return {
+    ...record,
+    createdAt: createdAt.toISOString(),
+    canEdit: Boolean(viewer.hackerId && hackerId === viewer.hackerId),
+    canDelete: viewer.canModerate,
+  };
 }
 
 function trimmedString(value: unknown) {
@@ -70,27 +92,75 @@ export async function findPublicEventId(eventId: string) {
   return event?.id ?? null;
 }
 
-export async function listEventIdeas(eventId: string) {
+export async function getEventIdeasViewer(
+  eventId: string
+): Promise<EventIdeasViewer> {
+  const hacker = await getCurrentHacker();
+  if (!hacker) return { hackerId: null, name: null, canModerate: false };
+
+  const context = await getEventPermissionContext(prisma, hacker.id, eventId);
+  return {
+    hackerId: hacker.id,
+    name: hacker.name,
+    canModerate: Boolean(context && canManageEventIdeasWithContext(context)),
+  };
+}
+
+export async function listEventIdeas(
+  eventId: string,
+  viewer: EventIdeasViewer
+) {
   const ideas = await prisma.eventIdea.findMany({
     where: { eventId },
     orderBy: { createdAt: 'desc' },
-    select: PUBLIC_IDEA_SELECT,
+    select: IDEA_SELECT,
   });
-  return ideas.map(toPublicIdea);
+  return ideas.map(idea => toPublicIdea(idea, viewer));
 }
 
 export async function createEventIdea({
   eventId,
-  hackerId,
+  viewer,
   input,
 }: {
   eventId: string;
-  hackerId: string | null;
+  viewer: EventIdeasViewer;
   input: EventIdeaInput;
 }) {
   const idea = await prisma.eventIdea.create({
-    data: { eventId, hackerId, ...input },
-    select: PUBLIC_IDEA_SELECT,
+    data: { eventId, hackerId: viewer.hackerId, ...input },
+    select: IDEA_SELECT,
   });
-  return toPublicIdea(idea);
+  return toPublicIdea(idea, viewer);
+}
+
+export async function findEventIdeaAuthor(eventId: string, ideaId: string) {
+  return prisma.eventIdea.findFirst({
+    where: { id: ideaId, eventId },
+    select: { hackerId: true },
+  });
+}
+
+export async function updateEventIdea({
+  ideaId,
+  viewer,
+  input,
+}: {
+  ideaId: string;
+  viewer: EventIdeasViewer;
+  input: EventIdeaInput;
+}) {
+  const idea = await prisma.eventIdea.update({
+    where: { id: ideaId },
+    data: input,
+    select: IDEA_SELECT,
+  });
+  return toPublicIdea(idea, viewer);
+}
+
+export async function deleteEventIdea(eventId: string, ideaId: string) {
+  const { count } = await prisma.eventIdea.deleteMany({
+    where: { id: ideaId, eventId },
+  });
+  return count > 0;
 }

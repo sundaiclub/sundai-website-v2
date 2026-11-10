@@ -13,6 +13,8 @@ const existingIdea: PublicEventIdea = {
   idea: 'Compiler for plants',
   description: 'Turns watering schedules into code',
   createdAt: '2026-11-10T15:30:00.000Z',
+  canEdit: false,
+  canDelete: false,
 };
 
 function jsonResponse(body: unknown, status = 200) {
@@ -23,11 +25,14 @@ function jsonResponse(body: unknown, status = 200) {
   });
 }
 
-function renderBoard(viewerName: string | null = null) {
+function renderBoard(
+  viewerName: string | null = null,
+  initialIdeas: PublicEventIdea[] = [existingIdea]
+) {
   render(
     <EventIdeasBoard
       eventId="e1"
-      initialIdeas={[existingIdea]}
+      initialIdeas={initialIdeas}
       timezone="America/New_York"
       viewerName={viewerName}
     />
@@ -67,6 +72,8 @@ describe('EventIdeasBoard', () => {
       idea: 'Plant-watering robot',
       description: null,
       createdAt: '2026-11-10T16:00:00.000Z',
+      canEdit: false,
+      canDelete: false,
     };
     global.fetch = jest.fn(() => jsonResponse(created, 201)) as jest.Mock;
     renderBoard();
@@ -122,6 +129,108 @@ describe('EventIdeasBoard', () => {
     expect(within(dialog).getByText('Idea is required')).toBeInTheDocument();
   });
 
+  it('hides row actions from viewers who cannot edit or delete', () => {
+    global.fetch = jest.fn() as jest.Mock;
+    renderBoard();
+
+    expect(
+      screen.queryByRole('button', { name: /^(edit|delete) /i })
+    ).not.toBeInTheDocument();
+    expect(screen.getAllByRole('columnheader')).toHaveLength(4);
+  });
+
+  it('lets authors edit their own idea', async () => {
+    const ownIdea = { ...existingIdea, canEdit: true };
+    const saved = { ...ownIdea, idea: 'Compiler for gardens' };
+    global.fetch = jest.fn(() => jsonResponse(saved)) as jest.Mock;
+    renderBoard('Grace', [ownIdea]);
+
+    expect(
+      screen.queryByRole('button', { name: /^delete /i })
+    ).not.toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Edit Compiler for plants' })
+    );
+    const dialog = screen.getByRole('dialog', { name: 'Edit your idea' });
+    expect(within(dialog).getByRole('textbox', { name: 'Name' })).toHaveValue(
+      'Grace'
+    );
+    expect(
+      within(dialog).getByRole('textbox', { name: /description/i })
+    ).toHaveValue('Turns watering schedules into code');
+    fireEvent.change(within(dialog).getByRole('textbox', { name: 'Idea' }), {
+      target: { value: 'Compiler for gardens' },
+    });
+
+    await act(async () => {
+      fireEvent.click(
+        within(dialog).getByRole('button', { name: 'Save idea' })
+      );
+    });
+
+    expect(global.fetch).toHaveBeenCalledWith('/api/events/e1/ideas/idea-1', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: 'Grace',
+        idea: 'Compiler for gardens',
+        description: 'Turns watering schedules into code',
+      }),
+    });
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.getAllByRole('row')).toHaveLength(2);
+    expect(screen.getByText('Compiler for gardens')).toBeInTheDocument();
+  });
+
+  it('lets organizers delete an idea after confirming', async () => {
+    const confirm = jest.spyOn(window, 'confirm').mockReturnValue(true);
+    global.fetch = jest.fn(() =>
+      Promise.resolve({ ok: true, status: 204 })
+    ) as jest.Mock;
+    renderBoard(null, [{ ...existingIdea, canDelete: true }]);
+
+    expect(
+      screen.queryByRole('button', { name: /^edit /i })
+    ).not.toBeInTheDocument();
+    await act(async () => {
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Delete Compiler for plants' })
+      );
+    });
+
+    expect(confirm).toHaveBeenCalled();
+    expect(global.fetch).toHaveBeenCalledWith('/api/events/e1/ideas/idea-1', {
+      method: 'DELETE',
+    });
+    expect(screen.queryByText('Compiler for plants')).not.toBeInTheDocument();
+    confirm.mockRestore();
+  });
+
+  it('keeps the idea when the organizer cancels or the delete fails', async () => {
+    const confirm = jest.spyOn(window, 'confirm').mockReturnValue(false);
+    global.fetch = jest.fn(() =>
+      jsonResponse({ message: 'Only event organizers can delete ideas' }, 403)
+    ) as jest.Mock;
+    renderBoard(null, [{ ...existingIdea, canDelete: true }]);
+    const deleteButton = screen.getByRole('button', {
+      name: 'Delete Compiler for plants',
+    });
+
+    fireEvent.click(deleteButton);
+    expect(global.fetch).not.toHaveBeenCalled();
+
+    confirm.mockReturnValue(true);
+    await act(async () => {
+      fireEvent.click(deleteButton);
+    });
+
+    expect(
+      screen.getByText('Only event organizers can delete ideas')
+    ).toBeInTheDocument();
+    expect(screen.getByText('Compiler for plants')).toBeInTheDocument();
+    confirm.mockRestore();
+  });
+
   it('refreshes the ideas every 10 seconds', async () => {
     jest.useFakeTimers();
     const refreshed: PublicEventIdea = {
@@ -130,6 +239,8 @@ describe('EventIdeasBoard', () => {
       idea: 'Kernel for coffee makers',
       description: null,
       createdAt: '2026-11-10T16:10:00.000Z',
+      canEdit: false,
+      canDelete: false,
     };
     global.fetch = jest.fn(() =>
       jsonResponse({ ideas: [refreshed, existingIdea] })

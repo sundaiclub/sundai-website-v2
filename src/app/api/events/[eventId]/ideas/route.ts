@@ -1,9 +1,8 @@
 import { NextResponse } from 'next/server';
-import { auth } from '@clerk/nextjs/server';
-import prisma from '@/lib/prisma';
 import {
   createEventIdea,
   findPublicEventId,
+  getEventIdeasViewer,
   listEventIdeas,
   parseEventIdeaInput,
 } from '@/lib/eventIdeas';
@@ -18,8 +17,9 @@ export async function GET(_req: Request, props: IdeasRouteProps) {
       return NextResponse.json({ message: 'Event not found' }, { status: 404 });
     }
 
+    const viewer = await getEventIdeasViewer(eventId);
     return NextResponse.json(
-      { ideas: await listEventIdeas(eventId) },
+      { ideas: await listEventIdeas(eventId, viewer) },
       { headers: { 'Cache-Control': 'no-store' } }
     );
   } catch (error) {
@@ -43,17 +43,9 @@ export async function POST(req: Request, props: IdeasRouteProps) {
       return NextResponse.json({ message: parsed.error }, { status: 400 });
     }
 
-    const { userId } = await auth();
-    const hacker = userId
-      ? await prisma.hacker.findUnique({
-          where: { clerkId: userId },
-          select: { id: true },
-        })
-      : null;
-
     const idea = await createEventIdea({
       eventId,
-      hackerId: hacker?.id ?? null,
+      viewer: await getEventIdeasViewer(eventId),
       input: parsed.input,
     });
     return NextResponse.json(idea, { status: 201 });
