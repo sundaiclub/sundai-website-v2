@@ -8,7 +8,9 @@ import {
   ManagementSection,
   useManagementClasses,
 } from '../../../../components/ManagementSurface';
-import DeliveryStatsSummary from '../../../../components/DeliveryStatsSummary';
+import CommunicationGroupCard, {
+  locationNames,
+} from '../../../../components/CommunicationGroupCard';
 import type {
   EventCommunicationAudience,
   EventCommunicationChannel,
@@ -112,6 +114,8 @@ export default function EventCommunicationsPanel({
   const [sending, setSending] = useState(false);
   const [notice, setNotice] = useState('');
   const [detailGroupId, setDetailGroupId] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [historyUpdatedAt, setHistoryUpdatedAt] = useState<Date | null>(null);
   const hasPendingSend = history.some(group =>
     group.communications.some(item => item.status === 'SENDING')
   );
@@ -134,6 +138,7 @@ export default function EventCommunicationsPanel({
       .then(payload => {
         if (!isCurrent) return;
         setHistory(payload.items ?? []);
+        setHistoryUpdatedAt(new Date());
         setLocations(payload.locations ?? []);
         setChapterInvitationStatus(payload.chapterInvitationStatus ?? null);
         if (payload.providerAvailability) {
@@ -165,6 +170,20 @@ export default function EventCommunicationsPanel({
   function applyHistory(payload: HistoryPayload) {
     setHistory(payload.items ?? []);
     setChapterInvitationStatus(payload.chapterInvitationStatus ?? null);
+    setHistoryUpdatedAt(new Date());
+  }
+
+  async function refreshHistory() {
+    setRefreshing(true);
+    try {
+      const updated = await reloadHistory();
+      if (updated) applyHistory(updated);
+      else setNotice('Unable to refresh communication history.');
+    } catch {
+      setNotice('Unable to refresh communication history.');
+    } finally {
+      setRefreshing(false);
+    }
   }
 
   useEffect(() => {
@@ -810,52 +829,54 @@ export default function EventCommunicationsPanel({
 
       <ManagementSection
         title="Communication history"
-        description="Email and SMS versions of the same message are shown together. Email delivery and clicks update as SES reports them."
+        description="Email and SMS versions of the same message are shown together. Delivery, clicks, and RSVPs update as SES and Twilio report them."
+        actions={
+          <div className="flex items-center gap-3">
+            {historyUpdatedAt && (
+              <span className={`text-xs ${classes.mutedText}`}>
+                Updated {historyUpdatedAt.toLocaleTimeString()}
+              </span>
+            )}
+            <button
+              aria-label="Refresh communication history"
+              className={classes.secondaryButton}
+              disabled={refreshing}
+              onClick={refreshHistory}
+              type="button"
+            >
+              <svg
+                aria-hidden="true"
+                className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`}
+                fill="none"
+                stroke="currentColor"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                viewBox="0 0 24 24"
+              >
+                <path d="M21 12a9 9 0 1 1-3-6.7L21 8" />
+                <path d="M21 3v5h-5" />
+              </svg>
+              {refreshing ? 'Refreshing…' : 'Refresh'}
+            </button>
+          </div>
+        }
       >
         {history.length === 0 ? (
           <ManagementEmptyState>
             No communications have been sent.
           </ManagementEmptyState>
         ) : (
-          <ul className="space-y-3">
+          <ul className="space-y-4">
             {history.map(group => {
               const isOpen = detailGroupId === group.sendGroupId;
               const email = group.communications.find(
                 item => item.channel === 'EMAIL'
               );
               return (
-                <li
-                  className={`${classes.subtlePanel} p-4`}
-                  key={group.sendGroupId}
-                >
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <h3 className="font-bold">
-                        {email?.subject ?? 'SMS message'}
-                      </h3>
-                      <p className={`mt-1 text-sm ${classes.mutedText}`}>
-                        {group.sender?.name ?? 'Organizer'} ·{' '}
-                        {new Date(group.createdAt).toLocaleString()}
-                      </p>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      {group.communications.map(item => (
-                        <ManagementBadge
-                          key={item.id}
-                          tone={
-                            item.status === 'SENT'
-                              ? 'success'
-                              : item.status === 'FAILED'
-                                ? 'danger'
-                                : item.status === 'DRAFT'
-                                  ? 'default'
-                                  : 'warning'
-                          }
-                        >
-                          {item.channel === 'EMAIL' ? 'Email' : 'SMS'} ·{' '}
-                          {item.status}
-                        </ManagementBadge>
-                      ))}
+                <li key={group.sendGroupId}>
+                  <CommunicationGroupCard
+                    actions={
                       <button
                         aria-expanded={isOpen}
                         className={classes.secondaryButton}
@@ -866,46 +887,18 @@ export default function EventCommunicationsPanel({
                       >
                         {isOpen ? 'Hide details' : 'View details'}
                       </button>
-                    </div>
-                  </div>
-                  <div className="mt-4 space-y-4">
-                    {group.communications.map(item => (
-                      <div key={item.id}>
-                        {group.communications.length > 1 && (
-                          <h4 className="mb-2 text-sm font-bold">
-                            {item.channel === 'EMAIL' ? 'Email' : 'SMS'}
-                          </h4>
-                        )}
-                        <DeliveryStatsSummary
-                          channel={item.channel}
-                          detailed={isOpen}
-                          stats={item.stats}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                  {isOpen && (
-                    <div className="mt-4 space-y-4 border-t pt-4">
-                      <p className="text-sm">
-                        Locations:{' '}
-                        {Array.isArray(group.audienceDefinition?.locationNames)
-                          ? group.audienceDefinition.locationNames.join(', ')
-                          : 'All locations'}
-                      </p>
-                      {group.communications.map(item => (
-                        <div key={item.id}>
-                          <h4 className="text-sm font-bold">
-                            {item.channel === 'EMAIL'
-                              ? 'Email message'
-                              : 'SMS message'}
-                          </h4>
-                          <p className="mt-1 whitespace-pre-wrap text-sm">
-                            {item.body}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                    }
+                    communications={group.communications}
+                    detailed={isOpen}
+                    locations={locationNames(group.audienceDefinition)}
+                    meta={
+                      <>
+                        Sent by {group.sender?.name ?? 'an organizer'} on{' '}
+                        {new Date(group.createdAt).toLocaleString()}
+                      </>
+                    }
+                    title={email?.subject ?? 'SMS message'}
+                  />
                 </li>
               );
             })}

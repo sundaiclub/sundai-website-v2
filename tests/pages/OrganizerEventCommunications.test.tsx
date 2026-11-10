@@ -492,11 +492,17 @@ describe('/organizer/events/[eventId]/communications', () => {
     const entry = (
       await screen.findByRole('heading', { name: /tomorrow’s build night/i })
     ).closest('li')!;
-    expect(within(entry).getByText(/email · partial/i)).toBeInTheDocument();
-    expect(within(entry).getByText(/sms · sent/i)).toBeInTheDocument();
+    expect(within(entry).getByText('Email: Some failed')).toBeInTheDocument();
+    expect(within(entry).getByText('SMS: Sent')).toBeInTheDocument();
     expect(within(entry).getByText(/morgan mc/i)).toBeInTheDocument();
-    expect(within(entry).getByText('85.7%')).toBeInTheDocument();
-    expect(within(entry).getByText('90%')).toBeInTheDocument();
+    // Each channel shows its delivered, waiting, and failed shares.
+    const legend = (label: string) =>
+      within(entry)
+        .getAllByText(label)
+        .map(term => term.nextElementSibling?.textContent);
+    expect(legend('Delivered')).toEqual(['85.7%(36)', '90%(27)']);
+    expect(legend('Failed')).toEqual(['4.8%(2)', '10%(3)']);
+    expect(legend('Waiting for confirmation')).toEqual(['9.5%(4)', '0%(0)']);
     expect(within(entry).getByText('25%')).toBeInTheDocument();
     // Both channels share one history entry.
     expect(entry.parentElement!.children).toHaveLength(1);
@@ -513,7 +519,7 @@ describe('/organizer/events/[eventId]/communications', () => {
       within(entry).getByText(/resend to the failed members/i)
     ).toBeInTheDocument();
     expect(
-      within(entry).getByText('4 registered after clicking')
+      within(entry).getByText("Event page · 4 RSVP'd after clicking")
     ).toBeInTheDocument();
     expect(
       within(entry).getByText('sundai.club/events/boston/ai-build-night')
@@ -525,5 +531,26 @@ describe('/organizer/events/[eventId]/communications', () => {
     expect(
       screen.queryByRole('button', { name: /edit sent/i })
     ).not.toBeInTheDocument();
+  });
+
+  it('refreshes communication history on request', async () => {
+    await renderPage();
+    await screen.findByRole('heading', { name: /tomorrow’s build night/i });
+    const historyCalls = () =>
+      (global.fetch as jest.Mock).mock.calls.filter(
+        ([url, init]) =>
+          url === `/api/events/${eventId}/blasts` && !init?.method
+      ).length;
+    const before = historyCalls();
+
+    fireEvent.click(
+      screen.getByRole('button', { name: /refresh communication history/i })
+    );
+
+    await waitFor(() => expect(historyCalls()).toBe(before + 1));
+    expect(await screen.findByText(/^Updated /)).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /refresh communication history/i })
+    ).toBeEnabled();
   });
 });

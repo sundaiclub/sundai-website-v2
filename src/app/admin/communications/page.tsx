@@ -6,11 +6,10 @@ import type { AdminCommunicationListItem } from '@/types/admin-communications';
 import type { MessagingHealth } from '@/types/delivery-stats';
 import MessagingHealthPanel from './MessagingHealthPanel';
 import AdminAuthGate from '../AdminAuthGate';
-import DeliveryStatsSummary from '../../components/DeliveryStatsSummary';
+import CommunicationGroupCard from '../../components/CommunicationGroupCard';
 import {
   ManagementAlert,
   ManagementBackButton,
-  ManagementBadge,
   ManagementEmptyState,
   ManagementHeader,
   ManagementPage,
@@ -69,49 +68,28 @@ export default function AdminCommunicationsPage() {
             </div>
           )}
           <ManagementSection>
-            <div className={`divide-y ${classes.divider}`}>
+            <div>
               {payload?.items.map(item => (
                 <Link
                   key={item.id}
                   href={`/admin/communications/${item.id}`}
-                  className="grid gap-4 py-4 transition hover:opacity-75 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,2fr)]"
+                  className="block py-2 transition hover:opacity-80"
                 >
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      {item.communications.map(communication => (
-                        <ManagementBadge key={communication.id}>
-                          {communication.channel}
-                        </ManagementBadge>
-                      ))}
-                      <span className="font-semibold">
-                        {item.subject ?? item.excerpt}
-                      </span>
-                    </div>
-                    <div className={`mt-1 text-sm ${classes.mutedText}`}>
-                      {item.chapter.name} · {item.event.title}
-                    </div>
-                    <div className={`mt-1 text-sm ${classes.mutedText}`}>
-                      {new Date(item.sentAt).toLocaleString()} ·{' '}
-                      {item.sender?.name ?? 'Unknown sender'}
-                    </div>
-                  </div>
-                  <div className="space-y-3">
-                    {item.communications.map(communication => (
-                      <div key={communication.id}>
-                        {item.communications.length > 1 && (
-                          <div className="mb-1 text-xs font-bold uppercase tracking-wide">
-                            {communication.channel === 'EMAIL'
-                              ? 'Email'
-                              : 'SMS'}
-                          </div>
-                        )}
-                        <DeliveryStatsSummary
-                          channel={communication.channel}
-                          stats={communication.stats}
-                        />
-                      </div>
-                    ))}
-                  </div>
+                  <CommunicationGroupCard
+                    communications={item.communications}
+                    meta={
+                      <>
+                        <span className="font-semibold">
+                          {item.chapter.name}
+                        </span>{' '}
+                        · {item.event.title}
+                        <br />
+                        Sent by {item.sender?.name ?? 'an organizer'} on{' '}
+                        {new Date(item.sentAt).toLocaleString()}
+                      </>
+                    }
+                    title={item.subject ?? item.excerpt}
+                  />
                 </Link>
               ))}
               {payload && payload.items.length === 0 && (
