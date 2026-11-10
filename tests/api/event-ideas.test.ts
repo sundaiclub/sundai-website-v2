@@ -120,7 +120,7 @@ describe('/api/events/[eventId]/ideas', () => {
     )
   })
 
-  it('marks only the viewer’s own ideas as editable', async () => {
+  it('lets viewers edit and delete only their own ideas', async () => {
     signInAs('h1')
     prisma.eventIdea.findMany.mockResolvedValue([ideaRecord, anonymousRecord])
 
@@ -133,7 +133,7 @@ describe('/api/events/[eventId]/ideas', () => {
         idea.canDelete,
       ])
     ).toEqual([
-      [true, false],
+      [true, true],
       [false, false],
     ])
   })
@@ -329,13 +329,55 @@ describe('/api/events/[eventId]/ideas/[ideaId]', () => {
     expect(response.status).toBe(404)
   })
 
-  it('blocks deletes from signed-out visitors and non-organizers, including authors', async () => {
-    const signedOut = await DELETE(new Request('http://localhost'), ideaRouteProps)
+  it('lets authors delete their own ideas', async () => {
     signInAs('h1')
-    const author = await DELETE(new Request('http://localhost'), ideaRouteProps)
+    prisma.eventIdea.findFirst.mockResolvedValue({ hackerId: 'h1' })
+    prisma.eventIdea.deleteMany.mockResolvedValue({ count: 1 })
 
-    expect(signedOut.status).toBe(401)
-    expect(author.status).toBe(403)
+    const response = await DELETE(new Request('http://localhost'), ideaRouteProps)
+
+    expect(response.status).toBe(204)
+    expect(prisma.eventIdea.findFirst).toHaveBeenCalledWith({
+      where: { id: 'idea-1', eventId: 'e1' },
+      select: { hackerId: true },
+    })
+    expect(prisma.eventIdea.deleteMany).toHaveBeenCalledWith({
+      where: { id: 'idea-1', eventId: 'e1' },
+    })
+  })
+
+  it('blocks signed-in non-organizers from deleting other people’s and anonymous ideas', async () => {
+    signInAs('h2')
+    for (const hackerId of ['h1', null]) {
+      prisma.eventIdea.findFirst.mockResolvedValue({ hackerId })
+
+      const response = await DELETE(
+        new Request('http://localhost'),
+        ideaRouteProps
+      )
+      const body = await response.json()
+
+      expect(response.status).toBe(403)
+      expect(body.message).toBe('You can only delete your own ideas')
+    }
+    expect(prisma.eventIdea.deleteMany).not.toHaveBeenCalled()
+  })
+
+  it('returns 404 when a non-organizer deletes a missing idea', async () => {
+    signInAs('h1')
+    prisma.eventIdea.findFirst.mockResolvedValue(null)
+
+    const response = await DELETE(new Request('http://localhost'), ideaRouteProps)
+
+    expect(response.status).toBe(404)
+    expect(prisma.eventIdea.deleteMany).not.toHaveBeenCalled()
+  })
+
+  it('requires sign-in to delete', async () => {
+    const response = await DELETE(new Request('http://localhost'), ideaRouteProps)
+
+    expect(response.status).toBe(401)
+    expect(prisma.eventIdea.findFirst).not.toHaveBeenCalled()
     expect(prisma.eventIdea.deleteMany).not.toHaveBeenCalled()
   })
 })

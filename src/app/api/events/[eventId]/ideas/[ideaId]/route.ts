@@ -53,7 +53,7 @@ export async function PATCH(req: Request, props: IdeaRouteProps) {
   }
 }
 
-// Organizers can remove any idea from their event.
+// Signed-in authors can remove their own ideas; organizers can remove any idea.
 export async function DELETE(_req: Request, props: IdeaRouteProps) {
   const params = await props.params;
   try {
@@ -61,11 +61,16 @@ export async function DELETE(_req: Request, props: IdeaRouteProps) {
     if (!viewer.hackerId) {
       return new NextResponse('Unauthorized', { status: 401 });
     }
+
     if (!viewer.canModerate) {
-      return NextResponse.json(
-        { message: 'Only event organizers can delete ideas' },
-        { status: 403 }
-      );
+      const existing = await findEventIdeaAuthor(params.eventId, params.ideaId);
+      if (!existing) return ideaNotFound();
+      if (existing.hackerId !== viewer.hackerId) {
+        return NextResponse.json(
+          { message: 'You can only delete your own ideas' },
+          { status: 403 }
+        );
+      }
     }
 
     if (!(await deleteEventIdea(params.eventId, params.ideaId))) {
