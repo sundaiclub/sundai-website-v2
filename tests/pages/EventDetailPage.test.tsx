@@ -13,6 +13,8 @@ import { listPublicEventProjects } from '@/lib/publicEventProjects';
 import { getPublicEventSocialMetadata } from '@/lib/eventSocialMetadata';
 import { getViewerCheckInTicket } from '@/lib/eventCheckIn';
 import { findViewerJudgedEvent } from '@/lib/judgingAccess';
+import { listEventIdeas } from '@/lib/eventIdeas';
+import prisma from '@/lib/prisma';
 import { DEFAULT_SOCIAL_IMAGE_URL, publicUrl } from '@/lib/siteUrl';
 import { mockProject } from '../utils/test-utils';
 
@@ -87,6 +89,32 @@ jest.mock('@/lib/judgingAccess', () => ({
   findViewerJudgedEvent: jest.fn(),
 }));
 
+jest.mock('@/lib/eventIdeas', () => ({
+  listEventIdeas: jest.fn(),
+}));
+
+jest.mock('@/lib/prisma', () => ({
+  __esModule: true,
+  default: { hacker: { findUnique: jest.fn() } },
+}));
+
+jest.mock('@/app/components/EventIdeasBoard', () => ({
+  EventIdeasBoard: ({
+    eventId,
+    initialIdeas,
+    viewerName,
+  }: {
+    eventId: string;
+    initialIdeas: Array<{ id: string; idea: string }>;
+    viewerName: string | null;
+  }) => (
+    <div data-testid="event-ideas-board">
+      Ideas board {eventId} viewer {viewerName ?? 'anonymous'}{' '}
+      {initialIdeas.map(idea => idea.idea).join(', ')}
+    </div>
+  ),
+}));
+
 jest.mock('@/app/components/EventJudgingPanel', () => ({
   __esModule: true,
   default: ({
@@ -121,6 +149,8 @@ const mockListVisibleEventMaterials = listVisibleEventMaterials as jest.Mock;
 const mockListPublicEventProjects = listPublicEventProjects as jest.Mock;
 const mockGetViewerCheckInTicket = getViewerCheckInTicket as jest.Mock;
 const mockFindViewerJudgedEvent = findViewerJudgedEvent as jest.Mock;
+const mockListEventIdeas = listEventIdeas as jest.Mock;
+const mockFindHacker = prisma.hacker.findUnique as jest.Mock;
 const routeParams = { chapterSlug: 'boston', eventSlug: 'ai-build-night' };
 const eventFixture = publicCalendarPayloadFixture.event;
 const approvedOnlyDetails = {
@@ -479,7 +509,7 @@ function mockEventFetches(event: PublicEventDetail | null) {
 
 async function renderDetailPage(
   event: PublicEventDetail | null,
-  tab?: 'projects' | 'pitch' | 'ticket' | 'judging',
+  tab?: 'ideas' | 'projects' | 'pitch' | 'ticket' | 'judging',
   extraSearchParams: { notice?: string; judge?: string } = {}
 ) {
   mockGetPublicEventBySlug.mockResolvedValue(event);
@@ -541,6 +571,8 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
     mockListPublicEventProjects.mockResolvedValue([]);
     mockGetViewerCheckInTicket.mockResolvedValue(null);
     mockFindViewerJudgedEvent.mockResolvedValue(null);
+    mockListEventIdeas.mockResolvedValue([]);
+    mockFindHacker.mockResolvedValue(null);
     mockSignedOut();
   });
 
@@ -665,9 +697,9 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
       .getAllByRole('link')
       .map(link => link.textContent)
       .filter(label =>
-        ['Info', 'Ticket', 'Projects', 'Pitch'].includes(label!)
+        ['Info', 'Ideas', 'Ticket', 'Projects', 'Pitch'].includes(label!)
       );
-    expect(tabs).toEqual(['Info', 'Ticket', 'Projects', 'Pitch']);
+    expect(tabs).toEqual(['Info', 'Ideas', 'Ticket', 'Projects', 'Pitch']);
     expect(screen.getByRole('link', { name: /^ticket$/i })).toHaveAttribute(
       'aria-current',
       'page'
@@ -820,12 +852,16 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
     expect(screen.queryByText(/expert mentors/i)).not.toBeInTheDocument();
   });
 
-  it('shows Info, Projects, and Pitch tabs when judging is disabled', async () => {
+  it('shows Info, Ideas, Projects, and Pitch tabs when judging is disabled', async () => {
     await renderDetailPage(buildEventDetail());
 
     expect(screen.getByRole('link', { name: 'Info' })).toHaveAttribute(
       'href',
       '/events/boston/ai-build-night'
+    );
+    expect(screen.getByRole('link', { name: 'Ideas' })).toHaveAttribute(
+      'href',
+      '/events/boston/ai-build-night?tab=ideas'
     );
     expect(screen.getByRole('link', { name: 'Projects' })).toHaveAttribute(
       'href',
@@ -834,6 +870,41 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
     expect(screen.getByRole('link', { name: 'Pitch' })).toHaveAttribute(
       'href',
       '/events/boston/ai-build-night?tab=pitch'
+    );
+  });
+
+  it('shows anonymous visitors the ideas board without loading ideas elsewhere', async () => {
+    await renderDetailPage(buildEventDetail());
+    expect(mockListEventIdeas).not.toHaveBeenCalled();
+
+    mockListEventIdeas.mockResolvedValue([
+      { id: 'idea-1', idea: 'Plant-watering robot' },
+    ]);
+    await renderDetailPage(buildEventDetail(), 'ideas');
+
+    expect(mockListEventIdeas).toHaveBeenCalledWith(eventFixture.id);
+    expect(mockFindHacker).not.toHaveBeenCalled();
+    expect(screen.getByTestId('event-ideas-board')).toHaveTextContent(
+      `Ideas board ${eventFixture.id} viewer anonymous Plant-watering robot`
+    );
+  });
+
+  it('passes the signed-in viewer name to the ideas board', async () => {
+    mockSignedIn();
+    mockFindHacker.mockResolvedValue({ name: 'Ada Lovelace' });
+
+    await renderDetailPage(buildEventDetail(), 'ideas');
+
+    expect(mockFindHacker).toHaveBeenCalledWith({
+      where: { clerkId: signedInUser.clerkId },
+      select: { name: true },
+    });
+    expect(screen.getByTestId('event-ideas-board')).toHaveTextContent(
+      'viewer Ada Lovelace'
+    );
+    expect(screen.getByRole('link', { name: 'Ideas' })).toHaveAttribute(
+      'aria-current',
+      'page'
     );
   });
 

@@ -71,6 +71,7 @@ model Hacker {
   organizerNoteRevisions    HackerOrganizerNoteRevision[] @relation("OrganizerNoteRevisionHacker")
   editedOrganizerRevisions  HackerOrganizerNoteRevision[] @relation("OrganizerNoteRevisionEditor")
   createdEventMaterials     EventMaterial[]               @relation("EventMaterialCreator")
+  eventIdeas                EventIdea[]                   @relation("EventIdeaAuthor")
   eventMaterialAudits       EventMaterialAudit[]          @relation("EventMaterialAuditActor")
   createdCommunications     EventCommunication[]          @relation("EventCommunicationCreator")
   sentCommunications        EventCommunication[]          @relation("EventCommunicationSender")
@@ -472,6 +473,7 @@ model Event {
   judgingCriteria             JudgingCriterion[]
   judges                      EventJudge[]
   judgingSubmissions          JudgingSubmission[]
+  ideas                       EventIdea[]
   createdAt                   DateTime                 @default(now())
   updatedAt                   DateTime                 @updatedAt
 
@@ -480,6 +482,22 @@ model Event {
   @@index([startTime])
   @@index([chapterId, status, startTime])
   @@index([visibility, status])
+}
+
+// Anyone, signed in or not, can share a project idea on a public event.
+model EventIdea {
+  id          String   @id @default(uuid())
+  event       Event    @relation(fields: [eventId], references: [id])
+  eventId     String
+  hacker      Hacker?  @relation("EventIdeaAuthor", fields: [hackerId], references: [id])
+  hackerId    String?
+  name        String
+  idea        String
+  description String?
+  createdAt   DateTime @default(now())
+
+  @@index([eventId, createdAt])
+  @@index([hackerId])
 }
 
 model EventProject {
