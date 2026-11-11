@@ -7,6 +7,7 @@ export const isPublicRoute = createRouteMatcher([
   '/privacy',
   '/terms',
   '/events(.*)',
+  '/ideas',
   '/chapters(.*)',
   '/projects(.*)',
   '/api/chapters(.*)',

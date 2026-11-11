@@ -36,6 +36,15 @@ describe('middleware', () => {
     );
   });
 
+  it('keeps event ideas public for signed-out visitors', () => {
+    require('../src/middleware');
+    const { createRouteMatcher } = require('@clerk/nextjs/server');
+
+    expect(createRouteMatcher).toHaveBeenCalledWith(
+      expect.arrayContaining(['/ideas', '/api/events/:eventId/ideas'])
+    );
+  });
+
   it('keeps the signed SES webhook and tracked email links public', () => {
     require('../src/middleware');
     const { createRouteMatcher } = require('@clerk/nextjs/server');

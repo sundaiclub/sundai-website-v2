@@ -165,3 +165,58 @@ export async function deleteEventIdea(eventId: string, ideaId: string) {
   });
   return count > 0;
 }
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function localDateKey(date: Date, timeZone: string) {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(date);
+}
+
+// "Today" is the current date in each event's own timezone, so an evening
+// event stays listed after midnight UTC.
+export async function listTodaysPublicEvents(now = new Date()) {
+  // Every timezone is within a day of UTC, so this window covers today anywhere.
+  const windowStart = new Date(now.getTime() - 2 * DAY_MS);
+  const windowEnd = new Date(now.getTime() + 2 * DAY_MS);
+  const events = await prisma.event.findMany({
+    where: {
+      ...publicEventVisibilityWhere(),
+      startTime: { lt: windowEnd },
+      OR: [
+        { endTime: { gt: windowStart } },
+        { endTime: null, startTime: { gt: windowStart } },
+      ],
+    },
+    orderBy: [{ startTime: 'asc' }, { title: 'asc' }],
+    select: {
+      id: true,
+      title: true,
+      slug: true,
+      startTime: true,
+      endTime: true,
+      timezone: true,
+      publicLocation: true,
+      image: { select: { url: true, alt: true } },
+      chapter: { select: { name: true, slug: true } },
+    },
+  });
+
+  return events
+    .filter(event => {
+      const today = localDateKey(now, event.timezone);
+      return (
+        localDateKey(event.startTime, event.timezone) <= today &&
+        today <= localDateKey(event.endTime ?? event.startTime, event.timezone)
+      );
+    })
+    .map(({ chapter, ...event }) => ({
+      ...event,
+      chapterName: chapter.name,
+      chapterSlug: chapter.slug,
+    }));
+}
