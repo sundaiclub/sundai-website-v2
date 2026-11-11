@@ -59,7 +59,7 @@ describe('PitchEventPage viewer states', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('shows the voting-in-progress message to signed-in non-attendees', async () => {
+  it.each([false, true])('shows voting status (%s)', async hasPitchProjects => {
     mockUseUser.mockReturnValue({ isLoaded: true, isSignedIn: true });
     global.fetch = jest.fn().mockResolvedValue({
       ok: true,
@@ -68,13 +68,18 @@ describe('PitchEventPage viewer states', () => {
         title: 'Demo Night',
         canViewPitch: false,
         pitchPhase: 'VOTING',
+        hasPitchProjects,
       }),
     });
 
     render(<PitchEventPage eventId="evt-1" />);
 
     expect(
-      await screen.findByText('Voting is currently happening.')
+      await screen.findByText(
+        hasPitchProjects
+          ? 'Voting is currently happening.'
+          : 'No projects to vote on yet.'
+      )
     ).toBeInTheDocument();
     await waitFor(() => {
       expect(screen.queryByText('Demo Night')).not.toBeInTheDocument();

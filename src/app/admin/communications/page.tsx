@@ -3,11 +3,13 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import type { AdminCommunicationListItem } from '@/types/admin-communications';
+import type { MessagingHealth } from '@/types/delivery-stats';
+import MessagingHealthPanel from './MessagingHealthPanel';
 import AdminAuthGate from '../AdminAuthGate';
+import CommunicationGroupCard from '../../components/CommunicationGroupCard';
 import {
   ManagementAlert,
   ManagementBackButton,
-  ManagementBadge,
   ManagementEmptyState,
   ManagementHeader,
   ManagementPage,
@@ -21,11 +23,8 @@ type ListPayload = {
   page: number;
   pageSize: number;
   total: number;
+  health: MessagingHealth;
 };
-
-function percentage(value: number, total: number) {
-  return total === 0 ? '0%' : `${Math.round((value / total) * 100)}%`;
-}
 
 export default function AdminCommunicationsPage() {
   const classes = useManagementClasses();
@@ -60,55 +59,37 @@ export default function AdminCommunicationsPage() {
           <ManagementHeader
             eyebrow="Site admin"
             title="Communications"
-            description="Review sent organizer communications from all chapters and their recipient delivery results."
+            description="Review sent organizer communications from all chapters. Email and SMS versions of one message appear together with their delivery and click results."
           />
           {error && <ManagementAlert tone="danger">{error}</ManagementAlert>}
+          {payload?.health && (
+            <div className="mb-5">
+              <MessagingHealthPanel health={payload.health} />
+            </div>
+          )}
           <ManagementSection>
-            <div className={`divide-y ${classes.divider}`}>
+            <div>
               {payload?.items.map(item => (
                 <Link
                   key={item.id}
                   href={`/admin/communications/${item.id}`}
-                  className="grid gap-3 py-4 transition hover:opacity-75 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1.2fr)_auto] lg:items-center"
+                  className="block py-2 transition hover:opacity-80"
                 >
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <ManagementBadge>{item.channel}</ManagementBadge>
-                      <span className="font-semibold">{item.excerpt}</span>
-                    </div>
-                    <div className={`mt-1 text-sm ${classes.mutedText}`}>
-                      {item.chapter.name} · {item.event.title}
-                    </div>
-                  </div>
-                  <div className="text-sm">
-                    <div>{new Date(item.sentAt).toLocaleString()}</div>
-                    <div className={classes.mutedText}>
-                      {item.sentBy?.name ?? 'Unknown sender'}
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-3 gap-2 text-sm">
-                    <div>
-                      <div className="font-semibold">
-                        {percentage(item.stats.delivered, item.stats.total)}
-                      </div>
-                      <div className={classes.mutedText}>Delivered</div>
-                    </div>
-                    <div>
-                      <div className="font-semibold">
-                        {percentage(item.stats.accepted, item.stats.total)}
-                      </div>
-                      <div className={classes.mutedText}>Sent</div>
-                    </div>
-                    <div>
-                      <div className="font-semibold">
-                        {percentage(item.stats.failed, item.stats.total)}
-                      </div>
-                      <div className={classes.mutedText}>Failed</div>
-                    </div>
-                  </div>
-                  <div className={`text-sm ${classes.mutedText}`}>
-                    {item.stats.total} recipients
-                  </div>
+                  <CommunicationGroupCard
+                    communications={item.communications}
+                    meta={
+                      <>
+                        <span className="font-semibold">
+                          {item.chapter.name}
+                        </span>{' '}
+                        · {item.event.title}
+                        <br />
+                        Sent by {item.sender?.name ?? 'an organizer'} on{' '}
+                        {new Date(item.sentAt).toLocaleString()}
+                      </>
+                    }
+                    title={item.subject ?? item.excerpt}
+                  />
                 </Link>
               ))}
               {payload && payload.items.length === 0 && (
