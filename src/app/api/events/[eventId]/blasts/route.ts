@@ -10,7 +10,9 @@ import {
   getEventCommunicationProviderAvailability,
   validateEventCommunicationDraft,
 } from '@/lib/eventCommunications';
-import { parsePageSize } from '@/lib/pagination';
+import { parsePageNumber, parsePageSize } from '@/lib/pagination';
+import { loadEventCommunicationHistory } from '@/lib/communicationHistory';
+import { isUuid } from '@/lib/messageRecipients';
 
 const HISTORY_PAGE_SIZE = 20;
 const MAX_HISTORY_PAGE_SIZE = 50;
@@ -36,32 +38,15 @@ export async function GET(
         { status: 400 }
       );
     }
-    const cursor = url.searchParams.get('cursor');
-    const [rows, chapterInvitationStatus] = await Promise.all([
-      prisma.eventCommunication.findMany({
-        where: { eventId: params.eventId },
-        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-        take: limit + 1,
-        ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
-        select: {
-          id: true,
-          eventId: true,
-          channel: true,
-          status: true,
-          subject: true,
-          body: true,
-          audienceType: true,
-          audienceDefinitionJson: true,
-          recipientCount: true,
-          sentCount: true,
-          failedCount: true,
-          sentAt: true,
-          createdAt: true,
-          updatedAt: true,
-          createdBy: { select: { id: true, name: true } },
-          sentBy: { select: { id: true, name: true } },
-        },
-      }),
+    const page = parsePageNumber(url.searchParams.get('page'));
+    if (page === null) {
+      return NextResponse.json(
+        { error: 'page must be a positive integer.' },
+        { status: 400 }
+      );
+    }
+    const [history, chapterInvitationStatus] = await Promise.all([
+      loadEventCommunicationHistory(params.eventId, page, limit),
       prisma.eventCommunication.findFirst({
         where: {
           eventId: params.eventId,
@@ -80,16 +65,15 @@ export async function GET(
         },
       }),
     ]);
-    const hasMore = rows.length > limit;
-    const items = hasMore ? rows.slice(0, limit) : rows;
 
     return NextResponse.json({
-      items,
+      items: history.groups,
+      page,
+      hasMore: history.hasMore,
       locations:
         parseEventLocationConfig(
           access.event!.communicationLocationsJson
         )?.locations.map(({ id, name }) => ({ id, name })) ?? [],
-      nextCursor: hasMore ? (items.at(-1)?.id ?? null) : null,
       chapterInvitationStatus,
       providerAvailability: getEventCommunicationProviderAvailability(),
     });
@@ -151,6 +135,32 @@ export async function POST(
       );
     }
 
+    if (body.sendGroupId !== undefined && !isUuid(body.sendGroupId)) {
+      return NextResponse.json(
+        { error: 'sendGroupId must be a UUID.' },
+        { status: 400 }
+      );
+    }
+    if (body.sendGroupId) {
+      // A send group holds one message per channel for a single event.
+      const conflict = await prisma.eventCommunication.findFirst({
+        where: {
+          sendGroupId: body.sendGroupId,
+          OR: [
+            { eventId: { not: params.eventId } },
+            { channel: body.channel as 'EMAIL' | 'SMS' },
+          ],
+        },
+        select: { id: true },
+      });
+      if (conflict) {
+        return NextResponse.json(
+          { error: 'sendGroupId is already used for this channel.' },
+          { status: 409 }
+        );
+      }
+    }
+
     const providers = getEventCommunicationProviderAvailability();
     const selectedProvider =
       body.channel === 'EMAIL' ? providers.email : providers.sms;
@@ -169,6 +179,7 @@ export async function POST(
         eventId: params.eventId,
         createdById: access.hacker!.id,
         channel: body.channel as 'EMAIL' | 'SMS',
+        ...(isUuid(body.sendGroupId) ? { sendGroupId: body.sendGroupId } : {}),
         status: 'DRAFT',
         subject: body.channel === 'EMAIL' ? String(body.subject).trim() : null,
         body: String(body.body).trim(),
@@ -191,6 +202,7 @@ export async function POST(
         createdById: true,
         sentById: true,
         channel: true,
+        sendGroupId: true,
         status: true,
         subject: true,
         body: true,

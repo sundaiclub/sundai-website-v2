@@ -12,6 +12,7 @@ import {
 } from '@/lib/eventDelivery';
 import { publishEmailBatches } from '@/lib/emailQueue';
 import { buildCheckInTicketContent } from '@/lib/eventDecisionNotifications';
+import { shortenSmsLinks } from '@/lib/messageLinks';
 import { hasCheckInWindowEnded } from '@/lib/eventCheckIn';
 
 const TICKET_AUDIENCE_DEFINITION = {
@@ -126,11 +127,21 @@ export async function sendCheckInTickets(input: {
         continue;
       }
 
+      const bodies = await prisma.$transaction(
+        tx =>
+          shortenSmsLinks(
+            tx,
+            communication.id,
+            smsContent.sms,
+            snapshot.recipients.map(recipient => recipient.id)
+          ),
+        { timeout: 60_000 }
+      );
       const outcomes = await deliverEventSmsRecipients({
-        body: smsContent.sms,
         recipients: snapshot.recipients.map(recipient => ({
           recipientId: recipient.id,
           contactValue: recipient.contactValue,
+          body: bodies.get(recipient.id) ?? smsContent.sms,
         })),
       });
       await finalizeEventCommunication({

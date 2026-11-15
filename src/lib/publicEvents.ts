@@ -334,7 +334,7 @@ const CANCELLABLE_REGISTRATION_STATUSES: readonly RegistrationStatus[] = [
 const GENERIC_BLOCKED_MESSAGE =
   'You are unable to register for this event at this time.';
 
-function publicEventVisibilityWhere(
+export function publicEventVisibilityWhere(
   chapterSlug?: string | null
 ): Prisma.EventWhereInput {
   return {

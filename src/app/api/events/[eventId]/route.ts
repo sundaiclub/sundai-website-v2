@@ -161,7 +161,10 @@ export async function GET(
           },
         },
         pitchSessions: {
-          select: { phase: true },
+          select: {
+            phase: true,
+            _count: { select: { projects: true } },
+          },
           orderBy: { createdAt: 'asc' },
           take: 1,
         },
@@ -240,6 +243,7 @@ export async function GET(
         ...(event.meetingUrl ? { meetingUrl: event.meetingUrl } : {}),
         canViewPitch: false,
         pitchPhase,
+        hasPitchProjects: (event.pitchSessions?.[0]?._count?.projects ?? 0) > 0,
       });
     }
 
@@ -281,6 +285,9 @@ export async function GET(
       ...(event.meetingUrl ? { meetingUrl: event.meetingUrl } : {}),
       canViewPitch: true,
       pitchPhase,
+      pitchSession: publicEvent.pitchSession
+        ? { phase: publicEvent.pitchSession.phase }
+        : null,
       canManagePitch: viewerCanManagePitch,
       staff: pitchEvent?.staff ?? [],
       pitchSessions: (pitchEvent?.pitchSessions ?? []).map(session => ({

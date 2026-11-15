@@ -245,6 +245,12 @@ export function canManageEventPitchWithContext(
   return canManageEventOperationsWithContext(context);
 }
 
+export function canManageEventIdeasWithContext(
+  context: EventPermissionContext
+): boolean {
+  return canManageEventOperationsWithContext(context);
+}
+
 export function canDecideEventApplicantsWithContext(
   context: EventPermissionContext
 ): boolean {

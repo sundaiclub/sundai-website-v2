@@ -31,6 +31,7 @@ jest.mock('../../src/lib/prisma', () => ({
       create: jest.fn(),
       findFirst: jest.fn(),
       findMany: jest.fn(),
+      groupBy: jest.fn(),
       findUnique: jest.fn(),
       update: jest.fn(),
       updateMany: jest.fn(),
@@ -41,8 +42,10 @@ jest.mock('../../src/lib/prisma', () => ({
     eventCommunicationRecipient: {
       createMany: jest.fn(),
       findMany: jest.fn(),
+      groupBy: jest.fn(),
       update: jest.fn(),
     },
+    $queryRaw: jest.fn(),
     $transaction: jest.fn(),
   },
 }));
@@ -194,6 +197,9 @@ describe('/api/events/[eventId]/blasts', () => {
         ? operation(prisma)
         : Promise.all(operation)
     );
+    prisma.eventCommunication.groupBy.mockResolvedValue([]);
+    prisma.eventCommunicationRecipient.groupBy.mockResolvedValue([]);
+    prisma.$queryRaw.mockResolvedValue([]);
   });
 
   it('returns the latest sent chapter invitation status', async () => {
@@ -563,16 +569,58 @@ describe('/api/events/[eventId]/blasts', () => {
     ).not.toHaveBeenCalled();
   });
 
-  it('returns immutable recipient snapshots rather than recalculating changed registrations', async () => {
+  it('returns aggregate delivery results without recipient contact details', async () => {
     prisma.eventCommunication.findUnique.mockResolvedValue({
       ...draft,
       status: 'PARTIAL',
-      recipientCount: 2,
-      sentCount: 1,
+      recipientCount: 3,
+      sentCount: 2,
       failedCount: 1,
     });
-    prisma.eventCommunicationRecipient.findMany.mockResolvedValue(snapshotRows);
-    prisma.eventRegistration.findMany.mockResolvedValue([]);
+    prisma.eventCommunicationRecipient.groupBy.mockImplementation(
+      ({ by }: { by: string[] }) => {
+        if (by.includes('status'))
+          return Promise.resolve([
+            {
+              communicationId: blastId,
+              status: 'DELIVERED',
+              _count: { _all: 2 },
+            },
+            {
+              communicationId: blastId,
+              status: 'UNDELIVERED',
+              _count: { _all: 1 },
+            },
+          ]);
+        if (by.includes('errorCode'))
+          return Promise.resolve([
+            {
+              communicationId: blastId,
+              errorCode: 'Bounce.Permanent.NoEmail',
+              _max: { errorMessage: 'smtp; 550 alex@example.com unknown' },
+              _count: { _all: 1 },
+            },
+          ]);
+        return Promise.resolve([]);
+      }
+    );
+    // Link rows, then per-message click totals.
+    prisma.$queryRaw
+      .mockResolvedValueOnce([
+        {
+          sourceId: blastId,
+          url: 'https://www.sundai.club/events/boston/build',
+          kind: 'CONTENT',
+          isEventLink: true,
+          clicks: 3,
+          uniqueClicks: 1,
+          botClicks: 2,
+          rsvps: 1,
+        },
+      ])
+      .mockResolvedValueOnce([
+        { sourceId: blastId, clicked: 1, preferenceClicks: 0, rsvps: 1 },
+      ]);
     const { GET } = loadRoute<{ GET: Function }>(
       '../../src/app/api/events/[eventId]/blasts/[blastId]/route'
     );
@@ -584,60 +632,125 @@ describe('/api/events/[eventId]/blasts', () => {
     const body = await response.json();
 
     expect(response.status).toBe(200);
-    expect(body.recipients).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          hackerId: 'hacker-alex',
-          contactValue: 'alex@example.com',
-        }),
-        expect.objectContaining({
-          hackerId: 'hacker-blair',
-          contactValue: 'blair@example.com',
-        }),
-      ])
-    );
-    expect(prisma.eventRegistration.findMany).not.toHaveBeenCalled();
+    expect(body).toMatchObject({ status: 'PARTIAL', recipientCount: 3 });
+    expect(body.stats).toEqual({
+      total: 3,
+      pending: 0,
+      accepted: 0,
+      delivered: 2,
+      failed: 1,
+      complained: 0,
+      unsubscribed: 0,
+      clicked: 1,
+      rsvps: 1,
+      hasEventLinks: true,
+      preferenceClicks: 0,
+      botClicks: 2,
+      failureReasons: [
+        {
+          code: 'Bounce.Permanent.NoEmail',
+          label: 'Email address does not exist',
+          hint: 'Ask the member to update their email address.',
+          example: 'smtp; 550 [email] unknown',
+          count: 1,
+        },
+      ],
+      links: [
+        {
+          url: 'https://www.sundai.club/events/boston/build',
+          kind: 'CONTENT',
+          clicks: 3,
+          uniqueClicks: 1,
+          botClicks: 2,
+          rsvps: 1,
+        },
+      ],
+    });
+    expect(body).not.toHaveProperty('recipients');
+    expect(prisma.eventCommunicationRecipient.findMany).not.toHaveBeenCalled();
+    expect(JSON.stringify(body)).not.toContain('@example.com');
   });
 
-  it('preserves successful outcomes and reports PARTIAL when one recipient fails', async () => {
-    prisma.eventCommunication.findUnique.mockResolvedValue({
+  it('lists sent history grouped by send with email before SMS', async () => {
+    prisma.eventCommunication.groupBy.mockResolvedValue([
+      { sendGroupId: 'group-1', _max: { createdAt: new Date() } },
+    ]);
+    const row = {
       ...draft,
-      status: 'PARTIAL',
-      recipientCount: 2,
-      sentCount: 1,
-      failedCount: 1,
-    });
-    prisma.eventCommunicationRecipient.findMany.mockResolvedValue(snapshotRows);
+      sendGroupId: 'group-1',
+      status: 'SENT',
+      sentAt: new Date('2026-07-10T12:05:00.000Z'),
+      sentBy: { id: 'hacker-mc', name: 'Morgan MC' },
+      createdBy: { id: 'hacker-mc', name: 'Morgan MC' },
+    };
+    prisma.eventCommunication.findMany.mockResolvedValue([
+      { ...row, id: 'sms-1', channel: 'SMS', subject: null },
+      { ...row, id: 'email-1' },
+    ]);
+    prisma.eventCommunication.findFirst.mockResolvedValue(null);
     const { GET } = loadRoute<{ GET: Function }>(
-      '../../src/app/api/events/[eventId]/blasts/[blastId]/route'
+      '../../src/app/api/events/[eventId]/blasts/route'
     );
 
     const response = await GET(
-      createJsonRequest(`/api/events/${eventId}/blasts/${blastId}`),
-      createRouteContext({ eventId, blastId })
+      createJsonRequest(`/api/events/${eventId}/blasts`),
+      createRouteContext({ eventId })
     );
     const body = await response.json();
 
-    expect(body).toMatchObject({
-      status: 'PARTIAL',
-      recipientCount: 2,
-      sentCount: 1,
-      failedCount: 1,
+    expect(response.status).toBe(200);
+    expect(body.items).toHaveLength(1);
+    expect(body.items[0]).toMatchObject({
+      sendGroupId: 'group-1',
+      sender: { name: 'Morgan MC' },
     });
-    expect(body.recipients).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          hackerId: 'hacker-alex',
-          status: 'SENT',
-          providerMessageId: 'provider-alex',
-        }),
-        expect.objectContaining({
-          hackerId: 'hacker-blair',
-          status: 'FAILED',
-          errorMessage: 'Delivery was rejected.',
-        }),
-      ])
+    expect(
+      body.items[0].communications.map((item: { id: string }) => item.id)
+    ).toEqual(['email-1', 'sms-1']);
+    expect(prisma.eventCommunication.groupBy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        by: ['sendGroupId'],
+        where: { eventId, status: { not: 'DRAFT' } },
+      })
     );
+  });
+
+  it('rejects a send group that belongs to another event or channel', async () => {
+    prisma.eventCommunication.findFirst.mockResolvedValue({ id: 'other' });
+    const { POST } = loadRoute<{ POST: Function }>(
+      '../../src/app/api/events/[eventId]/blasts/route'
+    );
+
+    const invalid = await POST(
+      createJsonRequest(`/api/events/${eventId}/blasts`, {
+        method: 'POST',
+        body: {
+          channel: 'EMAIL',
+          subject: 'Hi',
+          body: 'Body',
+          audienceType: 'APPROVED',
+          sendGroupId: 'not-a-uuid',
+        },
+      }),
+      createRouteContext({ eventId })
+    );
+    expect(invalid.status).toBe(400);
+
+    const conflict = await POST(
+      createJsonRequest(`/api/events/${eventId}/blasts`, {
+        method: 'POST',
+        body: {
+          channel: 'EMAIL',
+          subject: 'Hi',
+          body: 'Body',
+          audienceType: 'APPROVED',
+          sendGroupId: '7d9f1e8a-1b2c-4d3e-8f90-123456789abc',
+        },
+      }),
+      createRouteContext({ eventId })
+    );
+    expect(conflict.status).toBe(409);
+    expect(prisma.eventCommunication.create).not.toHaveBeenCalled();
   });
 
   it('redacts organizer notes and revisions from communication previews', async () => {

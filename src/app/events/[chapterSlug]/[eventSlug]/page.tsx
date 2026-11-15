@@ -15,6 +15,7 @@ import { EventProjectCarousel } from '@/app/components/EventProjectCarousel';
 import { EventCheckInTicket } from '@/app/components/EventCheckInTicket';
 import PitchEventPage from '@/app/components/PitchEventPage';
 import EventJudgingPanel from '@/app/components/EventJudgingPanel';
+import { EventIdeasBoard } from '@/app/components/EventIdeasBoard';
 import {
   ManagementAlert,
   ManagementLinkButton,
@@ -31,6 +32,7 @@ import {
   getViewerCheckInTicket,
 } from '@/lib/eventCheckIn';
 import { listPublicEventProjects } from '@/lib/publicEventProjects';
+import { getEventIdeasViewer, listEventIdeas } from '@/lib/eventIdeas';
 import { findViewerJudgedEvent } from '@/lib/judgingAccess';
 import { JUDGE_TOKEN_PARAM } from '@/types/judging';
 import { getPublicEventBySlug } from '@/lib/publicEvents';
@@ -58,17 +60,20 @@ function firstParam(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
 }
 
-type EventTab = 'info' | 'ticket' | 'projects' | 'pitch' | 'judging';
+type EventTab = 'info' | 'ideas' | 'ticket' | 'projects' | 'pitch' | 'judging';
 
 const eventTabs: Array<{ id: EventTab; label: string }> = [
   { id: 'info', label: 'Info' },
+  { id: 'ideas', label: 'Ideas' },
   { id: 'ticket', label: 'Ticket' },
   { id: 'projects', label: 'Projects' },
   { id: 'pitch', label: 'Pitch' },
   { id: 'judging', label: 'Judging' },
 ];
 
-export async function generateMetadata(props: EventPageProps): Promise<Metadata> {
+export async function generateMetadata(
+  props: EventPageProps
+): Promise<Metadata> {
   const searchParams = await props.searchParams;
   const params = await props.params;
   const judgeToken = firstParam(searchParams?.judge);
@@ -247,7 +252,9 @@ export default async function PublicEventDetailPage(props: EventPageProps) {
     : searchParams?.notice;
   const eventPath = `/events/${encodeURIComponent(event.chapterSlug)}/${encodeURIComponent(event.slug)}`;
 
-  const [visibleMaterials, eventProjects] = await Promise.all([
+  const ideasViewer =
+    activeTab === 'ideas' ? await getEventIdeasViewer(event.id) : null;
+  const [visibleMaterials, eventProjects, eventIdeas] = await Promise.all([
     listVisibleEventMaterials({
       eventId: event.id,
       viewer: {
@@ -257,6 +264,7 @@ export default async function PublicEventDetailPage(props: EventPageProps) {
     showProjects
       ? listPublicEventProjects({ eventId: event.id, clerkId: userId })
       : Promise.resolve([]),
+    ideasViewer ? listEventIdeas(event.id, ideasViewer) : Promise.resolve([]),
   ]);
   const materials = publicMaterials(
     visibleMaterials.map(material => ({
@@ -395,6 +403,15 @@ export default async function PublicEventDetailPage(props: EventPageProps) {
           </div>
           <EventNarrativeColumn event={event} />
         </div>
+      )}
+
+      {activeTab === 'ideas' && (
+        <EventIdeasBoard
+          eventId={event.id}
+          initialIdeas={eventIdeas}
+          timezone={event.timezone}
+          viewerName={ideasViewer?.name ?? null}
+        />
       )}
 
       {activeTab === 'ticket' && ticket && (

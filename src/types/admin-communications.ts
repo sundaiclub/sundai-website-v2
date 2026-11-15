@@ -1,43 +1,20 @@
 import type {
-  EventCommunicationRecipientStatus,
-  EventCommunicationStatus,
-} from '@prisma/client';
+  EventCommunicationHistoryGroup,
+  EventCommunicationHistoryItem,
+} from './event-workspace';
 
-export type AdminCommunicationStats = {
-  total: number;
-  pending: number;
-  accepted: number;
-  delivered: number;
-  failed: number;
-};
-
-export type AdminCommunicationListItem = {
+// One organizer send. The email and SMS versions share one entry.
+export type AdminCommunicationListItem = Omit<
+  EventCommunicationHistoryGroup,
+  'communications'
+> & {
   id: string;
-  channel: 'EMAIL' | 'SMS';
-  status: EventCommunicationStatus;
   subject: string | null;
   excerpt: string;
   sentAt: string;
   chapter: { id: string; name: string; slug: string };
   event: { id: string; title: string };
-  sentBy: { id: string; name: string; email: string | null } | null;
-  stats: AdminCommunicationStats;
+  communications: EventCommunicationHistoryItem[];
 };
 
-export type AdminCommunicationDetail = AdminCommunicationListItem & {
-  body: string;
-  audienceType: string;
-  audienceDefinition: unknown;
-  createdAt: string;
-  recipients: Array<{
-    id: string;
-    displayName: string;
-    contactValue: string;
-    status: EventCommunicationRecipientStatus;
-    providerMessageId: string | null;
-    errorCode: string | null;
-    errorMessage: string | null;
-    attemptedAt: string | null;
-    deliveredAt: string | null;
-  }>;
-};
+export type AdminCommunicationDetail = AdminCommunicationListItem;

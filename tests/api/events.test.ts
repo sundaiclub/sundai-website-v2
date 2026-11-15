@@ -410,14 +410,16 @@ describe('/api/events/[eventId]', () => {
     expect(body).not.toHaveProperty('phase');
   });
 
-  it('GET hides voting from signed-in viewers who are not part of the event', async () => {
+  it.each([0, 2])('GET hides voting (%i projects)', async projectCount => {
     mockAuth.mockReturnValue({ userId: 'clerk-viewer' });
     prisma.hacker.findUnique.mockResolvedValue({
       id: 'h-viewer',
       role: 'HACKER',
     });
     prisma.event.findFirst.mockResolvedValue(
-      buildPublicEvent({ pitchSessions: [{ phase: 'VOTING' }] })
+      buildPublicEvent({
+        pitchSessions: [{ phase: 'VOTING', _count: { projects: projectCount } }],
+      })
     );
 
     const response = await GET_EVENT(
@@ -431,6 +433,7 @@ describe('/api/events/[eventId]', () => {
       expect.objectContaining({
         canViewPitch: false,
         pitchPhase: 'VOTING',
+        hasPitchProjects: projectCount > 0,
       })
     );
     expect(body).not.toHaveProperty('pitchSessions');
@@ -478,7 +481,7 @@ describe('/api/events/[eventId]', () => {
     prisma.event.findFirst.mockResolvedValue(
       buildPublicEvent({
         meetingUrl: 'https://zoom.us/j/1234567890',
-        pitchSessions: [{ phase: 'VOTING' }],
+        pitchSessions: [{ phase: 'VOTING', _count: { projects: 2 } }],
       })
     );
     prisma.eventRegistration.findFirst.mockResolvedValue({

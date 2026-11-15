@@ -30,8 +30,14 @@ jest.mock('@/lib/prisma', () => ({
       updateMany: jest.fn(),
       update: jest.fn(),
     },
+    weeklyEmailRecipient: { createMany: jest.fn(), groupBy: jest.fn() },
+    $queryRaw: jest.fn(),
   },
 }));
+const recipientDb = prisma.weeklyEmailRecipient as unknown as Record<
+  string,
+  jest.Mock
+>;
 const db = prisma.weeklyEmail as unknown as Record<string, jest.Mock>;
 const auth = requireSiteAdmin as jest.Mock;
 const draft = {
@@ -102,14 +108,79 @@ describe('weekly email routes', () => {
     expect((await POST(request('send'), context)).status).toBe(202);
     expect(db.updateMany).toHaveBeenCalledWith({
       where: { id: 'draft', status: 'DRAFT', updatedAt: draft.updatedAt },
-      data: { status: 'SENDING' },
+      data: { status: 'SENDING', sentAt: expect.any(Date) },
     });
     expect(db.update).not.toHaveBeenCalled();
+    const [{ data: recipients }] = recipientDb.createMany.mock.calls[0];
+    expect(recipients).toEqual([
+      {
+        id: expect.stringMatching(/^[0-9a-f-]{36}$/),
+        weeklyEmailId: 'draft',
+        hackerId: 'user',
+        contactValue: 'admin@example.com',
+      },
+    ]);
     expect(require('@/lib/emailQueue').createEmailBatches).toHaveBeenCalledWith(
       prisma,
-      expect.any(Array),
+      [expect.objectContaining({ weeklyRecipientId: recipients[0].id })],
       { weeklyEmailId: 'draft' }
     );
+  });
+
+  it('does not create tracked recipient rows for a test send', async () => {
+    expect((await POST(request('test'), context)).status).toBe(202);
+    expect(recipientDb.createMany).not.toHaveBeenCalled();
+  });
+
+  it('lists sent weekly emails with aggregate delivery and click results', async () => {
+    db.findMany.mockResolvedValueOnce([draft]).mockResolvedValueOnce([
+      {
+        id: 'sent-1',
+        subject: 'Last week',
+        status: 'SENT',
+        sentAt: new Date('2026-10-30T15:00:00.000Z'),
+      },
+    ]);
+    recipientDb.groupBy.mockImplementation(({ by }) =>
+      Promise.resolve(
+        by.includes('status')
+          ? [
+              {
+                weeklyEmailId: 'sent-1',
+                status: 'DELIVERED',
+                _count: { _all: 9 },
+              },
+              {
+                weeklyEmailId: 'sent-1',
+                status: 'UNDELIVERED',
+                _count: { _all: 1 },
+              },
+            ]
+          : []
+      )
+    );
+    (prisma.$queryRaw as jest.Mock)
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        { sourceId: 'sent-1', clicked: 3, preferenceClicks: 1, rsvps: 0 },
+      ]);
+
+    const body = await (await GET()).json();
+
+    expect(body.drafts).toHaveLength(1);
+    expect(body.sent).toEqual([
+      expect.objectContaining({
+        id: 'sent-1',
+        sentAt: '2026-10-30T15:00:00.000Z',
+        stats: expect.objectContaining({
+          total: 10,
+          delivered: 9,
+          failed: 1,
+          clicked: 3,
+        }),
+      }),
+    ]);
+    expect(JSON.stringify(body)).not.toContain('@example.com');
   });
 
   it('does not send when another request already claimed or edited the draft', async () => {
@@ -130,10 +201,15 @@ describe('weekly email routes', () => {
   });
 
   it('retains saved batches and their IDs when queue publication fails', async () => {
-    require('@/lib/emailQueue').publishEmailBatches.mockRejectedValueOnce(new Error('Queue unavailable'));
+    require('@/lib/emailQueue').publishEmailBatches.mockRejectedValueOnce(
+      new Error('Queue unavailable')
+    );
     const response = await POST(request('send'), context);
     expect(response.status).toBe(202);
-    expect(await response.json()).toMatchObject({ batchIds: ['batch-1'], warning: expect.stringContaining('Resume queued emails') });
+    expect(await response.json()).toMatchObject({
+      batchIds: ['batch-1'],
+      warning: expect.stringContaining('Resume queued emails'),
+    });
     expect(db.update).not.toHaveBeenCalled();
   });
 });

@@ -1,11 +1,20 @@
-import type { SendEmailCommandInput } from '@aws-sdk/client-ses';
+import type { SendEmailCommandInput } from '@aws-sdk/client-sesv2';
 
 const EMAIL_BATCH_SIZE = 10;
-const sesClients = new Map<string, import('@aws-sdk/client-ses').SESClient>();
+// Twilio limits concurrent API requests per account. Larger sends queue here.
+const SMS_CONCURRENCY = 10;
+const SMS_RATE_LIMIT_RETRIES = 3;
+const sesClients = new Map<
+  string,
+  import('@aws-sdk/client-sesv2').SESv2Client
+>();
+const twilioClients = new Map<string, unknown>();
 
 export type EventDeliveryConfig = {
   awsRegion: string | null;
   sesFromEmail: string | null;
+  // SES publishes delivery, bounce, and complaint events for this set.
+  sesConfigurationSet?: string | null;
   twilioAccountSid: string | null;
   twilioAuthToken: string | null;
   twilioMessagingServiceSid: string | null;
@@ -23,6 +32,8 @@ type EventEmailInput = {
   subject: string;
   body: string;
   html?: string;
+  tags?: Record<string, string>;
+  headers?: Array<{ Name: string; Value: string }>;
 };
 
 type EventSmsInput = {
@@ -31,8 +42,11 @@ type EventSmsInput = {
 };
 
 type RecipientDeliveryInput = {
-  body: string;
-  recipients: Array<{ recipientId: string; contactValue: string }>;
+  recipients: Array<{
+    recipientId: string;
+    contactValue: string;
+    body: string;
+  }>;
 };
 
 type RecipientDeliveryResult = EventDeliveryResult & { recipientId: string };
@@ -80,6 +94,7 @@ function environmentConfig(): EventDeliveryConfig {
   return {
     awsRegion: process.env.AWS_REGION ?? null,
     sesFromEmail: process.env.AWS_SES_FROM_EMAIL ?? null,
+    sesConfigurationSet: process.env.AWS_SES_CONFIGURATION_SET ?? null,
     twilioAccountSid: process.env.TWILIO_ACCOUNT_SID ?? null,
     twilioAuthToken: process.env.TWILIO_AUTH_TOKEN ?? null,
     twilioMessagingServiceSid: process.env.TWILIO_MESSAGING_SERVICE_SID ?? null,
@@ -103,11 +118,13 @@ async function sendWithSes(
   payload: SendEmailCommandInput,
   config: EventDeliveryConfig
 ) {
-  const { SendEmailCommand, SESClient } = await import('@aws-sdk/client-ses');
+  const { SendEmailCommand, SESv2Client } = await import(
+    '@aws-sdk/client-sesv2'
+  );
   const region = config.awsRegion!;
   let client = sesClients.get(region);
   if (!client) {
-    client = new SESClient({
+    client = new SESv2Client({
       region,
       maxAttempts: 1,
       requestHandler: {
@@ -137,25 +154,31 @@ export async function sendEventEmail(
     );
   }
 
-  const payload = {
+  const tags = Object.entries(input.tags ?? {});
+  const payload: SendEmailCommandInput = {
+    FromEmailAddress: config.sesFromEmail!,
     Destination: { ToAddresses: [input.to] },
-    Message: {
-      Subject: { Charset: 'UTF-8', Data: input.subject },
-      Body: {
-        Text: { Charset: 'UTF-8', Data: input.body },
-        Html: {
-          Charset: 'UTF-8',
-          Data:
-            input.html ??
-            `<p>${input.body
-              .replaceAll('&', '&amp;')
-              .replaceAll('<', '&lt;')
-              .replaceAll('>', '&gt;')
-              .replaceAll('\n', '<br>')}</p>`,
+    Content: {
+      Simple: {
+        Subject: { Charset: 'UTF-8', Data: input.subject },
+        Body: {
+          Text: { Charset: 'UTF-8', Data: input.body },
+          Html: {
+            Charset: 'UTF-8',
+            Data: input.html ?? plainTextEmailHtml(input.body),
+          },
         },
+        ...(input.headers?.length ? { Headers: input.headers } : {}),
       },
     },
-    Source: config.sesFromEmail!,
+    ...(config.sesConfigurationSet
+      ? {
+          ConfigurationSetName: config.sesConfigurationSet,
+          ...(tags.length
+            ? { EmailTags: tags.map(([Name, Value]) => ({ Name, Value })) }
+            : {}),
+        }
+      : {}),
   };
 
   try {
@@ -173,6 +196,36 @@ export async function sendEventEmail(
   }
 }
 
+const escapeHtml = (value: string) =>
+  value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;');
+
+// Plain organizer messages become simple HTML with clickable links, which
+// lets SES deliver them with tracked links.
+export function plainTextEmailHtml(body: string) {
+  const linked = body
+    .split(/(https?:\/\/[^\s<>"]+[^\s<>".,;:!?)\]'])/g)
+    .map((part, index) =>
+      index % 2
+        ? `<a href="${escapeHtml(part)}">${escapeHtml(part)}</a>`
+        : escapeHtml(part)
+    )
+    .join('');
+  return `<p>${linked.replaceAll('\n', '<br>')}</p>`;
+}
+
+// Twilio messages can include credentials or phone numbers. Keep only the
+// numeric Twilio error code, which maps to a failure reason in reports.
+function twilioFailedResult(error: unknown): EventDeliveryResult {
+  const code = (error as { code?: unknown } | null)?.code;
+  return typeof code === 'number' && Number.isInteger(code)
+    ? failedResult(String(code))
+    : failedResult();
+}
+
 async function sendWithTwilio(
   payload: {
     to: string;
@@ -183,7 +236,12 @@ async function sendWithTwilio(
   config: EventDeliveryConfig
 ) {
   const { default: twilio } = await import('twilio');
-  const client = twilio(config.twilioAccountSid!, config.twilioAuthToken!);
+  const key = config.twilioAccountSid!;
+  let client = twilioClients.get(key) as ReturnType<typeof twilio> | undefined;
+  if (!client) {
+    client = twilio(config.twilioAccountSid!, config.twilioAuthToken!);
+    twilioClients.set(key, client);
+  }
   return client.messages.create(payload);
 }
 
@@ -222,8 +280,8 @@ export async function sendEventSms(
       errorCode: null,
       errorMessage: null,
     };
-  } catch {
-    return failedResult();
+  } catch (error) {
+    return twilioFailedResult(error);
   }
 }
 
@@ -234,23 +292,50 @@ function twilioStatusCallbackUrl() {
   return `${base.replace(/\/$/, '')}/api/webhooks/twilio/status`;
 }
 
+const isRateLimited = (result: EventDeliveryResult) =>
+  result.errorCode === '20429';
+
+// Sends each recipient's message with limited concurrency. A Twilio rate
+// limit response (20429) means Twilio did not accept the message, so it is
+// safe to try again after a short wait.
 export async function deliverEventSmsRecipients(
   input: RecipientDeliveryInput,
   dependencies: {
     sendSms?: (input: EventSmsInput) => Promise<EventDeliveryResult>;
+    wait?: (ms: number) => Promise<void>;
   } = {}
 ): Promise<RecipientDeliveryResult[]> {
-  return Promise.all(
-    input.recipients.map(async recipient => {
-      try {
-        const result = await (dependencies.sendSms ?? sendEventSms)({
-          to: recipient.contactValue,
-          body: input.body,
-        });
-        return { recipientId: recipient.recipientId, ...result };
-      } catch {
-        return { recipientId: recipient.recipientId, ...failedResult() };
+  const send = dependencies.sendSms ?? sendEventSms;
+  const wait =
+    dependencies.wait ??
+    ((ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms)));
+  const results: RecipientDeliveryResult[] = new Array(input.recipients.length);
+  let next = 0;
+  async function worker() {
+    while (next < input.recipients.length) {
+      const index = next++;
+      const recipient = input.recipients[index];
+      let result: EventDeliveryResult = failedResult();
+      for (let attempt = 0; attempt <= SMS_RATE_LIMIT_RETRIES; attempt++) {
+        if (attempt) await wait(1000 * 2 ** (attempt - 1));
+        try {
+          result = await send({
+            to: recipient.contactValue,
+            body: recipient.body,
+          });
+        } catch {
+          result = failedResult();
+        }
+        if (!isRateLimited(result)) break;
       }
-    })
+      results[index] = { recipientId: recipient.recipientId, ...result };
+    }
+  }
+  await Promise.all(
+    Array.from(
+      { length: Math.min(SMS_CONCURRENCY, input.recipients.length) },
+      worker
+    )
   );
+  return results;
 }

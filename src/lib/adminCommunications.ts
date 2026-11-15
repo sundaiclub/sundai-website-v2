@@ -1,5 +1,9 @@
-import type { EventCommunicationRecipientStatus } from '@prisma/client';
-import type { AdminCommunicationStats } from '@/types/admin-communications';
+import prisma from '@/lib/prisma';
+import {
+  communicationHistorySelect,
+  groupHistoryRows,
+} from '@/lib/communicationHistory';
+import { eventCommunicationDeliveryStats } from '@/lib/deliveryStats';
 
 export function fiveWordExcerpt(body: string) {
   const words = body.trim().split(/\s+/).filter(Boolean);
@@ -7,18 +11,54 @@ export function fiveWordExcerpt(body: string) {
   return words.length > 5 ? `${excerpt}…` : excerpt;
 }
 
-export function communicationStats(
-  statuses: EventCommunicationRecipientStatus[]
-): AdminCommunicationStats {
-  return {
-    total: statuses.length,
-    pending: statuses.filter(status =>
-      ['PENDING', 'SENDING'].includes(status)
-    ).length,
-    accepted: statuses.filter(status => status === 'SENT').length,
-    delivered: statuses.filter(status => status === 'DELIVERED').length,
-    failed: statuses.filter(status =>
-      ['FAILED', 'UNDELIVERED'].includes(status)
-    ).length,
-  };
+const adminSelect = {
+  ...communicationHistorySelect,
+  event: {
+    select: {
+      id: true,
+      title: true,
+      chapter: { select: { id: true, name: true, slug: true } },
+    },
+  },
+} as const;
+
+// Loads sent groups with aggregate delivery results for site admins.
+export async function loadAdminCommunicationGroups(
+  where: { sentAt: { not: null }; eventId?: string; sendGroupId?: string },
+  groupKeys: Array<{ eventId: string; sendGroupId: string }>,
+  db = prisma
+) {
+  const rows = groupKeys.length
+    ? await db.eventCommunication.findMany({
+        where: {
+          ...where,
+          OR: groupKeys.map(key => ({
+            eventId: key.eventId,
+            sendGroupId: key.sendGroupId,
+          })),
+        },
+        select: adminSelect,
+      })
+    : [];
+  const stats = await eventCommunicationDeliveryStats(
+    rows.map(row => row.id),
+    db
+  );
+  return groupHistoryRows(
+    rows,
+    groupKeys.map(key => key.sendGroupId),
+    stats
+  ).map(({ lead, communications, ...group }) => ({
+    ...group,
+    id: lead.id,
+    subject: communications.find(item => item.subject)?.subject ?? null,
+    excerpt: fiveWordExcerpt(lead.body),
+    sentAt: communications
+      .map(item => item.sentAt)
+      .filter(Boolean)
+      .sort()[0]!,
+    chapter: lead.event.chapter,
+    event: { id: lead.event.id, title: lead.event.title },
+    communications,
+  }));
 }

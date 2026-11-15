@@ -18,8 +18,11 @@ jest.mock('@/lib/prisma', () => ({
     eventRegistration: { findMany: jest.fn() },
     eventCommunication: { create: jest.fn() },
     emailDeliveryBatch: { findMany: jest.fn() },
+    $transaction: jest.fn(),
   },
 }));
+
+jest.mock('@/lib/messageLinks', () => ({ shortenSmsLinks: jest.fn() }));
 
 jest.mock('@/lib/eventCommunications', () => ({
   ...jest.requireActual('@/lib/eventCommunications'),
@@ -79,6 +82,13 @@ function audience(contactValue: string) {
 
 beforeEach(() => {
   jest.resetAllMocks();
+  (prisma.$transaction as jest.Mock).mockImplementation(
+    (operation: (tx: unknown) => unknown) => operation({})
+  );
+  require('@/lib/messageLinks').shortenSmsLinks.mockImplementation(
+    async (_tx: unknown, _id: string, body: string, ids: string[]) =>
+      new Map(ids.map(id => [id, `${body} [short:${id}]`]))
+  );
   db.event.findUnique.mockResolvedValue(event);
   db.eventRegistration.findMany.mockResolvedValue([
     { id: 'registration-ada', checkInToken: adaToken },
@@ -161,12 +171,19 @@ describe('sendCheckInTickets', () => {
   it('sends SMS through the shared delivery path and records outcomes', async () => {
     await sendCheckInTickets({ eventId: 'event-1', actorId: 'hacker-mc', now });
 
+    const { shortenSmsLinks } = require('@/lib/messageLinks');
+    expect(shortenSmsLinks).toHaveBeenCalledWith(
+      expect.anything(),
+      'communication-sms',
+      expect.stringContaining('/events/boston/ai-build-night?tab=ticket'),
+      ['communication-sms-recipient']
+    );
     expect(deliverEventSmsRecipients).toHaveBeenCalledWith({
-      body: expect.stringContaining('/events/boston/ai-build-night?tab=ticket'),
       recipients: [
         {
           recipientId: 'communication-sms-recipient',
           contactValue: '+16175550123',
+          body: expect.stringContaining('[short:communication-sms-recipient]'),
         },
       ],
     });
