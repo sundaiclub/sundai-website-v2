@@ -33,7 +33,6 @@ function renderBoard(
     <EventIdeasBoard
       eventId="e1"
       initialIdeas={initialIdeas}
-      timezone="America/New_York"
       viewerName={viewerName}
     />
   );
@@ -51,7 +50,10 @@ describe('EventIdeasBoard', () => {
     const row = screen.getByRole('row', { name: /grace/i });
     expect(row).toHaveTextContent('Compiler for plants');
     expect(row).toHaveTextContent('Turns watering schedules into code');
-    expect(row).toHaveTextContent('10:30 AM');
+    expect(row).not.toHaveTextContent('10:30 AM');
+    expect(
+      screen.queryByRole('columnheader', { name: 'Added' })
+    ).not.toBeInTheDocument();
   });
 
   it('prefills the signed-in viewer name', () => {
@@ -107,8 +109,9 @@ describe('EventIdeasBoard', () => {
     });
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     const rows = screen.getAllByRole('row').slice(1);
-    expect(rows[0]).toHaveTextContent('Plant-watering robot');
-    expect(rows[1]).toHaveTextContent('Compiler for plants');
+    // New ideas join the bottom so the list stays oldest first.
+    expect(rows[0]).toHaveTextContent('Compiler for plants');
+    expect(rows[1]).toHaveTextContent('Plant-watering robot');
   });
 
   it('shows the server error when an idea is rejected', async () => {
@@ -136,7 +139,7 @@ describe('EventIdeasBoard', () => {
     expect(
       screen.queryByRole('button', { name: /^(edit|delete) /i })
     ).not.toBeInTheDocument();
-    expect(screen.getAllByRole('columnheader')).toHaveLength(4);
+    expect(screen.getAllByRole('columnheader')).toHaveLength(3);
   });
 
   it('shows edit and delete on the author’s own idea only', () => {

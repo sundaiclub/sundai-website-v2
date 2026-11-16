@@ -409,7 +409,6 @@ export default async function PublicEventDetailPage(props: EventPageProps) {
         <EventIdeasBoard
           eventId={event.id}
           initialIdeas={eventIdeas}
-          timezone={event.timezone}
           viewerName={ideasViewer?.name ?? null}
         />
       )}

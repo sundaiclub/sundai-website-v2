@@ -113,7 +113,7 @@ export async function listEventIdeas(
 ) {
   const ideas = await prisma.eventIdea.findMany({
     where: { eventId },
-    orderBy: { createdAt: 'desc' },
+    orderBy: { createdAt: 'asc' },
     select: IDEA_SELECT,
   });
   return ideas.map(idea => toPublicIdea(idea, viewer));

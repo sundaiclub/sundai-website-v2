@@ -173,12 +173,10 @@ function IdeaDialog({
 
 export function EventIdeasBoard({
   eventId,
-  timezone,
   viewerName,
   initialIdeas,
 }: {
   eventId: string;
-  timezone: string;
   viewerName: string | null;
   initialIdeas: PublicEventIdea[];
 }) {
@@ -236,12 +234,6 @@ export function EventIdeasBoard({
     }
   }
 
-  const timeFormat = new Intl.DateTimeFormat('en-US', {
-    hour: 'numeric',
-    minute: '2-digit',
-    timeZone: timezone,
-  });
-
   return (
     <ManagementSection
       actions={
@@ -284,9 +276,6 @@ export function EventIdeasBoard({
                 <th className="px-4 py-3 font-semibold" scope="col">
                   Description
                 </th>
-                <th className="px-4 py-3 font-semibold" scope="col">
-                  Added
-                </th>
                 {showActions && (
                   <th className="px-4 py-3 font-semibold" scope="col">
                     <span className="sr-only">Actions</span>
@@ -307,11 +296,6 @@ export function EventIdeasBoard({
                     className={`whitespace-pre-wrap break-words px-4 py-5 ${classes.mutedText}`}
                   >
                     {idea.description}
-                  </td>
-                  <td
-                    className={`whitespace-nowrap px-4 py-5 ${classes.mutedText}`}
-                  >
-                    {timeFormat.format(new Date(idea.createdAt))}
                   </td>
                   {showActions && (
                     <td className="whitespace-nowrap px-4 py-4 text-right">
@@ -357,7 +341,7 @@ export function EventIdeasBoard({
                 ? current.map(existing =>
                     existing.id === idea.id ? idea : existing
                   )
-                : [idea, ...current]
+                : [...current, idea]
             );
             setDialog(null);
           }}
