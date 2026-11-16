@@ -59,19 +59,25 @@ describe('event schedule formatting', () => {
   const weekendStart = '2026-09-05T14:00:00.000Z';
   const weekendEnd = '2026-09-07T20:00:00.000Z';
 
-  it('collapses a single-day event into one date with a time range', () => {
+  it('shows a single-day event once with both times', () => {
     expect(schedule(eveningStart, eveningEnd, zone)).toBe(
-      'Saturday, September 5, 2026, 6:00 – 9:00 PM'
+      'Saturday, September 5, 2026, 6:00 PM – 9:00 PM'
     );
     expect(schedule(eveningStart, eveningEnd, zone, 'date')).toBe(
       'Sep 5, 2026'
     );
+    expect(schedule(eveningStart, eveningEnd, zone, 'medium')).toBe(
+      'Sep 5, 2026, 6:00 PM – 9:00 PM'
+    );
+    expect(schedule(eveningStart, eveningEnd, zone, 'short')).toBe(
+      'Sat, Sep 5, 6:00 PM – 9:00 PM'
+    );
     expect(schedule(eveningStart, eveningEnd, zone, 'time')).toBe(
-      '6:00 – 9:00 PM'
+      '6:00 PM – 9:00 PM'
     );
   });
 
-  it('keeps AM and PM on both times when they differ', () => {
+  it('shows AM or PM on both times', () => {
     // Sat Sep 5, 2026, 6:00 AM - 9:00 PM EDT.
     expect(
       schedule('2026-09-05T10:00:00.000Z', eveningEnd, zone, 'time')
