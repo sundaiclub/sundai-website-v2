@@ -128,6 +128,23 @@ function dateInputValue(date: Date) {
   return `${year}-${month}-${day}`;
 }
 
+function addDaysToDateInput(value: string, days: number) {
+  const [year, month, day] = value.split('-').map(Number);
+  return new Date(Date.UTC(year, month - 1, day + days))
+    .toISOString()
+    .slice(0, 10);
+}
+
+function formatDateInput(value: string) {
+  const [year, month, day] = value.split('-').map(Number);
+  return new Intl.DateTimeFormat('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    timeZone: 'UTC',
+  }).format(new Date(Date.UTC(year, month - 1, day)));
+}
+
 function nextSundayInputValue(from = new Date()) {
   const daysUntilSunday = (7 - from.getDay()) % 7 || 7;
   const nextSunday = new Date(from);
@@ -199,6 +216,8 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
     useState(false);
   const [publicLocation, setPublicLocation] = useState('');
   const [eventDate, setEventDate] = useState(() => nextSundayInputValue());
+  const [isMultiDay, setIsMultiDay] = useState(false);
+  const [endDate, setEndDate] = useState(() => nextSundayInputValue());
   const [startClock, setStartClock] = useState(DEFAULT_START_TIME);
   const [endClock, setEndClock] = useState(DEFAULT_END_TIME);
   const [isTimeModalOpen, setIsTimeModalOpen] = useState(false);
@@ -354,7 +373,11 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
             setEventDate(start.date);
             setStartClock(start.clock);
           }
-          if (end) setEndClock(end.clock);
+          if (end) {
+            setEndDate(end.date);
+            setEndClock(end.clock);
+            setIsMultiDay(Boolean(start && end.date !== start.date));
+          }
           setCapacity(
             eventPayload.capacity === null
               ? DEFAULT_CAPACITY
@@ -453,7 +476,17 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
     [chapterId, chapters]
   );
   const startTime = eventDate ? `${eventDate}T${startClock}` : '';
-  const endTime = eventDate ? `${eventDate}T${endClock}` : '';
+  const resolvedEndDate = isMultiDay ? endDate : eventDate;
+  const endTime = resolvedEndDate ? `${resolvedEndDate}T${endClock}` : '';
+  const scheduleError = !eventDate
+    ? null
+    : isMultiDay
+      ? !endDate || endDate <= eventDate
+        ? 'End day must be after the start day.'
+        : null
+      : endClock && startClock && endClock <= startClock
+        ? 'End time must be after the start time. For an event that runs past midnight, turn on “Multi-day event”.'
+        : null;
   const filteredMcCandidates = useMemo(
     () =>
       staffCandidates.filter(candidate => {
@@ -531,6 +564,7 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
       eventDate &&
       startClock &&
       endClock &&
+      !scheduleError &&
       timezone &&
       (hasNoCapacityLimit || capacity.trim())
   );
@@ -1228,24 +1262,58 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
                 value={publicLocation}
               />
             </label>
-            <label className="grid gap-2">
-              <span className="text-sm font-semibold">Event day</span>
-              <input
-                aria-label="Event day"
-                className={classes.input}
-                onChange={event => setEventDate(event.target.value)}
-                required
-                type="date"
-                value={eventDate}
-              />
-            </label>
-            <div className="grid gap-2">
+            <div className="grid content-start gap-2">
+              <label className="grid gap-2">
+                <span className="text-sm font-semibold">
+                  {isMultiDay ? 'Start day' : 'Event day'}
+                </span>
+                <input
+                  aria-label={isMultiDay ? 'Start day' : 'Event day'}
+                  className={classes.input}
+                  onChange={event => setEventDate(event.target.value)}
+                  required
+                  type="date"
+                  value={eventDate}
+                />
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  checked={isMultiDay}
+                  className={classes.checkbox}
+                  onChange={event => {
+                    const checked = event.target.checked;
+                    setIsMultiDay(checked);
+                    if (checked && eventDate) {
+                      setEndDate(addDaysToDateInput(eventDate, 1));
+                    }
+                  }}
+                  type="checkbox"
+                />
+                <span className="text-sm font-semibold">Multi-day event</span>
+              </label>
+            </div>
+            {isMultiDay && (
+              <label className="grid content-start gap-2">
+                <span className="text-sm font-semibold">End day</span>
+                <input
+                  aria-label="End day"
+                  className={classes.input}
+                  min={eventDate ? addDaysToDateInput(eventDate, 1) : undefined}
+                  onChange={event => setEndDate(event.target.value)}
+                  required
+                  type="date"
+                  value={endDate}
+                />
+              </label>
+            )}
+            <div className="grid content-start gap-2">
               <span className="text-sm font-semibold">Time</span>
               <div
                 className={`${classes.subtlePanel} flex min-h-11 flex-wrap items-center justify-between gap-3 px-3 py-2`}
               >
                 <span className="text-sm">
                   {formatClock(startClock)} to {formatClock(endClock)}
+                  {isMultiDay && endDate && ` on ${formatDateInput(endDate)}`}
                 </span>
                 <button
                   className={classes.secondaryButton}
@@ -1255,6 +1323,14 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
                   Change time
                 </button>
               </div>
+              {scheduleError && (
+                <p
+                  className={`text-sm ${isDarkMode ? 'text-red-300' : 'text-red-700'}`}
+                  role="alert"
+                >
+                  {scheduleError}
+                </p>
+              )}
             </div>
             <label className="grid gap-2">
               <span className="text-sm font-semibold">Capacity</span>

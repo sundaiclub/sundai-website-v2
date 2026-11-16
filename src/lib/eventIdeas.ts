@@ -1,5 +1,6 @@
 import prisma from '@/lib/prisma';
 import { getCurrentHacker } from '@/lib/eventManagementApi';
+import { eventDayKey } from '@/lib/eventDateTime';
 import {
   canManageEventIdeasWithContext,
   getEventPermissionContext,
@@ -168,15 +169,6 @@ export async function deleteEventIdea(eventId: string, ideaId: string) {
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-function localDateKey(date: Date, timeZone: string) {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(date);
-}
-
 // "Today" is the current date in each event's own timezone, so an evening
 // event stays listed after midnight UTC.
 export async function listTodaysPublicEvents(now = new Date()) {
@@ -208,10 +200,10 @@ export async function listTodaysPublicEvents(now = new Date()) {
 
   return events
     .filter(event => {
-      const today = localDateKey(now, event.timezone);
+      const today = eventDayKey(now, event.timezone);
       return (
-        localDateKey(event.startTime, event.timezone) <= today &&
-        today <= localDateKey(event.endTime ?? event.startTime, event.timezone)
+        eventDayKey(event.startTime, event.timezone) <= today &&
+        today <= eventDayKey(event.endTime ?? event.startTime, event.timezone)
       );
     })
     .map(({ chapter, ...event }) => ({

@@ -615,6 +615,61 @@ describe('/organizer/events/new', () => {
     });
   });
 
+  it('submits an end day for a multi-day event', async () => {
+    await renderNewEventPage();
+
+    fillRequiredEventFields();
+    expect(screen.queryByLabelText(/end day/i)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText(/multi-day event/i));
+    expect(screen.getByLabelText(/start day/i)).toHaveValue('2026-07-10');
+    expect(screen.getByLabelText(/end day/i)).toHaveValue('2026-07-11');
+    changeControl(/end day/i, '2026-07-12');
+    fireEvent.click(screen.getByRole('button', { name: /change time/i }));
+    changeControl(/start time of day/i, '18:00');
+    changeControl(/end time of day/i, '14:00');
+    fireEvent.click(screen.getByRole('button', { name: /done/i }));
+
+    expect(
+      screen.getByText(/6:00 PM to 2:00 PM on Sun, Jul 12/)
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /save draft/i }));
+
+    await waitFor(() => {
+      expect(latestFetchBody()).toEqual(
+        expect.objectContaining({
+          startTime: '2026-07-10T18:00',
+          endTime: '2026-07-12T14:00',
+        })
+      );
+    });
+  });
+
+  it('blocks saving until the end comes after the start', async () => {
+    await renderNewEventPage();
+
+    fillRequiredEventFields();
+    fireEvent.click(screen.getByRole('button', { name: /change time/i }));
+    changeControl(/start time of day/i, '20:00');
+    changeControl(/end time of day/i, '02:00');
+    fireEvent.click(screen.getByRole('button', { name: /done/i }));
+
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      /end time must be after the start time/i
+    );
+    expect(screen.getByRole('button', { name: /save draft/i })).toBeDisabled();
+
+    fireEvent.click(screen.getByLabelText(/multi-day event/i));
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+
+    changeControl(/end day/i, '2026-07-09');
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      /end day must be after the start day/i
+    );
+    expect(screen.getByRole('button', { name: /save draft/i })).toBeDisabled();
+  });
+
   it('submits no capacity limit as an unlimited event', async () => {
     await renderNewEventPage();
 

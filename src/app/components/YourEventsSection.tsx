@@ -2,28 +2,16 @@
 
 import EventSummaryCard from './EventSummaryCard';
 import { motion } from 'framer-motion';
+import { formatEventSchedule } from '@/lib/eventDateTime';
 import type { CurrentUserEvent } from '@/types/event-management';
 
 function formatEventTime(event: CurrentUserEvent) {
-  const timezone = event.timezone || event.chapter.timezone;
-  const dateTimeFormat = new Intl.DateTimeFormat(undefined, {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-    timeZone: timezone,
-  });
-  const timeFormat = new Intl.DateTimeFormat(undefined, {
-    hour: 'numeric',
-    minute: '2-digit',
-    timeZone: timezone,
-  });
-
-  const start = dateTimeFormat.format(new Date(event.startTime));
-  return event.endTime
-    ? `${start}–${timeFormat.format(new Date(event.endTime))}`
-    : start;
+  return formatEventSchedule(
+    event.startTime,
+    event.endTime,
+    event.timezone || event.chapter.timezone,
+    'short'
+  );
 }
 
 export default function YourEventsSection({

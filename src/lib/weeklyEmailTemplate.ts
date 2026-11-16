@@ -1,4 +1,5 @@
 import MarkdownIt from 'markdown-it';
+import { formatEventSchedule } from '@/lib/eventDateTime';
 import { normalizeProjectMarkdown } from '@/lib/markdown';
 import { publicUrl } from '@/lib/siteUrl';
 import type { WeeklyEmailContent } from '@/lib/weeklyEmails';
@@ -17,11 +18,7 @@ export function renderWeeklyEmail(
       url: publicUrl(
         `/events/${encodeURIComponent(chapter.slug)}/${encodeURIComponent(event.slug)}`
       ),
-      date: new Intl.DateTimeFormat('en-US', {
-        dateStyle: 'full',
-        timeStyle: 'short',
-        timeZone: event.timezone,
-      }).format(event.startTime),
+      date: formatEventSchedule(event.startTime, event.endTime, event.timezone),
       status: !event.applicationsOpen
         ? 'Registration closed'
         : event.capacity !== null &&

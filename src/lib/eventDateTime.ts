@@ -140,3 +140,104 @@ export function parseOptionalEventDateTimeInput(
   if (value === null || value === '') return null;
   return parseEventDateTimeInput(value, timeZone, fieldName);
 }
+
+type EventInstant = Date | string;
+
+const EVENT_TIME_FORMAT = {
+  hour: 'numeric',
+  minute: '2-digit',
+} satisfies Intl.DateTimeFormatOptions;
+
+// `date` is the date part of each style; `null` means the style has no date.
+const EVENT_SCHEDULE_FORMATS = {
+  // "Saturday, September 5, 2026, 6:00 PM – 9:00 PM"
+  full: {
+    date: { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' },
+    time: true,
+  },
+  // "Sep 5, 2026, 6:00 PM – 9:00 PM"
+  medium: {
+    date: { month: 'short', day: 'numeric', year: 'numeric' },
+    time: true,
+  },
+  // "Sat, Sep 5, 6:00 PM – 9:00 PM"
+  short: {
+    date: { weekday: 'short', month: 'short', day: 'numeric' },
+    time: true,
+  },
+  // "Sep 5, 2026" or "Sep 5 – 7, 2026"
+  date: {
+    date: { month: 'short', day: 'numeric', year: 'numeric' },
+    time: false,
+  },
+  // "6:00 PM – 9:00 PM"; falls back to `short` when the event spans days.
+  time: { date: null, time: true },
+} satisfies Record<
+  string,
+  { date: Intl.DateTimeFormatOptions | null; time: boolean }
+>;
+
+export type EventScheduleStyle = keyof typeof EVENT_SCHEDULE_FORMATS;
+
+export function eventDayKey(date: Date, timeZone: string | undefined) {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(date);
+}
+
+/** True when the event ends on a later calendar day in its own timezone. */
+export function isMultiDayEvent(
+  startTime: EventInstant,
+  endTime: EventInstant | null | undefined,
+  timeZone: string | undefined
+) {
+  if (!endTime) return false;
+  const start = new Date(startTime);
+  const end = new Date(endTime);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+    return false;
+  }
+  return eventDayKey(start, timeZone) !== eventDayKey(end, timeZone);
+}
+
+/**
+ * Formats an event's start and end in the event's timezone. A single-day
+ * event shows its date once and both times with AM or PM; a multi-day event
+ * shows both dates ("Sep 5 – 7, 2026" for the date-only style).
+ */
+export function formatEventSchedule(
+  startTime: EventInstant,
+  endTime: EventInstant | null | undefined,
+  timeZone: string | undefined,
+  style: EventScheduleStyle = 'full'
+) {
+  const start = new Date(startTime);
+  const end = endTime ? new Date(endTime) : null;
+  const hasEnd =
+    end !== null &&
+    !Number.isNaN(end.getTime()) &&
+    end.getTime() > start.getTime();
+  const multiDay = hasEnd && isMultiDayEvent(start, end, timeZone);
+  const format =
+    EVENT_SCHEDULE_FORMATS[style === 'time' && multiDay ? 'short' : style];
+  const formatter = (options: Intl.DateTimeFormatOptions) =>
+    new Intl.DateTimeFormat('en-US', { ...options, timeZone });
+  const dateAndTime = formatter({
+    ...format.date,
+    ...(format.time && EVENT_TIME_FORMAT),
+  });
+
+  if (!hasEnd) return dateAndTime.format(start);
+  if (multiDay || !format.time) return dateAndTime.formatRange(start, end);
+
+  // formatRange would drop the first AM/PM ("6:00 – 9:00 PM"), so format each
+  // time on its own.
+  const time = formatter(EVENT_TIME_FORMAT);
+  const times = `${time.format(start)} – ${time.format(end)}`;
+  return format.date
+    ? `${formatter(format.date).format(start)}, ${times}`
+    : times;
+}
