@@ -738,6 +738,51 @@ describe('/organizer/events/[eventId]/settings', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('keeps the end day when editing a multi-day event', async () => {
+    mockEventFetch({
+      ...eventSettings,
+      // Sun Jul 12, 10:00 AM - Tue Jul 14, 4:00 PM in America/New_York.
+      endTime: '2026-07-14T20:00:00.000Z',
+    });
+    renderSettingsPage();
+
+    expect(await screen.findByLabelText(/start day/i)).toHaveValue(
+      '2026-07-12'
+    );
+    expect(screen.getByLabelText(/multi-day event/i)).toBeChecked();
+    expect(screen.getByLabelText(/end day/i)).toHaveValue('2026-07-14');
+    expect(
+      screen.getByText(/10:00 AM to 4:00 PM on Tue, Jul 14/)
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(/you have unsaved changes/i)
+    ).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText(/^title$/i), {
+      target: { value: 'AI Build Weekend' },
+    });
+    fireEvent.click(topSaveSettingsButton()!);
+
+    await waitFor(() =>
+      expect(patchBodyForEvent()).toEqual(
+        expect.objectContaining({
+          startTime: '2026-07-12T10:00',
+          endTime: '2026-07-14T16:00',
+        })
+      )
+    );
+  });
+
+  it('keeps a single-day event on one day', async () => {
+    renderSettingsPage();
+
+    expect(await screen.findByLabelText(/event day/i)).toHaveValue(
+      '2026-07-12'
+    );
+    expect(screen.getByLabelText(/multi-day event/i)).not.toBeChecked();
+    expect(screen.queryByLabelText(/end day/i)).not.toBeInTheDocument();
+  });
+
   it('prefills the same message defaults as the new-event form when messages are unset', async () => {
     mockEventFetch({
       ...eventSettings,

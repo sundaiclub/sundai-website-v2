@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { formatEventSchedule } from '@/lib/eventDateTime';
 import {
   createContext,
   useContext,
@@ -80,29 +81,10 @@ function readableStatus(status: string) {
 }
 
 function scheduleLabel(startTime: string, endTime: string, timezone: string) {
-  const start = new Date(startTime);
-  const end = new Date(endTime);
-  if (Number.isNaN(start.valueOf()) || Number.isNaN(end.valueOf())) {
+  if (Number.isNaN(new Date(startTime).valueOf())) {
     return 'Schedule unavailable';
   }
-
-  const date = start.toLocaleDateString(undefined, {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    timeZone: timezone,
-  });
-  const startLabel = start.toLocaleTimeString(undefined, {
-    hour: 'numeric',
-    minute: '2-digit',
-    timeZone: timezone,
-  });
-  const endLabel = end.toLocaleTimeString(undefined, {
-    hour: 'numeric',
-    minute: '2-digit',
-    timeZone: timezone,
-  });
-  return `${date}, ${startLabel}–${endLabel}`;
+  return formatEventSchedule(startTime, endTime || null, timezone, 'medium');
 }
 
 export function WorkspaceLoading() {

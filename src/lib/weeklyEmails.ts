@@ -51,6 +51,7 @@ export async function loadWeeklyEmailContent(now: Date, testHackerId?: string) {
                     image: { select: { url: true, alt: true } },
                     slug: true,
                     startTime: true,
+                    endTime: true,
                     timezone: true,
                     publicLocation: true,
                     applicationsOpen: true,

@@ -2,35 +2,9 @@
 
 import Image from 'next/image';
 import type { ReactNode } from 'react';
+import { formatEventSchedule } from '@/lib/eventDateTime';
 import type { PublicEventDetail } from '@/types/event-management';
 import { useManagementClasses } from './ManagementSurface';
-
-function formatEventDate(
-  startTime: PublicEventDetail['startTime'],
-  endTime: PublicEventDetail['endTime'],
-  timezone: string
-) {
-  const start = new Date(startTime);
-  const end = endTime ? new Date(endTime) : null;
-  const date = new Intl.DateTimeFormat('en-US', {
-    weekday: 'long',
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric',
-    timeZone: timezone,
-  });
-  const time = new Intl.DateTimeFormat('en-US', {
-    hour: 'numeric',
-    minute: '2-digit',
-    timeZone: timezone,
-  });
-
-  if (!end) return `${date.format(start)} at ${time.format(start)}`;
-  if (date.format(start) === date.format(end)) {
-    return `${date.format(start)} · ${time.format(start)}–${time.format(end)}`;
-  }
-  return `${date.format(start)}, ${time.format(start)} – ${date.format(end)}, ${time.format(end)}`;
-}
 
 export function PublicEventHero({
   event,
@@ -115,7 +89,7 @@ export function PublicEventHero({
                 When
               </dt>
               <dd className="mt-1 text-base font-semibold leading-7">
-                {formatEventDate(
+                {formatEventSchedule(
                   event.startTime,
                   event.endTime,
                   event.timezone

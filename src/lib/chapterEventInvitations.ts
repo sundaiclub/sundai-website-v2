@@ -1,9 +1,11 @@
+import { formatEventSchedule } from '@/lib/eventDateTime';
 import { publicUrl } from '@/lib/siteUrl';
 
 export type ChapterEventInvitationContext = {
   title: string;
   slug: string;
   startTime: Date | string;
+  endTime?: Date | string | null;
   timezone: string;
   venueName?: string | null;
   location?: string | null;
@@ -32,18 +34,14 @@ function invitationUrls(event: ChapterEventInvitationContext) {
   };
 }
 
-function formattedStart(event: ChapterEventInvitationContext): string {
-  return new Intl.DateTimeFormat('en-US', {
-    dateStyle: 'full',
-    timeStyle: 'short',
-    timeZone: event.timezone,
-  }).format(new Date(event.startTime));
+function formattedSchedule(event: ChapterEventInvitationContext): string {
+  return formatEventSchedule(event.startTime, event.endTime, event.timezone);
 }
 
 export function chapterEventInvitationDefaults(
   event: ChapterEventInvitationContext
 ) {
-  const when = formattedStart(event);
+  const when = formattedSchedule(event);
   const location = event.venueName ?? event.publicLocation ?? event.location;
   const eventDetails = `Time: ${when}\nLocation: ${location ?? 'To be announced'}`;
   return {
