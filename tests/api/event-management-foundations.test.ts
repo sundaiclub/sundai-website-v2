@@ -500,3 +500,108 @@ describe('/api/events event-management foundations', () => {
     ]);
   });
 });
+
+describe('/api/events multi-day schedules', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    resetClerkMocks();
+    prisma.chapterMembership.findFirst.mockResolvedValue(null);
+    prisma.chapterMembership.findMany.mockResolvedValue([]);
+    prisma.eventStaff.findFirst.mockResolvedValue(null);
+    prisma.$transaction.mockImplementation(
+      async (ops: Array<Promise<unknown>>) => Promise.all(ops)
+    );
+  });
+
+  const createBody = (chapterId: string, startTime: string, endTime: string) => ({
+    title: 'Boston Weekend Hackathon',
+    description: 'A weekend of building.',
+    chapterId,
+    slug: 'boston-weekend-hackathon',
+    startTime,
+    endTime,
+    timezone: 'America/New_York',
+    publicLocation: 'Downtown Boston',
+    capacity: 80,
+  });
+
+  it('creates an event that ends on a later day', async () => {
+    const siteAdmin = buildSiteAdmin();
+    const chapter = buildChapter();
+    mockActor(siteAdmin);
+    mockMembershipLookup();
+    prisma.chapter.findUnique.mockResolvedValue(chapter);
+    prisma.event.create.mockResolvedValue(buildEvent({ chapterId: chapter.id }));
+
+    const response = await POST_EVENTS(
+      createJsonRequest('/api/events', {
+        method: 'POST',
+        body: createBody(chapter.id, '2026-06-19T18:00', '2026-06-21T17:00'),
+      }) as any
+    );
+
+    expect([200, 201]).toContain(response.status);
+    expect(prisma.event.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          startTime: new Date('2026-06-19T22:00:00.000Z'),
+          endTime: new Date('2026-06-21T21:00:00.000Z'),
+        }),
+      })
+    );
+  });
+
+  it('rejects an end day before the start day', async () => {
+    const siteAdmin = buildSiteAdmin();
+    const chapter = buildChapter();
+    mockActor(siteAdmin);
+    mockMembershipLookup();
+    prisma.chapter.findUnique.mockResolvedValue(chapter);
+
+    const response = await POST_EVENTS(
+      createJsonRequest('/api/events', {
+        method: 'POST',
+        body: createBody(chapter.id, '2026-06-21T18:00', '2026-06-19T17:00'),
+      }) as any
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual(
+      expect.objectContaining({ message: 'endTime must be after startTime' })
+    );
+    expect(prisma.event.create).not.toHaveBeenCalled();
+  });
+
+  it('updates a single-day event to end on a later day', async () => {
+    const { chapter, hacker: chapterAdmin, membership } =
+      buildChapterAdminFixture();
+    const event = buildEvent({ chapterId: chapter.id, timezone: 'America/New_York' });
+    mockActor(chapterAdmin);
+    mockMembershipLookup(membership);
+    prisma.event.findUnique.mockResolvedValue(event);
+    prisma.event.update.mockResolvedValue(event);
+
+    const response = await PATCH_EVENT(
+      createJsonRequest(`/api/events/${event.id}`, {
+        method: 'PATCH',
+        body: {
+          startTime: '2026-06-18T18:00',
+          endTime: '2026-06-20T12:00',
+          timezone: 'America/New_York',
+        },
+      }) as any,
+      createRouteContext({ eventId: event.id }) as any
+    );
+
+    expect(response.status).toBe(200);
+    expect(prisma.event.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: event.id },
+        data: expect.objectContaining({
+          startTime: new Date('2026-06-18T22:00:00.000Z'),
+          endTime: new Date('2026-06-20T16:00:00.000Z'),
+        }),
+      })
+    );
+  });
+});

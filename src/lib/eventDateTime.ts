@@ -140,3 +140,82 @@ export function parseOptionalEventDateTimeInput(
   if (value === null || value === '') return null;
   return parseEventDateTimeInput(value, timeZone, fieldName);
 }
+
+type EventInstant = Date | string;
+
+const EVENT_SCHEDULE_FORMATS = {
+  // "Saturday, September 5, 2026, 6:00 – 9:00 PM"
+  full: { dateStyle: 'full', timeStyle: 'short' },
+  // "Sep 5, 2026, 6:00 – 9:00 PM"
+  medium: {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  },
+  // "Sat, Sep 5, 6:00 – 9:00 PM"
+  short: {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  },
+  // "Sep 5, 2026" or "Sep 5 – 7, 2026"
+  date: { month: 'short', day: 'numeric', year: 'numeric' },
+  // "6:00 – 9:00 PM"; falls back to `short` when the event spans days.
+  time: { hour: 'numeric', minute: '2-digit' },
+} satisfies Record<string, Intl.DateTimeFormatOptions>;
+
+export type EventScheduleStyle = keyof typeof EVENT_SCHEDULE_FORMATS;
+
+export function eventDayKey(date: Date, timeZone: string | undefined) {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(date);
+}
+
+/** True when the event ends on a later calendar day in its own timezone. */
+export function isMultiDayEvent(
+  startTime: EventInstant,
+  endTime: EventInstant | null | undefined,
+  timeZone: string | undefined
+) {
+  if (!endTime) return false;
+  const start = new Date(startTime);
+  const end = new Date(endTime);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+    return false;
+  }
+  return eventDayKey(start, timeZone) !== eventDayKey(end, timeZone);
+}
+
+/**
+ * Formats an event's start and end in the event's timezone, collapsing the
+ * shared parts of the range (for example "Sep 5 – 7, 2026").
+ */
+export function formatEventSchedule(
+  startTime: EventInstant,
+  endTime: EventInstant | null | undefined,
+  timeZone: string | undefined,
+  style: EventScheduleStyle = 'full'
+) {
+  const start = new Date(startTime);
+  const end = endTime ? new Date(endTime) : null;
+  const hasEnd =
+    end !== null &&
+    !Number.isNaN(end.getTime()) &&
+    end.getTime() > start.getTime();
+  const resolvedStyle =
+    style === 'time' && isMultiDayEvent(start, end, timeZone) ? 'short' : style;
+  const format = new Intl.DateTimeFormat('en-US', {
+    ...EVENT_SCHEDULE_FORMATS[resolvedStyle],
+    timeZone,
+  });
+
+  return hasEnd ? format.formatRange(start, end) : format.format(start);
+}

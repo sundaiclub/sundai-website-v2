@@ -299,16 +299,12 @@ describe('/chapters/[chapterSlug] public chapter page', () => {
     ).not.toBeInTheDocument();
     expect(
       within(demoNight).getByText(
-        `Kendall Square · ${new Date(
-          '2026-07-10T22:00:00.000Z'
-        ).toLocaleDateString()}`
+        'Kendall Square · Jul 10, 2026'
       )
     ).toBeInTheDocument();
     expect(
       within(agentJam).getByText(
-        `The Foundry · ${new Date(
-          '2026-07-17T22:00:00.000Z'
-        ).toLocaleDateString()}`
+        'The Foundry · Jul 17, 2026'
       )
     ).toBeInTheDocument();
     expect(
@@ -350,9 +346,7 @@ describe('/chapters/[chapterSlug] public chapter page', () => {
     expect(previousEvent).toHaveAttribute('href', '/events/boston/spring-demo');
     expect(
       within(previousEvent).getByText(
-        `Central Square · ${new Date(
-          '2026-05-15T22:00:00.000Z'
-        ).toLocaleDateString()}`
+        'Central Square · May 15, 2026'
       )
     ).toBeInTheDocument();
   });

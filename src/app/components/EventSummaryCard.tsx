@@ -4,6 +4,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { ManagementBadge, useManagementClasses } from './ManagementSurface';
+import { formatEventSchedule } from '@/lib/eventDateTime';
 import type { EventStatus, EventVisibility } from '@/types/event-management';
 
 type EventSummaryCardData = {
@@ -15,6 +16,7 @@ type EventSummaryCardData = {
   } | null;
   publicLocation?: string | null;
   startTime?: Date | string;
+  endTime?: Date | string | null;
   timezone?: string;
   chapter?: { timezone?: string };
   status?: EventStatus;
@@ -78,10 +80,12 @@ export default function EventSummaryCard({
             event.publicLocation,
             dateLabel ??
               (event.startTime
-                ? new Date(event.startTime).toLocaleDateString(undefined, {
-                    timeZone:
-                      timezone ?? event.timezone ?? event.chapter?.timezone,
-                  })
+                ? formatEventSchedule(
+                    event.startTime,
+                    event.endTime,
+                    timezone ?? event.timezone ?? event.chapter?.timezone,
+                    'date'
+                  )
                 : null),
           ]
             .filter(Boolean)

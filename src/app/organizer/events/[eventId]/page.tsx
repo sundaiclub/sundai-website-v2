@@ -1,5 +1,6 @@
 'use client';
 import { useParams } from 'next/navigation';
+import { formatEventSchedule } from '@/lib/eventDateTime';
 import {
   ManagementLinkButton,
   ManagementSection,
@@ -20,19 +21,10 @@ function words(value: string) {
 }
 
 function formatSchedule(startTime: string, endTime: string, timezone: string) {
-  const start = new Date(startTime);
-  const end = new Date(endTime);
-  if (Number.isNaN(start.valueOf()) || Number.isNaN(end.valueOf())) {
+  if (Number.isNaN(new Date(startTime).valueOf())) {
     return 'Schedule unavailable';
   }
-
-  return `${start.toLocaleTimeString(undefined, {
-    timeStyle: 'short',
-    timeZone: timezone,
-  })} – ${end.toLocaleTimeString(undefined, {
-    timeStyle: 'short',
-    timeZone: timezone,
-  })}`;
+  return formatEventSchedule(startTime, endTime || null, timezone, 'time');
 }
 
 function Counts({ workspace }: { workspace: EventWorkspacePayload }) {

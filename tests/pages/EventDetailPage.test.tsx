@@ -812,7 +812,7 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
     await expectSomeText(/bring a laptop and a project idea/i);
     await expectSomeText(/boston, ma/i);
     await expectSomeText(/july 10, 2026/i);
-    await expectSomeText(/6:00\s*pm|6 pm/i);
+    await expectSomeText(/6:00\s*–\s*9:00\s*pm/i);
     expect(
       screen.getByRole('button', { name: /^register$/i })
     ).toBeInTheDocument();
