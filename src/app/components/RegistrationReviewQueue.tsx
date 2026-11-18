@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import type {
   JsonObject,
@@ -145,7 +146,33 @@ function RegistrationReviewRow({
     <article className={`${classes.panel} p-4`}>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h2 className="text-lg font-bold">{row.applicant.name}</h2>
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="text-lg font-bold">
+              <Link
+                className="underline-offset-2 hover:underline"
+                href={`/hacker/${row.applicant.id}`}
+                rel="noopener noreferrer"
+                target="_blank"
+              >
+                {row.applicant.name}
+              </Link>
+            </h2>
+            <ManagementBadge>
+              Applied to {row.applicantHistory.otherEventsApplied} other{' '}
+              {row.applicantHistory.otherEventsApplied === 1
+                ? 'event'
+                : 'events'}
+            </ManagementBadge>
+            <ManagementBadge>
+              Accepted to {row.applicantHistory.otherEventsAccepted}
+            </ManagementBadge>
+            <ManagementBadge>
+              {row.applicantHistory.publicProjects}{' '}
+              {row.applicantHistory.publicProjects === 1
+                ? 'project'
+                : 'projects'}
+            </ManagementBadge>
+          </div>
           <p className={`text-sm ${classes.mutedText}`}>
             {row.applicant.email}
           </p>

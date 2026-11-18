@@ -23,6 +23,10 @@ import {
   listEventRegistrations,
   submitPublicEventRegistration,
 } from '@/lib/eventRegistrations';
+import {
+  EMPTY_APPLICANT_HISTORY,
+  getApplicantHistory,
+} from '@/lib/applicantHistory';
 import { publicRegistrationActionResponse } from '@/lib/publicRegistrationApi';
 import { parseTemplateFieldsJson } from '@/lib/applicationTemplates';
 import {
@@ -30,6 +34,7 @@ import {
   parseRegistrationStatus,
 } from '@/lib/eventRequestParsing';
 import type {
+  ApplicantHistory,
   JsonObject,
   OrganizerRegistrationReviewCapabilities,
   OrganizerRegistrationReviewRow,
@@ -75,7 +80,8 @@ function isJsonObject(value: unknown): value is JsonObject {
 
 function reviewRow(
   registration: Awaited<ReturnType<typeof listEventRegistrations>>[number],
-  capabilities: OrganizerRegistrationReviewCapabilities
+  capabilities: OrganizerRegistrationReviewCapabilities,
+  applicantHistory: ApplicantHistory
 ): OrganizerRegistrationReviewRow {
   const answers = jsonObject(registration.answersJson);
   const activeBan = capabilities.canViewBanContext
@@ -106,6 +112,7 @@ function reviewRow(
           email: typeof answers?.email === 'string' ? answers.email : '',
           role: 'HACKER',
         },
+    applicantHistory,
     answersJson: answers,
     templateSnapshotJson: templateFields(registration.templateSnapshotJson),
     publicSafeMessage: registration.publicSafeMessage ?? null,
@@ -173,6 +180,10 @@ export async function GET(
       }),
       countEventRegistrationsByStatus(params.eventId, siteAdmin),
     ]);
+    const applicantHistory = await getApplicantHistory(
+      params.eventId,
+      registrations.map(registration => registration.hackerId)
+    );
 
     return NextResponse.json({
       eventId: params.eventId,
@@ -181,7 +192,11 @@ export async function GET(
       viewerRole: siteAdmin ? 'SITE_ADMIN' : canDecide ? 'MC' : 'CO_MC',
       counts,
       rows: registrations.map(registration =>
-        reviewRow(registration, capabilities)
+        reviewRow(
+          registration,
+          capabilities,
+          applicantHistory.get(registration.hackerId) ?? EMPTY_APPLICANT_HISTORY
+        )
       ),
     });
   } catch (error) {
