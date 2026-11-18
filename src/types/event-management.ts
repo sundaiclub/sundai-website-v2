@@ -626,6 +626,12 @@ export interface OrganizerRegistrationReviewCapabilities {
   canViewBanContext: boolean;
 }
 
+export interface ApplicantHistory {
+  otherEventsApplied: number;
+  otherEventsAccepted: number;
+  publicProjects: number;
+}
+
 export interface OrganizerRegistrationReviewRow {
   id: EntityId;
   eventId: EntityId;
@@ -636,6 +642,7 @@ export interface OrganizerRegistrationReviewRow {
     EventManagementHackerSummary,
     'id' | 'name' | 'username' | 'email' | 'role'
   >;
+  applicantHistory: ApplicantHistory;
   answersJson?: JsonObject | null;
   templateSnapshotJson?: TemplateFieldDefinition[] | null;
   publicSafeMessage?: string | null;

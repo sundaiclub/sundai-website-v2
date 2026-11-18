@@ -165,6 +165,11 @@ const pendingRow: OrganizerRegistrationReviewRow = {
     email: 'applicant@example.com',
     role: 'HACKER',
   },
+  applicantHistory: {
+    otherEventsApplied: 4,
+    otherEventsAccepted: 3,
+    publicProjects: 1,
+  },
   answersJson: {
     name: 'Signed In Applicant',
     email: 'applicant@example.com',
@@ -555,6 +560,18 @@ describe('/organizer/events/[eventId]/registrations', () => {
     expect(
       screen.queryByRole('button', { name: /^decline$/i })
     ).not.toBeInTheDocument();
+  });
+
+  it('links applicants to their profile and shows their history counts', async () => {
+    renderRegistrationsPage();
+
+    const profileLink = await screen.findByRole('link', {
+      name: 'Signed In Applicant',
+    });
+    expect(profileLink).toHaveAttribute('href', '/hacker/hacker-applicant');
+    expect(screen.getByText('Applied to 4 other events')).toBeInTheDocument();
+    expect(screen.getByText('Accepted to 3')).toBeInTheDocument();
+    expect(screen.getByText('1 project')).toBeInTheDocument();
   });
 
   it('renders registration queue tabs and applicant answers for the active status', async () => {

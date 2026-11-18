@@ -56,6 +56,10 @@ jest.mock('../../src/lib/prisma', () => ({
       create: jest.fn(),
       update: jest.fn(),
       count: jest.fn(),
+      groupBy: jest.fn().mockResolvedValue([]),
+    },
+    project: {
+      findMany: jest.fn().mockResolvedValue([]),
     },
     eventRegistrationAudit: {
       create: jest.fn(),
