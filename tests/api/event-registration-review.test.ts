@@ -57,6 +57,10 @@ jest.mock('../../src/lib/prisma', () => ({
       count: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
+      groupBy: jest.fn().mockResolvedValue([]),
+    },
+    project: {
+      findMany: jest.fn().mockResolvedValue([]),
     },
     eventRegistrationAudit: {
       create: jest.fn(),
@@ -338,6 +342,69 @@ describe('T051 organizer registration review listing API', () => {
         ],
       })
     );
+  });
+
+  it('includes each applicant history from other events and public projects', async () => {
+    const fixture = buildNativeEventRsvpFixture();
+    mockReviewPermissionDatabase({
+      actor: fixture.mc.hacker,
+      event: fixture.publishedEvent,
+      registration: fixture.pendingRegistration,
+      staff: fixture.mc.staff,
+    });
+    mockRegistrationList([fixture.pendingRegistration]);
+    prisma.eventRegistration.groupBy.mockResolvedValueOnce([
+      {
+        hackerId: fixture.applicant.id,
+        status: 'APPROVED',
+        _count: { _all: 2 },
+      },
+      {
+        hackerId: fixture.applicant.id,
+        status: 'DECLINED',
+        _count: { _all: 1 },
+      },
+    ]);
+    prisma.project.findMany.mockResolvedValueOnce([
+      { launchLeadId: fixture.applicant.id, participants: [] },
+      {
+        launchLeadId: 'hacker-someone-else',
+        participants: [{ hackerId: fixture.applicant.id }],
+      },
+    ]);
+
+    const response = await GET_REGISTRATIONS(
+      createJsonRequest(
+        `/api/events/${fixture.publishedEvent.id}/registrations`,
+        { searchParams: { status: 'PENDING' } }
+      ) as any,
+      createRouteContext({ eventId: fixture.publishedEvent.id })
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(prisma.eventRegistration.groupBy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          hackerId: { in: [fixture.applicant.id] },
+          eventId: { not: fixture.publishedEvent.id },
+        },
+      })
+    );
+    expect(prisma.project.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          AND: expect.arrayContaining([
+            expect.objectContaining({ status: 'APPROVED' }),
+          ]),
+        }),
+      })
+    );
+    expect(body.rows[0].applicantHistory).toEqual({
+      otherEventsApplied: 3,
+      otherEventsAccepted: 2,
+      publicProjects: 2,
+    });
   });
 
   it('hides actively banned applicants from non-site-admin registration review', async () => {
