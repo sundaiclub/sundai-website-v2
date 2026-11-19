@@ -689,20 +689,27 @@ describe('/api/projects/[projectId]/submit', () => {
           'http://localhost/api/projects/draft/submit',
           {
             method: 'PATCH',
-            body: JSON.stringify({ status, eventIds: ['event-draft'] }),
+            body: JSON.stringify({
+              status,
+              eventIds: ['event-draft'],
+              pitchEventIds: ['event-draft'],
+            }),
           }
         );
         expect(
           (await PATCH(request, { params: { projectId: mockProjectId } }))
             .status
         ).toBe(200);
+        // The pitch choice is saved even when the event has no open pitch queue.
         expect(mockPrisma.eventProject.upsert).toHaveBeenCalledWith(
           expect.objectContaining({
             create: {
               eventId: 'event-draft',
               projectId: mockProjectId,
               addedById: mockHackerId,
+              pitchRequested: true,
             },
+            update: { pitchRequested: true },
           })
         );
         expect(mockPrisma.eventProject.deleteMany).toHaveBeenCalledWith({

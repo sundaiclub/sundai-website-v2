@@ -243,8 +243,9 @@ export async function PATCH(
             eventId: event.id,
             projectId: params.projectId,
             addedById: currentUser.id,
+            pitchRequested: pitchEventIds.includes(event.id),
           },
-          update: {},
+          update: { pitchRequested: pitchEventIds.includes(event.id) },
         })
       ),
       ...pitchSessionsToJoin.map((pitch, index) =>

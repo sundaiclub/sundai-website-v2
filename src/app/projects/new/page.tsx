@@ -136,6 +136,9 @@ function NewProjectForm() {
       selectedEventIds.forEach(eventId =>
         formData.append('eventIds[]', eventId)
       );
+      pitchEventIds
+        .filter(eventId => selectedEventIds.includes(eventId))
+        .forEach(eventId => formData.append('pitchEventIds[]', eventId));
       formData.append(
         'members',
         JSON.stringify(
@@ -168,9 +171,6 @@ function NewProjectForm() {
       selectedEventIds.forEach(eventId =>
         editParams.append('eventId', eventId)
       );
-      pitchEventIds
-        .filter(eventId => selectedEventIds.includes(eventId))
-        .forEach(eventId => editParams.append('pitchEventId', eventId));
       if (judgingEvent) {
         editParams.set('judgingEventId', judgingEvent.id);
         editParams.set('judgingTrackId', judgingTrackId);

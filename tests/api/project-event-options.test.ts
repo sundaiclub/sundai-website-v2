@@ -180,7 +180,7 @@ describe('GET /api/events/project-options', () => {
         image: null,
         chapter: { id: 'chapter-1', name: 'Sundai Boston', slug: 'boston' },
         pitchSessions: [],
-        projects: [{ id: 'event-project-1' }],
+        projects: [{ id: 'event-project-1', pitchRequested: true }],
       },
     ]);
     prisma.judgingTrack.findMany.mockResolvedValue([
@@ -306,7 +306,7 @@ describe('GET /api/events/project-options', () => {
         pitchSessions: [
           { phase: 'VOTING', projects: [{ id: 'pitch-project-1' }] },
         ],
-        projects: [{ id: 'event-project-1' }],
+        projects: [{ id: 'event-project-1', pitchRequested: true }],
       },
       {
         id: 'event-new',
@@ -338,6 +338,7 @@ describe('GET /api/events/project-options', () => {
         selectedByDefault: true,
         pitchQueueOpen: true,
         pitchAdded: true,
+        pitchRequested: true,
       }),
       expect.objectContaining({
         id: 'event-new',
@@ -345,6 +346,7 @@ describe('GET /api/events/project-options', () => {
         selectedByDefault: false,
         pitchQueueOpen: true,
         pitchAdded: false,
+        pitchRequested: false,
       }),
     ]);
   });

@@ -70,7 +70,7 @@ export async function GET(request: Request) {
           ? {
               projects: {
                 where: { projectId },
-                select: { id: true },
+                select: { id: true, pitchRequested: true },
                 take: 1,
               },
             }
@@ -86,9 +86,9 @@ export async function GET(request: Request) {
 
     return NextResponse.json(
       events.map(({ pitchSessions, ...event }) => {
-        const alreadyAdded = Boolean(
-          projectId && 'projects' in event && event.projects.length > 0
-        );
+        const eventProject =
+          projectId && 'projects' in event ? event.projects[0] : undefined;
+        const alreadyAdded = Boolean(eventProject);
         const pitch = pitchSessions[0];
         const pitchAdded = Boolean(
           pitch && 'projects' in pitch && pitch.projects.length > 0
@@ -105,6 +105,7 @@ export async function GET(request: Request) {
               event.endTime >= now
           ),
           pitchAdded,
+          pitchRequested: eventProject?.pitchRequested ?? false,
           chapterName: event.chapter.name,
           chapterSlug: event.chapter.slug,
           alreadyAdded,

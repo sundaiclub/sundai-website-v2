@@ -228,7 +228,7 @@ describe('NewProject', () => {
     await waitFor(() =>
       expect(defaultRouter.push).toHaveBeenCalledWith(
         expect.stringContaining(
-          '/projects/new-project-id/edit?eventId=event-1&pitchEventId=event-1&sourceEventId=event-1'
+          '/projects/new-project-id/edit?eventId=event-1&sourceEventId=event-1'
         )
       )
     );
@@ -236,6 +236,7 @@ describe('NewProject', () => {
       ([url]) => url === '/api/projects'
     );
     expect(createCall[1].body.getAll('eventIds[]')).toEqual(['event-1']);
+    expect(createCall[1].body.getAll('pitchEventIds[]')).toEqual(['event-1']);
   });
 
   it('leaves the pitch queue unchecked without a source event until chosen', async () => {
@@ -295,9 +296,14 @@ describe('NewProject', () => {
 
     await waitFor(() =>
       expect(defaultRouter.push).toHaveBeenCalledWith(
-        '/projects/new-project-id/edit?eventId=event-1&eventId=event-2&pitchEventId=event-1'
+        '/projects/new-project-id/edit?eventId=event-1&eventId=event-2'
       )
     );
+    const createCall = (global.fetch as jest.Mock).mock.calls.find(
+      ([url]) => url === '/api/projects'
+    );
+    // The pitch choice is saved with the project instead of in the URL.
+    expect(createCall[1].body.getAll('pitchEventIds[]')).toEqual(['event-1']);
   });
 
   it('requires a track before creating a judged project and carries it to the editor', async () => {

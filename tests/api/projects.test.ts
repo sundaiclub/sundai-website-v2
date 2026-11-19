@@ -249,6 +249,7 @@ describe('/api/projects', () => {
         formData.append('members', '[]');
         formData.append('eventIds[]', 'event-1');
         formData.append('eventIds[]', 'event-1');
+        formData.append('pitchEventIds[]', 'event-1');
         const request = new NextRequest('http://localhost/api/projects', {
           method: 'POST',
         });
@@ -269,7 +270,13 @@ describe('/api/projects', () => {
               data: expect.objectContaining({
                 status: 'DRAFT',
                 eventParticipations: {
-                  create: [{ eventId: 'event-1', addedById: mockHacker.id }],
+                  create: [
+                    {
+                      eventId: 'event-1',
+                      addedById: mockHacker.id,
+                      pitchRequested: true,
+                    },
+                  ],
                 },
               }),
             })

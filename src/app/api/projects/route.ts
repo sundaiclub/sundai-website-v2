@@ -170,6 +170,9 @@ export async function POST(req: Request) {
           .filter((id): id is string => typeof id === 'string' && id.length > 0)
       )
     );
+    const pitchEventIds = formData
+      .getAll('pitchEventIds[]')
+      .filter((id): id is string => typeof id === 'string');
     if (eventIds.length > 0) {
       const events = await prisma.event.findMany({
         where: {
@@ -206,6 +209,7 @@ export async function POST(req: Request) {
                 create: eventIds.map(eventId => ({
                   eventId,
                   addedById: hacker.id,
+                  pitchRequested: pitchEventIds.includes(eventId),
                 })),
               },
             }

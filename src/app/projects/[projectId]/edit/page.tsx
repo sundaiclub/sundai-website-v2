@@ -64,6 +64,7 @@ type ProjectEventOption = {
   alreadyAdded: boolean;
   pitchQueueOpen: boolean;
   pitchAdded: boolean;
+  pitchRequested: boolean;
   judging: ProjectJudgingOption | null;
 };
 
@@ -165,9 +166,6 @@ export default function ProjectEditPage() {
   const searchParams = useSearchParams();
   const contextualEventIds = searchParams.getAll('eventId');
   const contextualEventIdsKey = contextualEventIds.join(',');
-  const contextualPitchEventIdsKey = searchParams
-    .getAll('pitchEventId')
-    .join(',');
   const contextualJudgingEventId = searchParams.get('judgingEventId');
   const contextualJudgingTrackId = searchParams.get('judgingTrackId');
   const sourceEventId = searchParams.get('sourceEventId');
@@ -262,7 +260,7 @@ export default function ProjectEditPage() {
   useEffect(() => {
     if (project) {
       setEditableTitle(project.title);
-      setEditableDescription(project.description);
+      setEditableDescription(project.description ?? '');
       setEditablePreview(project.preview);
       setEditableStartDate(
         project.startDate ? new Date(project.startDate) : new Date()
@@ -328,14 +326,11 @@ export default function ProjectEditPage() {
           events
         );
         setSelectedEventIds(selectedIds);
-        const contextualPitchIds = contextualPitchEventIdsKey
-          ? contextualPitchEventIdsKey.split(',')
-          : [];
         setPitchEventIds(
           events
             .filter(
               event =>
-                contextualPitchIds.includes(event.id) &&
+                event.pitchRequested &&
                 event.pitchQueueOpen &&
                 !event.pitchAdded
             )
@@ -369,7 +364,6 @@ export default function ProjectEditPage() {
     contextualEventIdsKey,
     contextualJudgingEventId,
     contextualJudgingTrackId,
-    contextualPitchEventIdsKey,
     params?.projectId,
   ]);
 
