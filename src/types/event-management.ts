@@ -661,13 +661,24 @@ export interface OrganizerRegistrationReviewRow {
   capabilities: OrganizerRegistrationReviewCapabilities;
 }
 
+export type RegistrationReviewOrder = 'oldest' | 'newest';
+
 export interface OrganizerRegistrationReviewState {
   eventId: EntityId;
-  statusFilter?: Exclude<RegistrationStatus, 'BLOCKED'> | 'BLOCKED';
+  statusFilter: RegistrationStatus;
   includeBannedUsers: boolean;
+  order: RegistrationReviewOrder;
   viewerRole: OrganizerReviewRole;
+  capacity: number | null;
   counts: Partial<Record<RegistrationStatus, number>>;
   rows: OrganizerRegistrationReviewRow[];
+  hasMore: boolean;
+}
+
+export interface RegistrationBulkDecisionResult {
+  status: RegistrationStatus;
+  updatedIds: EntityId[];
+  failedIds: EntityId[];
 }
 
 export interface ApplicationControlRequest {

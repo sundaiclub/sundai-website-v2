@@ -302,7 +302,22 @@ function mockRegistrationReviewAfterCloseDatabase({
   prisma.eventRegistration.findMany.mockImplementation(
     async ({ where }: any = {}) => {
       if (where?.eventId === event.id) {
-        return [registration];
+        return [
+          {
+            ...registration,
+            hacker: {
+              id: registration.hackerId,
+              name: 'Fake Applicant',
+              username: null,
+              email: 'fake-applicant@example.test',
+              role: 'HACKER',
+              organizerNote: null,
+              userBans: [],
+            },
+            decidedBy: null,
+            cancelledBy: null,
+          },
+        ];
       }
 
       return [];
@@ -654,11 +669,12 @@ describe('T069 event application close/open controls API', () => {
     expect(prisma.eventRegistration.findMany).toHaveBeenCalledWith({
       where: {
         eventId: fixture.publishedEvent.id,
+        hacker: { userBans: { none: { revokedAt: null } } },
         status: 'PENDING',
       },
       include: expect.objectContaining({ hacker: expect.any(Object) }),
-      orderBy: { createdAt: 'desc' },
-      take: 100,
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+      take: 51,
       skip: 0,
     });
     expect(body).toEqual(

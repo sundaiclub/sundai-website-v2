@@ -118,21 +118,6 @@ export type UpdateRegistrationStatusInput = {
   changeJson?: JsonObject | null;
 };
 
-export type ListEventRegistrationsOptions = {
-  status?: RegistrationStatus;
-  includeBannedUsers?: boolean;
-  take?: number;
-  skip?: number;
-};
-
-const ORGANIZER_REVIEW_STATUSES = [
-  'PENDING',
-  'APPROVED',
-  'WAITLISTED',
-  'DECLINED',
-  'CANCELLED',
-] as const satisfies readonly RegistrationStatus[];
-
 export type SubmitPublicEventRegistrationInput = {
   eventId: EntityId;
   hackerId: EntityId;
@@ -446,27 +431,6 @@ export function getRegistrationStatusGuard(
   return { allowed: false, reason: 'UNAUTHORIZED' };
 }
 
-function shouldFilterActiveBansForRegistrations(isSiteAdmin: boolean): boolean {
-  return !isSiteAdmin;
-}
-
-function filterRegistrationsForBanVisibility<
-  TRegistration extends Pick<EventRegistration, 'hackerId'>,
->(
-  registrations: TRegistration[],
-  activeBannedHackerIds: Iterable<EntityId>,
-  isSiteAdmin: boolean
-): TRegistration[] {
-  if (!shouldFilterActiveBansForRegistrations(isSiteAdmin)) {
-    return registrations;
-  }
-
-  const bannedIds = new Set(activeBannedHackerIds);
-  return registrations.filter(
-    registration => !bannedIds.has(registration.hackerId)
-  );
-}
-
 async function getActiveBannedHackerIds(
   hackerIds: EntityId[],
   db: EventManagementPrismaClient = client
@@ -486,89 +450,6 @@ async function getActiveBannedHackerIds(
   });
 
   return Array.from(new Set(bans.map(ban => ban.hackerId)));
-}
-
-export async function listEventRegistrations(
-  eventId: EntityId,
-  isSiteAdmin: boolean,
-  options: ListEventRegistrationsOptions = {},
-  db: EventManagementPrismaClient = client
-): Promise<EventRegistrationRecord[]> {
-  const registrations = await db.eventRegistration.findMany({
-    where: {
-      eventId,
-      ...(options.status ? { status: options.status } : {}),
-    },
-    include: {
-      hacker: {
-        select: {
-          id: true,
-          name: true,
-          username: true,
-          email: true,
-          role: true,
-          organizerNote: { select: { body: true } },
-          userBans: {
-            where: { revokedAt: null },
-            select: {
-              id: true,
-              publicSafeReason: true,
-              createdAt: true,
-            },
-            take: 1,
-          },
-        },
-      },
-      decidedBy: { select: { id: true, name: true } },
-      cancelledBy: { select: { id: true, name: true } },
-    },
-    orderBy: { createdAt: 'desc' },
-    take: options.take,
-    skip: options.skip,
-  });
-
-  if (
-    (isSiteAdmin && options.includeBannedUsers) ||
-    !shouldFilterActiveBansForRegistrations(isSiteAdmin)
-  ) {
-    return registrations;
-  }
-
-  const activeBannedHackerIds = await getActiveBannedHackerIds(
-    registrations.map(registration => registration.hackerId),
-    db
-  );
-
-  return filterRegistrationsForBanVisibility(
-    registrations,
-    activeBannedHackerIds,
-    isSiteAdmin
-  );
-}
-
-export async function countEventRegistrationsByStatus(
-  eventId: EntityId,
-  isSiteAdmin: boolean,
-  db: EventManagementPrismaClient = client
-): Promise<Partial<Record<RegistrationStatus, number>>> {
-  const entries: Array<readonly [RegistrationStatus, number]> = [];
-
-  for (const status of ORGANIZER_REVIEW_STATUSES) {
-    const count = await db.eventRegistration.count({
-      where: {
-        eventId,
-        status,
-        ...(!isSiteAdmin && {
-          hacker: {
-            userBans: { none: { revokedAt: null } },
-          },
-        }),
-      },
-    });
-    entries.push([status, count]);
-  }
-
-  return Object.fromEntries(entries);
 }
 
 export async function createInternalEventRegistration(

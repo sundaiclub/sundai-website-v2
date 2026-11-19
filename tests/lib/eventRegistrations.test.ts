@@ -5,7 +5,6 @@ import {
   countApprovedEventRegistrations,
   findOldestWaitlistedEventRegistration,
   hasApprovedRegistrationCapacity,
-  listEventRegistrations,
   updatePendingPublicEventRegistration,
 } from '../../src/lib/eventRegistrations';
 import type {
@@ -193,106 +192,6 @@ describe('event registration waitlist helpers', () => {
       },
       orderBy: [{ waitlistedAt: 'asc' }, { createdAt: 'asc' }],
     });
-  });
-});
-
-describe('event registration review query helpers', () => {
-  it('uses event and status filters with stable review ordering and pagination', async () => {
-    const db = createRegistrationDb();
-    db.eventRegistration.findMany.mockResolvedValue([]);
-
-    await expect(
-      listEventRegistrations(
-        eventId,
-        false,
-        { status: 'WAITLISTED', take: 25, skip: 50 },
-        db
-      )
-    ).resolves.toEqual([]);
-
-    expect(db.eventRegistration.findMany).toHaveBeenCalledWith({
-      where: {
-        eventId,
-        status: 'WAITLISTED',
-      },
-      include: expect.objectContaining({ hacker: expect.any(Object) }),
-      orderBy: { createdAt: 'desc' },
-      take: 25,
-      skip: 50,
-    });
-    expect(db.userBan.findMany).not.toHaveBeenCalled();
-  });
-
-  it('filters active bans from non-site-admin review lists with a deduped ban lookup', async () => {
-    const db = createRegistrationDb();
-    const visibleRegistration = buildRegistration({
-      id: 'registration-visible',
-      hackerId: 'hacker-visible',
-    });
-    const duplicateVisibleRegistration = buildRegistration({
-      id: 'registration-visible-older',
-      hackerId: 'hacker-visible',
-    });
-    const bannedRegistration = buildRegistration({
-      id: 'registration-banned',
-      hackerId: 'hacker-banned',
-    });
-    db.eventRegistration.findMany.mockResolvedValue([
-      bannedRegistration,
-      visibleRegistration,
-      duplicateVisibleRegistration,
-    ]);
-    db.userBan.findMany.mockResolvedValue([{ hackerId: 'hacker-banned' }]);
-
-    await expect(
-      listEventRegistrations(eventId, false, { status: 'PENDING' }, db)
-    ).resolves.toEqual([visibleRegistration, duplicateVisibleRegistration]);
-
-    expect(db.eventRegistration.findMany).toHaveBeenCalledWith({
-      where: {
-        eventId,
-        status: 'PENDING',
-      },
-      include: expect.objectContaining({ hacker: expect.any(Object) }),
-      orderBy: { createdAt: 'desc' },
-      take: undefined,
-      skip: undefined,
-    });
-    expect(db.userBan.findMany).toHaveBeenCalledWith({
-      where: {
-        hackerId: { in: ['hacker-banned', 'hacker-visible'] },
-        revokedAt: null,
-      },
-      select: { hackerId: true },
-    });
-  });
-
-  it('does not perform ban filtering for site-admin review lists', async () => {
-    const db = createRegistrationDb();
-    const registrations = [
-      buildRegistration({ id: 'registration-visible' }),
-      buildRegistration({
-        id: 'registration-banned',
-        hackerId: 'hacker-banned',
-      }),
-    ];
-    db.eventRegistration.findMany.mockResolvedValue(registrations);
-
-    await expect(
-      listEventRegistrations(eventId, true, { status: 'BLOCKED' }, db)
-    ).resolves.toEqual(registrations);
-
-    expect(db.eventRegistration.findMany).toHaveBeenCalledWith({
-      where: {
-        eventId,
-        status: 'BLOCKED',
-      },
-      include: expect.objectContaining({ hacker: expect.any(Object) }),
-      orderBy: { createdAt: 'desc' },
-      take: undefined,
-      skip: undefined,
-    });
-    expect(db.userBan.findMany).not.toHaveBeenCalled();
   });
 });
 
