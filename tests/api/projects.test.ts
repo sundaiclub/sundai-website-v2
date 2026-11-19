@@ -142,7 +142,7 @@ describe('/api/projects', () => {
   describe('POST', () => {
     const mockAuth = require('@clerk/nextjs/server').auth;
 
-    it('creates a new project successfully', async () => {
+    it('creates a new project with the signed-in builder as launch lead', async () => {
       mockAuth.mockReturnValue({ userId: 'test-clerk-id' });
       mockPrisma.hacker.findUnique.mockResolvedValue(mockHacker);
       mockPrisma.week.findFirst.mockResolvedValue({
@@ -171,6 +171,9 @@ describe('/api/projects', () => {
       const data = await response.json();
 
       expect(response.status).toBe(200);
+      expect(mockPrisma.hacker.findUnique).toHaveBeenCalledWith({
+        where: { clerkId: 'test-clerk-id' },
+      });
       expect(data).toMatchObject({
         id: mockProject.id,
         title: mockProject.title,
@@ -183,6 +186,11 @@ describe('/api/projects', () => {
         is_starred: mockProject.is_starred,
         is_broken: mockProject.is_broken,
       });
+      expect(mockPrisma.project.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ launchLeadId: mockHacker.id }),
+        })
+      );
       expect(mockPrisma.project.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.not.objectContaining({
