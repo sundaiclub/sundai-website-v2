@@ -103,7 +103,7 @@ describe('/api/events/[eventId]/image', () => {
 
   it('returns 413 when the image is too large', async () => {
     const file = new File(['image'], 'large.webp', { type: 'image/webp' });
-    Object.defineProperty(file, 'size', { value: 15 * 1024 * 1024 });
+    Object.defineProperty(file, 'size', { value: 5 * 1024 * 1024 });
 
     const response = await POST(imageRequest(file), {
       params: { eventId: 'event-1' },
@@ -111,7 +111,7 @@ describe('/api/events/[eventId]/image', () => {
 
     expect(response.status).toBe(413);
     expect(await response.json()).toEqual({
-      message: 'File too large. Image files must be smaller than 15 MB.',
+      message: 'This image is 5.0 MB. Images must be 4 MB or smaller. Try compressing it or saving it as a JPEG or WebP.',
     });
     expect(uploadToS3).not.toHaveBeenCalled();
   });

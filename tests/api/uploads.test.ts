@@ -102,7 +102,7 @@ describe('/api/uploads/image', () => {
     it('should return 413 when the image is too large', async () => {
       mockAuth.mockReturnValue({ userId: 'test-user-id' });
       const file = new File(['test'], 'test.jpg', { type: 'image/jpeg' });
-      Object.defineProperty(file, 'size', { value: 15 * 1024 * 1024 });
+      Object.defineProperty(file, 'size', { value: 5 * 1024 * 1024 });
 
       const response = await POST({
         formData: jest.fn().mockResolvedValue({
@@ -112,7 +112,7 @@ describe('/api/uploads/image', () => {
 
       expect(response.status).toBe(413);
       expect(await response.json()).toEqual({
-        error: 'File too large. Image files must be smaller than 15 MB.',
+        error: 'This image is 5.0 MB. Images must be 4 MB or smaller. Try compressing it or saving it as a JPEG or WebP.',
       });
       expect(mockUploadToS3).not.toHaveBeenCalled();
     });

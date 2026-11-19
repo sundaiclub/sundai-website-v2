@@ -185,6 +185,7 @@ export async function loadEventWorkspace(
     }),
   };
 
+  // Independent counts run in parallel; they do not need a shared snapshot.
   const [
     registrationGroups,
     projectTotal,
@@ -194,7 +195,8 @@ export async function loadEventWorkspace(
     highlightedProjects,
     materialCount,
     communicationCount,
-  ] = await prisma.$transaction([
+    checkInCounts,
+  ] = await Promise.all([
     prisma.eventRegistration.groupBy({
       by: ['status'],
       where: registrationWhere,
@@ -222,10 +224,8 @@ export async function loadEventWorkspace(
     }),
     prisma.eventMaterial.count({ where: { eventId } }),
     prisma.eventCommunication.count({ where: { eventId } }),
+    event.trackAttendance ? countEventCheckIns(eventId, actor) : null,
   ]);
-  const checkInCounts = event.trackAttendance
-    ? await countEventCheckIns(eventId, actor)
-    : null;
 
   return {
     event: {

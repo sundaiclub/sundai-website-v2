@@ -53,6 +53,7 @@ export function useManagementClasses() {
     } rounded-lg border`,
     mutedText,
     divider: isDarkMode ? 'divide-gray-800' : 'divide-gray-200',
+    border: isDarkMode ? 'border-gray-800' : 'border-gray-200',
     input: `${
       isDarkMode
         ? 'border-gray-700 bg-gray-950 text-gray-100 placeholder:text-gray-500 focus:border-gray-400 disabled:bg-gray-900'

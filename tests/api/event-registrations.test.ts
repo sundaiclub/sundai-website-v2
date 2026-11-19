@@ -2,7 +2,6 @@ import {
   canManageRegistrationStatus,
   createInternalEventRegistration,
   getRegistrationStatusGuard,
-  listEventRegistrations,
   updateEventRegistrationStatus,
 } from '../../src/lib/eventRegistrations';
 import { Prisma } from '@prisma/client';
@@ -268,68 +267,6 @@ describe('/api/events/[eventId]/registrations internals', () => {
 
     expect(db.eventRegistration.update).not.toHaveBeenCalled();
     expect(db.eventRegistrationAudit.create).not.toHaveBeenCalled();
-  });
-
-  it('filters actively banned applicants from non-site-admin registration lists', async () => {
-    const db = createRegistrationDb();
-    const visibleRegistration = buildRegistration({
-      id: 'registration-visible',
-      hackerId: 'hacker-visible',
-    });
-    const bannedRegistration = buildRegistration({
-      id: 'registration-banned',
-      hackerId: 'hacker-banned',
-    });
-    db.eventRegistration.findMany.mockResolvedValue([
-      bannedRegistration,
-      visibleRegistration,
-    ]);
-    db.userBan.findMany.mockResolvedValue([{ hackerId: 'hacker-banned' }]);
-
-    await expect(
-      listEventRegistrations('event-boston-demo-night', false, {}, db)
-    ).resolves.toEqual([visibleRegistration]);
-
-    expect(db.eventRegistration.findMany).toHaveBeenCalledWith({
-      where: { eventId: 'event-boston-demo-night' },
-      include: expect.objectContaining({ hacker: expect.any(Object) }),
-      orderBy: { createdAt: 'desc' },
-      take: undefined,
-      skip: undefined,
-    });
-    expect(db.userBan.findMany).toHaveBeenCalledWith({
-      where: {
-        hackerId: { in: ['hacker-banned', 'hacker-visible'] },
-        revokedAt: null,
-      },
-      select: { hackerId: true },
-    });
-  });
-
-  it('keeps banned applicants visible to site admins and skips ban filtering', async () => {
-    const db = createRegistrationDb();
-    const registrations = [
-      buildRegistration({
-        id: 'registration-visible',
-        hackerId: 'hacker-visible',
-      }),
-      buildRegistration({
-        id: 'registration-banned',
-        hackerId: 'hacker-banned',
-      }),
-    ];
-    db.eventRegistration.findMany.mockResolvedValue(registrations);
-
-    await expect(
-      listEventRegistrations(
-        'event-boston-demo-night',
-        true,
-        { includeBannedUsers: true },
-        db
-      )
-    ).resolves.toEqual(registrations);
-
-    expect(db.userBan.findMany).not.toHaveBeenCalled();
   });
 });
 

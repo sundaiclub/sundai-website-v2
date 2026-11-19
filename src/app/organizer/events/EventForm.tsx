@@ -668,7 +668,11 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
       setMessage('AI-generated event image selected.');
     } catch (error) {
       console.error('Unable to process AI-generated event image', error);
-      setMessage('Unable to select the AI-generated event image.');
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : 'Unable to select the AI-generated event image.'
+      );
     }
   }
 

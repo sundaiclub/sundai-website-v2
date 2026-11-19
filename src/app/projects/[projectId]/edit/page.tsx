@@ -31,6 +31,7 @@ import { swapFirstLetters } from '../../../utils/nameUtils';
 import ImageGenerationModal from '../../../components/ImageGenerationModal';
 import MarkdownEditor from '../../../components/MarkdownEditor';
 import JudgingSubmissionFields from '../../../components/JudgingSubmissionFields';
+import GithubRepoStatus from '../../../components/GithubRepoStatus';
 import {
   composeJudgingDescription,
   PROJECT_JUDGING_LOCK_MESSAGE,
@@ -61,6 +62,8 @@ type ProjectEventOption = {
   image: { url: string; alt?: string | null } | null;
   selectedByDefault: boolean;
   alreadyAdded: boolean;
+  pitchQueueOpen: boolean;
+  pitchAdded: boolean;
   judging: ProjectJudgingOption | null;
 };
 
@@ -162,6 +165,9 @@ export default function ProjectEditPage() {
   const searchParams = useSearchParams();
   const contextualEventIds = searchParams.getAll('eventId');
   const contextualEventIdsKey = contextualEventIds.join(',');
+  const contextualPitchEventIdsKey = searchParams
+    .getAll('pitchEventId')
+    .join(',');
   const contextualJudgingEventId = searchParams.get('judgingEventId');
   const contextualJudgingTrackId = searchParams.get('judgingTrackId');
   const sourceEventId = searchParams.get('sourceEventId');
@@ -179,6 +185,7 @@ export default function ProjectEditPage() {
   const [eventOptions, setEventOptions] = useState<ProjectEventOption[]>([]);
   const [selectedEventIds, setSelectedEventIds] =
     useState<string[]>(contextualEventIds);
+  const [pitchEventIds, setPitchEventIds] = useState<string[]>([]);
   const defaultEventImage = isDarkMode
     ? '/images/logos/sundai_logo_dark_horizontal.svg'
     : '/images/logos/sundai_logo_light_horizontal.svg';
@@ -321,6 +328,19 @@ export default function ProjectEditPage() {
           events
         );
         setSelectedEventIds(selectedIds);
+        const contextualPitchIds = contextualPitchEventIdsKey
+          ? contextualPitchEventIdsKey.split(',')
+          : [];
+        setPitchEventIds(
+          events
+            .filter(
+              event =>
+                contextualPitchIds.includes(event.id) &&
+                event.pitchQueueOpen &&
+                !event.pitchAdded
+            )
+            .map(event => event.id)
+        );
         setEventsReady(true);
         const submission = events.find(
           event => selectedIds.includes(event.id) && event.judging?.submission
@@ -349,6 +369,7 @@ export default function ProjectEditPage() {
     contextualEventIdsKey,
     contextualJudgingEventId,
     contextualJudgingTrackId,
+    contextualPitchEventIdsKey,
     params?.projectId,
   ]);
 
@@ -365,6 +386,9 @@ export default function ProjectEditPage() {
 
   const judgingEvent = eventOptions.find(
     event => event.judging && selectedEventIds.includes(event.id)
+  );
+  const selectedPitchEventIds = pitchEventIds.filter(eventId =>
+    selectedEventIds.includes(eventId)
   );
   const judgingQuestions =
     judgingEvent?.judging?.tracks.find(track => track.id === judgingTrackId)
@@ -556,7 +580,7 @@ export default function ProjectEditPage() {
               status: project.status,
               eventIds: selectedEventIds,
               removedEventIds,
-              sourceEventId: null,
+              pitchEventIds: selectedPitchEventIds,
             }),
           }
         );
@@ -651,7 +675,7 @@ export default function ProjectEditPage() {
                   event.alreadyAdded && !selectedEventIds.includes(event.id)
               )
               .map(event => event.id),
-            sourceEventId,
+            pitchEventIds: selectedPitchEventIds,
           }),
         }
       );
@@ -929,47 +953,75 @@ export default function ProjectEditPage() {
             {eventOptions.length > 0 ? (
               <div className="mt-3 grid gap-3 sm:grid-cols-2">
                 {eventOptions.map(event => (
-                  <label
+                  <div
                     key={event.id}
-                    className={`flex cursor-pointer items-center gap-3 rounded-md border p-3 ${
+                    className={`rounded-md border ${
                       isDarkMode
                         ? 'border-gray-600 bg-gray-900'
                         : 'border-gray-200 bg-white'
                     }`}
                   >
-                    <input
-                      type="checkbox"
-                      checked={selectedEventIds.includes(event.id)}
-                      onChange={eventSelection =>
-                        handleEventSelection(
-                          event.id,
-                          eventSelection.target.checked
-                        )
-                      }
-                      className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                    />
-                    <Image
-                      src={event.image?.url || defaultEventImage}
-                      alt={event.image?.alt || `${event.title} event`}
-                      width={64}
-                      height={48}
-                      className="h-12 w-16 rounded bg-black object-contain p-1"
-                    />
-                    <span className="min-w-0">
-                      <span className="block truncate text-sm font-medium">
-                        {event.title}
+                    <label className="flex cursor-pointer items-center gap-3 p-3">
+                      <input
+                        type="checkbox"
+                        checked={selectedEventIds.includes(event.id)}
+                        onChange={eventSelection =>
+                          handleEventSelection(
+                            event.id,
+                            eventSelection.target.checked
+                          )
+                        }
+                        className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                      />
+                      <Image
+                        src={event.image?.url || defaultEventImage}
+                        alt={event.image?.alt || `${event.title} event`}
+                        width={64}
+                        height={48}
+                        className="h-12 w-16 rounded bg-black object-contain p-1"
+                      />
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-medium">
+                          {event.title}
+                        </span>
+                        <span
+                          className={`block truncate text-xs ${
+                            isDarkMode ? 'text-gray-400' : 'text-gray-600'
+                          }`}
+                        >
+                          {event.chapterName}
+                          {event.judging ? ' · Judged' : ''}
+                          {event.alreadyAdded ? ' · Already added' : ''}
+                          {event.pitchAdded ? ' · In pitch queue' : ''}
+                        </span>
                       </span>
-                      <span
-                        className={`block truncate text-xs ${
-                          isDarkMode ? 'text-gray-400' : 'text-gray-600'
-                        }`}
-                      >
-                        {event.chapterName}
-                        {event.judging ? ' · Judged' : ''}
-                        {event.alreadyAdded ? ' · Already added' : ''}
-                      </span>
-                    </span>
-                  </label>
+                    </label>
+                    {event.pitchQueueOpen &&
+                      !event.pitchAdded &&
+                      selectedEventIds.includes(event.id) && (
+                        <label
+                          className={`flex cursor-pointer items-center gap-2 border-t px-3 py-2 text-sm ${
+                            isDarkMode
+                              ? 'border-gray-600 text-gray-300'
+                              : 'border-gray-200 text-gray-700'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={pitchEventIds.includes(event.id)}
+                            onChange={pitchSelection =>
+                              setPitchEventIds(current =>
+                                pitchSelection.target.checked
+                                  ? [...current, event.id]
+                                  : current.filter(id => id !== event.id)
+                              )
+                            }
+                            className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                          />
+                          Add to pitch queue
+                        </label>
+                      )}
+                  </div>
                 ))}
               </div>
             ) : (
@@ -1066,24 +1118,30 @@ export default function ProjectEditPage() {
               }}
               className="space-y-4 mt-2"
             >
-              <input
-                type="text"
-                inputMode="url"
-                placeholder="GitHub URL"
-                aria-label="GitHub URL"
-                aria-required={githubUrlRequired}
-                value={editableGithubUrl}
-                onChange={e => setEditableGithubUrl(e.target.value)}
-                className={`block w-3/4 border ${isDarkMode ? 'border-gray-600 bg-gray-800 text-gray-100' : 'border-gray-300 bg-white text-gray-900'} rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 p-2`}
-              />
-              {githubUrlRequired && (
-                <p
-                  className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}
-                >
-                  GitHub link is required for the selected event. Enter a URL
-                  that contains github.com.
-                </p>
-              )}
+              <div className="space-y-1">
+                <input
+                  type="text"
+                  inputMode="url"
+                  placeholder="GitHub URL"
+                  aria-label="GitHub URL"
+                  aria-required={githubUrlRequired}
+                  value={editableGithubUrl}
+                  onChange={e => setEditableGithubUrl(e.target.value)}
+                  className={`block w-3/4 border ${isDarkMode ? 'border-gray-600 bg-gray-800 text-gray-100' : 'border-gray-300 bg-white text-gray-900'} rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 p-2`}
+                />
+                <GithubRepoStatus
+                  url={editableGithubUrl}
+                  isDarkMode={isDarkMode}
+                />
+                {githubUrlRequired && (
+                  <p
+                    className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}
+                  >
+                    GitHub link is required for the selected event. Enter a URL
+                    that contains github.com.
+                  </p>
+                )}
+              </div>
               <input
                 type="text"
                 inputMode="url"

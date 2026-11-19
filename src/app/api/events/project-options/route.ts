@@ -45,10 +45,27 @@ export async function GET(request: Request) {
         id: true,
         title: true,
         requireGithubUrl: true,
+        judgingEnabled: true,
         startTime: true,
         endTime: true,
         image: { select: { url: true, alt: true } },
         chapter: { select: { id: true, name: true, slug: true } },
+        pitchSessions: {
+          select: {
+            phase: true,
+            ...(projectId
+              ? {
+                  projects: {
+                    where: { projectId },
+                    select: { id: true },
+                    take: 1,
+                  },
+                }
+              : {}),
+          },
+          orderBy: { createdAt: 'asc' },
+          take: 1,
+        },
         ...(projectId
           ? {
               projects: {
@@ -68,13 +85,26 @@ export async function GET(request: Request) {
     );
 
     return NextResponse.json(
-      events.map(event => {
+      events.map(({ pitchSessions, ...event }) => {
         const alreadyAdded = Boolean(
           projectId && 'projects' in event && event.projects.length > 0
+        );
+        const pitch = pitchSessions[0];
+        const pitchAdded = Boolean(
+          pitch && 'projects' in pitch && pitch.projects.length > 0
         );
 
         return {
           ...event,
+          pitchQueueOpen: Boolean(
+            !event.judgingEnabled &&
+              pitch &&
+              pitch.phase !== 'FINISHED' &&
+              event.startTime <= now &&
+              event.endTime &&
+              event.endTime >= now
+          ),
+          pitchAdded,
           chapterName: event.chapter.name,
           chapterSlug: event.chapter.slug,
           alreadyAdded,

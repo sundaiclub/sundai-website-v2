@@ -79,7 +79,7 @@ it('fails before uploading when the Vercel role is missing', async () => {
 
 it('rejects oversized files before contacting S3', async () => {
   const image = file();
-  Object.defineProperty(image, 'size', { value: 15 * 1024 * 1024 });
-  await expect(uploadToS3(image)).rejects.toThrow('File too large');
+  Object.defineProperty(image, 'size', { value: 5 * 1024 * 1024 });
+  await expect(uploadToS3(image)).rejects.toThrow('This image is 5.0 MB');
   expect(send).not.toHaveBeenCalled();
 });

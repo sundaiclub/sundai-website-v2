@@ -9,7 +9,6 @@ import {
 } from '@/lib/eventManagementApi';
 import {
   canDecideRegistrationsWithContext,
-  canEditRegistrationNotes,
   canEditRegistrationNotesWithContext,
   canManageRegistrations,
   canDecideRegistrations,
@@ -17,115 +16,38 @@ import {
   getEventPermissionContext,
 } from '@/lib/eventManagementAuth';
 import {
-  countEventRegistrationsByStatus,
   createInternalEventRegistration,
   isApplicantDecisionStatus,
-  listEventRegistrations,
   submitPublicEventRegistration,
 } from '@/lib/eventRegistrations';
 import {
-  EMPTY_APPLICANT_HISTORY,
-  getApplicantHistory,
-} from '@/lib/applicantHistory';
+  REVIEW_QUEUE_MAX_PAGE_SIZE,
+  REVIEW_QUEUE_PAGE_SIZE,
+  loadRegistrationReviewQueue,
+} from '@/lib/registrationReviewQueue';
+import { privateJson } from '@/lib/publicData';
 import { publicRegistrationActionResponse } from '@/lib/publicRegistrationApi';
-import { parseTemplateFieldsJson } from '@/lib/applicationTemplates';
 import {
   parseRegistrationSource,
   parseRegistrationStatus,
 } from '@/lib/eventRequestParsing';
 import type {
-  ApplicantHistory,
-  JsonObject,
   OrganizerRegistrationReviewCapabilities,
-  OrganizerRegistrationReviewRow,
-  TemplateFieldDefinition,
+  OrganizerRegistrationReviewState,
 } from '@/types/event-management';
 
-function jsonObject(value: unknown): JsonObject | null {
-  return isJsonObject(value) ? value : null;
-}
+const MAX_SEARCH_LENGTH = 200;
 
-function templateFields(value: unknown): TemplateFieldDefinition[] | null {
-  if (value === null || value === undefined) return null;
-  try {
-    return parseTemplateFieldsJson(value, 'registration.templateSnapshotJson');
-  } catch {
-    return null;
-  }
-}
-
-function isJsonValue(
-  value: unknown
-): value is import('@/types/event-management').JsonValue {
-  if (
-    value === null ||
-    typeof value === 'string' ||
-    typeof value === 'boolean'
-  ) {
-    return true;
-  }
-  if (typeof value === 'number') return Number.isFinite(value);
-  if (Array.isArray(value)) return value.every(isJsonValue);
-  return isJsonObject(value);
-}
-
-function isJsonObject(value: unknown): value is JsonObject {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    !Array.isArray(value) &&
-    Object.values(value).every(isJsonValue)
-  );
-}
-
-function reviewRow(
-  registration: Awaited<ReturnType<typeof listEventRegistrations>>[number],
-  capabilities: OrganizerRegistrationReviewCapabilities,
-  applicantHistory: ApplicantHistory
-): OrganizerRegistrationReviewRow {
-  const answers = jsonObject(registration.answersJson);
-  const activeBan = capabilities.canViewBanContext
-    ? (registration.hacker?.userBans?.[0] ?? null)
-    : null;
-
-  return {
-    id: registration.id,
-    eventId: registration.eventId,
-    hackerId: registration.hackerId,
-    status: registration.status,
-    source: registration.source,
-    applicant: registration.hacker
-      ? {
-          id: registration.hacker.id,
-          name: registration.hacker.name,
-          username: registration.hacker.username ?? null,
-          email: registration.hacker.email,
-          role: registration.hacker.role,
-        }
-      : {
-          id: registration.hackerId,
-          name:
-            typeof answers?.name === 'string'
-              ? answers.name
-              : 'Unknown applicant',
-          username: null,
-          email: typeof answers?.email === 'string' ? answers.email : '',
-          role: 'HACKER',
-        },
-    applicantHistory,
-    answersJson: answers,
-    templateSnapshotJson: templateFields(registration.templateSnapshotJson),
-    publicSafeMessage: registration.publicSafeMessage ?? null,
-    internalReviewNotes: registration.internalReviewNotes ?? null,
-    organizerNoteBody: registration.hacker?.organizerNote?.body ?? null,
-    submittedAt: registration.submittedAt ?? null,
-    decidedAt: registration.decidedAt ?? null,
-    decidedBy: registration.decidedBy ?? null,
-    cancelledAt: registration.cancelledAt ?? null,
-    cancelledBy: registration.cancelledBy ?? null,
-    activeBan,
-    capabilities,
-  };
+function parseCount(
+  value: string | null,
+  fallback: number,
+  min: number,
+  max: number
+) {
+  if (value === null) return fallback;
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.min(max, Math.max(min, parsed));
 }
 
 export async function GET(
@@ -150,8 +72,6 @@ export async function GET(
     }
 
     const canDecide = canDecideRegistrationsWithContext(permissionContext);
-    const canEditNotes = canEditRegistrationNotesWithContext(permissionContext);
-
     const siteAdmin = isSiteAdmin(hacker);
     const capabilities: OrganizerRegistrationReviewCapabilities = {
       canView: true,
@@ -160,45 +80,57 @@ export async function GET(
       canWaitlist: canDecide,
       canDecline: canDecide,
       canCancel: canDecide,
-      canEditInternalNotes: canEditNotes,
+      canEditInternalNotes:
+        canEditRegistrationNotesWithContext(permissionContext),
       canViewBanContext: siteAdmin,
     };
 
     const url = new URL(req.url);
-    const rawStatus = url.searchParams.get('status') ?? undefined;
-    const parsedStatus = parseRegistrationStatus(rawStatus);
+    const parsedStatus = parseRegistrationStatus(
+      url.searchParams.get('status') ?? undefined
+    );
     if (parsedStatus === null) return badRequest('status is invalid');
     const statusFilter = parsedStatus ?? 'PENDING';
+    const rawOrder = url.searchParams.get('order');
+    if (rawOrder !== null && rawOrder !== 'oldest' && rawOrder !== 'newest') {
+      return badRequest('order is invalid');
+    }
+    const order = rawOrder ?? 'oldest';
+    // Only a verified site administrator can opt in to banned applicants.
     const includeBannedUsers =
-      url.searchParams.get('includeBannedUsers') === 'true';
-    const [registrations, counts] = await Promise.all([
-      listEventRegistrations(params.eventId, siteAdmin, {
-        status: parsedStatus,
-        includeBannedUsers,
-        take: Number(url.searchParams.get('take') ?? 100),
-        skip: Number(url.searchParams.get('skip') ?? 0),
-      }),
-      countEventRegistrationsByStatus(params.eventId, siteAdmin),
-    ]);
-    const applicantHistory = await getApplicantHistory(
-      params.eventId,
-      registrations.map(registration => registration.hackerId)
-    );
+      siteAdmin && url.searchParams.get('includeBannedUsers') === 'true';
+    const search = url.searchParams.get('q')?.slice(0, MAX_SEARCH_LENGTH);
 
-    return NextResponse.json({
+    const queue = await loadRegistrationReviewQueue({
+      eventId: params.eventId,
+      status: statusFilter,
+      hideBannedUsers: !includeBannedUsers,
+      search,
+      order,
+      take: parseCount(
+        url.searchParams.get('take'),
+        REVIEW_QUEUE_PAGE_SIZE,
+        1,
+        REVIEW_QUEUE_MAX_PAGE_SIZE
+      ),
+      skip: parseCount(
+        url.searchParams.get('skip'),
+        0,
+        0,
+        Number.MAX_SAFE_INTEGER
+      ),
+      capabilities,
+    });
+
+    const body: OrganizerRegistrationReviewState = {
       eventId: params.eventId,
       statusFilter,
       includeBannedUsers,
+      order,
       viewerRole: siteAdmin ? 'SITE_ADMIN' : canDecide ? 'MC' : 'CO_MC',
-      counts,
-      rows: registrations.map(registration =>
-        reviewRow(
-          registration,
-          capabilities,
-          applicantHistory.get(registration.hackerId) ?? EMPTY_APPLICANT_HISTORY
-        )
-      ),
-    });
+      ...queue,
+    };
+    return privateJson(body);
   } catch (error) {
     console.error('[EVENT_REGISTRATIONS_GET]', error);
     return new NextResponse('Internal Error', { status: 500 });

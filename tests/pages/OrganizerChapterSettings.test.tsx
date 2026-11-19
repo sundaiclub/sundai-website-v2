@@ -552,7 +552,7 @@ describe('/organizer/chapters/[chapterSlug]/settings', () => {
 
     expect(
       await screen.findByText(
-        /file too large\. image files must be smaller than 15 mb\./i
+        /this image is too large to upload\. images must be 4 mb or smaller\./i
       )
     ).toBeInTheDocument();
   });

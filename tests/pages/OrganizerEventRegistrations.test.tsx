@@ -5,6 +5,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from '@testing-library/react';
 
 import type {
@@ -46,24 +47,6 @@ type WorkspaceLayoutComponent = React.ComponentType<{
 }>;
 
 const eventId = 'event-ai-build-night';
-
-const eventSummary = {
-  id: eventId,
-  title: 'AI Build Night',
-  slug: 'ai-build-night',
-  status: 'PUBLISHED',
-  visibility: 'PUBLIC',
-  applicationMode: 'REQUIRES_APPROVAL',
-  applicationsOpen: true,
-  capacity: 40,
-  approvedCount: 12,
-  chapter: {
-    id: 'chapter-boston',
-    name: 'Sundai Boston',
-    slug: 'boston',
-    timezone: 'America/New_York',
-  },
-};
 
 const workspaceSummary = {
   event: {
@@ -361,24 +344,31 @@ function reviewState({
   rows,
   statusFilter,
   viewerRole,
+  hasMore = false,
+  rowsByStatus = defaultRowsByStatus,
 }: {
   includeBannedUsers: boolean;
   rows: OrganizerRegistrationReviewRow[];
   statusFilter: RegistrationStatus;
   viewerRole: OrganizerReviewRole;
+  hasMore?: boolean;
+  rowsByStatus?: Record<RegistrationStatus, OrganizerRegistrationReviewRow[]>;
 }): OrganizerRegistrationReviewState {
   return {
     eventId,
     statusFilter,
     includeBannedUsers,
+    order: 'oldest',
     viewerRole,
+    capacity: 40,
     counts: Object.fromEntries(
-      Object.entries(defaultRowsByStatus).map(([status, statusRows]) => [
+      Object.entries(rowsByStatus).map(([status, statusRows]) => [
         status,
         statusRows.length,
       ])
     ),
     rows,
+    hasMore,
   };
 }
 
@@ -386,46 +376,47 @@ function mockRegistrationReviewFetch({
   rowsByStatus = defaultRowsByStatus,
   viewerRole = 'MC',
   includeBlockedForSiteAdmin = false,
+  pagesBySkip,
+  failDecisions = false,
 }: {
   rowsByStatus?: Record<RegistrationStatus, OrganizerRegistrationReviewRow[]>;
   viewerRole?: OrganizerReviewRole;
   includeBlockedForSiteAdmin?: boolean;
+  pagesBySkip?: Record<string, OrganizerRegistrationReviewRow[]>;
+  failDecisions?: boolean;
 } = {}) {
   global.fetch = jest.fn((input: RequestInfo | URL, init?: RequestInit) => {
     const url = parseRequestUrl(input);
-
-    if (
-      url.pathname === `/api/events/${eventId}` &&
-      url.search === '?management=true'
-    ) {
-      return jsonResponse(eventSummary);
-    }
 
     if (url.pathname === `/api/events/${eventId}/workspace`) {
       return jsonResponse(workspaceSummary);
     }
 
     if (
-      url.pathname ===
-        `/api/events/${eventId}/registrations/${pendingRow.id}/notes` &&
-      init?.method === 'PATCH'
+      url.pathname === `/api/events/${eventId}/registrations/decisions` &&
+      init?.method === 'POST'
     ) {
+      if (failDecisions) return jsonResponse('Internal Error', 500);
+      const body = JSON.parse(String(init.body));
       return jsonResponse({
-        ...pendingRow,
-        internalReviewNotes: JSON.parse(String(init.body)).internalReviewNotes,
+        status: body.status,
+        updatedIds: body.registrationIds,
+        failedIds: [],
       });
     }
 
-    if (
-      url.pathname ===
-        `/api/events/${eventId}/registrations/${pendingRow.id}` &&
-      init?.method === 'PATCH'
-    ) {
+    const notesMatch = url.pathname.match(/\/registrations\/([^/]+)\/notes$/);
+    if (notesMatch && init?.method === 'PATCH') {
+      return jsonResponse({ id: notesMatch[1] });
+    }
+
+    const decisionMatch = url.pathname.match(
+      new RegExp(`^/api/events/${eventId}/registrations/([^/]+)$`)
+    );
+    if (decisionMatch && init?.method === 'PATCH') {
+      if (failDecisions) return jsonResponse('Internal Error', 500);
       const body = JSON.parse(String(init.body));
-      return jsonResponse({
-        ...pendingRow,
-        status: body.status,
-      });
+      return jsonResponse({ id: decisionMatch[1], status: body.status });
     }
 
     if (url.pathname === `/api/events/${eventId}/registrations`) {
@@ -433,7 +424,9 @@ function mockRegistrationReviewFetch({
         url.searchParams.get('includeBannedUsers') === 'true';
       const statusFilter = (url.searchParams.get('status') ??
         'PENDING') as RegistrationStatus;
-      const statusRows = rowsByStatus[statusFilter] ?? [];
+      const skip = url.searchParams.get('skip') ?? '0';
+      const statusRows =
+        pagesBySkip?.[skip] ?? rowsByStatus[statusFilter] ?? [];
       const rows =
         includeBannedUsers && includeBlockedForSiteAdmin
           ? [...statusRows, blockedBannedRow]
@@ -445,6 +438,10 @@ function mockRegistrationReviewFetch({
           rows,
           statusFilter,
           viewerRole,
+          rowsByStatus,
+          hasMore: Boolean(
+            pagesBySkip && pagesBySkip[String(Number(skip) + rows.length)]
+          ),
         })
       );
     }
@@ -479,16 +476,32 @@ function renderWorkspaceRegistrations() {
   );
 }
 
-function latestFetchBody(pathPattern: RegExp) {
+function fetchUrls() {
+  return (global.fetch as jest.Mock).mock.calls.map(([input]) =>
+    requestUrl(input)
+  );
+}
+
+function fetchCall(pathPattern: RegExp) {
   const call = (global.fetch as jest.Mock).mock.calls.find(([input]) =>
-    pathPattern.test(requestUrl(input))
+    pathPattern.test(parseRequestUrl(input).pathname)
   );
 
   if (!call) {
     throw new Error(`Expected fetch matching ${pathPattern}`);
   }
 
-  return JSON.parse(String(call[1]?.body ?? '{}'));
+  return call;
+}
+
+function fetchBody(pathPattern: RegExp) {
+  return JSON.parse(String(fetchCall(pathPattern)[1]?.body ?? '{}'));
+}
+
+async function findDetail(name: RegExp | string = /signed in applicant/i) {
+  return screen.findByRole('article', {
+    name: typeof name === 'string' ? `RSVP from ${name}` : name,
+  });
 }
 
 describe('/organizer/events/[eventId]/registrations', () => {
@@ -512,27 +525,45 @@ describe('/organizer/events/[eventId]/registrations', () => {
     cleanup();
   });
 
-  it('opens the existing registration review inside the event workspace shell', async () => {
+  it('loads the queue alongside the workspace instead of fetching the workspace twice', async () => {
     renderWorkspaceRegistrations();
 
-    expect(await screen.findByText(/signed in applicant/i)).toBeInTheDocument();
+    const detail = await findDetail();
+    expect(
+      within(detail).getByRole('link', { name: 'Signed In Applicant' })
+    ).toBeInTheDocument();
     expect(
       screen.getByRole('navigation', { name: /event workspace/i })
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole('link', { name: /rsvps|registrations/i })
-    ).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('link', { name: /rsvps/i })).toHaveAttribute(
+      'aria-current',
+      'page'
+    );
     expect(
       screen.getByRole('heading', { level: 1, name: 'AI Build Night' })
     ).toBeInTheDocument();
-    expect(screen.getByText(/sundai boston/i)).toBeInTheDocument();
 
-    expect(global.fetch).toHaveBeenCalledWith(
-      `/api/events/${eventId}/workspace`
-    );
-    expect(global.fetch).toHaveBeenCalledWith(
-      expect.stringMatching(`/api/events/${eventId}/registrations\\?`)
-    );
+    const urls = fetchUrls();
+    expect(
+      urls.filter(url => url === `/api/events/${eventId}/workspace`)
+    ).toHaveLength(1);
+    expect(
+      urls.filter(url =>
+        url.startsWith(`/api/events/${eventId}/registrations?`)
+      )
+    ).toHaveLength(1);
+    // The shell starts the RSVP request before the workspace request.
+    expect(urls[0]).toMatch(/\/registrations\?status=PENDING&order=oldest$/);
+  });
+
+  it('shows the capacity summary from the queue response', async () => {
+    renderRegistrationsPage();
+
+    expect(await screen.findByText('1 / 40 approved')).toBeInTheDocument();
+    expect(
+      screen.getByRole('progressbar', { name: /1 of 40 spots filled/i })
+    ).toBeInTheDocument();
+    expect(screen.getByText(/1 waitlisted · 1 pending/i)).toBeInTheDocument();
   });
 
   it('keeps co-MCs note-only when registration review is opened through the workspace', async () => {
@@ -546,127 +577,97 @@ describe('/organizer/events/[eventId]/registrations', () => {
 
     renderWorkspaceRegistrations();
 
-    expect(await screen.findByText(/signed in applicant/i)).toBeInTheDocument();
-    expect(
-      screen.getByRole('navigation', { name: /event workspace/i })
-    ).toBeInTheDocument();
+    await findDetail();
     expect(screen.getByLabelText(/internal review notes/i)).toBeEnabled();
+    for (const name of [/^approve$/i, /^waitlist$/i, /^decline$/i]) {
+      expect(screen.queryByRole('button', { name })).not.toBeInTheDocument();
+    }
     expect(
-      screen.queryByRole('button', { name: /^approve$/i })
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole('button', { name: /^waitlist$/i })
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole('button', { name: /^decline$/i })
+      screen.queryByRole('checkbox', { name: /select/i })
     ).not.toBeInTheDocument();
   });
 
   it('links applicants to their profile and shows their history counts', async () => {
     renderRegistrationsPage();
 
-    const profileLink = await screen.findByRole('link', {
-      name: 'Signed In Applicant',
-    });
-    expect(profileLink).toHaveAttribute('href', '/hacker/hacker-applicant');
-    expect(screen.getByText('Applied to 4 other events')).toBeInTheDocument();
-    expect(screen.getByText('Accepted to 3')).toBeInTheDocument();
-    expect(screen.getByText('1 project')).toBeInTheDocument();
+    const detail = await findDetail();
+    expect(
+      within(detail).getByRole('link', { name: 'Signed In Applicant' })
+    ).toHaveAttribute('href', '/hacker/hacker-applicant');
+    expect(
+      within(detail).getByText('Applied to 4 other events')
+    ).toBeInTheDocument();
+    expect(within(detail).getByText('Accepted to 3')).toBeInTheDocument();
+    expect(within(detail).getByText('1 project')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', {
+        name: /signed in applicant.*4 other events/i,
+      })
+    ).toBeInTheDocument();
   });
 
-  it('renders registration queue tabs and applicant answers for the active status', async () => {
+  it('renders status tabs and applicant answers for the active status', async () => {
     renderRegistrationsPage();
 
-    expect(await screen.findByText(/signed in applicant/i)).toBeInTheDocument();
-
-    for (const label of [
-      /pending/i,
-      /approved/i,
-      /waitlisted/i,
-      /declined/i,
-      /cancelled/i,
-    ]) {
-      expect(screen.getByRole('tab', { name: label })).toBeInTheDocument();
-    }
+    const detail = await findDetail();
     for (const status of [
-      'pending',
-      'approved',
-      'waitlisted',
-      'declined',
-      'cancelled',
+      'Pending',
+      'Approved',
+      'Waitlisted',
+      'Declined',
+      'Cancelled',
     ]) {
       expect(
         screen.getByRole('tab', { name: new RegExp(`${status} 1`, 'i') })
       ).toBeInTheDocument();
     }
 
-    expect(screen.getByText(/applicant@example.com/i)).toBeInTheDocument();
     expect(
-      screen.getByText(/why do you want to join this event/i)
+      within(detail).getByText(/applicant@example.com/i)
     ).toBeInTheDocument();
     expect(
-      screen.getByText(/i want to build with the boston ai community/i)
+      within(detail).getByText(/why do you want to join this event/i)
     ).toBeInTheDocument();
-    expect(screen.getByText(/project url/i)).toBeInTheDocument();
     expect(
-      screen.getByRole('link', {
-        name: 'example.com/applicant-project',
-      })
-    ).toHaveAttribute('href', 'https://example.com/applicant-project');
+      within(detail).getByText(/i want to build with the boston ai community/i)
+    ).toBeInTheDocument();
+    const projectLink = within(detail).getByRole('link', {
+      name: 'example.com/applicant-project',
+    });
+    expect(projectLink).toHaveAttribute(
+      'href',
+      'https://example.com/applicant-project'
+    );
+    expect(projectLink).toHaveAttribute('target', '_blank');
+    expect(projectLink).toHaveAttribute('rel', 'noopener noreferrer');
     expect(
-      screen.getByRole('link', {
-        name: 'example.com/applicant-project',
-      })
-    ).toHaveAttribute('target', '_blank');
-    expect(
-      screen.getByRole('link', {
-        name: 'example.com/applicant-project',
-      })
-    ).toHaveAttribute('rel', 'noopener noreferrer');
-    expect(
-      screen.getByText(/strong previous sundai contributor/i)
+      within(detail).getByText(/strong previous sundai contributor/i)
     ).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('tab', { name: /approved/i }));
 
-    expect(await screen.findByText(/approved applicant/i)).toBeInTheDocument();
+    const approvedDetail = await findDetail('Approved Applicant');
     expect(screen.queryByText(/signed in applicant/i)).not.toBeInTheDocument();
     expect(
-      screen.queryByRole('button', { name: /^approve$/i })
+      within(approvedDetail).queryByRole('button', { name: /^approve$/i })
     ).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /^waitlist$/i })).toBeEnabled();
-    expect(screen.getByRole('button', { name: /^decline$/i })).toBeEnabled();
-
-    await waitFor(() => {
-      const urls = (global.fetch as jest.Mock).mock.calls.map(([input]) =>
-        requestUrl(input)
-      );
-
-      expect(urls).toEqual(
-        expect.arrayContaining([
-          expect.stringMatching(
-            /\/api\/events\/event-ai-build-night\/registrations\?.*status=APPROVED/
-          ),
-        ])
-      );
-    });
-
-    fireEvent.click(screen.getByRole('tab', { name: /waitlisted/i }));
     expect(
-      await screen.findByText(/waitlisted applicant/i)
+      within(approvedDetail).getByRole('button', { name: /^waitlist$/i })
+    ).toBeEnabled();
+    expect(fetchUrls()).toEqual(
+      expect.arrayContaining([
+        expect.stringMatching(/\/registrations\?status=APPROVED/),
+      ])
+    );
+
+    fireEvent.click(screen.getByRole('tab', { name: /pending/i }));
+    // A tab that was already loaded shows its rows right away.
+    expect(
+      screen.getByRole('article', { name: /signed in applicant/i })
     ).toBeInTheDocument();
-    expect(
-      screen.queryByRole('button', { name: /^waitlist$/i })
-    ).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('tab', { name: /declined/i }));
-    expect(await screen.findByText(/declined applicant/i)).toBeInTheDocument();
-    expect(
-      screen.queryByRole('button', { name: /^decline$/i })
-    ).not.toBeInTheDocument();
   });
 
-  it('saves event-specific internal review notes without mixing them with public messages', async () => {
+  it('saves internal review notes automatically without mixing them with public messages', async () => {
     renderRegistrationsPage();
 
     const notes = await screen.findByLabelText(/internal review notes/i);
@@ -676,126 +677,275 @@ describe('/organizer/events/[eventId]/registrations', () => {
       target: { value: 'Confirmed GPU access and mentor match.' },
     });
     expect(screen.getByText(/unsaved changes/i)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /^save$/i }));
+    fireEvent.blur(notes);
 
-    await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith(
-        `/api/events/${eventId}/registrations/${pendingRow.id}/notes`,
-        expect.objectContaining({ method: 'PATCH' })
-      );
-    });
-
-    expect(
-      latestFetchBody(/\/registrations\/registration-pending\/notes$/)
-    ).toMatchObject({
+    expect(await screen.findByText(/notes saved/i)).toBeInTheDocument();
+    expect(fetchCall(/\/registration-pending\/notes$/)[1]).toEqual(
+      expect.objectContaining({ method: 'PATCH' })
+    );
+    const body = fetchBody(/\/registration-pending\/notes$/);
+    expect(body).toEqual({
       internalReviewNotes: 'Confirmed GPU access and mentor match.',
     });
     expect(
-      latestFetchBody(/\/registrations\/registration-pending\/notes$/)
-    ).not.toHaveProperty('publicSafeMessage');
-    expect(await screen.findByText(/saved successfully/i)).toBeInTheDocument();
-    expect(screen.queryByText(/unsaved changes/i)).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /^save$/i })).toBeDisabled();
+      (global.fetch as jest.Mock).mock.calls.filter(([input]) =>
+        requestUrl(input).endsWith('/notes')
+      )
+    ).toHaveLength(1);
   });
 
-  it('shows decision controls to MCs but hides them from note-only co-MCs', async () => {
+  it('approves the selected applicant, moves the counts, and selects the next one', async () => {
+    const secondPending: OrganizerRegistrationReviewRow = {
+      ...pendingRow,
+      id: 'registration-pending-second',
+      hackerId: 'hacker-second',
+      applicant: {
+        ...pendingRow.applicant,
+        id: 'hacker-second',
+        name: 'Second Applicant',
+      },
+    };
+    mockRegistrationReviewFetch({
+      rowsByStatus: {
+        ...defaultRowsByStatus,
+        PENDING: [pendingRow, secondPending],
+      },
+    });
     renderRegistrationsPage();
 
-    expect(await screen.findByText(/signed in applicant/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /approve/i })).toBeEnabled();
-    expect(screen.getByRole('button', { name: /waitlist/i })).toBeEnabled();
-    expect(screen.getByRole('button', { name: /decline/i })).toBeEnabled();
+    const detail = await findDetail();
+    fireEvent.click(within(detail).getByRole('button', { name: /^approve$/i }));
 
-    fireEvent.click(screen.getByRole('button', { name: /approve/i }));
-
-    await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith(
-        `/api/events/${eventId}/registrations/${pendingRow.id}`,
-        expect.objectContaining({ method: 'PATCH' })
-      );
-    });
-    expect(
-      latestFetchBody(/\/registrations\/registration-pending$/)
-    ).toMatchObject({
+    await findDetail('Second Applicant');
+    expect(fetchCall(/\/registrations\/registration-pending$/)[1]).toEqual(
+      expect.objectContaining({ method: 'PATCH' })
+    );
+    expect(fetchBody(/\/registrations\/registration-pending$/)).toEqual({
       status: 'APPROVED',
     });
-    await waitFor(() => {
-      expect(
-        screen.queryByText(/signed in applicant/i)
-      ).not.toBeInTheDocument();
-    });
-    expect(
-      screen.getByText(/no registrations in this queue/i)
-    ).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: /pending 0/i })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /pending 1/i })).toBeInTheDocument();
     expect(
       screen.getByRole('tab', { name: /approved 2/i })
     ).toBeInTheDocument();
+    expect(screen.getByText('2 / 40 approved')).toBeInTheDocument();
+  });
 
-    cleanup();
-    mockRegistrationReviewFetch({
-      viewerRole: 'CO_MC',
-      rowsByStatus: {
-        ...defaultRowsByStatus,
-        PENDING: [{ ...pendingRow, capabilities: noteOnlyCapabilities }],
-      },
-    });
-
+  it('shows an empty queue after the last pending applicant is decided', async () => {
     renderRegistrationsPage();
 
-    expect(await screen.findByText(/signed in applicant/i)).toBeInTheDocument();
+    const detail = await findDetail();
+    fireEvent.click(within(detail).getByRole('button', { name: /^approve$/i }));
+
     expect(
-      screen.queryByRole('button', { name: /approve/i })
-    ).not.toBeInTheDocument();
+      await screen.findByText(/no rsvps waiting for review/i)
+    ).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /pending 0/i })).toBeInTheDocument();
+  });
+
+  it('keeps the applicant and shows an error when a decision fails', async () => {
+    mockRegistrationReviewFetch({ failDecisions: true });
+    renderRegistrationsPage();
+
+    const detail = await findDetail();
+    fireEvent.click(within(detail).getByRole('button', { name: /^approve$/i }));
+
     expect(
-      screen.queryByRole('button', { name: /waitlist/i })
-    ).not.toBeInTheDocument();
+      await screen.findByText(/couldn't update signed in applicant/i)
+    ).toBeInTheDocument();
+    expect(await findDetail()).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /pending 1/i })).toBeInTheDocument();
+  });
+
+  it('asks for confirmation before declining', async () => {
+    renderRegistrationsPage();
+
+    const detail = await findDetail();
+    fireEvent.click(within(detail).getByRole('button', { name: /^decline$/i }));
+
+    expect(fetchUrls()).not.toEqual(
+      expect.arrayContaining([
+        expect.stringMatching(/\/registrations\/registration-pending$/),
+      ])
+    );
+    fireEvent.click(
+      within(detail).getByRole('button', { name: /confirm decline/i })
+    );
+
+    await waitFor(() => {
+      expect(fetchBody(/\/registrations\/registration-pending$/)).toEqual({
+        status: 'DECLINED',
+      });
+    });
+  });
+
+  it('marks applicants who have internal review notes', async () => {
+    const withoutNotes: OrganizerRegistrationReviewRow = {
+      ...pendingRow,
+      id: 'registration-without-notes',
+      hackerId: 'hacker-without-notes',
+      applicant: {
+        ...pendingRow.applicant,
+        id: 'hacker-without-notes',
+        name: 'Quiet Applicant',
+      },
+      internalReviewNotes: null,
+    };
+    mockRegistrationReviewFetch({
+      rowsByStatus: {
+        ...defaultRowsByStatus,
+        PENDING: [pendingRow, withoutNotes],
+      },
+    });
+    renderRegistrationsPage();
+
+    const detail = await findDetail();
+    expect(within(detail).getByText('Has notes')).toBeInTheDocument();
+    const listItems = screen.getAllByRole('listitem');
+    expect(within(listItems[0]).getByText('Notes')).toBeInTheDocument();
+    expect(within(listItems[1]).queryByText('Notes')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /quiet applicant/i }));
+    const quietDetail = await findDetail('Quiet Applicant');
     expect(
-      screen.queryByRole('button', { name: /decline/i })
+      within(quietDetail).queryByText('Has notes')
     ).not.toBeInTheDocument();
-    expect(screen.getByLabelText(/internal review notes/i)).toBeEnabled();
+    const notes = within(quietDetail).getByLabelText(/internal review notes/i);
+    fireEvent.change(notes, { target: { value: 'Met them at demo day.' } });
+    fireEvent.blur(notes);
+
+    await waitFor(() => {
+      expect(
+        within(screen.getAllByRole('listitem')[1]).getByText('Notes')
+      ).toBeInTheDocument();
+    });
+  });
+
+  it('approves several selected applicants with one bulk request', async () => {
+    const secondPending: OrganizerRegistrationReviewRow = {
+      ...pendingRow,
+      id: 'registration-pending-second',
+      hackerId: 'hacker-second',
+      applicant: {
+        ...pendingRow.applicant,
+        id: 'hacker-second',
+        name: 'Second Applicant',
+      },
+    };
+    mockRegistrationReviewFetch({
+      rowsByStatus: {
+        ...defaultRowsByStatus,
+        PENDING: [pendingRow, secondPending],
+      },
+    });
+    renderRegistrationsPage();
+
+    await findDetail();
+    fireEvent.click(
+      screen.getByRole('checkbox', { name: /select all loaded rsvps/i })
+    );
+    const bulkBar = screen.getByRole('region', { name: /bulk actions/i });
+    expect(within(bulkBar).getByText('2 selected')).toBeInTheDocument();
+    fireEvent.click(
+      within(bulkBar).getByRole('button', { name: /approve selected/i })
+    );
+
+    expect(
+      await screen.findByText(/no rsvps waiting for review/i)
+    ).toBeInTheDocument();
+    expect(fetchBody(/\/registrations\/decisions$/)).toEqual({
+      registrationIds: ['registration-pending', 'registration-pending-second'],
+      status: 'APPROVED',
+    });
+    expect(
+      screen.getByRole('tab', { name: /approved 3/i })
+    ).toBeInTheDocument();
+  });
+
+  it('confirms bulk declines before sending them', async () => {
+    renderRegistrationsPage();
+
+    await findDetail();
+    fireEvent.click(
+      screen.getByRole('checkbox', { name: /select signed in applicant/i })
+    );
+    const bulkBar = screen.getByRole('region', { name: /bulk actions/i });
+    fireEvent.click(
+      within(bulkBar).getByRole('button', { name: /decline selected/i })
+    );
+    expect(within(bulkBar).getByText(/decline 1 rsvp\?/i)).toBeInTheDocument();
+    expect(fetchUrls().some(url => url.endsWith('/decisions'))).toBe(false);
+  });
+
+  it('searches the queue on the server after typing stops', async () => {
+    renderRegistrationsPage();
+
+    await findDetail();
+    fireEvent.change(screen.getByLabelText(/search rsvps/i), {
+      target: { value: 'gpu' },
+    });
+
+    await waitFor(() => {
+      expect(fetchUrls()).toEqual(
+        expect.arrayContaining([
+          expect.stringMatching(/\/registrations\?.*q=gpu/),
+        ])
+      );
+    });
+  });
+
+  it('loads more rows on request', async () => {
+    const nextRow: OrganizerRegistrationReviewRow = {
+      ...pendingRow,
+      id: 'registration-next-page',
+      hackerId: 'hacker-next-page',
+      applicant: {
+        ...pendingRow.applicant,
+        id: 'hacker-next-page',
+        name: 'Next Page Applicant',
+      },
+    };
+    mockRegistrationReviewFetch({
+      pagesBySkip: { '0': [pendingRow], '1': [nextRow] },
+    });
+    renderRegistrationsPage();
+
+    await findDetail();
+    fireEvent.click(screen.getByRole('button', { name: /load more/i }));
+
+    expect(
+      await screen.findByRole('button', { name: /next page applicant/i })
+    ).toBeInTheDocument();
+    expect(fetchUrls()).toEqual(
+      expect.arrayContaining([
+        expect.stringMatching(/\/registrations\?.*skip=1/),
+      ])
+    );
+    expect(
+      screen.queryByRole('button', { name: /load more/i })
+    ).not.toBeInTheDocument();
   });
 
   it('keeps globally banned applicants and moderation signals hidden from non-site-admin queues', async () => {
     mockRegistrationReviewFetch({
-      rowsByStatus: {
-        ...defaultRowsByStatus,
-        PENDING: [pendingRow],
-      },
       includeBlockedForSiteAdmin: true,
       viewerRole: 'CHAPTER_ADMIN',
     });
 
     renderRegistrationsPage();
 
-    expect(await screen.findByText(/signed in applicant/i)).toBeInTheDocument();
+    await findDetail();
     expect(screen.queryByText(/banned applicant/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/active global ban/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/unable to register/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/include banned/i)).not.toBeInTheDocument();
-
-    const registrationListCalls = (global.fetch as jest.Mock).mock.calls
-      .map(([input]) => requestUrl(input))
-      .filter(url => url.includes(`/api/events/${eventId}/registrations`));
-
-    expect(registrationListCalls).not.toEqual(
+    expect(fetchUrls()).not.toEqual(
       expect.arrayContaining([
         expect.stringContaining('includeBannedUsers=true'),
       ])
     );
   });
 
-  it('lets site admins enter the include-banned context and see blocked applicant ban context', async () => {
-    mockUseUserContext.mockReturnValue({
-      isAdmin: true,
-      loading: false,
-      userInfo: {
-        id: 'hacker-site-admin',
-        name: 'Site Admin',
-        email: 'site-admin@example.com',
-        role: 'SITE_ADMIN',
-      },
-    });
+  it('lets site admins include banned users and see blocked applicant ban context', async () => {
     mockRegistrationReviewFetch({
       includeBlockedForSiteAdmin: true,
       viewerRole: 'SITE_ADMIN',
@@ -803,28 +953,26 @@ describe('/organizer/events/[eventId]/registrations', () => {
 
     renderRegistrationsPage();
 
-    const includeBanned = await screen.findByRole('checkbox', {
-      name: /include banned|show banned/i,
-    });
-    fireEvent.click(includeBanned);
+    fireEvent.click(
+      await screen.findByRole('checkbox', { name: /include banned users/i })
+    );
 
-    expect(await screen.findByText(/banned applicant/i)).toBeInTheDocument();
-    expect(screen.getByText(/blocked/i)).toBeInTheDocument();
-    expect(screen.getByText(/active global ban/i)).toBeInTheDocument();
-    expect(screen.getByText(/unable to register/i)).toBeInTheDocument();
-
-    await waitFor(() => {
-      const urls = (global.fetch as jest.Mock).mock.calls.map(([input]) =>
-        requestUrl(input)
-      );
-
-      expect(urls).toEqual(
-        expect.arrayContaining([
-          expect.stringMatching(
-            /\/api\/events\/event-ai-build-night\/registrations\?.*includeBannedUsers=true/
-          ),
-        ])
-      );
-    });
+    expect(
+      await screen.findByRole('tab', { name: /blocked/i })
+    ).toBeInTheDocument();
+    fireEvent.click(
+      await screen.findByRole('button', { name: /banned applicant/i })
+    );
+    const detail = await findDetail('Banned Applicant');
+    expect(within(detail).getByText(/active ban/i)).toBeInTheDocument();
+    expect(
+      within(detail).getByText(/active global ban; visible to site admins/i)
+    ).toBeInTheDocument();
+    expect(within(detail).getByText(/unable to register/i)).toBeInTheDocument();
+    expect(fetchUrls()).toEqual(
+      expect.arrayContaining([
+        expect.stringMatching(/\/registrations\?.*includeBannedUsers=true/),
+      ])
+    );
   });
 });

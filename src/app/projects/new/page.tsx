@@ -22,6 +22,7 @@ type ProjectEventOption = {
   chapterName: string;
   image?: { url: string; alt?: string | null } | null;
   selectedByDefault: boolean;
+  pitchQueueOpen: boolean;
   judging: ProjectJudgingOption | null;
 };
 
@@ -54,6 +55,7 @@ function NewProjectForm() {
   const [leadSearchTerm, setLeadSearchTerm] = useState('');
   const [eventOptions, setEventOptions] = useState<ProjectEventOption[]>([]);
   const [selectedEventIds, setSelectedEventIds] = useState<string[]>([]);
+  const [pitchEventIds, setPitchEventIds] = useState<string[]>([]);
   const [judgingTrackId, setJudgingTrackId] = useState('');
   const judgingEvent = eventOptions.find(
     event => event.judging && selectedEventIds.includes(event.id)
@@ -85,6 +87,11 @@ function NewProjectForm() {
               .map(event => event.id),
             events
           )
+        );
+        setPitchEventIds(
+          events
+            .filter(event => event.id === sourceEventId && event.pitchQueueOpen)
+            .map(event => event.id)
         );
       })
       .catch(error => console.error('Error fetching project events:', error));
@@ -201,6 +208,9 @@ function NewProjectForm() {
       selectedEventIds.forEach(eventId =>
         editParams.append('eventId', eventId)
       );
+      pitchEventIds
+        .filter(eventId => selectedEventIds.includes(eventId))
+        .forEach(eventId => editParams.append('pitchEventId', eventId));
       if (judgingEvent) {
         editParams.set('judgingEventId', judgingEvent.id);
         editParams.set('judgingTrackId', judgingTrackId);
@@ -433,62 +443,88 @@ function NewProjectForm() {
             ) : (
               <div className="space-y-2">
                 {eventOptions.map(event => (
-                  <label
-                    className={`flex min-w-0 max-w-full cursor-pointer items-center gap-3 overflow-hidden rounded-md border p-3 ${
+                  <div
+                    className={`min-w-0 max-w-full overflow-hidden rounded-md border ${
                       isDarkMode
                         ? 'border-gray-700 bg-gray-900'
                         : 'border-gray-200 bg-gray-50'
                     }`}
                     key={event.id}
                   >
-                    <input
-                      checked={selectedEventIds.includes(event.id)}
-                      onChange={change => {
-                        if (event.judging) setJudgingTrackId('');
-                        setSelectedEventIds(current =>
-                          selectProjectEvent(
-                            current,
-                            eventOptions,
-                            event.id,
-                            change.target.checked
-                          )
-                        );
-                      }}
-                      type="checkbox"
-                      className="shrink-0"
-                    />
-                    {event.image?.url ? (
-                      <Image
-                        alt={event.image.alt || event.title}
-                        className="h-12 w-16 shrink-0 rounded object-cover"
-                        height={48}
-                        src={event.image.url}
-                        unoptimized
-                        width={64}
+                    <label className="flex min-w-0 max-w-full cursor-pointer items-center gap-3 overflow-hidden p-3">
+                      <input
+                        checked={selectedEventIds.includes(event.id)}
+                        onChange={change => {
+                          if (event.judging) setJudgingTrackId('');
+                          setSelectedEventIds(current =>
+                            selectProjectEvent(
+                              current,
+                              eventOptions,
+                              event.id,
+                              change.target.checked
+                            )
+                          );
+                        }}
+                        type="checkbox"
+                        className="shrink-0"
                       />
-                    ) : (
-                      <Image
-                        alt={`${event.title} event`}
-                        className="h-12 w-16 shrink-0 rounded bg-black object-contain p-1"
-                        height={48}
-                        src={defaultEventImage}
-                        width={64}
-                      />
-                    )}
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate font-medium">
-                        {event.title}
+                      {event.image?.url ? (
+                        <Image
+                          alt={event.image.alt || event.title}
+                          className="h-12 w-16 shrink-0 rounded object-cover"
+                          height={48}
+                          src={event.image.url}
+                          unoptimized
+                          width={64}
+                        />
+                      ) : (
+                        <Image
+                          alt={`${event.title} event`}
+                          className="h-12 w-16 shrink-0 rounded bg-black object-contain p-1"
+                          height={48}
+                          src={defaultEventImage}
+                          width={64}
+                        />
+                      )}
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate font-medium">
+                          {event.title}
+                        </span>
+                        <span
+                          className={`block truncate text-xs ${
+                            isDarkMode ? 'text-gray-400' : 'text-gray-600'
+                          }`}
+                        >
+                          {event.chapterName}
+                          {event.judging ? ' · Judged' : ''}
+                        </span>
                       </span>
-                      <span
-                        className={`block truncate text-xs ${
-                          isDarkMode ? 'text-gray-400' : 'text-gray-600'
-                        }`}
-                      >
-                        {event.chapterName}
-                        {event.judging ? ' · Judged' : ''}
-                      </span>
-                    </span>
-                  </label>
+                    </label>
+                    {event.pitchQueueOpen &&
+                      selectedEventIds.includes(event.id) && (
+                        <label
+                          className={`flex cursor-pointer items-center gap-2 border-t px-3 py-2 text-sm ${
+                            isDarkMode
+                              ? 'border-gray-700 text-gray-300'
+                              : 'border-gray-200 text-gray-700'
+                          }`}
+                        >
+                          <input
+                            checked={pitchEventIds.includes(event.id)}
+                            onChange={change =>
+                              setPitchEventIds(current =>
+                                change.target.checked
+                                  ? [...current, event.id]
+                                  : current.filter(id => id !== event.id)
+                              )
+                            }
+                            type="checkbox"
+                            className="shrink-0"
+                          />
+                          Add to pitch queue
+                        </label>
+                      )}
+                  </div>
                 ))}
               </div>
             )}
