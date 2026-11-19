@@ -2,10 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import prisma from '@/lib/prisma';
 import { uploadToS3 } from '@/lib/s3-images';
-import {
-  IMAGE_UPLOAD_SIZE_ERROR,
-  validateImageUploadSize,
-} from '@/lib/imageUploads';
+import { validateImageUploadSize } from '@/lib/imageUploads';
 
 export async function POST(
   request: Request,
@@ -37,11 +34,9 @@ export async function POST(
       return NextResponse.json({ error: 'Invalid file type' }, { status: 400 });
     }
 
-    if (validateImageUploadSize(file)) {
-      return NextResponse.json(
-        { error: IMAGE_UPLOAD_SIZE_ERROR },
-        { status: 413 }
-      );
+    const sizeError = validateImageUploadSize(file);
+    if (sizeError) {
+      return NextResponse.json({ error: sizeError }, { status: 413 });
     }
     const uploadResult = await uploadToS3(file, 'avatars');
 

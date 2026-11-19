@@ -443,7 +443,7 @@ describe('/api/projects/[projectId]/edit', () => {
       const formData = new FormData();
       formData.append(
         'thumbnail',
-        new File([new Uint8Array(15 * 1024 * 1024)], 'large.jpg', {
+        new File([new Uint8Array(5 * 1024 * 1024)], 'large.jpg', {
           type: 'image/jpeg',
         })
       );
@@ -458,7 +458,7 @@ describe('/api/projects/[projectId]/edit', () => {
 
       expect(response.status).toBe(413);
       expect(await response.json()).toEqual({
-        error: 'File too large. Image files must be smaller than 15 MB.',
+        error: 'This image is 5.0 MB. Images must be 4 MB or smaller. Try compressing it or saving it as a JPEG or WebP.',
       });
       expect(mockUploadToS3).not.toHaveBeenCalled();
     });

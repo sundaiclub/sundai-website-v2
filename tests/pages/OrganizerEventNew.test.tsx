@@ -356,7 +356,7 @@ describe('/organizer/events/new', () => {
 
     expect(
       await screen.findByText(
-        /file too large\. image files must be smaller than 15 mb\. the event was saved\./i
+        /images must be 4 mb or smaller\. try compressing it or saving it as a jpeg or webp\. the event was saved\./i
       )
     ).toBeInTheDocument();
   });

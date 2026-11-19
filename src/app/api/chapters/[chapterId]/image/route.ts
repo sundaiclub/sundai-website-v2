@@ -3,10 +3,7 @@ import prisma from '@/lib/prisma';
 import { requireChapterManager } from '@/lib/eventManagementApi';
 import { resolveChapterId } from '@/lib/chapters';
 import { uploadToS3 } from '@/lib/s3-images';
-import {
-  IMAGE_UPLOAD_SIZE_ERROR,
-  validateImageUploadSize,
-} from '@/lib/imageUploads';
+import { validateImageUploadSize } from '@/lib/imageUploads';
 
 const chapterImageSelect = {
   id: true,
@@ -54,11 +51,9 @@ export async function POST(
       return NextResponse.json({ error: 'Invalid file type' }, { status: 400 });
     }
 
-    if (validateImageUploadSize(file)) {
-      return NextResponse.json(
-        { error: IMAGE_UPLOAD_SIZE_ERROR },
-        { status: 413 }
-      );
+    const sizeError = validateImageUploadSize(file);
+    if (sizeError) {
+      return NextResponse.json({ error: sizeError }, { status: 413 });
     }
 
     const existing = await prisma.chapter.findUnique({

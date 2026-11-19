@@ -919,7 +919,7 @@ describe('/api/chapters', () => {
   it('returns 413 when a chapter image is too large', async () => {
     const { chapter, hacker, membership } = buildChapterAdminFixture();
     const file = new File(['image'], 'large.jpg', { type: 'image/jpeg' });
-    Object.defineProperty(file, 'size', { value: 15 * 1024 * 1024 });
+    Object.defineProperty(file, 'size', { value: 5 * 1024 * 1024 });
     const formData = new FormData();
     formData.append('file', file);
 
@@ -934,7 +934,7 @@ describe('/api/chapters', () => {
 
     expect(response.status).toBe(413);
     expect(await response.json()).toEqual({
-      error: 'File too large. Image files must be smaller than 15 MB.',
+      error: 'This image is 5.0 MB. Images must be 4 MB or smaller. Try compressing it or saving it as a JPEG or WebP.',
     });
     expect(uploadToS3).not.toHaveBeenCalled();
   });

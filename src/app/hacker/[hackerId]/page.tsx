@@ -13,6 +13,10 @@ import {
 } from "@heroicons/react/24/outline";
 import { useTheme } from "../../contexts/ThemeContext";
 import { swapFirstLetters } from "../../utils/nameUtils";
+import {
+  getImageUploadError,
+  validateImageUploadSize,
+} from "@/lib/imageUploads";
 
 type ProjectSummary = {
   id: string;
@@ -248,8 +252,9 @@ export default function HackerProfile() {
       setAvatarError("Please select an image file");
       return;
     }
-    if (file.size > 5 * 1024 * 1024) {
-      setAvatarError("Image must be smaller than 5MB");
+    const sizeError = validateImageUploadSize(file);
+    if (sizeError) {
+      setAvatarError(sizeError);
       return;
     }
 
@@ -263,13 +268,20 @@ export default function HackerProfile() {
         { method: "POST", body: formData }
       );
       if (!response.ok) {
-        throw new Error("Failed to upload avatar");
+        throw new Error(
+          await getImageUploadError(
+            response,
+            "Upload failed. Please try again."
+          )
+        );
       }
       const updated = await response.json();
       setHacker((prev) => (prev ? { ...prev, avatar: updated.avatar } : prev));
     } catch (error) {
       console.error("Error uploading avatar:", error);
-      setAvatarError("Upload failed. Please try again.");
+      setAvatarError(
+        error instanceof Error ? error.message : "Upload failed. Please try again."
+      );
     } finally {
       setUploadingAvatar(false);
     }

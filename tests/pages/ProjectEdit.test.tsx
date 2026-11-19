@@ -471,7 +471,76 @@ describe('ProjectEdit', () => {
       status: 'APPROVED',
       eventIds: [],
       removedEventIds: [],
-      sourceEventId: 'event-1',
+      pitchEventIds: [],
+    });
+  });
+
+  it('keeps the pitch queue choice from a new contextual project', async () => {
+    mockSearchParams.mockReturnValue(
+      new URLSearchParams(
+        'eventId=event-1&pitchEventId=event-1&sourceEventId=event-1'
+      )
+    );
+    const draftProject = { ...mockProject, status: 'DRAFT' };
+    (global.fetch as jest.Mock).mockImplementation(
+      (input: RequestInfo | URL) => {
+        const url = input.toString();
+        if (url === '/api/projects/test-project-id') {
+          return Promise.resolve({ ok: true, json: async () => draftProject });
+        }
+        if (url === '/api/events/project-options?projectId=test-project-id') {
+          return Promise.resolve({
+            ok: true,
+            json: async () => [
+              {
+                id: 'event-1',
+                title: 'Boston Build Night',
+                chapterName: 'Sundai Boston',
+                image: null,
+                alreadyAdded: true,
+                selectedByDefault: true,
+                pitchQueueOpen: true,
+                pitchAdded: false,
+              },
+            ],
+          });
+        }
+        if (url === '/api/projects/test-project-id/submit') {
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({ ...draftProject, status: 'APPROVED' }),
+          });
+        }
+        if (url === '/api/projects/test-project-id/edit') {
+          return Promise.resolve({ ok: true, json: async () => draftProject });
+        }
+        return Promise.resolve({ ok: true, json: async () => [] });
+      }
+    );
+
+    render(
+      <ThemeProvider>
+        <ProjectEdit />
+      </ThemeProvider>
+    );
+
+    expect(
+      await screen.findByRole('checkbox', { name: 'Add to pitch queue' })
+    ).toBeChecked();
+    await screen.findByDisplayValue('Test Project');
+    fireEvent.click(screen.getAllByRole('button', { name: 'Publish' })[0]);
+
+    await waitFor(() =>
+      expect(mockPush).toHaveBeenCalledWith('/pitch/event-1')
+    );
+    const submitCall = (global.fetch as jest.Mock).mock.calls.find(
+      ([url]) => url === '/api/projects/test-project-id/submit'
+    );
+    expect(JSON.parse(submitCall[1].body)).toEqual({
+      status: 'APPROVED',
+      eventIds: ['event-1'],
+      removedEventIds: [],
+      pitchEventIds: ['event-1'],
     });
   });
 
@@ -539,7 +608,7 @@ describe('ProjectEdit', () => {
         status: 'DRAFT',
         eventIds: ['event-draft'],
         removedEventIds: [],
-        sourceEventId: null,
+        pitchEventIds: [],
       });
       first.unmount();
       mockSearchParams.mockReturnValue(new URLSearchParams());
@@ -638,6 +707,8 @@ describe('ProjectEdit', () => {
                 image: null,
                 alreadyAdded: true,
                 selectedByDefault: true,
+                pitchQueueOpen: true,
+                pitchAdded: true,
               },
               {
                 id: 'event-new',
@@ -646,6 +717,8 @@ describe('ProjectEdit', () => {
                 image: null,
                 alreadyAdded: false,
                 selectedByDefault: false,
+                pitchQueueOpen: true,
+                pitchAdded: false,
               },
             ],
           });
@@ -691,7 +764,15 @@ describe('ProjectEdit', () => {
       screen.getByRole('img', { name: 'Cambridge Build Night event' })
     ).toHaveAttribute('src', expect.stringContaining('sundai_logo'));
 
+    expect(
+      screen.queryByRole('checkbox', { name: 'Add to pitch queue' })
+    ).not.toBeInTheDocument();
     await userEvent.click(newEvent);
+    const pitchChoice = screen.getByRole('checkbox', {
+      name: 'Add to pitch queue',
+    });
+    expect(pitchChoice).not.toBeChecked();
+    await userEvent.click(pitchChoice);
     await userEvent.click(
       screen.getAllByRole('button', { name: 'Save Changes' })[0]
     );
@@ -706,7 +787,7 @@ describe('ProjectEdit', () => {
         status: 'APPROVED',
         eventIds: ['event-added', 'event-new'],
         removedEventIds: [],
-        sourceEventId: null,
+        pitchEventIds: ['event-new'],
       });
     });
   });
@@ -776,7 +857,7 @@ describe('ProjectEdit', () => {
         status: 'APPROVED',
         eventIds: [],
         removedEventIds: ['event-added'],
-        sourceEventId: null,
+        pitchEventIds: [],
       });
     });
   });

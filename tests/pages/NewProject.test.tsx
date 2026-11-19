@@ -216,6 +216,7 @@ describe('NewProject', () => {
                 chapterName: 'Sundai Boston',
                 image: null,
                 selectedByDefault: false,
+                pitchQueueOpen: true,
               },
             ],
           });
@@ -233,6 +234,9 @@ describe('NewProject', () => {
     });
     expect(eventChoice).toBeChecked();
     expect(
+      screen.getByRole('checkbox', { name: 'Add to pitch queue' })
+    ).toBeChecked();
+    expect(
       screen.getByRole('img', { name: 'Boston Build Night event' })
     ).toHaveAttribute('src', expect.stringContaining('sundai_logo'));
 
@@ -247,12 +251,78 @@ describe('NewProject', () => {
     await waitFor(() =>
       expect(defaultRouter.push).toHaveBeenCalledWith(
         expect.stringContaining(
-          '/projects/new-project-id/edit?eventId=event-1&sourceEventId=event-1'
+          '/projects/new-project-id/edit?eventId=event-1&pitchEventId=event-1&sourceEventId=event-1'
         )
       )
     );
-    const createCall = (global.fetch as jest.Mock).mock.calls.find(([url]) => url === '/api/projects');
+    const createCall = (global.fetch as jest.Mock).mock.calls.find(
+      ([url]) => url === '/api/projects'
+    );
     expect(createCall[1].body.getAll('eventIds[]')).toEqual(['event-1']);
+  });
+
+  it('leaves the pitch queue unchecked without a source event until chosen', async () => {
+    (global.fetch as jest.Mock).mockImplementation(
+      (input: RequestInfo | URL) => {
+        if (input === '/api/hackers') {
+          return Promise.resolve({
+            ok: true,
+            json: async () => [
+              { id: 'hacker-1', name: 'John Doe', email: 'test@example.com' },
+            ],
+          });
+        }
+        if (input === '/api/events/project-options') {
+          return Promise.resolve({
+            ok: true,
+            json: async () => [
+              {
+                id: 'event-1',
+                title: 'Boston Build Night',
+                chapterName: 'Sundai Boston',
+                image: null,
+                selectedByDefault: true,
+                pitchQueueOpen: true,
+              },
+              {
+                id: 'event-2',
+                title: 'Closed Pitch Night',
+                chapterName: 'Sundai Boston',
+                image: null,
+                selectedByDefault: true,
+                pitchQueueOpen: false,
+              },
+            ],
+          });
+        }
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ id: 'new-project-id' }),
+        });
+      }
+    );
+
+    renderWithTheme(<NewProject />);
+    const pitchChoices = await screen.findAllByRole('checkbox', {
+      name: 'Add to pitch queue',
+    });
+    expect(pitchChoices).toHaveLength(1);
+    expect(pitchChoices[0]).not.toBeChecked();
+
+    fireEvent.click(pitchChoices[0]);
+    fireEvent.change(screen.getByLabelText('Project Title *'), {
+      target: { value: 'New Project' },
+    });
+    fireEvent.change(screen.getByLabelText('Brief Description *'), {
+      target: { value: 'New project description' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Create Project' }));
+
+    await waitFor(() =>
+      expect(defaultRouter.push).toHaveBeenCalledWith(
+        '/projects/new-project-id/edit?eventId=event-1&eventId=event-2&pitchEventId=event-1'
+      )
+    );
   });
 
   it('requires a track before creating a judged project and carries it to the editor', async () => {

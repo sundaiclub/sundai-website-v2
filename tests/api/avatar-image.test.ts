@@ -56,7 +56,7 @@ it('does not upload an avatar for another user', async () => {
 });
 it('rejects an oversized avatar before uploading', async () => {
   const file = new File(['image'], 'avatar.png', { type: 'image/png' });
-  Object.defineProperty(file, 'size', { value: 15 * 1024 * 1024 + 1 });
+  Object.defineProperty(file, 'size', { value: 5 * 1024 * 1024 });
   const response = await POST(request(file), { params: { hackerId: 'owner' } });
   expect(response.status).toBe(413);
   expect(uploadToS3).not.toHaveBeenCalled();

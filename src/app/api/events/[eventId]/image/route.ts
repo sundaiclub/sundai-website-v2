@@ -2,10 +2,7 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { requireEventSettingsManager } from '@/lib/eventManagementApi';
 import { uploadToS3 } from '@/lib/s3-images';
-import {
-  IMAGE_UPLOAD_SIZE_ERROR,
-  validateImageUploadSize,
-} from '@/lib/imageUploads';
+import { validateImageUploadSize } from '@/lib/imageUploads';
 
 const ALLOWED_EVENT_IMAGE_TYPES = new Set([
   'image/jpeg',
@@ -48,11 +45,9 @@ export async function POST(
         { status: 400 }
       );
     }
-    if (validateImageUploadSize(file)) {
-      return NextResponse.json(
-        { message: IMAGE_UPLOAD_SIZE_ERROR },
-        { status: 413 }
-      );
+    const sizeError = validateImageUploadSize(file);
+    if (sizeError) {
+      return NextResponse.json({ message: sizeError }, { status: 413 });
     }
 
     const upload = await uploadToS3(file, 'events');
