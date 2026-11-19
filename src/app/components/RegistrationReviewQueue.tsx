@@ -331,7 +331,6 @@ export function RegistrationReviewListItem({
           {!row.activeBan && !history && (
             <ManagementBadge tone="warning">New</ManagementBadge>
           )}
-          {hasInternalNotes(row) && <ManagementBadge>Notes</ManagementBadge>}
         </span>
         <span className={`block truncate text-xs ${classes.mutedText}`}>
           {[appliedAgo, history ?? 'First Sundai event']

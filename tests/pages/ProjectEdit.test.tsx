@@ -394,6 +394,56 @@ describe('ProjectEdit', () => {
     });
   });
 
+  it('still saves when the GitHub link warning is showing', async () => {
+    (global.fetch as jest.Mock).mockImplementation(
+      (input: RequestInfo | URL) => {
+        const url = input.toString();
+        if (url.startsWith('https://api.github.com/')) {
+          return Promise.resolve({
+            ok: false,
+            status: 404,
+            json: async () => ({}),
+          });
+        }
+        return Promise.resolve({
+          ok: true,
+          json: async () =>
+            url.startsWith('/api/projects/test-project-id') ? mockProject : [],
+        });
+      }
+    );
+
+    render(
+      <ThemeProvider>
+        <ProjectEdit />
+      </ThemeProvider>
+    );
+
+    await screen.findByDisplayValue('Test Project');
+    fireEvent.change(screen.getByLabelText('GitHub URL'), {
+      target: { value: 'https://github.com/example/private-repo' },
+    });
+    expect(
+      await screen.findByText(/cannot be found or is private/i, undefined, {
+        timeout: 2000,
+      })
+    ).toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getAllByRole('button', { name: /save changes/i })[0]
+    );
+
+    await waitFor(() => {
+      const calls = (global.fetch as jest.Mock).mock.calls as any[];
+      expect(
+        calls.some(
+          ([url, init]) =>
+            /\/api\/projects\/.*\/edit/.test(url) && init?.method === 'PATCH'
+        )
+      ).toBe(true);
+    });
+  });
+
   it('should handle error state', async () => {
     (global.fetch as jest.Mock).mockResolvedValueOnce({
       ok: false,

@@ -778,7 +778,7 @@ describe('/organizer/events/[eventId]/registrations', () => {
     });
   });
 
-  it('marks applicants who have internal review notes', async () => {
+  it('marks the application when it has internal review notes', async () => {
     const withoutNotes: OrganizerRegistrationReviewRow = {
       ...pendingRow,
       id: 'registration-without-notes',
@@ -800,24 +800,15 @@ describe('/organizer/events/[eventId]/registrations', () => {
 
     const detail = await findDetail();
     expect(within(detail).getByText('Has notes')).toBeInTheDocument();
-    const listItems = screen.getAllByRole('listitem');
-    expect(within(listItems[0]).getByText('Notes')).toBeInTheDocument();
-    expect(within(listItems[1]).queryByText('Notes')).not.toBeInTheDocument();
+    for (const item of screen.getAllByRole('listitem')) {
+      expect(within(item).queryByText(/notes/i)).not.toBeInTheDocument();
+    }
 
     fireEvent.click(screen.getByRole('button', { name: /quiet applicant/i }));
     const quietDetail = await findDetail('Quiet Applicant');
     expect(
       within(quietDetail).queryByText('Has notes')
     ).not.toBeInTheDocument();
-    const notes = within(quietDetail).getByLabelText(/internal review notes/i);
-    fireEvent.change(notes, { target: { value: 'Met them at demo day.' } });
-    fireEvent.blur(notes);
-
-    await waitFor(() => {
-      expect(
-        within(screen.getAllByRole('listitem')[1]).getByText('Notes')
-      ).toBeInTheDocument();
-    });
   });
 
   it('approves several selected applicants with one bulk request', async () => {
