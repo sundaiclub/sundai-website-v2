@@ -9,6 +9,7 @@ import {
 import toast from 'react-hot-toast';
 import MarkdownEditor from '@/app/components/MarkdownEditor';
 import { ThemeProvider } from '@/app/contexts/ThemeContext';
+import { uploadImageFile } from '@/lib/imageUploads';
 
 jest.mock('react-markdown', () => ({
   __esModule: true,
@@ -20,7 +21,15 @@ jest.mock('react-hot-toast', () => ({
   default: { loading: jest.fn(), dismiss: jest.fn(), error: jest.fn() },
 }));
 
-beforeEach(() => jest.clearAllMocks());
+jest.mock('@/lib/imageUploads', () => ({
+  ...jest.requireActual('@/lib/imageUploads'),
+  uploadImageFile: jest.fn(),
+}));
+
+beforeEach(() => {
+  jest.clearAllMocks();
+  (uploadImageFile as jest.Mock).mockResolvedValue('upload-token');
+});
 
 function Editors() {
   const [first, setFirst] = useState('First text');
@@ -89,6 +98,12 @@ it('inserts a dropped image at position zero and escapes its filename', async ()
   expect(screen.getByRole('textbox', { name: 'Second' })).toHaveValue(
     'Second text'
   );
+  expect(uploadImageFile).toHaveBeenCalledWith(expect.any(File), 'projects');
+  expect(fetch).toHaveBeenCalledWith('/api/uploads/image', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ uploadToken: 'upload-token' }),
+  });
 });
 
 it('keeps a completed upload when the user switches to preview', async () => {

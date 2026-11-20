@@ -15,6 +15,7 @@ import { useTheme } from "../../contexts/ThemeContext";
 import { swapFirstLetters } from "../../utils/nameUtils";
 import {
   getImageUploadError,
+  uploadImageFile,
   validateImageUploadSize,
 } from "@/lib/imageUploads";
 
@@ -261,11 +262,14 @@ export default function HackerProfile() {
     setAvatarError(null);
     setUploadingAvatar(true);
     try {
-      const formData = new FormData();
-      formData.append("file", file);
+      const uploadToken = await uploadImageFile(file, "avatars");
       const response = await fetch(
         `/api/hackers/${params?.hackerId}/avatar`,
-        { method: "POST", body: formData }
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ uploadToken }),
+        }
       );
       if (!response.ok) {
         throw new Error(

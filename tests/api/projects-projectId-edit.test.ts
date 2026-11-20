@@ -2,7 +2,8 @@ import { publicFields, publicProjectSelect } from '@/lib/publicData';
 import { NextRequest } from 'next/server';
 import { PATCH } from '../../src/app/api/projects/[projectId]/edit/route';
 import prisma from '../../src/lib/prisma';
-import { uploadToS3 } from '../../src/lib/s3-images';
+import { claimUploadedImage } from '../../src/lib/s3-images';
+import { ImageUploadError } from '../../src/lib/imageUploads';
 
 // Mock dependencies
 jest.mock('../../src/lib/prisma', () => ({
@@ -23,7 +24,7 @@ jest.mock('../../src/lib/prisma', () => ({
 }));
 
 jest.mock('../../src/lib/s3-images', () => ({
-  uploadToS3: jest.fn(),
+  claimUploadedImage: jest.fn(),
 }));
 
 jest.mock('@clerk/nextjs/server', () => ({
@@ -31,7 +32,9 @@ jest.mock('@clerk/nextjs/server', () => ({
 }));
 
 const mockPrisma = prisma as jest.Mocked<typeof prisma>;
-const mockUploadToS3 = uploadToS3 as jest.MockedFunction<typeof uploadToS3>;
+const mockClaimUploadedImage = claimUploadedImage as jest.MockedFunction<
+  typeof claimUploadedImage
+>;
 
 describe('/api/projects/[projectId]/edit', () => {
   const mockProjectId = 'test-project-id';
@@ -375,9 +378,12 @@ describe('/api/projects/[projectId]/edit', () => {
       };
 
       const mockUploadResult = {
-        key: 'test-image.jpg',
+        key: 'projects/test-image.jpg',
         bucket: 'test-bucket',
         url: 'https://example.com/test-image.jpg',
+        filename: 'test.jpg',
+        mimeType: 'image/jpeg',
+        size: 14 * 1024 * 1024,
       };
 
       const mockImage = {
@@ -394,7 +400,7 @@ describe('/api/projects/[projectId]/edit', () => {
 
       mockPrisma.project.findUnique.mockResolvedValue(mockProject as any);
       mockPrisma.hacker.findUnique.mockResolvedValue(mockUser as any);
-      mockUploadToS3.mockResolvedValue(mockUploadResult);
+      mockClaimUploadedImage.mockResolvedValue(mockUploadResult);
       mockPrisma.image.create.mockResolvedValue(mockImage as any);
       mockPrisma.project.update.mockResolvedValue(mockUpdatedProject as any);
 
@@ -402,10 +408,7 @@ describe('/api/projects/[projectId]/edit', () => {
 
       const formData = new FormData();
       formData.append('title', 'Updated Title');
-      formData.append(
-        'thumbnail',
-        new File(['test'], 'test.jpg', { type: 'image/jpeg' })
-      );
+      formData.append('thumbnailUploadToken', 'upload-token');
 
       const request = new NextRequest(
         `http://localhost:3000/api/projects/${mockProjectId}/edit`,
@@ -422,10 +425,25 @@ describe('/api/projects/[projectId]/edit', () => {
 
       expect(response.status).toBe(200);
       expect(data).toEqual(publicFields(mockUpdatedProject, publicProjectSelect));
-      expect(mockUploadToS3).toHaveBeenCalled();
+      expect(mockClaimUploadedImage).toHaveBeenCalledWith(
+        'upload-token',
+        'projects'
+      );
+      expect(mockPrisma.image.create).toHaveBeenCalledWith({
+        data: {
+          key: 'projects/test-image.jpg',
+          bucket: 'test-bucket',
+          url: 'https://example.com/test-image.jpg',
+          filename: 'test.jpg',
+          mimeType: 'image/jpeg',
+          size: 14 * 1024 * 1024,
+          alt: 'Updated Title',
+          prompt: null,
+        },
+      });
     });
 
-    it('should return 413 when the thumbnail is too large', async () => {
+    it('reports a thumbnail upload that cannot be claimed', async () => {
       const { auth } = require('@clerk/nextjs/server');
       auth.mockReturnValue({ userId: mockUserId });
       mockPrisma.project.findUnique.mockResolvedValue({
@@ -440,13 +458,15 @@ describe('/api/projects/[projectId]/edit', () => {
         role: 'HACKER',
       } as any);
 
-      const formData = new FormData();
-      formData.append(
-        'thumbnail',
-        new File([new Uint8Array(5 * 1024 * 1024)], 'large.jpg', {
-          type: 'image/jpeg',
-        })
+      mockClaimUploadedImage.mockRejectedValue(
+        new ImageUploadError(
+          'The uploaded image could not be found. Please upload it again.',
+          400
+        )
       );
+
+      const formData = new FormData();
+      formData.append('thumbnailUploadToken', 'stale');
       const request = new NextRequest(
         `http://localhost:3000/api/projects/${mockProjectId}/edit`,
         { method: 'PATCH', body: formData }
@@ -456,11 +476,11 @@ describe('/api/projects/[projectId]/edit', () => {
         params: { projectId: mockProjectId },
       });
 
-      expect(response.status).toBe(413);
+      expect(response.status).toBe(400);
       expect(await response.json()).toEqual({
-        error: 'This image is 5.0 MB. Images must be 4 MB or smaller. Try compressing it or saving it as a JPEG or WebP.',
+        error: 'The uploaded image could not be found. Please upload it again.',
       });
-      expect(mockUploadToS3).not.toHaveBeenCalled();
+      expect(mockPrisma.image.create).not.toHaveBeenCalled();
     });
 
     it('should handle thumbnail deletion', async () => {

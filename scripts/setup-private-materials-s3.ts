@@ -74,6 +74,8 @@ async function main() {
               AllowedOrigins: [
                 'https://sundai.club',
                 'https://www.sundai.club',
+                'https://sundai-website-v2-*.vercel.app',
+                'http://localhost:3000',
               ],
               AllowedMethods: ['PUT'],
               AllowedHeaders: ['content-type'],

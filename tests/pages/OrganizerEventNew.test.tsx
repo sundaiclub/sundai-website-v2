@@ -138,9 +138,33 @@ function latestFetchBody() {
   return JSON.parse(String(postCall[1].body));
 }
 
+const S3_UPLOAD_URL = 'https://uploads.s3.example.com/';
+
+function s3UploadedFile() {
+  const s3Call = (global.fetch as jest.Mock).mock.calls.find(
+    ([url]) => requestUrl(url) === S3_UPLOAD_URL
+  );
+  return (s3Call?.[1].body as FormData).get('file') as File;
+}
+
 function mockOrganizerFetches() {
   global.fetch = jest.fn((input: RequestInfo | URL, init?: RequestInit) => {
     const url = requestUrl(input);
+
+    if (url.includes('/api/uploads/image-intents')) {
+      return jsonResponse(
+        {
+          url: S3_UPLOAD_URL,
+          fields: { key: 'events/upload-key' },
+          uploadToken: 'upload-token',
+        },
+        201
+      );
+    }
+
+    if (url === S3_UPLOAD_URL) {
+      return jsonResponse('', 204);
+    }
 
     if (url.includes('/api/chapters')) {
       return jsonResponse(chapters);
@@ -323,27 +347,24 @@ describe('/organizer/events/new', () => {
         '/api/events/event-created/image',
         expect.objectContaining({
           method: 'POST',
-          body: expect.any(FormData),
+          body: JSON.stringify({ uploadToken: 'upload-token', prompt: null }),
         })
       );
     });
-    const imageCall = (global.fetch as jest.Mock).mock.calls.find(([url]) =>
-      requestUrl(url).includes('/api/events/event-created/image')
-    );
-    expect((imageCall?.[1].body as FormData).get('image')).toBe(image);
+    expect(s3UploadedFile()).toBe(image);
     expect(
       await screen.findByText(/event draft was successfully created/i)
     ).toBeInTheDocument();
   });
 
-  it('shows the size limit when an event image upload returns 413', async () => {
+  it('shows the size limit when S3 rejects an event image as too large', async () => {
     await renderNewEventPage();
     fillRequiredEventFields();
     const defaultFetch = (global.fetch as jest.Mock).getMockImplementation()!;
     (global.fetch as jest.Mock).mockImplementation(
       (input: RequestInfo | URL, init?: RequestInit) =>
-        requestUrl(input).includes('/api/events/event-created/image')
-          ? jsonResponse({}, 413)
+        requestUrl(input) === S3_UPLOAD_URL
+          ? jsonResponse('<Error><Code>EntityTooLarge</Code></Error>', 400)
           : defaultFetch(input, init)
     );
 
@@ -356,7 +377,7 @@ describe('/organizer/events/new', () => {
 
     expect(
       await screen.findByText(
-        /images must be 4 mb or smaller\. try compressing it or saving it as a jpeg or webp\. the event was saved\./i
+        /images must be 15 mb or smaller\. try compressing it or saving it as a jpeg or webp\. the event was saved\./i
       )
     ).toBeInTheDocument();
   });
@@ -395,20 +416,18 @@ describe('/organizer/events/new', () => {
       );
       expect(global.fetch).toHaveBeenCalledWith(
         '/api/events/event-created/image',
-        expect.objectContaining({ method: 'POST', body: expect.any(FormData) })
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({
+            uploadToken: 'upload-token',
+            prompt: 'Generated event image 1',
+          }),
+        })
       );
     });
-    const imageCall = (global.fetch as jest.Mock).mock.calls.find(([url]) =>
-      requestUrl(url).includes('/api/events/event-created/image')
-    );
-    const uploadedImage = (imageCall?.[1].body as FormData).get(
-      'image'
-    ) as File;
+    const uploadedImage = s3UploadedFile();
     expect(uploadedImage.name).toBe('ai-generated-event-image.webp');
     expect(uploadedImage.type).toBe('image/webp');
-    expect((imageCall?.[1].body as FormData).get('prompt')).toBe(
-      'Generated event image 1'
-    );
   });
 
   it('preselects the requested chapter from the chapterId query parameter', async () => {

@@ -42,6 +42,7 @@ import {
 import type { JudgingAnswers, ProjectJudgingOption } from '@/types/judging';
 import {
   getImageUploadError,
+  uploadImageFile,
   validateImageUploadSize,
 } from '@/lib/imageUploads';
 
@@ -514,7 +515,10 @@ export default function ProjectEditPage() {
       const formData = new FormData();
       formData.append('title', editableTitle);
       if (thumbnail) {
-        formData.append('thumbnail', thumbnail);
+        formData.append(
+          'thumbnailUploadToken',
+          await uploadImageFile(thumbnail, 'projects')
+        );
       }
       if (thumbnailPrompt) {
         formData.append('thumbnailPrompt', thumbnailPrompt);
@@ -617,7 +621,10 @@ export default function ProjectEditPage() {
       const formData = new FormData();
       formData.append('title', editableTitle);
       if (thumbnail) {
-        formData.append('thumbnail', thumbnail);
+        formData.append(
+          'thumbnailUploadToken',
+          await uploadImageFile(thumbnail, 'projects')
+        );
       }
       if (thumbnailPrompt) {
         formData.append('thumbnailPrompt', thumbnailPrompt);

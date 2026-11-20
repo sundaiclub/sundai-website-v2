@@ -44,6 +44,7 @@ import { parseTemplateFieldsJson } from '@/lib/applicationTemplates';
 import { CHAPTER_TIMEZONE_GROUPS } from '@/lib/chapterTimezones';
 import {
   getImageUploadError,
+  uploadImageFile,
   validateImageUploadSize,
 } from '@/lib/imageUploads';
 
@@ -941,26 +942,28 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
         );
       }
       if (eventImageFile && savedEvent?.id) {
-        const imageFormData = new FormData();
-        imageFormData.append('image', eventImageFile);
-        if (eventImagePrompt) imageFormData.append('prompt', eventImagePrompt);
-        const imageResponse = await fetch(
-          `/api/events/${savedEvent.id}/image`,
-          {
-            method: 'POST',
-            body: imageFormData,
-          }
-        );
-        if (!imageResponse.ok) {
-          setSavedEventId(savedEvent.id);
-          const uploadError = await getImageUploadError(
-            imageResponse,
-            'Unable to upload the event image.'
+        let image: OrganizerEventSettings['image'] = null;
+        let uploadError = 'Unable to upload the event image.';
+        try {
+          const uploadToken = await uploadImageFile(eventImageFile, 'events');
+          const imageResponse = await fetch(
+            `/api/events/${savedEvent.id}/image`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ uploadToken, prompt: eventImagePrompt }),
+            }
           );
+          if (imageResponse.ok) image = await imageResponse.json();
+          else uploadError = await getImageUploadError(imageResponse, uploadError);
+        } catch (error) {
+          if (error instanceof Error) uploadError = error.message;
+        }
+        if (!image) {
+          setSavedEventId(savedEvent.id);
           setMessage(`${uploadError} The event was saved.`);
           return;
         }
-        const image = await imageResponse.json();
         setEventImageFile(null);
         setEventImagePrompt(null);
         setEventImagePreview(image.url);

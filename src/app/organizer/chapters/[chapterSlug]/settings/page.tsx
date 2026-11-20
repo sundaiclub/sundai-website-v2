@@ -34,7 +34,7 @@ import { CHAPTER_TIMEZONE_GROUPS } from '@/lib/chapterTimezones';
 import { DEFAULT_EVENT_MESSAGES } from '@/lib/eventMessageDefaults';
 import {
   getImageUploadError,
-  validateImageUploadSize,
+  uploadImageFile,
 } from '@/lib/imageUploads';
 
 function firstChapter(payload: unknown): OrganizerChapterSettings | null {
@@ -308,15 +308,11 @@ export default function OrganizerChapterSettingsPage() {
     setSettingsError('');
 
     try {
-      const sizeError = validateImageUploadSize(file);
-      if (sizeError) throw new Error(sizeError);
-
-      const formData = new FormData();
-      formData.append('file', file);
-
+      const uploadToken = await uploadImageFile(file, 'chapters');
       const response = await fetch(`/api/chapters/${chapter.id}/image`, {
         method: 'POST',
-        body: formData,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ uploadToken }),
       });
 
       if (!response.ok) {

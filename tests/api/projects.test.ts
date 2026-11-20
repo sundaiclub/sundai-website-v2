@@ -29,11 +29,6 @@ jest.mock('@clerk/nextjs/server', () => ({
   auth: jest.fn(),
 }));
 
-// Mock GCP storage
-jest.mock('../../src/lib/s3-images', () => ({
-  uploadToS3: jest.fn(),
-}));
-
 // Get the mocked Prisma
 const mockPrisma = require('../../src/lib/prisma').default;
 
