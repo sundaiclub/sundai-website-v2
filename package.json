@@ -32,10 +32,7 @@
     "db:migrate:deploy": "./scripts/migrate_deploy.sh",
     "db:backfill:sundai-boston": "ts-node --compiler-options '{\"module\":\"CommonJS\",\"moduleResolution\":\"node\"}' prisma/data-migrations/20260807000000_backfill_sundai_boston_events.ts",
     "fetch:sundai-boston-images": "node scripts/fetch-sundai-boston-event-images.mjs",
-    "db:populate": "./scripts/populate_db.sh",
-    "images:copy": "node --no-deprecation scripts/copy-images-to-s3.ts",
-    "images:migrate": "node --no-deprecation scripts/migrate-images-to-s3.ts",
-    "materials:setup": "node --no-deprecation scripts/setup-private-materials-s3.ts"
+    "db:populate": "./scripts/populate_db.sh"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1146.0",
