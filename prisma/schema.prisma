@@ -411,73 +411,74 @@ enum PitchSessionPhase {
 
 // Events and Pitch Queue
 model Event {
-  id                          String                   @id @default(uuid())
-  title                       String
-  description                 String?
-  startTime                   DateTime
-  endTime                     DateTime?
-  timezone                    String
-  meetingUrl                  String?
-  location                    String?
-  venueName                   String?
-  publicLocation              String?
-  address                     String?
-  virtualUrl                  String?
-  createdBy                   Hacker                   @relation(fields: [createdById], references: [id])
-  createdById                 String
-  chapter                     Chapter                  @relation(fields: [chapterId], references: [id])
-  chapterId                   String
-  slug                        String
-  status                      EventStatus              @default(DRAFT)
-  visibility                  EventVisibility          @default(PUBLIC)
-  programType                 String?
-  publicProgramLabel          String?
-  capacity                    Int?
-  applicationMode             EventApplicationMode     @default(REQUIRES_APPROVAL)
-  applicationRequired         Boolean                  @default(true)
-  requireGithubUrl            Boolean                  @default(false)
-  autoPromoteWaitlist         Boolean                  @default(false)
-  approvedDetailsJson         Json?
-  applicationQuestionsJson    Json?
-  communicationLocationsJson  Json?
-  hideChapterDefaultQuestions Boolean                  @default(false)
-  confirmationMessage         String?
-  waitlistMessage             String?
-  declineMessage              String?
-  applicationsOpen            Boolean                  @default(true)
-  applicationsClosedAt        DateTime?
-  applicationsClosedBy        Hacker?                  @relation("EventApplicationsClosedBy", fields: [applicationsClosedById], references: [id])
-  applicationsClosedById      String?
-  applicationsCloseReason     String?
-  trackAttendance             Boolean                  @default(false)
+  id                            String                   @id @default(uuid())
+  title                         String
+  description                   String?
+  startTime                     DateTime
+  endTime                       DateTime?
+  timezone                      String
+  meetingUrl                    String?
+  location                      String?
+  venueName                     String?
+  publicLocation                String?
+  address                       String?
+  virtualUrl                    String?
+  createdBy                     Hacker                   @relation(fields: [createdById], references: [id])
+  createdById                   String
+  chapter                       Chapter                  @relation(fields: [chapterId], references: [id])
+  chapterId                     String
+  slug                          String
+  status                        EventStatus              @default(DRAFT)
+  visibility                    EventVisibility          @default(PUBLIC)
+  programType                   String?
+  publicProgramLabel            String?
+  capacity                      Int?
+  applicationMode               EventApplicationMode     @default(REQUIRES_APPROVAL)
+  applicationRequired           Boolean                  @default(true)
+  requireGithubUrl              Boolean                  @default(false)
+  autoPromoteWaitlist           Boolean                  @default(false)
+  approvedDetailsJson           Json?
+  applicationQuestionsJson      Json?
+  communicationLocationsJson    Json?
+  hideChapterDefaultQuestions   Boolean                  @default(false)
+  confirmationMessage           String?
+  waitlistMessage               String?
+  declineMessage                String?
+  applicationsOpen              Boolean                  @default(true)
+  applicationsClosedAt          DateTime?
+  applicationsClosedBy          Hacker?                  @relation("EventApplicationsClosedBy", fields: [applicationsClosedById], references: [id])
+  applicationsClosedById        String?
+  applicationsCloseReason       String?
+  trackAttendance               Boolean                  @default(false)
   // Judging: submissions default to the event window unless overridden.
-  judgingEnabled              Boolean                  @default(false)
-  projectsHidden              Boolean                  @default(false)
-  judgingOpen                 Boolean                  @default(false)
-  judgesPerProject            Int                      @default(3)
+  judgingEnabled                Boolean                  @default(false)
+  projectsHidden                Boolean                  @default(false)
+  judgingOpen                   Boolean                  @default(false)
+  judgesPerProject              Int                      @default(3)
   judgingAssignmentsPublishedAt DateTime?
-  judgingSubmissionsOpenAt    DateTime?
-  judgingSubmissionsCloseAt   DateTime?
-  image                       Image?                   @relation("EventImage", fields: [imageId], references: [id])
-  imageId                     String?                  @unique
-  staff                       EventStaff[]
-  pitchSessions               PitchSession[]
-  projects                    EventProject[]
-  registrations               EventRegistration[]
-  registrationAudits          EventRegistrationAudit[]
-  materials                   EventMaterial[]
-  materialAudits              EventMaterialAudit[]
-  communications              EventCommunication[]
-  staffAudits                 EventStaffAudit[]
-  judgingTracks               JudgingTrack[]
-  judgingCriteria             JudgingCriterion[]
-  judges                      EventJudge[]
-  judgingSubmissions          JudgingSubmission[]
-  ideas                       EventIdea[]
-  createdAt                   DateTime                 @default(now())
-  updatedAt                   DateTime                 @updatedAt
+  judgingSubmissionsOpenAt      DateTime?
+  judgingSubmissionsCloseAt     DateTime?
+  image                         Image?                   @relation("EventImage", fields: [imageId], references: [id])
+  imageId                       String?                  @unique
+  staff                         EventStaff[]
+  pitchSessions                 PitchSession[]
+  projects                      EventProject[]
+  registrations                 EventRegistration[]
+  registrationAudits            EventRegistrationAudit[]
+  materials                     EventMaterial[]
+  materialAudits                EventMaterialAudit[]
+  communications                EventCommunication[]
+  staffAudits                   EventStaffAudit[]
+  judgingTracks                 JudgingTrack[]
+  judgingCriteria               JudgingCriterion[]
+  judges                        EventJudge[]
+  judgingSubmissions            JudgingSubmission[]
+  ideas                         EventIdea[]
+  createdAt                     DateTime                 @default(now())
+  updatedAt                     DateTime                 @updatedAt
 
-  messageLinks                MessageLink[]
+  messageLinks MessageLink[]
+
   @@unique([chapterId, slug])
   @@index([startTime])
   @@index([chapterId, status, startTime])
@@ -501,16 +502,18 @@ model EventIdea {
 }
 
 model EventProject {
-  id         String                 @id @default(uuid())
-  event      Event                  @relation(fields: [eventId], references: [id])
-  eventId    String
-  project    Project                @relation(fields: [projectId], references: [id])
-  projectId  String
-  addedBy    Hacker                 @relation("EventProjectAdder", fields: [addedById], references: [id])
-  addedById  String
-  cardStatus EventProjectCardStatus @default(DRAFT)
-  createdAt  DateTime               @default(now())
-  updatedAt  DateTime               @updatedAt
+  id             String                 @id @default(uuid())
+  event          Event                  @relation(fields: [eventId], references: [id])
+  eventId        String
+  project        Project                @relation(fields: [projectId], references: [id])
+  projectId      String
+  addedBy        Hacker                 @relation("EventProjectAdder", fields: [addedById], references: [id])
+  addedById      String
+  cardStatus     EventProjectCardStatus @default(DRAFT)
+  // The team asked to join this event's pitch queue when the project is published.
+  pitchRequested Boolean                @default(false)
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
 
   @@unique([eventId, projectId])
   @@index([eventId, cardStatus])
@@ -964,8 +967,8 @@ enum PitchTimerPhase {
 }
 
 model WeeklyEmail {
-  id           String               @id @default(uuid())
-  subject      String               @db.VarChar(200)
+  id           String                 @id @default(uuid())
+  subject      String                 @db.VarChar(200)
   body         String
   status       WeeklyEmailStatus      @default(DRAFT)
   sentAt       DateTime?

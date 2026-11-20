@@ -339,7 +339,7 @@ describe('/api/projects/[projectId]/submit', () => {
       expect(data).toEqual(mockUpdatedProject);
     });
 
-    it('publishes into selected events and only the open source pitch queue', async () => {
+    it('publishes into selected events and only the requested pitch queues', async () => {
       const now = new Date('2026-08-28T17:00:00.000Z');
       jest.useFakeTimers().setSystemTime(now);
       const mockUser = { id: mockHackerId, role: 'HACKER' };
@@ -387,7 +387,7 @@ describe('/api/projects/[projectId]/submit', () => {
           body: JSON.stringify({
             status: 'APPROVED',
             eventIds: ['event-source', 'event-other'],
-            sourceEventId: 'event-source',
+            pitchEventIds: ['event-source', 'event-unselected'],
           }),
           headers: { 'Content-Type': 'application/json' },
         }
@@ -407,6 +407,150 @@ describe('/api/projects/[projectId]/submit', () => {
           position: 3,
         }),
       });
+      jest.useRealTimers();
+    });
+
+    it('does not join a pitch queue unless it is requested', async () => {
+      jest.useFakeTimers().setSystemTime(new Date('2026-08-28T17:00:00.000Z'));
+      mockPrisma.hacker.findUnique.mockResolvedValue({
+        id: mockHackerId,
+        role: 'HACKER',
+      } as any);
+      mockPrisma.project.findUnique.mockResolvedValue({
+        id: mockProjectId,
+        launchLeadId: mockHackerId,
+        participants: [],
+      } as any);
+      mockPrisma.project.update.mockResolvedValue({
+        id: mockProjectId,
+        status: 'APPROVED',
+      } as any);
+      (mockPrisma.event.findMany as jest.Mock).mockResolvedValue([
+        {
+          id: 'event-source',
+          startTime: new Date('2026-08-28T16:00:00.000Z'),
+          endTime: new Date('2026-08-28T21:00:00.000Z'),
+          pitchSessions: [
+            { id: 'pitch-1', phase: 'VOTING', defaultPitchSec: 180 },
+          ],
+        },
+      ]);
+
+      const request = new NextRequest(
+        `http://localhost:3000/api/projects/${mockProjectId}/submit`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify({
+            status: 'APPROVED',
+            eventIds: ['event-source'],
+          }),
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
+
+      expect(
+        (await PATCH(request, { params: { projectId: mockProjectId } })).status
+      ).toBe(200);
+      expect(mockPrisma.eventProject.upsert).toHaveBeenCalledTimes(1);
+      expect(mockPrisma.pitchProject.create).not.toHaveBeenCalled();
+      jest.useRealTimers();
+    });
+
+    it('does not join the pitch queue of a judged event', async () => {
+      jest.useFakeTimers().setSystemTime(new Date('2026-08-28T17:00:00.000Z'));
+      mockPrisma.hacker.findUnique.mockResolvedValue({
+        id: mockHackerId,
+        role: 'HACKER',
+      } as any);
+      mockPrisma.project.findUnique.mockResolvedValue({
+        id: mockProjectId,
+        launchLeadId: mockHackerId,
+        participants: [],
+      } as any);
+      mockPrisma.project.update.mockResolvedValue({
+        id: mockProjectId,
+        status: 'APPROVED',
+      } as any);
+      (mockPrisma.event.findMany as jest.Mock).mockResolvedValue([
+        {
+          id: 'event-judged',
+          judgingEnabled: true,
+          startTime: new Date('2026-08-28T16:00:00.000Z'),
+          endTime: new Date('2026-08-28T21:00:00.000Z'),
+          pitchSessions: [
+            { id: 'pitch-1', phase: 'VOTING', defaultPitchSec: 180 },
+          ],
+        },
+      ]);
+
+      const request = new NextRequest(
+        `http://localhost:3000/api/projects/${mockProjectId}/submit`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify({
+            status: 'APPROVED',
+            eventIds: ['event-judged'],
+            pitchEventIds: ['event-judged'],
+          }),
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
+
+      expect(
+        (await PATCH(request, { params: { projectId: mockProjectId } })).status
+      ).toBe(200);
+      expect(mockPrisma.eventProject.upsert).toHaveBeenCalledTimes(1);
+      expect(mockPrisma.pitchProject.create).not.toHaveBeenCalled();
+      jest.useRealTimers();
+    });
+
+    it('skips a requested pitch queue that already has the project', async () => {
+      jest.useFakeTimers().setSystemTime(new Date('2026-08-28T17:00:00.000Z'));
+      mockPrisma.hacker.findUnique.mockResolvedValue({
+        id: mockHackerId,
+        role: 'HACKER',
+      } as any);
+      mockPrisma.project.findUnique.mockResolvedValue({
+        id: mockProjectId,
+        status: 'APPROVED',
+        launchLeadId: mockHackerId,
+        participants: [],
+      } as any);
+      mockPrisma.project.update.mockResolvedValue({
+        id: mockProjectId,
+        status: 'APPROVED',
+      } as any);
+      (mockPrisma.event.findMany as jest.Mock).mockResolvedValue([
+        {
+          id: 'event-source',
+          startTime: new Date('2026-08-28T16:00:00.000Z'),
+          endTime: new Date('2026-08-28T21:00:00.000Z'),
+          pitchSessions: [
+            { id: 'pitch-1', phase: 'PITCHING', defaultPitchSec: 180 },
+          ],
+        },
+      ]);
+      (mockPrisma.pitchProject.findMany as jest.Mock).mockResolvedValue([
+        { pitchSessionId: 'pitch-1' },
+      ]);
+
+      const request = new NextRequest(
+        `http://localhost:3000/api/projects/${mockProjectId}/submit`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify({
+            status: 'APPROVED',
+            eventIds: ['event-source'],
+            pitchEventIds: ['event-source'],
+          }),
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
+
+      expect(
+        (await PATCH(request, { params: { projectId: mockProjectId } })).status
+      ).toBe(200);
+      expect(mockPrisma.pitchProject.create).not.toHaveBeenCalled();
       jest.useRealTimers();
     });
 
@@ -444,7 +588,7 @@ describe('/api/projects/[projectId]/submit', () => {
           body: JSON.stringify({
             status: 'APPROVED',
             eventIds: ['event-source'],
-            sourceEventId: 'event-source',
+            pitchEventIds: ['event-source'],
           }),
           headers: { 'Content-Type': 'application/json' },
         }
@@ -492,7 +636,7 @@ describe('/api/projects/[projectId]/submit', () => {
             status: 'APPROVED',
             eventIds: [],
             removedEventIds: ['event-remove'],
-            sourceEventId: null,
+            pitchEventIds: [],
           }),
           headers: { 'Content-Type': 'application/json' },
         }
@@ -545,20 +689,27 @@ describe('/api/projects/[projectId]/submit', () => {
           'http://localhost/api/projects/draft/submit',
           {
             method: 'PATCH',
-            body: JSON.stringify({ status, eventIds: ['event-draft'] }),
+            body: JSON.stringify({
+              status,
+              eventIds: ['event-draft'],
+              pitchEventIds: ['event-draft'],
+            }),
           }
         );
         expect(
           (await PATCH(request, { params: { projectId: mockProjectId } }))
             .status
         ).toBe(200);
+        // The pitch choice is saved even when the event has no open pitch queue.
         expect(mockPrisma.eventProject.upsert).toHaveBeenCalledWith(
           expect.objectContaining({
             create: {
               eventId: 'event-draft',
               projectId: mockProjectId,
               addedById: mockHackerId,
+              pitchRequested: true,
             },
+            update: { pitchRequested: true },
           })
         );
         expect(mockPrisma.eventProject.deleteMany).toHaveBeenCalledWith({

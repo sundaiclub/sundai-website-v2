@@ -1,11 +1,8 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import prisma from '@/lib/prisma';
-import { uploadToS3 } from '@/lib/s3-images';
-import {
-  IMAGE_UPLOAD_SIZE_ERROR,
-  validateImageUploadSize,
-} from '@/lib/imageUploads';
+import { ImageUploadError } from '@/lib/imageUploads';
+import { claimUploadedImage } from '@/lib/s3-images';
 
 export async function POST(
   request: Request,
@@ -26,33 +23,17 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const formData = await request.formData();
-    const file = formData.get('file') as File | null;
-
-    if (!file || !(file instanceof File)) {
-      return NextResponse.json({ error: 'No file provided' }, { status: 400 });
-    }
-
-    if (!file.type.startsWith('image/')) {
-      return NextResponse.json({ error: 'Invalid file type' }, { status: 400 });
-    }
-
-    if (validateImageUploadSize(file)) {
-      return NextResponse.json(
-        { error: IMAGE_UPLOAD_SIZE_ERROR },
-        { status: 413 }
-      );
-    }
-    const uploadResult = await uploadToS3(file, 'avatars');
+    const body = await request.json().catch(() => null);
+    const upload = await claimUploadedImage(body?.uploadToken, 'avatars');
 
     const newImage = await prisma.image.create({
       data: {
-        key: uploadResult.key,
-        bucket: uploadResult.bucket,
-        url: uploadResult.url,
-        filename: file.name,
-        mimeType: file.type || 'application/octet-stream',
-        size: file.size,
+        key: upload.key,
+        bucket: upload.bucket,
+        url: upload.url,
+        filename: upload.filename,
+        mimeType: upload.mimeType,
+        size: upload.size,
         alt: `${requestingHacker.name} avatar`,
       },
     });
@@ -83,6 +64,12 @@ export async function POST(
 
     return NextResponse.json(updated);
   } catch (error) {
+    if (error instanceof ImageUploadError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.status }
+      );
+    }
     console.error('Error uploading avatar:', error);
     return NextResponse.json(
       { error: 'Failed to upload avatar' },

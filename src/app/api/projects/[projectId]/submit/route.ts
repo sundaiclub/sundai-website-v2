@@ -46,8 +46,9 @@ export async function PATCH(
     const removedEventIds = stringIds(body?.removedEventIds).filter(
       eventId => !eventIds.includes(eventId)
     );
-    const sourceEventId =
-      typeof body?.sourceEventId === 'string' ? body.sourceEventId : null;
+    const pitchEventIds = stringIds(body?.pitchEventIds).filter(eventId =>
+      eventIds.includes(eventId)
+    );
 
     if (!PROJECT_STATUSES.has(status)) {
       return NextResponse.json(
@@ -129,6 +130,7 @@ export async function PATCH(
         startTime: true,
         endTime: true,
         requireGithubUrl: true,
+        judgingEnabled: true,
         pitchSessions: {
           select: { id: true, phase: true, defaultPitchSec: true },
           orderBy: { createdAt: 'asc' },
@@ -173,29 +175,46 @@ export async function PATCH(
     const pitchEntryIdsToRemove = pitchEntriesToRemove.map(entry => entry.id);
 
     const now = new Date();
-    const sourceEvent = sourceEventId
-      ? events.find(event => event.id === sourceEventId)
-      : null;
-    const sourcePitch = sourceEvent?.pitchSessions[0];
-    const sourceIsHappening = Boolean(
-      sourceEvent &&
-        sourceEvent.startTime <= now &&
-        sourceEvent.endTime &&
-        sourceEvent.endTime >= now
+    const pitchSessions =
+      status === 'APPROVED'
+        ? events.flatMap(event => {
+            const pitch = event.pitchSessions[0];
+            const isHappening =
+              event.startTime <= now &&
+              event.endTime !== null &&
+              event.endTime >= now;
+            return pitchEventIds.includes(event.id) &&
+              !event.judgingEnabled &&
+              pitch &&
+              isHappening &&
+              pitch.phase !== 'FINISHED'
+              ? [pitch]
+              : [];
+          })
+        : [];
+    const existingPitchEntries =
+      pitchSessions.length > 0
+        ? await prisma.pitchProject.findMany({
+            where: {
+              projectId: params.projectId,
+              pitchSessionId: { in: pitchSessions.map(pitch => pitch.id) },
+            },
+            select: { pitchSessionId: true },
+          })
+        : [];
+    const pitchSessionsToJoin = pitchSessions.filter(
+      pitch =>
+        !existingPitchEntries.some(entry => entry.pitchSessionId === pitch.id)
     );
-    const shouldJoinPitch = Boolean(
-      status === 'APPROVED' &&
-        sourcePitch &&
-        sourceIsHappening &&
-        sourcePitch.phase !== 'FINISHED'
-    );
-    const lastPitchProject = shouldJoinPitch
-      ? await prisma.pitchProject.findFirst({
-          where: { pitchSessionId: sourcePitch!.id },
+    const lastPitchPositions = await Promise.all(
+      pitchSessionsToJoin.map(pitch =>
+        prisma.pitchProject.findFirst({
+          where: { pitchSessionId: pitch.id },
           orderBy: { position: 'desc' },
           select: { position: true },
         })
-      : null;
+      )
+    );
 
     const operations = [
       prisma.project.update({
@@ -224,26 +243,25 @@ export async function PATCH(
             eventId: event.id,
             projectId: params.projectId,
             addedById: currentUser.id,
+            pitchRequested: pitchEventIds.includes(event.id),
           },
-          update: {},
+          update: { pitchRequested: pitchEventIds.includes(event.id) },
         })
       ),
-      ...(shouldJoinPitch
-        ? [
-            prisma.pitchProject.create({
-              data: {
-                pitchSessionId: sourcePitch!.id,
-                projectId: params.projectId,
-                addedById: currentUser.id,
-                position: (lastPitchProject?.position ?? 0) + 1,
-                isTopProject: false,
-                ...(sourcePitch!.phase === 'PITCHING' && {
-                  allottedSec: sourcePitch!.defaultPitchSec,
-                }),
-              },
+      ...pitchSessionsToJoin.map((pitch, index) =>
+        prisma.pitchProject.create({
+          data: {
+            pitchSessionId: pitch.id,
+            projectId: params.projectId,
+            addedById: currentUser.id,
+            position: (lastPitchPositions[index]?.position ?? 0) + 1,
+            isTopProject: false,
+            ...(pitch.phase === 'PITCHING' && {
+              allottedSec: pitch.defaultPitchSec,
             }),
-          ]
-        : []),
+          },
+        })
+      ),
       ...(removedEventIds.length > 0
         ? [
             prisma.pitchProjectVote.deleteMany({

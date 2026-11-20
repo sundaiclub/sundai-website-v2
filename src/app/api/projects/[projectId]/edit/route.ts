@@ -8,10 +8,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import type { Prisma, ProjectStatus } from '@prisma/client';
 import prisma from '@/lib/prisma';
-import {
-  IMAGE_UPLOAD_SIZE_ERROR,
-  validateImageUploadSize,
-} from '@/lib/imageUploads';
+import { ImageUploadError } from '@/lib/imageUploads';
 import { HttpsUrlInputError, normalizeOptionalHttpsUrl } from '@/lib/httpsUrls';
 
 const PROJECT_STATUSES = [
@@ -169,32 +166,29 @@ export async function PATCH(
     };
 
     const deleteThumbnail = formData.get('deleteThumbnail') === 'true';
-    const thumbnail = formData.get('thumbnail') as File | null;
+    const thumbnailUploadToken = formData.get('thumbnailUploadToken');
     const thumbnailPrompt = formData.get('thumbnailPrompt')?.toString() || null;
-
-    if (thumbnail instanceof File && validateImageUploadSize(thumbnail)) {
-      return privateJson({ error: IMAGE_UPLOAD_SIZE_ERROR }, { status: 413 });
-    }
 
     if (deleteThumbnail) {
       updateData.thumbnail = {
         disconnect: true,
       };
-    } else if (thumbnail && thumbnail instanceof File) {
+    } else if (thumbnailUploadToken) {
+      const { claimUploadedImage } = await import('@/lib/s3-images');
       try {
-        const { uploadToS3 } = await import('@/lib/s3-images');
-        const uploadResult = await uploadToS3(thumbnail);
+        const upload = await claimUploadedImage(
+          thumbnailUploadToken,
+          'projects'
+        );
 
         const newImage = await prisma.image.create({
           data: {
-            key: uploadResult.key,
-            bucket: uploadResult.bucket,
-            url: uploadResult.url,
-            filename: thumbnail.name,
-            mimeType: thumbnail.type || 'application/octet-stream',
-            size: thumbnail.size,
-            width: undefined,
-            height: undefined,
+            key: upload.key,
+            bucket: upload.bucket,
+            url: upload.url,
+            filename: upload.filename,
+            mimeType: upload.mimeType,
+            size: upload.size,
             alt: title?.toString() || '',
             prompt: thumbnailPrompt,
           },
@@ -204,6 +198,12 @@ export async function PATCH(
           connect: { id: newImage.id },
         };
       } catch (error) {
+        if (error instanceof ImageUploadError) {
+          return privateJson(
+            { error: error.message },
+            { status: error.status }
+          );
+        }
         console.error('Error uploading thumbnail:', error);
         return new NextResponse('Error uploading thumbnail', { status: 500 });
       }

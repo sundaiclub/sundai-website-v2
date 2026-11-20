@@ -45,6 +45,7 @@ describe('GET /api/events/project-options', () => {
         endTime: new Date('2026-08-28T21:00:00.000Z'),
         image: { url: 'https://example.com/event.png', alt: 'Builders' },
         chapter: { id: 'chapter-1', name: 'Sundai Boston', slug: 'boston' },
+        pitchSessions: [],
       },
     ]);
 
@@ -98,7 +99,65 @@ describe('GET /api/events/project-options', () => {
         id: 'event-1',
         chapterName: 'Sundai Boston',
         selectedByDefault: true,
+        pitchQueueOpen: false,
         judging: null,
+      }),
+    ]);
+  });
+
+  it('only offers pitch queues for happening, unjudged events that are not finished', async () => {
+    prisma.hacker.findUnique.mockResolvedValue({
+      id: 'hacker-1',
+      role: 'HACKER',
+    });
+    const event = {
+      title: 'Build Night',
+      image: null,
+      chapter: { id: 'chapter-1', name: 'Sundai Boston', slug: 'boston' },
+    };
+    prisma.event.findMany.mockResolvedValue([
+      {
+        ...event,
+        id: 'event-open',
+        startTime: now,
+        endTime: new Date('2026-08-28T21:00:00.000Z'),
+        pitchSessions: [{ phase: 'PITCHING' }],
+      },
+      {
+        ...event,
+        id: 'event-finished',
+        startTime: now,
+        endTime: new Date('2026-08-28T21:00:00.000Z'),
+        pitchSessions: [{ phase: 'FINISHED' }],
+      },
+      {
+        ...event,
+        id: 'event-judged',
+        judgingEnabled: true,
+        startTime: now,
+        endTime: new Date('2026-08-28T21:00:00.000Z'),
+        pitchSessions: [{ phase: 'VOTING' }],
+      },
+      {
+        ...event,
+        id: 'event-judging-window',
+        startTime: new Date('2026-08-29T16:00:00.000Z'),
+        endTime: new Date('2026-08-29T21:00:00.000Z'),
+        pitchSessions: [{ phase: 'VOTING' }],
+      },
+    ]);
+
+    const response = await GET(
+      new Request('http://localhost/api/events/project-options')
+    );
+
+    await expect(response.json()).resolves.toEqual([
+      expect.objectContaining({ id: 'event-open', pitchQueueOpen: true }),
+      expect.objectContaining({ id: 'event-finished', pitchQueueOpen: false }),
+      expect.objectContaining({ id: 'event-judged', pitchQueueOpen: false }),
+      expect.objectContaining({
+        id: 'event-judging-window',
+        pitchQueueOpen: false,
       }),
     ]);
   });
@@ -120,7 +179,8 @@ describe('GET /api/events/project-options', () => {
         endTime: null,
         image: null,
         chapter: { id: 'chapter-1', name: 'Sundai Boston', slug: 'boston' },
-        projects: [{ id: 'event-project-1' }],
+        pitchSessions: [],
+        projects: [{ id: 'event-project-1', pitchRequested: true }],
       },
     ]);
     prisma.judgingTrack.findMany.mockResolvedValue([
@@ -188,6 +248,7 @@ describe('GET /api/events/project-options', () => {
         endTime: new Date('2026-08-28T21:00:00.000Z'),
         image: null,
         chapter: { id: 'chapter-1', name: 'Sundai Boston', slug: 'boston' },
+        pitchSessions: [],
       },
     ]);
 
@@ -242,7 +303,10 @@ describe('GET /api/events/project-options', () => {
         endTime: new Date('2026-08-28T21:00:00.000Z'),
         image: null,
         chapter: { id: 'chapter-1', name: 'Sundai Boston', slug: 'boston' },
-        projects: [{ id: 'event-project-1' }],
+        pitchSessions: [
+          { phase: 'VOTING', projects: [{ id: 'pitch-project-1' }] },
+        ],
+        projects: [{ id: 'event-project-1', pitchRequested: true }],
       },
       {
         id: 'event-new',
@@ -255,6 +319,7 @@ describe('GET /api/events/project-options', () => {
           name: 'Sundai Cambridge',
           slug: 'cambridge',
         },
+        pitchSessions: [{ phase: 'VOTING', projects: [] }],
         projects: [],
       },
     ]);
@@ -271,11 +336,17 @@ describe('GET /api/events/project-options', () => {
         id: 'event-added',
         alreadyAdded: true,
         selectedByDefault: true,
+        pitchQueueOpen: true,
+        pitchAdded: true,
+        pitchRequested: true,
       }),
       expect.objectContaining({
         id: 'event-new',
         alreadyAdded: false,
         selectedByDefault: false,
+        pitchQueueOpen: true,
+        pitchAdded: false,
+        pitchRequested: false,
       }),
     ]);
   });

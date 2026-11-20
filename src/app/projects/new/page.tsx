@@ -22,6 +22,7 @@ type ProjectEventOption = {
   chapterName: string;
   image?: { url: string; alt?: string | null } | null;
   selectedByDefault: boolean;
+  pitchQueueOpen: boolean;
   judging: ProjectJudgingOption | null;
 };
 
@@ -37,23 +38,18 @@ function NewProjectForm() {
   const [selectedMembers, setSelectedMembers] = useState<HackerTeamMember[]>(
     []
   );
-  const [searchTerm, setSearchTerm] = useState('');
   const [project, setProject] = useState({
     title: '',
     preview: '',
-    launchLeadId: '',
-    members: [] as string[],
   });
-  const [selectedRole, setSelectedRole] = useState('hacker');
   const { isDarkMode } = useTheme();
   const defaultEventImage = isDarkMode
     ? '/images/logos/sundai_logo_dark_horizontal.svg'
     : '/images/logos/sundai_logo_light_horizontal.svg';
-  const [showLaunchLeadModal, setShowLaunchLeadModal] = useState(false);
   const [teamSearchTerm, setTeamSearchTerm] = useState('');
-  const [leadSearchTerm, setLeadSearchTerm] = useState('');
   const [eventOptions, setEventOptions] = useState<ProjectEventOption[]>([]);
   const [selectedEventIds, setSelectedEventIds] = useState<string[]>([]);
+  const [pitchEventIds, setPitchEventIds] = useState<string[]>([]);
   const [judgingTrackId, setJudgingTrackId] = useState('');
   const judgingEvent = eventOptions.find(
     event => event.judging && selectedEventIds.includes(event.id)
@@ -86,34 +82,19 @@ function NewProjectForm() {
             events
           )
         );
+        setPitchEventIds(
+          events
+            .filter(event => event.id === sourceEventId && event.pitchQueueOpen)
+            .map(event => event.id)
+        );
       })
       .catch(error => console.error('Error fetching project events:', error));
   }, [sourceEventId]);
-
-  useEffect(() => {
-    if (user) {
-      const currentUserInHackers = hackers.find(
-        h => h.email === user.primaryEmailAddress?.emailAddress
-      );
-      if (currentUserInHackers) {
-        setProject(prev => ({
-          ...prev,
-          launchLeadId: currentUserInHackers.id,
-        }));
-      }
-    }
-  }, [user, hackers]);
 
   const filteredTeamHackers = hackers.filter(
     hacker =>
       hacker.name.toLowerCase().includes(teamSearchTerm.toLowerCase()) ||
       hacker.email?.toLowerCase().includes(teamSearchTerm.toLowerCase())
-  );
-
-  const filteredLeadHackers = hackers.filter(
-    hacker =>
-      hacker.name.toLowerCase().includes(leadSearchTerm.toLowerCase()) ||
-      hacker.email?.toLowerCase().includes(leadSearchTerm.toLowerCase())
   );
 
   const handleAddMember = (hacker: HackerSelectionOption, role: string) => {
@@ -123,10 +104,6 @@ function NewProjectForm() {
     }
 
     setSelectedMembers([...selectedMembers, { ...hacker, role }]);
-    setProject(prev => ({
-      ...prev,
-      members: [...prev.members, hacker.id],
-    }));
     setTeamSearchTerm('');
   };
 
@@ -134,21 +111,12 @@ function NewProjectForm() {
     setSelectedMembers(
       selectedMembers.filter(member => member.id !== hackerId)
     );
-    setProject(prev => ({
-      ...prev,
-      members: prev.members.filter(id => id !== hackerId),
-    }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) {
       toast.error('Please sign in to create a project');
-      return;
-    }
-
-    if (!project.launchLeadId) {
-      toast.error('Please select a launch lead');
       return;
     }
 
@@ -165,10 +133,12 @@ function NewProjectForm() {
       const formData = new FormData();
       formData.append('title', project.title);
       formData.append('preview', project.preview);
-      formData.append('launchLeadId', project.launchLeadId);
       selectedEventIds.forEach(eventId =>
         formData.append('eventIds[]', eventId)
       );
+      pitchEventIds
+        .filter(eventId => selectedEventIds.includes(eventId))
+        .forEach(eventId => formData.append('pitchEventIds[]', eventId));
       formData.append(
         'members',
         JSON.stringify(
@@ -250,55 +220,6 @@ function NewProjectForm() {
         </h1>
 
         <form onSubmit={handleSubmit} noValidate className="space-y-6">
-          <div>
-            <label
-              className={`block text-sm font-medium mb-1 ${
-                isDarkMode ? 'text-gray-300' : 'text-gray-700'
-              } font-fira-code`}
-            >
-              Launch Lead *
-            </label>
-            <div className="relative">
-              {project.launchLeadId ? (
-                <div
-                  onClick={() => setShowLaunchLeadModal(true)}
-                  className={`inline-flex items-center px-3 py-1 rounded-full text-sm cursor-pointer transition-colors ${
-                    isDarkMode
-                      ? 'bg-purple-900/50 text-purple-100 hover:bg-purple-800/50'
-                      : 'bg-purple-100 text-purple-800 hover:bg-purple-200'
-                  }`}
-                >
-                  <span>
-                    {hackers.find(h => h.id === project.launchLeadId)?.name}
-                  </span>
-                  <span
-                    className={`mx-1 ${isDarkMode ? 'text-purple-400' : 'text-purple-400'}`}
-                  >
-                    •
-                  </span>
-                  <span
-                    className={
-                      isDarkMode ? 'text-purple-300' : 'text-purple-600'
-                    }
-                  >
-                    Launch Lead
-                  </span>
-                </div>
-              ) : (
-                <div
-                  onClick={() => setShowLaunchLeadModal(true)}
-                  className={`inline-flex items-center px-3 py-1 rounded-full text-sm cursor-pointer transition-colors ${
-                    isDarkMode
-                      ? 'bg-purple-900/50 text-purple-100 hover:bg-purple-800/50'
-                      : 'bg-purple-100 text-purple-800 hover:bg-purple-200'
-                  }`}
-                >
-                  <span>Select Launch Lead</span>
-                </div>
-              )}
-            </div>
-          </div>
-
           <div>
             <label
               htmlFor="title"
@@ -433,62 +354,88 @@ function NewProjectForm() {
             ) : (
               <div className="space-y-2">
                 {eventOptions.map(event => (
-                  <label
-                    className={`flex min-w-0 max-w-full cursor-pointer items-center gap-3 overflow-hidden rounded-md border p-3 ${
+                  <div
+                    className={`min-w-0 max-w-full overflow-hidden rounded-md border ${
                       isDarkMode
                         ? 'border-gray-700 bg-gray-900'
                         : 'border-gray-200 bg-gray-50'
                     }`}
                     key={event.id}
                   >
-                    <input
-                      checked={selectedEventIds.includes(event.id)}
-                      onChange={change => {
-                        if (event.judging) setJudgingTrackId('');
-                        setSelectedEventIds(current =>
-                          selectProjectEvent(
-                            current,
-                            eventOptions,
-                            event.id,
-                            change.target.checked
-                          )
-                        );
-                      }}
-                      type="checkbox"
-                      className="shrink-0"
-                    />
-                    {event.image?.url ? (
-                      <Image
-                        alt={event.image.alt || event.title}
-                        className="h-12 w-16 shrink-0 rounded object-cover"
-                        height={48}
-                        src={event.image.url}
-                        unoptimized
-                        width={64}
+                    <label className="flex min-w-0 max-w-full cursor-pointer items-center gap-3 overflow-hidden p-3">
+                      <input
+                        checked={selectedEventIds.includes(event.id)}
+                        onChange={change => {
+                          if (event.judging) setJudgingTrackId('');
+                          setSelectedEventIds(current =>
+                            selectProjectEvent(
+                              current,
+                              eventOptions,
+                              event.id,
+                              change.target.checked
+                            )
+                          );
+                        }}
+                        type="checkbox"
+                        className="shrink-0"
                       />
-                    ) : (
-                      <Image
-                        alt={`${event.title} event`}
-                        className="h-12 w-16 shrink-0 rounded bg-black object-contain p-1"
-                        height={48}
-                        src={defaultEventImage}
-                        width={64}
-                      />
-                    )}
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate font-medium">
-                        {event.title}
+                      {event.image?.url ? (
+                        <Image
+                          alt={event.image.alt || event.title}
+                          className="h-12 w-16 shrink-0 rounded object-cover"
+                          height={48}
+                          src={event.image.url}
+                          unoptimized
+                          width={64}
+                        />
+                      ) : (
+                        <Image
+                          alt={`${event.title} event`}
+                          className="h-12 w-16 shrink-0 rounded bg-black object-contain p-1"
+                          height={48}
+                          src={defaultEventImage}
+                          width={64}
+                        />
+                      )}
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate font-medium">
+                          {event.title}
+                        </span>
+                        <span
+                          className={`block truncate text-xs ${
+                            isDarkMode ? 'text-gray-400' : 'text-gray-600'
+                          }`}
+                        >
+                          {event.chapterName}
+                          {event.judging ? ' · Judged' : ''}
+                        </span>
                       </span>
-                      <span
-                        className={`block truncate text-xs ${
-                          isDarkMode ? 'text-gray-400' : 'text-gray-600'
-                        }`}
-                      >
-                        {event.chapterName}
-                        {event.judging ? ' · Judged' : ''}
-                      </span>
-                    </span>
-                  </label>
+                    </label>
+                    {event.pitchQueueOpen &&
+                      selectedEventIds.includes(event.id) && (
+                        <label
+                          className={`flex cursor-pointer items-center gap-2 border-t px-3 py-2 text-sm ${
+                            isDarkMode
+                              ? 'border-gray-700 text-gray-300'
+                              : 'border-gray-200 text-gray-700'
+                          }`}
+                        >
+                          <input
+                            checked={pitchEventIds.includes(event.id)}
+                            onChange={change =>
+                              setPitchEventIds(current =>
+                                change.target.checked
+                                  ? [...current, event.id]
+                                  : current.filter(id => id !== event.id)
+                              )
+                            }
+                            type="checkbox"
+                            className="shrink-0"
+                          />
+                          Add to pitch queue
+                        </label>
+                      )}
+                  </div>
                 ))}
               </div>
             )}
@@ -523,23 +470,6 @@ function NewProjectForm() {
           </div>
         </form>
       </div>
-
-      <HackerSelector
-        showModal={showLaunchLeadModal}
-        setShowModal={setShowLaunchLeadModal}
-        isDarkMode={isDarkMode}
-        searchTerm={leadSearchTerm}
-        setSearchTerm={setLeadSearchTerm}
-        filteredHackers={filteredLeadHackers}
-        handleAddMember={hacker => {
-          setProject(prev => ({ ...prev, launchLeadId: hacker.id }));
-          setShowLaunchLeadModal(false);
-        }}
-        title="Select Launch Lead"
-        singleSelect={true}
-        selectedIds={project.launchLeadId ? [project.launchLeadId] : []}
-        showRoleSelector={false}
-      />
 
       <HackerSelector
         showModal={showModal}

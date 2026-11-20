@@ -1,11 +1,12 @@
 import { POST } from '../../src/app/api/events/[eventId]/image/route';
+import { ImageUploadError } from '../../src/lib/imageUploads';
 
 jest.mock('../../src/lib/eventManagementApi', () => ({
   requireEventSettingsManager: jest.fn(),
 }));
 
 jest.mock('../../src/lib/s3-images', () => ({
-  uploadToS3: jest.fn(),
+  claimUploadedImage: jest.fn(),
 }));
 
 jest.mock('../../src/lib/prisma', () => ({
@@ -26,13 +27,22 @@ const prisma = require('../../src/lib/prisma').default;
 const {
   requireEventSettingsManager,
 } = require('../../src/lib/eventManagementApi');
-const { uploadToS3 } = require('../../src/lib/s3-images');
+const { claimUploadedImage } = require('../../src/lib/s3-images');
 
-function imageRequest(file: File, prompt?: string) {
-  const formData = new FormData();
-  formData.append('image', file);
-  if (prompt) formData.append('prompt', prompt);
-  return { formData: jest.fn().mockResolvedValue(formData) } as any;
+function imageRequest(body: unknown) {
+  return { json: jest.fn().mockResolvedValue(body) } as any;
+}
+
+function uploaded(overrides = {}) {
+  return {
+    key: 'events/generated-demo.webp',
+    bucket: 's3-images',
+    url: 'https://cdn.example.com/generated-demo.webp',
+    filename: 'demo.webp',
+    mimeType: 'image/webp',
+    size: 9 * 1024 * 1024,
+    ...overrides,
+  };
 }
 
 describe('/api/events/[eventId]/image', () => {
@@ -49,12 +59,8 @@ describe('/api/events/[eventId]/image', () => {
     });
   });
 
-  it('uploads and connects an event image', async () => {
-    uploadToS3.mockResolvedValue({
-      key: 'events/generated-demo.webp',
-      bucket: 's3-images',
-      url: 'https://cdn.example.com/generated-demo.webp',
-    });
+  it('claims and connects an uploaded event image', async () => {
+    claimUploadedImage.mockResolvedValue(uploaded());
     prisma.image.create.mockResolvedValue({ id: 'image-1' });
     prisma.event.update.mockResolvedValue({
       image: {
@@ -65,20 +71,21 @@ describe('/api/events/[eventId]/image', () => {
     });
 
     const response = await POST(
-      imageRequest(
-        new File(['image-bytes'], 'demo.webp', { type: 'image/webp' }),
-        'A pixel-art crowd building AI projects'
-      ),
+      imageRequest({
+        uploadToken: 'upload-token',
+        prompt: 'A pixel-art crowd building AI projects',
+      }),
       { params: { eventId: 'event-1' } }
     );
 
     expect(response.status).toBe(200);
-    expect(uploadToS3).toHaveBeenCalledWith(expect.any(File), 'events');
+    expect(claimUploadedImage).toHaveBeenCalledWith('upload-token', 'events');
     expect(prisma.image.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         key: 'events/generated-demo.webp',
         filename: 'demo.webp',
         mimeType: 'image/webp',
+        size: 9 * 1024 * 1024,
         alt: 'Demo Night event',
         prompt: 'A pixel-art crowd building AI projects',
       }),
@@ -90,29 +97,44 @@ describe('/api/events/[eventId]/image', () => {
     });
   });
 
-  it('rejects unsupported files before uploading', async () => {
-    const response = await POST(
-      imageRequest(new File(['text'], 'notes.txt', { type: 'text/plain' })),
-      { params: { eventId: 'event-1' } }
-    );
-
-    expect(response.status).toBe(400);
-    expect(uploadToS3).not.toHaveBeenCalled();
-    expect(prisma.image.create).not.toHaveBeenCalled();
-  });
-
-  it('returns 413 when the image is too large', async () => {
-    const file = new File(['image'], 'large.webp', { type: 'image/webp' });
-    Object.defineProperty(file, 'size', { value: 15 * 1024 * 1024 });
-
-    const response = await POST(imageRequest(file), {
+  it('requires an upload token', async () => {
+    const response = await POST(imageRequest({}), {
       params: { eventId: 'event-1' },
     });
 
-    expect(response.status).toBe(413);
-    expect(await response.json()).toEqual({
-      message: 'File too large. Image files must be smaller than 15 MB.',
+    expect(response.status).toBe(400);
+    expect(claimUploadedImage).not.toHaveBeenCalled();
+  });
+
+  it('rejects unsupported image types', async () => {
+    claimUploadedImage.mockResolvedValue(
+      uploaded({ mimeType: 'image/svg+xml' })
+    );
+
+    const response = await POST(imageRequest({ uploadToken: 'upload-token' }), {
+      params: { eventId: 'event-1' },
     });
-    expect(uploadToS3).not.toHaveBeenCalled();
+
+    expect(response.status).toBe(400);
+    expect(prisma.image.create).not.toHaveBeenCalled();
+  });
+
+  it('reports an upload that cannot be claimed', async () => {
+    claimUploadedImage.mockRejectedValue(
+      new ImageUploadError(
+        'The uploaded image could not be found. Please upload it again.',
+        400
+      )
+    );
+
+    const response = await POST(imageRequest({ uploadToken: 'stale' }), {
+      params: { eventId: 'event-1' },
+    });
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      message: 'The uploaded image could not be found. Please upload it again.',
+    });
+    expect(prisma.image.create).not.toHaveBeenCalled();
   });
 });

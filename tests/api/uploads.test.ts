@@ -1,157 +1,91 @@
 import { POST } from '../../src/app/api/uploads/image/route';
 import prisma from '@/lib/prisma';
+import { auth } from '@clerk/nextjs/server';
+import { ImageUploadError } from '@/lib/imageUploads';
+import { claimUploadedImage } from '@/lib/s3-images';
 
 jest.mock('@/lib/prisma', () => ({
   __esModule: true,
   default: { image: { create: jest.fn() } },
 }));
+jest.mock('@clerk/nextjs/server', () => ({ auth: jest.fn() }));
+jest.mock('@/lib/s3-images', () => ({ claimUploadedImage: jest.fn() }));
 
-// Mock auth
-jest.mock('@clerk/nextjs/server', () => ({
-  auth: jest.fn(),
-}));
-
-// Mock uploadToS3
-jest.mock('../../src/lib/s3-images', () => ({
-  uploadToS3: jest.fn(),
-}));
+const request = (body: unknown) =>
+  ({ json: jest.fn().mockResolvedValue(body) }) as any;
 
 describe('/api/uploads/image', () => {
-  const mockAuth = jest.fn();
-  const mockUploadToS3 = jest.fn();
-
   beforeEach(() => {
     jest.clearAllMocks();
-    // Reset the mock implementation
-    require('@clerk/nextjs/server').auth = mockAuth;
-    require('../../src/lib/s3-images').uploadToS3 = mockUploadToS3;
+    (auth as jest.Mock).mockReturnValue({ userId: 'test-user-id' });
     (prisma.image.create as jest.Mock).mockResolvedValue({ id: 'image-id' });
   });
 
-  describe('POST', () => {
-    it('should upload image successfully', async () => {
-      mockAuth.mockReturnValue({ userId: 'test-user-id' });
-      mockUploadToS3.mockResolvedValue({
-        url: 'https://images.example.com/image.jpg',
-        key: 'image.jpg',
+  it('records an uploaded image and returns its URL', async () => {
+    (claimUploadedImage as jest.Mock).mockResolvedValue({
+      url: 'https://images.example.com/image.jpg',
+      key: 'projects/image.jpg',
+      bucket: 'bucket',
+      filename: 'test.jpg',
+      mimeType: 'image/jpeg',
+      size: 10 * 1024 * 1024,
+    });
+
+    const response = await POST(request({ uploadToken: 'upload-token' }));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      url: 'https://images.example.com/image.jpg',
+    });
+    expect(claimUploadedImage).toHaveBeenCalledWith('upload-token', 'projects');
+    expect(prisma.image.create).toHaveBeenCalledWith({
+      data: {
+        key: 'projects/image.jpg',
         bucket: 'bucket',
-      });
-
-      const mockFile = new File(['test'], 'test.jpg', { type: 'image/jpeg' });
-
-      // Mock FormData
-      const mockFormData = {
-        get: jest.fn().mockReturnValue(mockFile),
-      };
-
-      const request = {
-        formData: jest.fn().mockResolvedValue(mockFormData),
-      } as any;
-
-      const response = await POST(request);
-      const data = await response.json();
-
-      expect(response.status).toBe(200);
-      expect(data).toEqual({
         url: 'https://images.example.com/image.jpg',
-      });
-      expect(mockUploadToS3).toHaveBeenCalledWith(mockFile, 'projects');
-      expect(prisma.image.create).toHaveBeenCalledWith({
-        data: {
-          key: 'image.jpg',
-          bucket: 'bucket',
-          url: 'https://images.example.com/image.jpg',
-          filename: 'test.jpg',
-          mimeType: 'image/jpeg',
-          size: mockFile.size,
-          alt: 'test.jpg',
-        },
-      });
+        filename: 'test.jpg',
+        mimeType: 'image/jpeg',
+        size: 10 * 1024 * 1024,
+        alt: 'test.jpg',
+      },
     });
+  });
 
-    it('should return 401 when user is not authenticated', async () => {
-      mockAuth.mockReturnValue({ userId: null });
+  it('returns 401 when the user is not signed in', async () => {
+    (auth as jest.Mock).mockReturnValue({ userId: null });
 
-      const request = {
-        formData: jest
-          .fn()
-          .mockResolvedValue({ get: jest.fn().mockReturnValue(null) }),
-      } as any;
+    const response = await POST(request({ uploadToken: 'upload-token' }));
 
-      const response = await POST(request);
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({ error: 'Unauthorized' });
+    expect(claimUploadedImage).not.toHaveBeenCalled();
+  });
 
-      expect(response.status).toBe(401);
-      expect(await response.json()).toEqual({ error: 'Unauthorized' });
+  it('reports an upload that cannot be claimed', async () => {
+    (claimUploadedImage as jest.Mock).mockRejectedValue(
+      new ImageUploadError(
+        'The uploaded image could not be found. Please upload it again.',
+        400
+      )
+    );
+
+    const response = await POST(request({}));
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      error: 'The uploaded image could not be found. Please upload it again.',
     });
+    expect(prisma.image.create).not.toHaveBeenCalled();
+  });
 
-    it('should return 400 when no file is provided', async () => {
-      mockAuth.mockReturnValue({ userId: 'test-user-id' });
+  it('hides unexpected storage errors', async () => {
+    const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
+    (claimUploadedImage as jest.Mock).mockRejectedValue(new Error('S3 down'));
 
-      const request = {
-        formData: jest
-          .fn()
-          .mockResolvedValue({ get: jest.fn().mockReturnValue(null) }),
-      } as any;
+    const response = await POST(request({ uploadToken: 'upload-token' }));
 
-      const response = await POST(request);
-
-      expect(response.status).toBe(400);
-      expect(await response.json()).toEqual({ error: 'No file provided' });
-    });
-
-    it('should return 413 when the image is too large', async () => {
-      mockAuth.mockReturnValue({ userId: 'test-user-id' });
-      const file = new File(['test'], 'test.jpg', { type: 'image/jpeg' });
-      Object.defineProperty(file, 'size', { value: 15 * 1024 * 1024 });
-
-      const response = await POST({
-        formData: jest.fn().mockResolvedValue({
-          get: jest.fn().mockReturnValue(file),
-        }),
-      } as any);
-
-      expect(response.status).toBe(413);
-      expect(await response.json()).toEqual({
-        error: 'File too large. Image files must be smaller than 15 MB.',
-      });
-      expect(mockUploadToS3).not.toHaveBeenCalled();
-    });
-
-    it('rejects a text field submitted as a file', async () => {
-      mockAuth.mockReturnValue({ userId: 'test-user-id' });
-      const response = await POST({
-        formData: jest.fn().mockResolvedValue({ get: () => 'not a file' }),
-      } as any);
-      expect(response.status).toBe(400);
-      expect(mockUploadToS3).not.toHaveBeenCalled();
-    });
-
-    it('should handle upload errors', async () => {
-      const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
-
-      mockAuth.mockReturnValue({ userId: 'test-user-id' });
-      mockUploadToS3.mockRejectedValue(new Error('Upload failed'));
-
-      const mockFile = new File(['test'], 'test.jpg', { type: 'image/jpeg' });
-
-      const request = {
-        formData: jest
-          .fn()
-          .mockResolvedValue({ get: jest.fn().mockReturnValue(mockFile) }),
-      } as any;
-
-      const response = await POST(request);
-
-      expect(response.status).toBe(500);
-      expect(await response.json()).toEqual({
-        error: 'Failed to upload image',
-      });
-      expect(consoleSpy).toHaveBeenCalledWith(
-        'Error uploading image:',
-        expect.any(Error)
-      );
-
-      consoleSpy.mockRestore();
-    });
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({ error: 'Failed to upload image' });
+    consoleSpy.mockRestore();
   });
 });

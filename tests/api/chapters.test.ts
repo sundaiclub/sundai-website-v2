@@ -34,7 +34,7 @@ jest.mock('@clerk/nextjs/server', () =>
 );
 
 jest.mock('../../src/lib/s3-images', () => ({
-  uploadToS3: jest.fn(),
+  claimUploadedImage: jest.fn(),
 }));
 
 jest.mock('../../src/lib/prisma', () => ({
@@ -73,7 +73,8 @@ jest.mock('../../src/lib/prisma', () => ({
 }));
 
 const prisma = require('../../src/lib/prisma').default;
-const { uploadToS3 } = require('../../src/lib/s3-images');
+const { claimUploadedImage } = require('../../src/lib/s3-images');
+const { ImageUploadError } = require('../../src/lib/imageUploads');
 
 const mockHackerLookup = (...hackers: HackerFixture[]) => {
   prisma.hacker.findUnique.mockImplementation(async ({ where }: any) => {
@@ -859,12 +860,6 @@ describe('/api/chapters', () => {
       heroImageId: newImage.id,
       heroImage: newImage,
     };
-    const formData = new FormData();
-    formData.append(
-      'file',
-      new File(['image-bytes'], 'boston.jpg', { type: 'image/jpeg' })
-    );
-
     mockActor(hacker);
     prisma.chapter.findUnique
       .mockResolvedValueOnce({ id: chapter.id })
@@ -874,23 +869,28 @@ describe('/api/chapters', () => {
         heroImageId: 'image-old',
       });
     prisma.chapterMembership.findFirst.mockResolvedValue(membership);
-    uploadToS3.mockResolvedValue({
+    claimUploadedImage.mockResolvedValue({
       url: newImage.url,
       key: 'chapters/boston.jpg',
       bucket: 's3-images',
+      filename: 'boston.jpg',
+      mimeType: 'image/jpeg',
+      size: 11 * 1024 * 1024,
     });
     prisma.image.create.mockResolvedValue(newImage);
     prisma.image.delete.mockResolvedValue({ id: 'image-old' });
     prisma.chapter.update.mockResolvedValue(updatedChapter);
 
     const response = await POST_CHAPTER_IMAGE(
-      { formData: jest.fn().mockResolvedValue(formData) } as any,
+      {
+        json: jest.fn().mockResolvedValue({ uploadToken: 'upload-token' }),
+      } as any,
       createRouteContext({ chapterId: chapter.id }) as any
     );
     const body = await response.json();
 
     expect(response.status).toBe(200);
-    expect(uploadToS3).toHaveBeenCalledWith(expect.any(File), 'chapters');
+    expect(claimUploadedImage).toHaveBeenCalledWith('upload-token', 'chapters');
     expect(prisma.image.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
@@ -898,6 +898,7 @@ describe('/api/chapters', () => {
           url: newImage.url,
           filename: 'boston.jpg',
           mimeType: 'image/jpeg',
+          size: 11 * 1024 * 1024,
         }),
       })
     );
@@ -916,26 +917,31 @@ describe('/api/chapters', () => {
     });
   });
 
-  it('returns 413 when a chapter image is too large', async () => {
+  it('reports a chapter image upload that cannot be claimed', async () => {
     const { chapter, hacker, membership } = buildChapterAdminFixture();
-    const file = new File(['image'], 'large.jpg', { type: 'image/jpeg' });
-    Object.defineProperty(file, 'size', { value: 15 * 1024 * 1024 });
-    const formData = new FormData();
-    formData.append('file', file);
-
     mockActor(hacker);
-    prisma.chapter.findUnique.mockResolvedValue({ id: chapter.id });
+    prisma.chapter.findUnique.mockResolvedValue({
+      id: chapter.id,
+      name: chapter.name,
+      heroImageId: null,
+    });
     prisma.chapterMembership.findFirst.mockResolvedValue(membership);
+    claimUploadedImage.mockRejectedValue(
+      new ImageUploadError(
+        'The uploaded image could not be found. Please upload it again.',
+        400
+      )
+    );
 
     const response = await POST_CHAPTER_IMAGE(
-      { formData: jest.fn().mockResolvedValue(formData) } as any,
+      { json: jest.fn().mockResolvedValue({ uploadToken: 'stale' }) } as any,
       createRouteContext({ chapterId: chapter.id }) as any
     );
 
-    expect(response.status).toBe(413);
+    expect(response.status).toBe(400);
     expect(await response.json()).toEqual({
-      error: 'File too large. Image files must be smaller than 15 MB.',
+      error: 'The uploaded image could not be found. Please upload it again.',
     });
-    expect(uploadToS3).not.toHaveBeenCalled();
+    expect(prisma.image.create).not.toHaveBeenCalled();
   });
 });

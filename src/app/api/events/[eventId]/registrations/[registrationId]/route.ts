@@ -8,14 +8,16 @@ import {
   unauthorized,
 } from '@/lib/eventManagementApi';
 import {
-  canDecideRegistrations,
-  canManageRegistrations,
+  canDecideRegistrationsWithContext,
+  canManageRegistrationsWithContext,
+  getEventPermissionContext,
 } from '@/lib/eventManagementAuth';
+import { isApplicantDecisionStatus } from '@/lib/eventRegistrations';
 import {
-  isApplicantDecisionStatus,
-  updateEventRegistrationStatus,
-} from '@/lib/eventRegistrations';
-import { notifyEventDecision } from '@/lib/eventDecisionNotifications';
+  applyRegistrationStatusChange,
+  defaultDecisionMessage,
+} from '@/lib/registrationDecisions';
+import { privateJson } from '@/lib/publicData';
 import { parseRegistrationStatus } from '@/lib/eventRequestParsing';
 
 export async function PATCH(
@@ -27,12 +29,17 @@ export async function PATCH(
     const hacker = await getCurrentHacker();
     if (!hacker) return unauthorized();
 
-    const canManage = await canManageRegistrations(
+    const permissionContext = await getEventPermissionContext(
       prisma,
       hacker.id,
       params.eventId
     );
-    if (!canManage) return forbidden();
+    if (
+      !permissionContext ||
+      !canManageRegistrationsWithContext(permissionContext)
+    ) {
+      return forbidden();
+    }
 
     const body = await req.json();
     const toStatus = parseRegistrationStatus(body?.status);
@@ -41,68 +48,38 @@ export async function PATCH(
 
     if (
       isApplicantDecisionStatus(toStatus) &&
-      !(await canDecideRegistrations(prisma, hacker.id, params.eventId))
+      !canDecideRegistrationsWithContext(permissionContext)
     ) {
       return forbidden();
     }
 
-    const previousRegistration = await prisma.eventRegistration.findFirst({
-      where: {
-        id: params.registrationId,
-        eventId: params.eventId,
-      },
-      select: { status: true },
-    });
+    const [previousRegistration, defaultMessage] = await Promise.all([
+      prisma.eventRegistration.findFirst({
+        where: { id: params.registrationId, eventId: params.eventId },
+        select: { status: true },
+      }),
+      body.publicSafeMessage === undefined
+        ? defaultDecisionMessage(params.eventId, toStatus)
+        : undefined,
+    ]);
+    if (!previousRegistration) return notFound();
 
-    let publicSafeMessage = body.publicSafeMessage;
-    if (
-      (toStatus === 'APPROVED' ||
-        toStatus === 'WAITLISTED' ||
-        toStatus === 'DECLINED') &&
-      publicSafeMessage === undefined
-    ) {
-      const event = await prisma.event.findUnique({
-        where: { id: params.eventId },
-        select: {
-          confirmationMessage: true,
-          waitlistMessage: true,
-          declineMessage: true,
-        },
-      });
-      publicSafeMessage =
-        ({
-          APPROVED: event?.confirmationMessage,
-          WAITLISTED: event?.waitlistMessage,
-          DECLINED: event?.declineMessage,
-        }[toStatus] as string | null | undefined) ?? undefined;
-    }
-
-    const registration = await updateEventRegistrationStatus({
-      registrationId: params.registrationId,
+    const registration = await applyRegistrationStatusChange({
       eventId: params.eventId,
+      registrationId: params.registrationId,
       actorId: hacker.id,
+      previousStatus: previousRegistration.status,
       toStatus,
-      publicSafeMessage,
+      publicSafeMessage:
+        body.publicSafeMessage === undefined
+          ? defaultMessage
+          : body.publicSafeMessage,
       internalReviewNotes: body.internalReviewNotes,
-      changeJson: body.changeJson ?? undefined,
+      changeJson: body.changeJson,
     });
-
     if (!registration) return notFound();
 
-    if (
-      previousRegistration?.status !== toStatus &&
-      (toStatus === 'APPROVED' ||
-        toStatus === 'WAITLISTED' ||
-        toStatus === 'DECLINED')
-    ) {
-      await notifyEventDecision({
-        eventId: params.eventId,
-        registrationId: params.registrationId,
-        status: toStatus,
-      });
-    }
-
-    return NextResponse.json(registration);
+    return privateJson({ id: registration.id, status: registration.status });
   } catch (error) {
     console.error('[EVENT_REGISTRATION_PATCH]', error);
     return new NextResponse('Internal Error', { status: 500 });

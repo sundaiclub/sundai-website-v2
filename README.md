@@ -393,11 +393,11 @@ S3_MATERIALS_ROLE_ARN=arn:aws:iam::426771917681:role/sundai-images-production
 
 Vercel uses the production OIDC role. Local development uses AWS CLI credentials.
 The role needs PutObject, GetObject (including HEAD), and DeleteObject only for
-`event-materials/*` in the private bucket. The setup script enables all public
-access blocks, disables ACLs, enables encryption and versioning, and configures
-CORS for signed PUT uploads from `https://sundai.club` and
-`https://www.sundai.club`. Add a development origin to a separate development
-bucket if you need local browser uploads; do not add wildcard production origins.
+`event-materials/*` in the private bucket. The bucket blocks all public access,
+disables ACLs, and has encryption and versioning enabled. Its CORS rule allows
+signed PUT uploads from `https://sundai.club`, `https://www.sundai.club`,
+`https://v3.sundai.club`, `https://sundai-website-v2-*.vercel.app`, and
+`http://localhost:3000`.
 Upload URLs expire after 15 minutes; download URLs expire after 5 minutes. Do not
 persist these URLs. Uploaded content type is part of the upload signature.
 
@@ -405,32 +405,6 @@ Material uploads are limited to 25 MiB and the passive-file allowlist displayed
 in the organizer UI. The API checks the S3 object's size and MIME type before
 creating a material record. Visibility, attendee and organizer access checks
 remain unchanged.
-
-Before deploying this change:
-
-1. Have an AWS admin add the statements in
-   `docs/s3-materials-operator-policy.json` to the operator's permissions.
-   The current user was denied creation of `sundai-materials-426771917681`.
-2. With Node 24 and the operator's AWS profile, run `npm run materials:setup`.
-   This adds the separate runtime policy in
-   `docs/s3-materials-production-policy.json` to the existing OIDC role. It does
-   not replace the image policy or change the production trust policy.
-3. Set the three `S3_MATERIALS_*` variables in Vercel Production.
-4. Deploy through the existing main-branch CI/CD process. Keep the image data
-   migration manual. There are no new Prisma schema migrations for storage.
-5. Test a small private upload, finalization, authorized download, denied
-   unauthorized download, and deletion on `sundai.club`.
-6. After the production checks pass, remove the unused `GOOGLE_PRIVATE_KEY`,
-   `GOOGLE_CLOUD_BUCKET`, `GOOGLE_CLOUD_MATERIALS_BUCKET` and `GEMINI_API_KEY`
-   Vercel variables. They are not used by this cutover code. Old deployments
-   still need their previous configuration until the cutover is complete.
-
-The production database has zero EventMaterial records, and Production did not
-configure a private GCP materials bucket at the audit. There is no material data
-migration to apply for that state. Recheck before cutover; if files are added in
-GCP, copy and verify them before changing their bucket references. The application
-contains no GCP storage adapter or fallback.
-
 
 ### Email and SMS provider availability
 
@@ -550,9 +524,13 @@ their short expiry or when current access is removed.
 
 ### AWS Storage Setup:
 
-Use the private-material setup procedure above. Configure public images with
-the `S3_IMAGE_*` values in `.env.example`. The application no longer uses GCP
-services.
+Configure public images with the `S3_IMAGE_*` values in `.env.example`. Browsers
+upload images directly to the image bucket with a signed POST policy that limits
+each file to 15 MB. The image bucket's CORS rule allows POST from the same
+origins as the material bucket. The `S3_IMAGE_ROLE_ARN` role needs PutObject,
+GetObject (including HEAD), and ListBucket for the `projects/`, `chapters/`,
+`events/`, and `avatars/` prefixes. Private material storage is described above.
+The application no longer uses GCP services.
 
 ### AI Image Generation Setup (Optional):
 1. In Amazon Bedrock, enable access to `openai.gpt-5.6-luna` in a supported region.
@@ -579,8 +557,7 @@ Built with ❤️ by the Sundai Club team
 
 ## Remaining GCP resource audit
 
-The code no longer uses GCP at runtime. One-time copy tools still read the GCP
-source until the cutover is complete. The Sundai project audit found:
+The code no longer uses GCP. The Sundai project audit found:
 
 | Resource | State | Data to review before closing GCP |
 | --- | --- | --- |

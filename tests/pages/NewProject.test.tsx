@@ -4,7 +4,6 @@ import { useUser } from '@clerk/nextjs';
 import { useRouter, useSearchParams } from 'next/navigation';
 import NewProject from '../../src/app/projects/new/page';
 import { ThemeProvider } from '../../src/app/contexts/ThemeContext';
-import * as api from '../../src/lib/api';
 import toast from 'react-hot-toast';
 
 jest.mock('@clerk/nextjs', () => ({
@@ -14,10 +13,6 @@ jest.mock('@clerk/nextjs', () => ({
 jest.mock('next/navigation', () => ({
   useRouter: jest.fn(),
   useSearchParams: jest.fn(),
-}));
-
-jest.mock('../../src/lib/api', () => ({
-  createProject: jest.fn(),
 }));
 
 jest.mock('react-hot-toast', () => ({
@@ -33,10 +28,11 @@ const mockUseRouter = useRouter as jest.MockedFunction<typeof useRouter>;
 const mockUseSearchParams = useSearchParams as jest.MockedFunction<
   typeof useSearchParams
 >;
-const mockCreateProject = api.createProject as jest.MockedFunction<
-  typeof api.createProject
->;
 const mockToast = toast as jest.Mocked<typeof toast>;
+const builders = [
+  { id: 'hacker-1', name: 'John Doe' },
+  { id: 'hacker-2', name: 'Jane Smith' },
+];
 
 const defaultProps = {
   user: {
@@ -67,20 +63,11 @@ describe('NewProject', () => {
     mockUseUser.mockReturnValue(defaultProps);
     mockUseRouter.mockReturnValue(defaultRouter);
     mockUseSearchParams.mockReturnValue(new URLSearchParams() as any);
-    mockCreateProject.mockResolvedValue({
-      id: 'new-project-id',
-      title: 'New Project',
-    });
-
     global.fetch = jest.fn().mockImplementation((input: RequestInfo | URL) => {
       if (input === '/api/hackers') {
         return Promise.resolve({
           ok: true,
-          json: () =>
-            Promise.resolve([
-              { id: 'hacker-1', name: 'John Doe', email: 'john@example.com' },
-              { id: 'hacker-2', name: 'Jane Smith', email: 'jane@example.com' },
-            ]),
+          json: async () => builders,
         });
       }
       if (input === '/api/events/project-options') {
@@ -100,7 +87,7 @@ describe('NewProject', () => {
     renderWithTheme(<NewProject />);
 
     expect(screen.getByText('Initialize New Project')).toBeInTheDocument();
-    expect(screen.getByText('Launch Lead *')).toBeInTheDocument();
+    expect(screen.queryByText(/launch lead/i)).not.toBeInTheDocument();
     expect(screen.getByText('Project Title *')).toBeInTheDocument();
     expect(screen.getByText('Brief Description *')).toBeInTheDocument();
     expect(screen.getByText('Team Members')).toBeInTheDocument();
@@ -122,12 +109,8 @@ describe('NewProject', () => {
     expect(screen.getByText('+ Add Team Members')).toBeInTheDocument();
   });
 
-  it('should handle form submission', async () => {
+  it('creates a project without submitting a launch lead', async () => {
     renderWithTheme(<NewProject />);
-
-    await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith('/api/hackers');
-    });
 
     fireEvent.change(screen.getByLabelText('Project Title *'), {
       target: { value: 'New Project' },
@@ -136,31 +119,20 @@ describe('NewProject', () => {
       target: { value: 'New project description' },
     });
 
-    const submitButton = screen.getByText('Create Project');
-    fireEvent.click(submitButton);
+    fireEvent.click(screen.getByRole('button', { name: 'Create Project' }));
 
     await waitFor(() => {
-      expect(mockToast.error).toHaveBeenCalledWith(
-        'Please select a launch lead'
+      expect(defaultRouter.push).toHaveBeenCalledWith(
+        '/projects/new-project-id/edit'
       );
     });
-  });
-
-  it('should handle form validation', async () => {
-    renderWithTheme(<NewProject />);
-
-    await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith('/api/hackers');
-    });
-
-    const submitButton = screen.getByText('Create Project');
-    fireEvent.click(submitButton);
-
-    await waitFor(() => {
-      expect(mockToast.error).toHaveBeenCalledWith(
-        'Please select a launch lead'
-      );
-    });
+    const createCall = (global.fetch as jest.Mock).mock.calls.find(
+      ([url]) => url === '/api/projects'
+    );
+    expect(createCall?.[1].method).toBe('POST');
+    expect(createCall?.[1].body.get('title')).toBe('New Project');
+    expect(createCall?.[1].body.get('preview')).toBe('New project description');
+    expect(createCall?.[1].body.has('launchLeadId')).toBe(false);
   });
 
   it('should handle unauthenticated user', () => {
@@ -171,7 +143,14 @@ describe('NewProject', () => {
 
     renderWithTheme(<NewProject />);
 
-    expect(screen.getByText('Initialize New Project')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Create Project' }));
+    expect(mockToast.error).toHaveBeenCalledWith(
+      'Please sign in to create a project'
+    );
+    expect(global.fetch).not.toHaveBeenCalledWith(
+      '/api/projects',
+      expect.anything()
+    );
   });
 
   it('should update form state when inputs change', () => {
@@ -201,9 +180,7 @@ describe('NewProject', () => {
         if (input === '/api/hackers') {
           return Promise.resolve({
             ok: true,
-            json: async () => [
-              { id: 'hacker-1', name: 'John Doe', email: 'test@example.com' },
-            ],
+            json: async () => builders,
           });
         }
         if (input === '/api/events/project-options') {
@@ -216,6 +193,7 @@ describe('NewProject', () => {
                 chapterName: 'Sundai Boston',
                 image: null,
                 selectedByDefault: false,
+                pitchQueueOpen: true,
               },
             ],
           });
@@ -232,6 +210,9 @@ describe('NewProject', () => {
       name: /boston build night/i,
     });
     expect(eventChoice).toBeChecked();
+    expect(
+      screen.getByRole('checkbox', { name: 'Add to pitch queue' })
+    ).toBeChecked();
     expect(
       screen.getByRole('img', { name: 'Boston Build Night event' })
     ).toHaveAttribute('src', expect.stringContaining('sundai_logo'));
@@ -251,8 +232,78 @@ describe('NewProject', () => {
         )
       )
     );
-    const createCall = (global.fetch as jest.Mock).mock.calls.find(([url]) => url === '/api/projects');
+    const createCall = (global.fetch as jest.Mock).mock.calls.find(
+      ([url]) => url === '/api/projects'
+    );
     expect(createCall[1].body.getAll('eventIds[]')).toEqual(['event-1']);
+    expect(createCall[1].body.getAll('pitchEventIds[]')).toEqual(['event-1']);
+  });
+
+  it('leaves the pitch queue unchecked without a source event until chosen', async () => {
+    (global.fetch as jest.Mock).mockImplementation(
+      (input: RequestInfo | URL) => {
+        if (input === '/api/hackers') {
+          return Promise.resolve({
+            ok: true,
+            json: async () => builders,
+          });
+        }
+        if (input === '/api/events/project-options') {
+          return Promise.resolve({
+            ok: true,
+            json: async () => [
+              {
+                id: 'event-1',
+                title: 'Boston Build Night',
+                chapterName: 'Sundai Boston',
+                image: null,
+                selectedByDefault: true,
+                pitchQueueOpen: true,
+              },
+              {
+                id: 'event-2',
+                title: 'Closed Pitch Night',
+                chapterName: 'Sundai Boston',
+                image: null,
+                selectedByDefault: true,
+                pitchQueueOpen: false,
+              },
+            ],
+          });
+        }
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ id: 'new-project-id' }),
+        });
+      }
+    );
+
+    renderWithTheme(<NewProject />);
+    const pitchChoices = await screen.findAllByRole('checkbox', {
+      name: 'Add to pitch queue',
+    });
+    expect(pitchChoices).toHaveLength(1);
+    expect(pitchChoices[0]).not.toBeChecked();
+
+    fireEvent.click(pitchChoices[0]);
+    fireEvent.change(screen.getByLabelText('Project Title *'), {
+      target: { value: 'New Project' },
+    });
+    fireEvent.change(screen.getByLabelText('Brief Description *'), {
+      target: { value: 'New project description' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Create Project' }));
+
+    await waitFor(() =>
+      expect(defaultRouter.push).toHaveBeenCalledWith(
+        '/projects/new-project-id/edit?eventId=event-1&eventId=event-2'
+      )
+    );
+    const createCall = (global.fetch as jest.Mock).mock.calls.find(
+      ([url]) => url === '/api/projects'
+    );
+    // The pitch choice is saved with the project instead of in the URL.
+    expect(createCall[1].body.getAll('pitchEventIds[]')).toEqual(['event-1']);
   });
 
   it('requires a track before creating a judged project and carries it to the editor', async () => {
@@ -261,7 +312,7 @@ describe('NewProject', () => {
         ok: true,
         json: async () =>
           input === '/api/hackers'
-            ? [{ id: 'hacker-1', name: 'John Doe', email: 'test@example.com' }]
+            ? builders
             : input === '/api/events/project-options'
               ? [
                   {

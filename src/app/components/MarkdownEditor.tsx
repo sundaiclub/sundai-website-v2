@@ -10,24 +10,16 @@ import {
 } from '@heroicons/react/24/outline';
 import { useTheme } from '../contexts/ThemeContext';
 import ProjectMarkdown from './ProjectMarkdown';
-import {
-  getImageUploadError,
-  validateImageUploadSize,
-} from '@/lib/imageUploads';
+import { getImageUploadError, uploadImageFile } from '@/lib/imageUploads';
 type UploadImageResponse = { url: string };
 const uploadImage = async (file: File): Promise<string> => {
-  const sizeError = validateImageUploadSize(file);
-  if (sizeError) throw new Error(sizeError);
-
   const loadingToast = toast.loading('Uploading image...');
-  const formData = new FormData();
-  formData.append('file', file);
-  formData.append('filename', file.name);
-
   try {
+    const uploadToken = await uploadImageFile(file, 'projects');
     const response = await fetch('/api/uploads/image', {
       method: 'POST',
-      body: formData,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ uploadToken }),
     });
     if (!response.ok) {
       throw new Error(

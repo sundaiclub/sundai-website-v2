@@ -7,6 +7,7 @@ import {
   createContext,
   useContext,
   useEffect,
+  useRef,
   useState,
   type ReactNode,
 } from 'react';
@@ -20,6 +21,7 @@ import type {
   EventWorkspaceOverview,
   WorkspaceSection,
 } from '@/types/event-workspace';
+import { prefetchRegistrationQueue } from './registrations/registrationQueueClient';
 
 type EffectiveWorkspaceRole = 'SITE_ADMIN' | 'CHAPTER_ADMIN' | 'MC' | 'CO_MC';
 
@@ -283,6 +285,7 @@ export default function WorkspaceShell({
   const [state, setState] = useState<
     'loading' | 'ready' | 'permission-lost' | 'unavailable'
   >(initialWorkspace ? 'ready' : 'loading');
+  const initialPathname = useRef(usePathname());
 
   useEffect(() => {
     if (initialWorkspace) {
@@ -294,6 +297,12 @@ export default function WorkspaceShell({
     let isCurrent = true;
     setState('loading');
     setWorkspace(null);
+    // The RSVP page waits for this shell, so start its list request now.
+    if (
+      initialPathname.current === `/organizer/events/${eventId}/registrations`
+    ) {
+      prefetchRegistrationQueue(eventId);
+    }
 
     fetch(`/api/events/${eventId}/workspace`)
       .then(async response => {

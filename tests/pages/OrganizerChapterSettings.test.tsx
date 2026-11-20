@@ -272,9 +272,26 @@ function isApplicationTemplateListRequest(url: string) {
   return url === `/api/application-templates?chapterId=${chapter.id}`;
 }
 
+const S3_UPLOAD_URL = 'https://images.s3.example.com/';
+
 function mockOrganizerFetches() {
   global.fetch = jest.fn((input: RequestInfo | URL) => {
     const url = requestUrl(input);
+
+    if (url.includes('/api/uploads/image-intents')) {
+      return jsonResponse(
+        {
+          url: S3_UPLOAD_URL,
+          fields: { key: 'chapters/upload-key' },
+          uploadToken: 'upload-token',
+        },
+        201
+      );
+    }
+
+    if (url === S3_UPLOAD_URL) {
+      return jsonResponse('', 204);
+    }
 
     if (url.includes('/members')) {
       return jsonResponse(members);
@@ -507,6 +524,17 @@ describe('/organizer/chapters/[chapterSlug]/settings', () => {
     fireEvent.change(imageInput, { target: { files: [image] } });
 
     await screen.findByText(/chapter image uploaded/i);
+    expect(global.fetch).toHaveBeenCalledWith(
+      S3_UPLOAD_URL,
+      expect.objectContaining({ method: 'POST', body: expect.any(FormData) })
+    );
+    expect(global.fetch).toHaveBeenCalledWith(
+      `/api/chapters/${chapter.id}/image`,
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ uploadToken: 'upload-token' }),
+      })
+    );
 
     const description = screen.getByLabelText(/chapter description/i);
     fireEvent.change(description, {
@@ -531,7 +559,7 @@ describe('/organizer/chapters/[chapterSlug]/settings', () => {
     });
   });
 
-  it('shows the size limit when a chapter image upload returns 413', async () => {
+  it('shows the size limit when S3 rejects a chapter image as too large', async () => {
     mockChapterAdmin();
     renderSettingsPage();
 
@@ -539,8 +567,8 @@ describe('/organizer/chapters/[chapterSlug]/settings', () => {
     const defaultFetch = (global.fetch as jest.Mock).getMockImplementation()!;
     (global.fetch as jest.Mock).mockImplementation(
       (input: RequestInfo | URL, init?: RequestInit) =>
-        requestUrl(input).includes(`/api/chapters/${chapter.id}/image`)
-          ? jsonResponse({}, 413)
+        requestUrl(input) === S3_UPLOAD_URL
+          ? jsonResponse('<Error><Code>EntityTooLarge</Code></Error>', 400)
           : defaultFetch(input, init)
     );
 
@@ -552,9 +580,13 @@ describe('/organizer/chapters/[chapterSlug]/settings', () => {
 
     expect(
       await screen.findByText(
-        /file too large\. image files must be smaller than 15 mb\./i
+        /this image is too large to upload\. images must be 15 mb or smaller\./i
       )
     ).toBeInTheDocument();
+    expect(global.fetch).not.toHaveBeenCalledWith(
+      `/api/chapters/${chapter.id}/image`,
+      expect.anything()
+    );
   });
 
   it('creates a ban flag from the selected hacker search result', async () => {

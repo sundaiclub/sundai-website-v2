@@ -1,11 +1,8 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { requireEventSettingsManager } from '@/lib/eventManagementApi';
-import { uploadToS3 } from '@/lib/s3-images';
-import {
-  IMAGE_UPLOAD_SIZE_ERROR,
-  validateImageUploadSize,
-} from '@/lib/imageUploads';
+import { ImageUploadError } from '@/lib/imageUploads';
+import { claimUploadedImage } from '@/lib/s3-images';
 
 const ALLOWED_EVENT_IMAGE_TYPES = new Set([
   'image/jpeg',
@@ -29,41 +26,33 @@ export async function POST(
     });
     if (!event) return new NextResponse('Not Found', { status: 404 });
 
-    const formData = await request.formData();
-    const file = formData.get('image');
-    const rawPrompt = formData.get('prompt');
-    const prompt =
-      typeof rawPrompt === 'string' && rawPrompt.trim()
-        ? rawPrompt.trim().slice(0, 10_000)
-        : null;
-    if (!(file instanceof File) || file.size === 0) {
+    const body = await request.json().catch(() => null);
+    if (typeof body?.uploadToken !== 'string' || !body.uploadToken) {
       return NextResponse.json(
         { message: 'An event image is required.' },
         { status: 400 }
       );
     }
-    if (!ALLOWED_EVENT_IMAGE_TYPES.has(file.type)) {
+    const prompt =
+      typeof body.prompt === 'string' && body.prompt.trim()
+        ? body.prompt.trim().slice(0, 10_000)
+        : null;
+
+    const upload = await claimUploadedImage(body.uploadToken, 'events');
+    if (!ALLOWED_EVENT_IMAGE_TYPES.has(upload.mimeType)) {
       return NextResponse.json(
         { message: 'Event images must be JPEG, PNG, WebP, or GIF files.' },
         { status: 400 }
       );
     }
-    if (validateImageUploadSize(file)) {
-      return NextResponse.json(
-        { message: IMAGE_UPLOAD_SIZE_ERROR },
-        { status: 413 }
-      );
-    }
-
-    const upload = await uploadToS3(file, 'events');
     const image = await prisma.image.create({
       data: {
         key: upload.key,
         bucket: upload.bucket,
         url: upload.url,
-        filename: file.name,
-        mimeType: file.type,
-        size: file.size,
+        filename: upload.filename,
+        mimeType: upload.mimeType,
+        size: upload.size,
         alt: `${event.title} event`,
         prompt,
       },
@@ -84,6 +73,12 @@ export async function POST(
 
     return NextResponse.json(updatedEvent.image);
   } catch (error) {
+    if (error instanceof ImageUploadError) {
+      return NextResponse.json(
+        { message: error.message },
+        { status: error.status }
+      );
+    }
     console.error('[EVENT_IMAGE_POST]', error);
     return NextResponse.json(
       { message: 'Unable to upload event image.' },
