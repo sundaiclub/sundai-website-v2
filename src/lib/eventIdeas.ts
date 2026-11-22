@@ -31,7 +31,7 @@ type IdeaRecord = {
 };
 
 export type EventIdeasViewer = {
-  hackerId: string | null;
+  hackerId: string;
   name: string | null;
   canModerate: boolean;
 };
@@ -41,7 +41,7 @@ function toPublicIdea(
   { hackerId, createdAt, ...record }: IdeaRecord,
   viewer: EventIdeasViewer
 ): PublicEventIdea {
-  const isAuthor = Boolean(viewer.hackerId && hackerId === viewer.hackerId);
+  const isAuthor = hackerId === viewer.hackerId;
   return {
     ...record,
     createdAt: createdAt.toISOString(),
@@ -94,11 +94,12 @@ export async function findPublicEventId(eventId: string) {
   return event?.id ?? null;
 }
 
+// Ideas are only for signed-in members, so signed-out visitors get no viewer.
 export async function getEventIdeasViewer(
   eventId: string
-): Promise<EventIdeasViewer> {
+): Promise<EventIdeasViewer | null> {
   const hacker = await getCurrentHacker();
-  if (!hacker) return { hackerId: null, name: null, canModerate: false };
+  if (!hacker) return null;
 
   const context = await getEventPermissionContext(prisma, hacker.id, eventId);
   return {

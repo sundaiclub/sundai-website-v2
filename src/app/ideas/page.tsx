@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { auth } from '@clerk/nextjs/server';
 import EventSummaryCard from '@/app/components/EventSummaryCard';
 import {
   ManagementEmptyState,
@@ -28,6 +29,7 @@ function timeRangeLabel(start: Date, end: Date | null, timeZone: string) {
 }
 
 export default async function IdeasLandingPage() {
+  await auth.protect();
   const events = await listTodaysPublicEvents();
 
   return (

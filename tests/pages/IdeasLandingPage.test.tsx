@@ -3,6 +3,12 @@ import IdeasLandingPage from '@/app/ideas/page';
 import { ThemeProvider } from '@/app/contexts/ThemeContext';
 import { listTodaysPublicEvents } from '@/lib/eventIdeas';
 
+const mockProtect = jest.fn();
+
+jest.mock('@clerk/nextjs/server', () => ({
+  auth: { protect: () => mockProtect() },
+}));
+
 jest.mock('@/lib/eventIdeas', () => ({
   listTodaysPublicEvents: jest.fn(),
 }));
@@ -10,7 +16,17 @@ jest.mock('@/lib/eventIdeas', () => ({
 const mockListTodaysPublicEvents = listTodaysPublicEvents as jest.Mock;
 
 describe('IdeasLandingPage', () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockProtect.mockResolvedValue({ userId: 'user_1' });
+  });
+
+  it('sends signed-out visitors to sign in before listing events', async () => {
+    mockProtect.mockRejectedValue(new Error('NEXT_REDIRECT'));
+
+    await expect(IdeasLandingPage()).rejects.toThrow('NEXT_REDIRECT');
+    expect(mockListTodaysPublicEvents).not.toHaveBeenCalled();
+  });
 
   it("links each of today's events to its Ideas tab", async () => {
     mockListTodaysPublicEvents.mockResolvedValue([
