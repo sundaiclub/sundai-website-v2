@@ -15,7 +15,11 @@ import { EventProjectCarousel } from '@/app/components/EventProjectCarousel';
 import { EventCheckInTicket } from '@/app/components/EventCheckInTicket';
 import PitchEventPage from '@/app/components/PitchEventPage';
 import EventJudgingPanel from '@/app/components/EventJudgingPanel';
-import { EventIdeasBoard } from '@/app/components/EventIdeasBoard';
+import { EventGuidePanel } from '@/app/components/EventGuidePanel';
+import {
+  EventIdeasBoard,
+  EventIdeasSignInPrompt,
+} from '@/app/components/EventIdeasBoard';
 import {
   ManagementAlert,
   ManagementLinkButton,
@@ -33,6 +37,7 @@ import {
 } from '@/lib/eventCheckIn';
 import { listPublicEventProjects } from '@/lib/publicEventProjects';
 import { getEventIdeasViewer, listEventIdeas } from '@/lib/eventIdeas';
+import { guideEmbedUrl } from '@/lib/eventGuide';
 import { findViewerJudgedEvent } from '@/lib/judgingAccess';
 import { JUDGE_TOKEN_PARAM } from '@/types/judging';
 import { getPublicEventBySlug } from '@/lib/publicEvents';
@@ -60,10 +65,18 @@ function firstParam(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
 }
 
-type EventTab = 'info' | 'ideas' | 'ticket' | 'projects' | 'pitch' | 'judging';
+type EventTab =
+  | 'info'
+  | 'guide'
+  | 'ideas'
+  | 'ticket'
+  | 'projects'
+  | 'pitch'
+  | 'judging';
 
 const eventTabs: Array<{ id: EventTab; label: string }> = [
   { id: 'info', label: 'Info' },
+  { id: 'guide', label: 'Guide' },
   { id: 'ideas', label: 'Ideas' },
   { id: 'ticket', label: 'Ticket' },
   { id: 'projects', label: 'Projects' },
@@ -236,6 +249,7 @@ export default async function PublicEventDetailPage(props: EventPageProps) {
       ));
   const visibleTabs = eventTabs.filter(
     tab =>
+      (tab.id !== 'guide' || event.hasGuide) &&
       (tab.id !== 'ticket' || ticket) &&
       (tab.id !== 'judging' || judgedEvent) &&
       (tab.id !== 'pitch' || !event.judgingEnabled) &&
@@ -405,13 +419,25 @@ export default async function PublicEventDetailPage(props: EventPageProps) {
         </div>
       )}
 
-      {activeTab === 'ideas' && (
-        <EventIdeasBoard
-          eventId={event.id}
-          initialIdeas={eventIdeas}
-          viewerName={ideasViewer?.name ?? null}
+      {activeTab === 'guide' && (
+        <EventGuidePanel
+          embedUrl={event.guideUrl ? guideEmbedUrl(event.guideUrl) : null}
+          eventTitle={event.title}
+          guideUrl={event.guideUrl}
+          signedIn={Boolean(userId)}
         />
       )}
+
+      {activeTab === 'ideas' &&
+        (ideasViewer ? (
+          <EventIdeasBoard
+            eventId={event.id}
+            initialIdeas={eventIdeas}
+            viewerName={ideasViewer.name}
+          />
+        ) : (
+          <EventIdeasSignInPrompt />
+        ))}
 
       {activeTab === 'ticket' && ticket && (
         <div className="mx-auto max-w-md">

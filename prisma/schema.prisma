@@ -423,6 +423,8 @@ model Event {
   publicLocation                String?
   address                       String?
   virtualUrl                    String?
+  // Slideshow shown to approved attendees on the event Guide tab.
+  guideUrl                      String?
   createdBy                     Hacker                   @relation(fields: [createdById], references: [id])
   createdById                   String
   chapter                       Chapter                  @relation(fields: [chapterId], references: [id])

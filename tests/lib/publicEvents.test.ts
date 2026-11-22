@@ -269,6 +269,46 @@ describe('public event helpers', () => {
     );
   });
 
+  it('shares the guide link only with approved attendees and event managers', () => {
+    const event = buildPublicEvent({
+      guideUrl: 'https://docs.google.com/presentation/d/fake-guide/edit',
+    });
+    const registration = (status: RegistrationStatus) => ({
+      id: `registration-${status}`,
+      status,
+      canEditAnswers: false,
+      canCancel: true,
+    });
+
+    const anonymous = redactPublicEventForViewer(event, { now });
+    const pending = redactPublicEventForViewer(event, {
+      viewerRegistration: registration('PENDING'),
+      now,
+    });
+    const approved = redactPublicEventForViewer(event, {
+      viewerRegistration: registration('APPROVED'),
+      now,
+    });
+    const manager = redactPublicEventForViewer(event, {
+      viewerCanManageRegistrations: true,
+      now,
+    });
+
+    for (const detail of [anonymous, pending]) {
+      expect(detail.hasGuide).toBe(true);
+      expect(detail.guideUrl).toBeNull();
+      expect(JSON.stringify(detail)).not.toContain('fake-guide');
+    }
+    expect(approved.guideUrl).toBe(event.guideUrl);
+    expect(manager.guideUrl).toBe(event.guideUrl);
+    expect(
+      redactPublicEventForViewer(buildPublicEvent(), {
+        viewerRegistration: registration('APPROVED'),
+        now,
+      })
+    ).toMatchObject({ hasGuide: false, guideUrl: null });
+  });
+
   it('exposes the viewer staff role and disables staff registration cancellation', () => {
     const detail = redactPublicEventForViewer(buildPublicEvent(), {
       viewerRegistration: {

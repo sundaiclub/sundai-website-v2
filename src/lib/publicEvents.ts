@@ -152,6 +152,7 @@ type PublicEventsEventRecord = {
   applicationsCloseReason?: string | null;
   autoPromoteWaitlist?: boolean | null;
   approvedDetailsJson?: JsonValue | null;
+  guideUrl?: string | null;
   applicationQuestionsJson?: JsonValue | null;
   hideChapterDefaultQuestions?: boolean | null;
   chapterId: EntityId;
@@ -570,6 +571,8 @@ export function redactPublicEventForViewer(
     publicExpertText: null,
     approvedDetailsJson: approvedDetails,
     approvedDetailsVisible,
+    hasGuide: Boolean(event.guideUrl),
+    guideUrl: approvedDetailsVisible ? (event.guideUrl ?? null) : null,
     applicationControls,
     applicationQuestionSet:
       options.applicationQuestionSet ?? buildApplicationQuestionSet(event),
