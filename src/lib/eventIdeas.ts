@@ -6,6 +6,7 @@ import {
   getEventPermissionContext,
 } from '@/lib/eventManagementAuth';
 import { publicEventVisibilityWhere } from '@/lib/publicEvents';
+import { EVENT_PICKER_SELECT, toEventPickerItem } from '@/lib/eventPicker';
 import {
   EVENT_IDEA_LIMITS,
   type EventIdeaInput,
@@ -186,17 +187,7 @@ export async function listTodaysPublicEvents(now = new Date()) {
       ],
     },
     orderBy: [{ startTime: 'asc' }, { title: 'asc' }],
-    select: {
-      id: true,
-      title: true,
-      slug: true,
-      startTime: true,
-      endTime: true,
-      timezone: true,
-      publicLocation: true,
-      image: { select: { url: true, alt: true } },
-      chapter: { select: { name: true, slug: true } },
-    },
+    select: EVENT_PICKER_SELECT,
   });
 
   return events
@@ -207,9 +198,5 @@ export async function listTodaysPublicEvents(now = new Date()) {
         today <= eventDayKey(event.endTime ?? event.startTime, event.timezone)
       );
     })
-    .map(({ chapter, ...event }) => ({
-      ...event,
-      chapterName: chapter.name,
-      chapterSlug: chapter.slug,
-    }));
+    .map(toEventPickerItem);
 }

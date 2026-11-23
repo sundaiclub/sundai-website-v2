@@ -1419,7 +1419,7 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
               />
               <span className={`text-sm ${classes.mutedText}`}>
                 Approved attendees see this slideshow on the event&apos;s Guide
-                tab. Share Google Slides with anyone who has the link.
+                tab.
               </span>
             </label>
           </div>
