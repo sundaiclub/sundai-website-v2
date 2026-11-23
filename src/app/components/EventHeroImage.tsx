@@ -1,17 +1,48 @@
 'use client';
 
 import Image from 'next/image';
-import type { ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { formatEventSchedule } from '@/lib/eventDateTime';
 import type { PublicEventDetail } from '@/types/event-management';
 import { useManagementClasses } from './ManagementSurface';
 
+function mapsUrl(address: string, useAppleMaps: boolean) {
+  const query = encodeURIComponent(address);
+  return useAppleMaps
+    ? `https://maps.apple.com/?q=${query}`
+    : `https://www.google.com/maps/search/?api=1&query=${query}`;
+}
+
+function AddressLink({ address }: { address: string }) {
+  // Apple devices open Apple Maps. Everything else opens Google Maps. The
+  // device is only known in the browser, so the link starts as Google Maps.
+  const [useAppleMaps, setUseAppleMaps] = useState(false);
+  useEffect(() => {
+    setUseAppleMaps(/iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent));
+  }, []);
+
+  return (
+    <a
+      aria-label={`Open ${address} in maps`}
+      className="underline decoration-dotted underline-offset-4 outline-none hover:decoration-solid focus-visible:ring-2"
+      href={mapsUrl(address, useAppleMaps)}
+      rel="noopener noreferrer"
+      target="_blank"
+    >
+      {address}
+    </a>
+  );
+}
+
 export function PublicEventHero({
   event,
+  mapsAddress,
   actions,
   chapterActions,
 }: {
   event: PublicEventDetail;
+  // The full address shown to approved attendees. It links to a maps app.
+  mapsAddress?: string | null;
   actions?: ReactNode;
   chapterActions?: ReactNode;
 }) {
@@ -124,7 +155,11 @@ export function PublicEventHero({
                 Where
               </dt>
               <dd className="mt-1 text-base font-semibold leading-7">
-                {event.publicLocation || 'Location to be announced'}
+                {mapsAddress ? (
+                  <AddressLink address={mapsAddress} />
+                ) : (
+                  event.publicLocation || 'Location to be announced'
+                )}
               </dd>
             </div>
           </div>

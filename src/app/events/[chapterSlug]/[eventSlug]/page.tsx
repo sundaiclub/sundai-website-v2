@@ -11,7 +11,7 @@ import {
   type PublicEventMaterialLink,
 } from '@/app/components/EventDetailSections';
 import { PublicEventHero } from '@/app/components/EventHeroImage';
-import { EventProjectCarousel } from '@/app/components/EventProjectCarousel';
+import { EventProjectGrid } from '@/app/components/EventProjectGrid';
 import { EventCheckInTicket } from '@/app/components/EventCheckInTicket';
 import PitchEventPage from '@/app/components/PitchEventPage';
 import EventJudgingPanel from '@/app/components/EventJudgingPanel';
@@ -393,6 +393,7 @@ export default async function PublicEventDetailPage(props: EventPageProps) {
           <div className="grid min-w-0 gap-5">
             <PublicEventHero
               event={heroEvent}
+              mapsAddress={privateAddress}
               chapterActions={
                 <>
                   <PublicEventStatusBadge status={event.publicStatus} />
@@ -457,7 +458,7 @@ export default async function PublicEventDetailPage(props: EventPageProps) {
             event={event}
             returnTo={`${eventPath}?tab=projects`}
           />
-          <EventProjectCarousel projects={eventProjects} />
+          <EventProjectGrid projects={eventProjects} />
         </div>
       )}
 
