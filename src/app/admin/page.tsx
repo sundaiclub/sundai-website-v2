@@ -17,6 +17,7 @@ const adminSections = [
   { href: '/admin/bans', label: 'Global moderation' },
   { href: '/admin/communications', label: 'Communications' },
   { href: '/admin/weekly-emails', label: 'Weekly emails' },
+  { href: '/admin/event-engagement', label: 'Hack engagement' },
 ];
 
 export default function AdminConsolePage() {
