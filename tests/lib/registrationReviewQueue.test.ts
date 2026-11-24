@@ -94,7 +94,10 @@ describe('loadRegistrationReviewQueue', () => {
 
     const page = await loadRegistrationReviewQueue(baseInput(), db as never);
 
-    const banExclusion = { userBans: { none: { revokedAt: null } } };
+    const banExclusion = {
+      eventStaffAssignments: { none: { eventId } },
+      userBans: { none: { revokedAt: null } },
+    };
     expect(db.eventRegistration.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { eventId, hacker: banExclusion, status: 'PENDING' },
@@ -114,7 +117,7 @@ describe('loadRegistrationReviewQueue', () => {
     expect(page.hasMore).toBe(false);
   });
 
-  it('includes banned applicants only when asked to', async () => {
+  it('leaves event staff out of the list and the counts when banned applicants are included', async () => {
     const db = createDb();
 
     await loadRegistrationReviewQueue(
@@ -122,15 +125,17 @@ describe('loadRegistrationReviewQueue', () => {
       db as never
     );
 
+    const staffExclusion = { eventStaffAssignments: { none: { eventId } } };
     expect(db.eventRegistration.findMany.mock.calls[0][0].where).toEqual({
       eventId,
+      hacker: staffExclusion,
       status: 'PENDING',
     });
     expect(
       db.eventRegistration.groupBy.mock.calls.find(
         ([args]: [{ by: string[] }]) => args.by.length === 1
       )[0].where
-    ).toEqual({ eventId });
+    ).toEqual({ eventId, hacker: staffExclusion });
   });
 
   it('searches applicant name, email, and username and sorts newest first', async () => {

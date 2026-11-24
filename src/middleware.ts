@@ -2,18 +2,14 @@ import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
 
 export const isPublicRoute = createRouteMatcher([
   '/',
-  '/guide',
   '/join',
   '/privacy',
   '/terms',
   '/events(.*)',
-  '/ideas',
   '/chapters(.*)',
   '/projects(.*)',
   '/api/chapters(.*)',
   '/api/events',
-  // Anyone can read and share project ideas on a public event.
-  '/api/events/:eventId/ideas',
   '/api/projects(.*)',
   '/api/webhooks/clerk',
   '/api/webhooks/twilio(.*)',

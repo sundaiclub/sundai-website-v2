@@ -7,6 +7,7 @@ import {
   parseEventIdeaInput,
   updateEventIdea,
 } from '@/lib/eventIdeas';
+import { unauthorized } from '@/lib/eventManagementApi';
 
 type IdeaRouteProps = { params: Promise<{ eventId: string; ideaId: string }> };
 
@@ -22,9 +23,7 @@ export async function PATCH(req: Request, props: IdeaRouteProps) {
     if (!eventId) return ideaNotFound();
 
     const viewer = await getEventIdeasViewer(eventId);
-    if (!viewer.hackerId) {
-      return new NextResponse('Unauthorized', { status: 401 });
-    }
+    if (!viewer) return unauthorized();
 
     const existing = await findEventIdeaAuthor(eventId, params.ideaId);
     if (!existing) return ideaNotFound();
@@ -58,9 +57,7 @@ export async function DELETE(_req: Request, props: IdeaRouteProps) {
   const params = await props.params;
   try {
     const viewer = await getEventIdeasViewer(params.eventId);
-    if (!viewer.hackerId) {
-      return new NextResponse('Unauthorized', { status: 401 });
-    }
+    if (!viewer) return unauthorized();
 
     if (!viewer.canModerate) {
       const existing = await findEventIdeaAuthor(params.eventId, params.ideaId);

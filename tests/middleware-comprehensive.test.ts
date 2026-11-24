@@ -36,13 +36,13 @@ describe('middleware', () => {
     );
   });
 
-  it('keeps event ideas public for signed-out visitors', () => {
+  it('requires sign-in for event ideas', () => {
     require('../src/middleware');
     const { createRouteMatcher } = require('@clerk/nextjs/server');
+    const [publicRoutes] = createRouteMatcher.mock.calls[0];
 
-    expect(createRouteMatcher).toHaveBeenCalledWith(
-      expect.arrayContaining(['/ideas', '/api/events/:eventId/ideas'])
-    );
+    expect(publicRoutes).not.toContain('/ideas');
+    expect(publicRoutes).not.toContain('/api/events/:eventId/ideas');
   });
 
   it('keeps the signed SES webhook and tracked email links public', () => {

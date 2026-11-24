@@ -12,6 +12,7 @@ import {
   ManagementSection,
   useManagementClasses,
 } from './ManagementSurface';
+import { SignInAction } from './SignInAction';
 
 async function responseMessage(response: Response, fallback: string) {
   const body = await response.json().catch(() => null);
@@ -171,6 +172,26 @@ function IdeaDialog({
   );
 }
 
+const IDEAS_DESCRIPTION =
+  'Share what you want to build today and find people to build it with.';
+
+export function EventIdeasSignInPrompt() {
+  return (
+    <ManagementSection
+      description={IDEAS_DESCRIPTION}
+      size="large"
+      title="Ideas"
+    >
+      <ManagementEmptyState>
+        <div className="flex flex-col items-center gap-4">
+          <span>Sign in to see and share ideas for this event.</span>
+          <SignInAction label="Sign in to see ideas" />
+        </div>
+      </ManagementEmptyState>
+    </ManagementSection>
+  );
+}
+
 export function EventIdeasBoard({
   eventId,
   viewerName,
@@ -246,7 +267,7 @@ export function EventIdeasBoard({
           Add idea
         </button>
       }
-      description="Share what you want to build today and find people to build it with."
+      description={IDEAS_DESCRIPTION}
       size="large"
       title="Ideas"
     >

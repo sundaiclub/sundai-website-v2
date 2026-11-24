@@ -20,9 +20,13 @@ jest.mock('../../src/lib/prisma', () => ({
   },
 }));
 
-jest.mock('../../src/lib/eventManagementApi', () => ({
-  getCurrentHacker: jest.fn(),
-}));
+jest.mock('../../src/lib/eventManagementApi', () => {
+  const { NextResponse } = jest.requireActual('next/server');
+  return {
+    getCurrentHacker: jest.fn(),
+    unauthorized: () => new NextResponse('Unauthorized', { status: 401 }),
+  };
+});
 
 jest.mock('../../src/lib/eventManagementAuth', () => ({
   ...jest.requireActual('../../src/lib/eventManagementAuth'),
@@ -87,6 +91,7 @@ describe('/api/events/[eventId]/ideas', () => {
   });
 
   it('lists ideas oldest first without exposing author ids', async () => {
+    signInAs('h2');
     prisma.eventIdea.findMany.mockResolvedValue([ideaRecord]);
 
     const response = await GET(new Request('http://localhost'), routeProps);
@@ -166,29 +171,17 @@ describe('/api/events/[eventId]/ideas', () => {
     expect(prisma.eventIdea.create).not.toHaveBeenCalled();
   });
 
-  it('accepts ideas from signed-out visitors', async () => {
-    prisma.eventIdea.create.mockResolvedValue(anonymousRecord);
-
-    const response = await POST(
-      jsonRequest('POST', {
-        name: '  Ada ',
-        idea: ' A robot that waters plants ',
-      }),
+  it('requires sign-in to read and share ideas', async () => {
+    const getResponse = await GET(new Request('http://localhost'), routeProps);
+    const postResponse = await POST(
+      jsonRequest('POST', { name: 'Ada', idea: 'Idea' }),
       routeProps
     );
 
-    expect(response.status).toBe(201);
-    expect(prisma.eventIdea.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: {
-          eventId: 'e1',
-          hackerId: null,
-          name: 'Ada',
-          idea: 'A robot that waters plants',
-          description: null,
-        },
-      })
-    );
+    expect(getResponse.status).toBe(401);
+    expect(postResponse.status).toBe(401);
+    expect(prisma.eventIdea.findMany).not.toHaveBeenCalled();
+    expect(prisma.eventIdea.create).not.toHaveBeenCalled();
   });
 
   it('links ideas to the signed-in hacker', async () => {
@@ -200,8 +193,8 @@ describe('/api/events/[eventId]/ideas', () => {
 
     const response = await POST(
       jsonRequest('POST', {
-        name: 'Ada',
-        idea: 'A robot that waters plants',
+        name: '  Ada ',
+        idea: ' A robot that waters plants ',
         description: 'Uses soil sensors',
       }),
       routeProps
@@ -217,12 +210,19 @@ describe('/api/events/[eventId]/ideas', () => {
     expect(body).not.toHaveProperty('hackerId');
     expect(prisma.eventIdea.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({ hackerId: 'h1' }),
+        data: {
+          eventId: 'e1',
+          hackerId: 'h1',
+          name: 'Ada',
+          idea: 'A robot that waters plants',
+          description: 'Uses soil sensors',
+        },
       })
     );
   });
 
   it('rejects ideas without a name or idea', async () => {
+    signInAs('h1');
     const response = await POST(
       jsonRequest('POST', { name: ' ', idea: 'x' }),
       routeProps

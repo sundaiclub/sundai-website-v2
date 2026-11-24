@@ -45,6 +45,9 @@ describe('AdminPage', () => {
       screen.getByRole('link', { name: 'Global moderation' })
     ).toHaveAttribute('href', '/admin/bans');
     expect(
+      screen.getByRole('link', { name: 'Hack engagement' })
+    ).toHaveAttribute('href', '/admin/event-engagement');
+    expect(
       screen.queryByRole('link', { name: 'Organizer events' })
     ).not.toBeInTheDocument();
   });

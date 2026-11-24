@@ -231,6 +231,7 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
   const [trackAttendance, setTrackAttendance] = useState(false);
   const [approvedAddress, setApprovedAddress] = useState('');
   const [approvedDetails, setApprovedDetails] = useState('');
+  const [guideUrl, setGuideUrl] = useState('');
   const [applicationsOpen, setApplicationsOpen] = useState(true);
   const [applicationsCloseReason, setApplicationsCloseReason] = useState('');
   const [selectedMcs, setSelectedMcs] = useState<HackerSelectionOption[]>([]);
@@ -406,6 +407,7 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
               ? approvedDetails.details
               : ''
           );
+          setGuideUrl(eventPayload.guideUrl ?? '');
           setSelectedMcs(
             (eventPayload.staff ?? [])
               .filter(staff => staff.role === 'MC' && staff.hacker)
@@ -822,6 +824,7 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
         address: approvedAddress,
         details: approvedDetails,
       },
+      guideUrl: guideUrl.trim(),
       ...(canAdminister && { staff }),
       applicationQuestionsJson,
       hideChapterDefaultQuestions: true,
@@ -955,7 +958,8 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
             }
           );
           if (imageResponse.ok) image = await imageResponse.json();
-          else uploadError = await getImageUploadError(imageResponse, uploadError);
+          else
+            uploadError = await getImageUploadError(imageResponse, uploadError);
         } catch (error) {
           if (error instanceof Error) uploadError = error.message;
         }
@@ -1403,6 +1407,20 @@ export function OrganizerEventForm({ eventId }: { eventId?: string }) {
                 onChange={event => setApprovedDetails(event.target.value)}
                 value={approvedDetails}
               />
+            </label>
+            <label className="grid gap-2">
+              <span className="text-sm font-semibold">Guide URL</span>
+              <input
+                aria-label="Guide URL"
+                className={classes.input}
+                onChange={event => setGuideUrl(event.target.value)}
+                placeholder="https://docs.google.com/presentation/d/…"
+                value={guideUrl}
+              />
+              <span className={`text-sm ${classes.mutedText}`}>
+                Approved attendees see this slideshow on the event&apos;s Guide
+                tab.
+              </span>
             </label>
           </div>
         </ManagementSection>

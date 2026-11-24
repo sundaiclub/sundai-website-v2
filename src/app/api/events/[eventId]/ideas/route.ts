@@ -6,6 +6,7 @@ import {
   listEventIdeas,
   parseEventIdeaInput,
 } from '@/lib/eventIdeas';
+import { unauthorized } from '@/lib/eventManagementApi';
 
 type IdeasRouteProps = { params: Promise<{ eventId: string }> };
 
@@ -18,6 +19,8 @@ export async function GET(_req: Request, props: IdeasRouteProps) {
     }
 
     const viewer = await getEventIdeasViewer(eventId);
+    if (!viewer) return unauthorized();
+
     return NextResponse.json(
       { ideas: await listEventIdeas(eventId, viewer) },
       { headers: { 'Cache-Control': 'no-store' } }
@@ -28,7 +31,7 @@ export async function GET(_req: Request, props: IdeasRouteProps) {
   }
 }
 
-// Signed-out visitors can share ideas too; signed-in authors are linked.
+// Signed-in members share ideas, and each idea is linked to its author.
 export async function POST(req: Request, props: IdeasRouteProps) {
   const params = await props.params;
   try {
@@ -36,6 +39,9 @@ export async function POST(req: Request, props: IdeasRouteProps) {
     if (!eventId) {
       return NextResponse.json({ message: 'Event not found' }, { status: 404 });
     }
+
+    const viewer = await getEventIdeasViewer(eventId);
+    if (!viewer) return unauthorized();
 
     const body = await req.json().catch(() => null);
     const parsed = parseEventIdeaInput(body);
@@ -45,7 +51,7 @@ export async function POST(req: Request, props: IdeasRouteProps) {
 
     const idea = await createEventIdea({
       eventId,
-      viewer: await getEventIdeasViewer(eventId),
+      viewer,
       input: parsed.input,
     });
     return NextResponse.json(idea, { status: 201 });

@@ -362,7 +362,12 @@ describe('T051 organizer registration review listing API', () => {
     expect(prisma.eventRegistration.findMany).toHaveBeenCalledWith({
       where: {
         eventId: fixture.publishedEvent.id,
-        hacker: { userBans: { none: { revokedAt: null } } },
+        hacker: {
+          eventStaffAssignments: {
+            none: { eventId: fixture.publishedEvent.id },
+          },
+          userBans: { none: { revokedAt: null } },
+        },
         status: 'PENDING',
       },
       include: expect.objectContaining({ hacker: expect.any(Object) }),

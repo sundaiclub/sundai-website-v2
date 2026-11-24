@@ -426,6 +426,7 @@ export type OrganizerEventSettings = {
   autoPromoteWaitlist?: boolean;
   trackAttendance?: boolean;
   approvedDetailsJson?: JsonObject | null;
+  guideUrl?: string | null;
   applicationQuestionsJson?: JsonValue | null;
   hideChapterDefaultQuestions?: boolean;
   confirmationMessage?: string | null;
@@ -540,6 +541,9 @@ export interface PublicEventDetail extends PublicEventCard {
   publicExpertText?: string | null;
   approvedDetailsJson?: JsonObject | null;
   approvedDetailsVisible: boolean;
+  hasGuide: boolean;
+  // Only approved attendees and event staff receive the guide link.
+  guideUrl: string | null;
   applicationControls: ApplicationControlsState;
   applicationQuestionSet: ApplicationQuestionSet;
   reusableAnswersJson?: JsonObject | null;

@@ -366,6 +366,47 @@ describe('/api/events/[eventId]', () => {
     }
   );
 
+  it.each([
+    [
+      'docs.google.com/presentation/d/fake-guide/edit',
+      200,
+      'https://docs.google.com/presentation/d/fake-guide/edit',
+    ],
+    ['', 200, null],
+    ['http://example.com/guide', 400, undefined],
+    [42, 400, undefined],
+  ])(
+    'PATCH validates and saves the guide URL for an MC: %s',
+    async (guideUrl, status, saved) => {
+      mockAuth.mockReturnValue({ userId: 'clerk-mc' });
+      prisma.hacker.findUnique.mockResolvedValue({
+        id: 'h-mc',
+        role: 'HACKER',
+      });
+      prisma.event.findUnique.mockResolvedValue({
+        id: 'evt-1',
+        chapterId: 'boston',
+      });
+      prisma.eventStaff.findFirst.mockResolvedValue({
+        role: 'MC',
+        hackerId: 'h-mc',
+      });
+      const response = await PATCH_EVENT(
+        new NextRequest('http://localhost/api/events/evt-1', {
+          method: 'PATCH',
+          body: JSON.stringify({ guideUrl }),
+        }),
+        { params: { eventId: 'evt-1' } }
+      );
+      expect(response.status).toBe(status);
+      if (status === 200) {
+        expect(prisma.event.update.mock.calls[0][0].data.guideUrl).toBe(saved);
+      } else {
+        expect(prisma.event.update).not.toHaveBeenCalled();
+      }
+    }
+  );
+
   it('GET returns 404 when missing', async () => {
     prisma.event.findFirst.mockResolvedValue(null);
     const request = new NextRequest('http://localhost:3000/api/events/evt-1');
@@ -418,7 +459,9 @@ describe('/api/events/[eventId]', () => {
     });
     prisma.event.findFirst.mockResolvedValue(
       buildPublicEvent({
-        pitchSessions: [{ phase: 'VOTING', _count: { projects: projectCount } }],
+        pitchSessions: [
+          { phase: 'VOTING', _count: { projects: projectCount } },
+        ],
       })
     );
 

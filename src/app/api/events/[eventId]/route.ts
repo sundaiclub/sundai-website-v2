@@ -337,6 +337,7 @@ export async function PATCH(
       publicLocation,
       address,
       virtualUrl,
+      guideUrl,
       slug,
       status,
       visibility,
@@ -468,6 +469,10 @@ export async function PATCH(
       virtualUrl === undefined
         ? undefined
         : normalizeOptionalHttpsUrl(virtualUrl, 'Virtual URL');
+    const normalizedGuideUrl =
+      guideUrl === undefined
+        ? undefined
+        : normalizeOptionalHttpsUrl(guideUrl, 'Guide URL');
 
     if (applicationQuestionsJson !== undefined) {
       parseTemplateFieldsJson(
@@ -512,6 +517,7 @@ export async function PATCH(
         }),
         ...(address !== undefined && { address: address || null }),
         ...(virtualUrl !== undefined && { virtualUrl: normalizedVirtualUrl }),
+        ...(guideUrl !== undefined && { guideUrl: normalizedGuideUrl }),
         ...(slug !== undefined && {
           slug: slugifyEventValue(slug || title || params.eventId),
         }),

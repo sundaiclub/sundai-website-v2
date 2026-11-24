@@ -67,15 +67,19 @@ type ReviewRegistrationRecord = Prisma.EventRegistrationGetPayload<{
   include: typeof reviewRegistrationInclude;
 }>;
 
-const ACTIVE_BAN_EXCLUSION = {
-  hacker: { userBans: { none: { revokedAt: null } } },
-} satisfies Prisma.EventRegistrationWhereInput;
-
+// MCs and co-MCs get an approved registration when they are assigned as event
+// staff. They never applied, so the review queue and its counts leave them out.
 function registrationScopeWhere(
   eventId: EntityId,
   hideBannedUsers: boolean
 ): Prisma.EventRegistrationWhereInput {
-  return { eventId, ...(hideBannedUsers && ACTIVE_BAN_EXCLUSION) };
+  return {
+    eventId,
+    hacker: {
+      eventStaffAssignments: { none: { eventId } },
+      ...(hideBannedUsers && { userBans: { none: { revokedAt: null } } }),
+    },
+  };
 }
 
 function searchWhere(

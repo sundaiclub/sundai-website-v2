@@ -177,6 +177,7 @@ export async function POST(req: Request) {
       publicLocation,
       address,
       virtualUrl,
+      guideUrl,
       chapterId = 'boston',
       slug,
       status,
@@ -320,6 +321,7 @@ export async function POST(req: Request) {
       virtualUrl,
       'Virtual URL'
     );
+    const normalizedGuideUrl = normalizeOptionalHttpsUrl(guideUrl, 'Guide URL');
 
     const baseSlug = slugifyEventValue(slug || title);
     const createEvent = (eventSlug: string) =>
@@ -340,6 +342,7 @@ export async function POST(req: Request) {
           publicLocation: publicLocation ?? location ?? null,
           address: address || null,
           virtualUrl: normalizedVirtualUrl ?? normalizedMeetingUrl,
+          guideUrl: normalizedGuideUrl,
           createdById: user.id,
           ...(status !== undefined && { status }),
           ...(visibility !== undefined && { visibility }),

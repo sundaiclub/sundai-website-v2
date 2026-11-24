@@ -1,5 +1,11 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import type {
   PublicEventDetail,
   PublicViewerRegistrationState,
@@ -104,9 +110,12 @@ jest.mock('@/app/components/EventIdeasBoard', () => ({
     viewerName: string | null;
   }) => (
     <div data-testid="event-ideas-board">
-      Ideas board {eventId} viewer {viewerName ?? 'anonymous'}{' '}
+      Ideas board {eventId} viewer {viewerName}{' '}
       {initialIdeas.map(idea => idea.idea).join(', ')}
     </div>
+  ),
+  EventIdeasSignInPrompt: () => (
+    <div data-testid="event-ideas-sign-in">Sign in to see ideas</div>
   ),
 }));
 
@@ -146,11 +155,6 @@ const mockGetViewerCheckInTicket = getViewerCheckInTicket as jest.Mock;
 const mockFindViewerJudgedEvent = findViewerJudgedEvent as jest.Mock;
 const mockListEventIdeas = listEventIdeas as jest.Mock;
 const mockGetEventIdeasViewer = getEventIdeasViewer as jest.Mock;
-const anonymousIdeasViewer = {
-  hackerId: null,
-  name: null,
-  canModerate: false,
-};
 const routeParams = { chapterSlug: 'boston', eventSlug: 'ai-build-night' };
 const eventFixture = publicCalendarPayloadFixture.event;
 const approvedOnlyDetails = {
@@ -363,6 +367,8 @@ function buildEventDetail(
       'Expert mentors will be available for AI product feedback.',
     approvedDetailsJson: null,
     approvedDetailsVisible: false,
+    hasGuide: false,
+    guideUrl: null,
     applicationControls: {
       applicationMode: 'REQUIRES_APPROVAL',
       applicationsOpen: true,
@@ -509,7 +515,7 @@ function mockEventFetches(event: PublicEventDetail | null) {
 
 async function renderDetailPage(
   event: PublicEventDetail | null,
-  tab?: 'ideas' | 'projects' | 'pitch' | 'ticket' | 'judging',
+  tab?: 'guide' | 'ideas' | 'projects' | 'pitch' | 'ticket' | 'judging',
   extraSearchParams: { notice?: string; judge?: string } = {}
 ) {
   mockGetPublicEventBySlug.mockResolvedValue(event);
@@ -572,7 +578,7 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
     mockGetViewerCheckInTicket.mockResolvedValue(null);
     mockFindViewerJudgedEvent.mockResolvedValue(null);
     mockListEventIdeas.mockResolvedValue([]);
-    mockGetEventIdeasViewer.mockResolvedValue(anonymousIdeasViewer);
+    mockGetEventIdeasViewer.mockResolvedValue(null);
     mockSignedOut();
   });
 
@@ -873,24 +879,94 @@ describe('/events/[chapterSlug]/[eventSlug] public detail page', () => {
     );
   });
 
-  it('shows anonymous visitors the ideas board without loading ideas elsewhere', async () => {
+  it('shows the Guide tab after Info only when the event has a guide', async () => {
+    await renderDetailPage(buildEventDetail(), 'guide');
+
+    expect(
+      screen.queryByRole('link', { name: 'Guide' })
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Info' })).toHaveAttribute(
+      'aria-current',
+      'page'
+    );
+
+    cleanup();
+    await renderDetailPage(buildEventDetail({ hasGuide: true }));
+
+    const tabs = screen
+      .getByRole('navigation', { name: 'Event sections' })
+      .querySelectorAll('a');
+    expect(Array.from(tabs, tab => tab.textContent).slice(0, 2)).toEqual([
+      'Info',
+      'Guide',
+    ]);
+    expect(screen.getByRole('link', { name: 'Guide' })).toHaveAttribute(
+      'href',
+      '/events/boston/ai-build-night?tab=guide'
+    );
+  });
+
+  it('asks signed-out visitors to sign in on the Guide tab', async () => {
+    await renderDetailPage(buildEventDetail({ hasGuide: true }), 'guide');
+
+    expect(
+      screen.getByRole('button', { name: 'Sign in to view the guide' })
+    ).toBeVisible();
+    expect(document.querySelector('iframe')).toBeNull();
+  });
+
+  it('tells signed-in viewers who are not approved that the guide is for approved attendees', async () => {
+    mockSignedIn();
+
+    await renderDetailPage(
+      buildEventDetail({ hasGuide: true, viewerRegistrationStatus: 'PENDING' }),
+      'guide'
+    );
+
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'You are not able to view the material unless you are an approved attendee.'
+    );
+    expect(
+      screen.queryByRole('button', { name: /sign in/i })
+    ).not.toBeInTheDocument();
+    expect(document.querySelector('iframe')).toBeNull();
+  });
+
+  it('shows approved attendees the guide slideshow', async () => {
+    mockSignedIn();
+
+    await renderDetailPage(
+      buildEventDetail({
+        hasGuide: true,
+        guideUrl: 'https://docs.google.com/presentation/d/fake-guide/edit',
+        viewerRegistrationStatus: 'APPROVED',
+        approvedDetailsVisible: true,
+      }),
+      'guide'
+    );
+
+    expect(screen.getByTitle(`${eventFixture.title} guide`)).toHaveAttribute(
+      'src',
+      'https://docs.google.com/presentation/d/fake-guide/embed?start=false&loop=false&delayms=3000'
+    );
+    expect(
+      screen.getByRole('link', { name: 'Open in new tab' })
+    ).toHaveAttribute(
+      'href',
+      'https://docs.google.com/presentation/d/fake-guide/edit'
+    );
+  });
+
+  it('asks signed-out visitors to sign in on the Ideas tab without loading ideas', async () => {
     await renderDetailPage(buildEventDetail());
     expect(mockGetEventIdeasViewer).not.toHaveBeenCalled();
-    expect(mockListEventIdeas).not.toHaveBeenCalled();
 
-    mockListEventIdeas.mockResolvedValue([
-      { id: 'idea-1', idea: 'Plant-watering robot' },
-    ]);
     await renderDetailPage(buildEventDetail(), 'ideas');
 
     expect(mockGetEventIdeasViewer).toHaveBeenCalledWith(eventFixture.id);
-    expect(mockListEventIdeas).toHaveBeenCalledWith(
-      eventFixture.id,
-      anonymousIdeasViewer
-    );
-    expect(screen.getByTestId('event-ideas-board')).toHaveTextContent(
-      `Ideas board ${eventFixture.id} viewer anonymous Plant-watering robot`
-    );
+    expect(mockListEventIdeas).not.toHaveBeenCalled();
+    expect(screen.getByTestId('event-ideas-sign-in')).toBeVisible();
+    expect(screen.queryByTestId('event-ideas-board')).not.toBeInTheDocument();
   });
 
   it('passes the signed-in viewer name to the ideas board', async () => {
