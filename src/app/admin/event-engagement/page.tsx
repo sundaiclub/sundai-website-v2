@@ -90,7 +90,7 @@ function ChapterTable({ chapter }: { chapter: ChapterEngagement }) {
       description={`${formatRate(chapter.builtRate)} of RSVPs built a project across ${chapter.rankedEvents} ranked ${chapter.rankedEvents === 1 ? 'hack' : 'hacks'}.`}
     >
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[720px] text-left text-sm">
+        <table className="w-full min-w-[800px] text-left text-base">
           <thead className={classes.mutedText}>
             <tr>
               <th className="px-2 py-2">#</th>
